@@ -1,0 +1,38 @@
+# OutilsIA.fr
+
+**The French forge of practical AI tools, local-AI guides and reproducible hardware benchmarks.**
+
+🔗 **https://outilsia.fr**
+
+OutilsIA is a French-first toolbox for running AI on your own machine: free in-browser tools, honest hardware guides (which GPU for which model, VRAM tiers, Ollama / LM Studio), and reproducible benchmarks — with no "best AI ever" hype.
+
+## Free tools
+
+| Tool | What it does |
+|------|--------------|
+| [MemoryForge](https://outilsia.fr/memoryforge) | Turns a messy chat into a clean, portable `MEMORY.md` so your AI stops forgetting your context |
+| [Mon PC peut-il ?](https://outilsia.fr/mon-pc-peut-il) | Tells you in 10 seconds which local AI models your PC can actually run |
+| [PromptForge](https://outilsia.fr/promptforge) | Scores and optimizes your prompts |
+| [Comparateur](https://outilsia.fr/comparateur) | Independent comparison of the major AI models |
+| [Benchmark local vs cloud](https://outilsia.fr/benchmark-local-vs-cloud) | Calculates when a GPU is cheaper than your cloud subscriptions |
+
+## Guides
+
+- [Local AI guide](https://outilsia.fr/ia-locale) — Ollama, LM Studio, llama.cpp, offline AI, local RAG, private assistants
+- [AI hardware guide](https://outilsia.fr/materiel) — GPU RTX, mini-PC, Mac M4, Raspberry Pi
+- [Best GPU for local AI](https://outilsia.fr/blog/meilleur-gpu-ia-locale-2026)
+- [How we test](https://outilsia.fr/comment-nous-testons) — open methodology, real bench (RTX 4080 Super), affiliate disclosure
+
+## Original research
+
+**[Dragon Labyrinth Benchmark](https://outilsia.fr/blog/dragon-labyrinth-ia-benchmark-2026)** — a reproducible study where a 1980s game chip beats frontier LLMs at imperfect-information play. Methodology, scorecard and data are public (CC-BY).
+
+## About
+
+Built and maintained by Chris Drakkeng. Part of a network of independent French tools: [Strategy Arena](https://strategyarena.io), [ScoreIA](https://scoreia.ai).
+
+Editorial principle: practical, transparent about limits, benchmark-oriented. No universal "best AI" claims.
+
+## License
+
+Content © OutilsIA. Open datasets (e.g. Dragon Labyrinth) released under CC-BY 4.0.
