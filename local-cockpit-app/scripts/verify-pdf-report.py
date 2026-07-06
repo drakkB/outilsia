@@ -50,6 +50,13 @@ REQUIRED_TEXT = [
     "Lien public prêt",
     "https://outilsia.fr/r/demo",
     "Achat seulement après preuve",
+    "Dossier upgrade IA locale",
+    "Acheter si",
+    "Attendre si",
+    "Contrôler avant achat",
+    "Limites actuelles",
+    "Modèles débloqués",
+    "compatibilité réelle",
 ]
 
 
@@ -111,6 +118,15 @@ def main():
         upgrade_items = page.locator("#printReportRoot .pdf-upgrade-comparison > div").count()
         if upgrade_items < 3:
             raise AssertionError(f"pdf should contain upgrade comparison items, got {upgrade_items}")
+        dossier = page.locator("#printReportRoot .pdf-upgrade-dossier").count()
+        if dossier < 1:
+            raise AssertionError("pdf should contain premium upgrade dossier")
+        upgrade_rules = page.locator("#printReportRoot .pdf-upgrade-rules > div").count()
+        if upgrade_rules < 3:
+            raise AssertionError(f"pdf should contain buy/wait/control rules, got {upgrade_rules}")
+        limit_items = page.locator("#printReportRoot .pdf-limit-list li").count()
+        if limit_items < 4:
+            raise AssertionError(f"pdf should contain current machine limits, got {limit_items}")
         screenshot = OUT / "local-cockpit-pdf-report.png"
         page.screenshot(path=screenshot, full_page=True)
         if DESKTOP.exists():

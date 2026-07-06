@@ -1285,6 +1285,91 @@ h2 {
   margin: 0 5px 0 0;
 }
 
+.pdf-upgrade-dossier {
+  background: linear-gradient(135deg, #f8fbf7 0%, #eef8f7 100%);
+  border: 1px solid #cde9e6;
+  border-radius: 16px;
+  box-shadow: 0 18px 38px rgba(8, 17, 22, .08);
+  margin-top: 14px;
+  padding: 18px;
+}
+
+.pdf-dossier-head {
+  border-bottom: 1px solid #d7e6e5;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+}
+
+.pdf-dossier-head strong {
+  color: #0c1c21;
+  display: block;
+  font-size: 24px;
+  line-height: 1.15;
+  margin: 5px 0;
+}
+
+.pdf-dossier-head p,
+.pdf-dossier-columns p,
+.pdf-limit-list li {
+  color: #33454b;
+  font-size: 12px;
+  line-height: 1.42;
+  margin: 5px 0;
+}
+
+.pdf-upgrade-rules {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.pdf-upgrade-rules div,
+.pdf-dossier-columns > div {
+  background: #ffffff;
+  border: 1px solid #d7e6e5;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.pdf-dossier-head span,
+.pdf-upgrade-rules span,
+.pdf-dossier-columns span {
+  color: #0f766e;
+  display: block;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.pdf-upgrade-rules strong {
+  color: #0c1c21;
+  display: block;
+  font-size: 15px;
+  line-height: 1.25;
+  margin-bottom: 5px;
+}
+
+.pdf-upgrade-rules p {
+  color: #33454b;
+  font-size: 11px;
+  line-height: 1.38;
+  margin: 0;
+}
+
+.pdf-dossier-columns {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1.35fr .9fr;
+}
+
+.pdf-limit-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
 .pdf-buy-checklist {
   background: #f8fbf7;
   border: 1px solid #dbead0;

@@ -3591,6 +3591,24 @@ function premiumReportHtml(report = readinessReport()) {
   const upgradeGuide = upgradeImpact.guide || upgrade.url || "";
   const upgradeShopUrl = upgradeImpact.url || "";
   const unlockedModels = upgradeImpact.newlyReachable || [];
+  const blockedModels = ((state.compatibility?.compatibility || state.compatibility || {}).blocked_next || (state.compatibility?.compatibility || state.compatibility || {}).blocked || [])
+    .slice(0, 4);
+  const currentLimits = [
+    vramValue ? `VRAM actuelle : ${vramValue} Go, suffisante pour les modèles compatibles mais limitante pour les gros paliers.` : "VRAM à confirmer par un scan matériel.",
+    ramValue ? `RAM actuelle : ${ramValue} Go, utile pour RAG, multitâche et offload CPU.` : "RAM à confirmer par un scan matériel.",
+    blockedModels.length ? `Paliers bloqués : ${blockedModels.map(modelTitle).join(", ")}.` : "Aucun palier proche bloqué dans le catalogue actuel.",
+    benchmark ? `Preuve locale disponible : ${benchmark.model} à ${benchmark.estimated_tokens_per_second ?? "--"} tok/s.` : "Benchmark local requis avant achat matériel."
+  ];
+  const upgradeBuyRule = upgrade.title
+    ? `Acheter si ${model.ref || "le modèle visé"} reste trop lent, manque de VRAM ou bloque après benchmark local.`
+    : "Acheter seulement après un benchmark qui montre une limite claire.";
+  const upgradeWaitRule = benchmark
+    ? "Attendre si les modèles recommandés répondent déjà vite et que l'usage reste chat, code léger, résumé ou mémoire locale."
+    : "Attendre tant qu'aucune preuve locale tokens/s n'a été produite.";
+  const upgradeControlRule = "Contrôler VRAM, alimentation, refroidissement, longueur de carte, garantie et prix réel avant achat.";
+  const unlockedText = unlockedModels.length
+    ? unlockedModels.map(modelTitle).join(", ")
+    : "Aucun modèle proche débloqué dans les paliers actuels : l'upgrade apporte surtout de la marge.";
   return `
     <article class="pdf-sheet">
       <header class="pdf-hero">
@@ -3766,6 +3784,44 @@ function premiumReportHtml(report = readinessReport()) {
           </div>
           ${upgradeAvoid ? `<p><strong class="pdf-inline-warning">À éviter</strong> ${escapeHtml(upgradeAvoid)}</p>` : ""}
           ${upgradeGuide || upgradeShopUrl ? `<p>${upgradeGuide ? `Guide : ${escapeHtml(upgradeGuide)}` : ""}${upgradeGuide && upgradeShopUrl ? " · " : ""}${upgradeShopUrl ? `Prix : ${escapeHtml(upgradeShopUrl)}` : ""}</p>` : ""}
+        </div>
+      </section>
+
+      <section class="pdf-upgrade-dossier">
+        <div class="pdf-dossier-head">
+          <span>Dossier upgrade IA locale</span>
+          <strong>${escapeHtml(upgradeTitle)}</strong>
+          <p>${escapeHtml(pdfExcerpt(upgradeReason || buyOnlyIf, 260))}</p>
+        </div>
+        <div class="pdf-upgrade-rules">
+          <div>
+            <span>Acheter si</span>
+            <strong>${escapeHtml(upgrade.title || "blocage prouvé")}</strong>
+            <p>${escapeHtml(upgradeBuyRule)}</p>
+          </div>
+          <div>
+            <span>Attendre si</span>
+            <strong>les modèles actuels suffisent</strong>
+            <p>${escapeHtml(upgradeWaitRule)}</p>
+          </div>
+          <div>
+            <span>Contrôler avant achat</span>
+            <strong>compatibilité réelle</strong>
+            <p>${escapeHtml(upgradeControlRule)}</p>
+          </div>
+        </div>
+        <div class="pdf-dossier-columns">
+          <div>
+            <span>Limites actuelles</span>
+            <ul class="pdf-limit-list">
+              ${currentLimits.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+            </ul>
+          </div>
+          <div>
+            <span>Modèles débloqués</span>
+            <p>${escapeHtml(unlockedText)}</p>
+            <p>${escapeHtml(upgradePrice ? `Budget indicatif : ${upgradePrice}.` : "Budget indicatif à vérifier selon le marché.")}</p>
+          </div>
         </div>
       </section>
 
