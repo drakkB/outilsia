@@ -255,7 +255,7 @@ function checkLocalFiles() {
     "windows_artifacts_ok",
     "launch_smoke_ok",
     "primary_download",
-    "Get-FileHash",
+    "Hash-Lower",
     "release.freshness is missing",
     "release.freshness.stale must be false",
     "release_freshness_ok",
@@ -425,7 +425,7 @@ function checkLocalFiles() {
   assertText(join(appRoot, "scripts", "verify-upgrade-catalog.mjs"), [
     "local-ai-upgrades.json",
     "affiliate_url",
-    "tag=boiral21-21",
+    "OUTILSIA_AMAZON_TAG",
     "upgrade_catalog_ok",
   ], "upgrade catalog verifier");
 
@@ -444,7 +444,7 @@ function checkLocalFiles() {
     "copyBetaReportBtn",
     "betaReportMarkdown",
     "Rapport recette beta OutilsIA Local Cockpit",
-    "Rapport bêta copié",
+    "Rapport app copié",
     "copyWindowsRecipeEvidence",
     "downloadWindowsRecipeEvidence",
     "RECETTE-RESULTAT.json",

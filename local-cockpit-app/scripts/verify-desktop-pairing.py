@@ -15,6 +15,8 @@ sys.path.insert(0, SERVER)
 
 from routers.ops_routes import create_ops_router  # noqa: E402
 
+AMAZON_TAG = os.environ.get("OUTILSIA_AMAZON_TAG", "boiral21-21")
+
 
 def _ip(_request):
     return "127.0.0.1"
@@ -63,7 +65,7 @@ def assert_enriched_upgrades(label: str, compat: dict) -> None:
     for key in ("id", "component", "price_range_eur", "guide_url", "avoid", "effects"):
         assert first.get(key), f"{label}: upgrade.{key} missing in {first}"
     assert first["guide_url"].startswith("/"), f"{label}: guide_url must be internal"
-    assert "tag=boiral21-21" in first.get("url", ""), f"{label}: affiliate tag missing"
+    assert f"tag={AMAZON_TAG}" in first.get("url", ""), f"{label}: affiliate tag missing"
 
 
 def main() -> int:

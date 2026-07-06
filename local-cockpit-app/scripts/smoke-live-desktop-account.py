@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import secrets
 import sqlite3
 import subprocess
@@ -12,6 +13,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from http.cookiejar import CookieJar
+
+AMAZON_TAG = os.environ.get("OUTILSIA_AMAZON_TAG", "boiral21-21")
 
 
 def parse_args() -> argparse.Namespace:
@@ -152,7 +155,7 @@ def assert_enriched_upgrades(label: str, compat: dict) -> None:
     for key in ("id", "component", "price_range_eur", "guide_url", "avoid", "effects"):
         assert first.get(key), f"{label}: upgrade.{key} missing in {first}"
     assert first["guide_url"].startswith("/"), f"{label}: guide_url must be internal"
-    assert "tag=boiral21-21" in first.get("url", ""), f"{label}: affiliate tag missing"
+    assert f"tag={AMAZON_TAG}" in first.get("url", ""), f"{label}: affiliate tag missing"
 
 
 def cleanup_remote_user(ssh_target: str, remote_db: str, email: str) -> None:

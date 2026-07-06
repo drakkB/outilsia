@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(appRoot, "..");
 const catalogPath = join(repoRoot, "server-work", "static", "data", "local-ai-upgrades.json");
+const amazonTag = process.env.OUTILSIA_AMAZON_TAG || "boiral21-21";
 const errors = [];
 const warnings = [];
 
@@ -85,7 +86,7 @@ for (const [index, item] of (catalog.upgrades || []).entries()) {
   if (!guideUrl.startsWith("/")) fail(`${label}: guide_url must be an internal path`);
   const affiliateUrl = String(item.affiliate_url || "");
   if (!affiliateUrl.startsWith("https://www.amazon.fr/")) fail(`${label}: affiliate_url must be an Amazon FR URL`);
-  if (!affiliateUrl.includes("tag=boiral21-21")) fail(`${label}: affiliate_url missing Amazon tag`);
+  if (!affiliateUrl.includes(`tag=${amazonTag}`)) fail(`${label}: affiliate_url missing Amazon tag`);
   checkRule(item.applies_when, label);
   checkEffects(item.effects, label);
 }
