@@ -38,10 +38,11 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Verify beta preflight
+      - name: Verify public CI surface
         run: |
+          node --check src/app.js
           npm run verify:ui
-          npm run preflight:beta
+          npm run verify:branding
 
       - name: Build fresh Windows beta
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-windows-beta.ps1 -SkipInstall -DesktopFolder "OutilsIA-Local-Cockpit-Beta-Windows"
