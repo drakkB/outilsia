@@ -28,6 +28,7 @@ const ARENA_RUN_KEY = "outilsia.localCockpit.lastArenaRun.v1";
 const PROMPT_LIBRARY_KEY = "outilsia.localCockpit.promptLibrary.v1";
 const CHAT_HISTORY_KEY = "outilsia.localCockpit.chatHistory.v1";
 const FIELD_TEST_PROFILE_KEY = "outilsia.localCockpit.fieldTestProfile.v1";
+const USAGE_PROFILE_KEY = "outilsia.localCockpit.usageProfile.v1";
 const MAX_BENCHMARK_HISTORY = 80;
 const MAX_PROMPT_LIBRARY = 40;
 const MAX_CHAT_HISTORY = 60;
@@ -56,6 +57,51 @@ const TEST_PROFILES = {
   memory: {
     label: "Mémoire Obsidian",
     prompt: "Transforme ce résultat en note Obsidian courte avec titre, tags et prochaine action : qwen3:0.6b fonctionne, mais il faut tester un modèle 4B pour comparer la qualité."
+  }
+};
+
+const USAGE_PROFILES = {
+  polyvalent: {
+    label: "Polyvalent",
+    detail: "Équilibre vitesse, qualité et confort quotidien.",
+    arena: "compromise",
+    test: "reasoning",
+    chat: "Explique simplement ce que mon PC peut faire tourner en IA locale et quel modèle essayer ensuite."
+  },
+  chat: {
+    label: "Chat",
+    detail: "Conversation, synthèse et assistant quotidien.",
+    arena: "assistant",
+    test: "simple",
+    chat: "Réponds comme assistant local : que puis-je faire avec cette machine, et quel modèle utiliser au quotidien ?"
+  },
+  code: {
+    label: "Code",
+    detail: "Code, debug court et scripts utiles.",
+    arena: "code",
+    test: "code",
+    chat: "Aide-moi à choisir un modèle local pour coder, expliquer du code et corriger des scripts courts."
+  },
+  memory: {
+    label: "Mémoire",
+    detail: "MemoryForge, Obsidian, notes projet et décisions.",
+    arena: "memory",
+    test: "memory",
+    chat: "Transforme le diagnostic de cette machine en note MemoryForge courte avec décision, modèle conseillé et prochaine action."
+  },
+  french: {
+    label: "Français",
+    detail: "Réponses naturelles en français, résumé et pédagogie.",
+    arena: "french",
+    test: "french",
+    chat: "Explique en français naturel le meilleur chemin pour utiliser une IA locale sur cette machine."
+  },
+  portable: {
+    label: "Portable",
+    detail: "Vieux PC, laptop, faible VRAM ou CPU/RAM.",
+    arena: "light_laptop",
+    test: "simple",
+    chat: "Donne un plan simple et encourageant pour utiliser une IA locale sur un vieux PC ou un portable modeste."
   }
 };
 
@@ -1588,6 +1634,72 @@ function renderHardwareDoctor(scan) {
   `;
 }
 
+function readUsageProfileKey() {
+  try {
+    const saved = localStorage.getItem(USAGE_PROFILE_KEY);
+    if (saved && USAGE_PROFILES[saved]) return saved;
+  } catch (_) {
+    // localStorage can be unavailable in restricted shells.
+  }
+  const vram = Number(state.scan?.vram_gb || 0);
+  const ram = Number(state.scan?.ram_gb || 0);
+  if (state.scan && (!vram || vram <= 6 || ram <= 16)) return "portable";
+  return "polyvalent";
+}
+
+function currentUsageProfile() {
+  const key = readUsageProfileKey();
+  return { key, ...USAGE_PROFILES[key] };
+}
+
+function usageProfileModelRef(profileKey = readUsageProfileKey()) {
+  const profile = USAGE_PROFILES[profileKey] || USAGE_PROFILES.polyvalent;
+  const arena = arenaWinners(readLastArenaRun()?.results || []);
+  const arenaModel = arena?.[profile.arena]?.model;
+  if (arenaModel && isOllamaModelInstalled(arenaModel)) return normalizeOllamaRef(arenaModel);
+  if (profileKey === "chat") {
+    return installedModelForPatterns([/hermes/i, /mistral/i, /llama/i]) || recommendedModelState().ref || "qwen3:0.6b";
+  }
+  if (profileKey === "code") {
+    return installedModelForPatterns([/deepseek/i, /coder/i, /code/i])
+      || installedModelForPatterns([/qwen/i], { exclude: [/0\.6b/i] })
+      || recommendedModelState().ref
+      || "qwen3:0.6b";
+  }
+  if (profileKey === "memory") {
+    return installedModelForPatterns([/hermes/i]) || recommendedModelState().ref || "qwen3:0.6b";
+  }
+  if (profileKey === "french") {
+    return installedModelForPatterns([/mistral/i, /hermes/i, /qwen/i], { exclude: [/0\.6b/i] })
+      || recommendedModelState().ref
+      || "qwen3:0.6b";
+  }
+  if (profileKey === "portable") {
+    return installedModelForPatterns([/qwen3:0\.6b/i, /mini/i, /3b/i, /7b/i, /8b/i])
+      || "qwen3:0.6b";
+  }
+  return arena?.compromise?.model || recommendedModelState().ref || Array.from(installedOllamaRefs())[0] || "qwen3:0.6b";
+}
+
+function applyUsageProfile(profileKey) {
+  const profile = USAGE_PROFILES[profileKey];
+  if (!profile) return;
+  try {
+    localStorage.setItem(USAGE_PROFILE_KEY, profileKey);
+  } catch (_) {
+    // Best effort only.
+  }
+  const test = TEST_PROFILES[profile.test] || TEST_PROFILES.simple;
+  const model = usageProfileModelRef(profileKey);
+  if (els.benchmarkPromptInput) els.benchmarkPromptInput.value = test.prompt;
+  if (els.chatPromptInput) els.chatPromptInput.value = profile.chat || test.prompt;
+  if (els.chatModelInput && model) els.chatModelInput.value = model;
+  renderPreparePanel();
+  renderReadinessPanel();
+  renderChatPresets();
+  setStatus(`Profil ${profile.label} prêt`, "ok");
+}
+
 function renderScan(scan) {
   state.scan = scan;
   els.sourceText.textContent = scan.source || "local";
@@ -2626,6 +2738,8 @@ function renderPreparePanel() {
   const flow = prepareFlowState();
   renderChatPresets();
   const recommended = flow.recommended;
+  const usage = currentUsageProfile();
+  const usageModel = usageProfileModelRef(usage.key);
   const testSpeed = flow.benchmarkReady ? `${benchmarkSpeedFor(flow.testModel) ?? "--"} tok/s` : "à mesurer";
   const reportLabel = flow.reportReady ? "Journal MemoryForge prêt" : flow.benchmarkReady ? "à générer" : "après benchmark";
   const secondLabel = recommended.ref
@@ -2653,6 +2767,23 @@ function renderPreparePanel() {
           <span>${escapeHtml(step.text)}</span>
         </div>
       `).join("")}
+    </div>
+    <div class="usage-profile-box" aria-label="Profil d'usage">
+      <div class="usage-profile-head">
+        <div>
+          <span class="label">Profil d'usage</span>
+          <strong>${escapeHtml(usage.label)}</strong>
+          <p>${escapeHtml(usage.detail)}</p>
+        </div>
+        <span>${escapeHtml(usageModel || "modèle à choisir")}</span>
+      </div>
+      <div class="usage-profile-actions">
+        ${Object.entries(USAGE_PROFILES).map(([key, profile]) => `
+          <button type="button" data-usage-profile="${escapeHtml(key)}" class="${key === usage.key ? "active" : ""}">
+            ${escapeHtml(profile.label)}
+          </button>
+        `).join("")}
+      </div>
     </div>
     <div class="cockpit-focus">
       <div class="cockpit-focus-card ${flow.benchmarkReady ? "ok-step" : ""}">
@@ -2707,6 +2838,8 @@ function readinessReport() {
   const flow = prepareFlowState();
   const proof = releaseProof();
   const scan = state.scan || {};
+  const usage = currentUsageProfile();
+  const usageModel = usageProfileModelRef(usage.key);
   const compatibility = state.compatibility?.compatibility || state.compatibility || {};
   const score = normalizeScore(compatibility.score ?? compatibility.compatibility_score ?? null);
   const verdict = compatibility.summary
@@ -2764,6 +2897,13 @@ function readinessReport() {
       vram: formatGb(scan.vram_gb),
       os: [scan.os_name, scan.os_version].filter(Boolean).join(" ") || "non scanné",
       ollama: runtimeOllama(scan)
+    },
+    usage_profile: {
+      key: usage.key,
+      label: usage.label,
+      detail: usage.detail,
+      recommended_model: usageModel,
+      arena_profile: usage.arena
     },
     test_model: flow.testModel,
     recommended_model: flow.recommended?.ref ? {
@@ -2834,6 +2974,7 @@ function readinessMarkdown(report = readinessReport()) {
     `- VRAM: ${report.machine.vram}`,
     `- OS: ${report.machine.os}`,
     `- Ollama: ${report.machine.ollama}`,
+    `- Profil d'usage: ${report.usage_profile.label}${report.usage_profile.recommended_model ? ` - ${report.usage_profile.recommended_model}` : ""}`,
     `- Modèle test: ${report.test_model}`,
     report.recommended_model ? `- Deuxième modèle recommandé: ${report.recommended_model.ref} (${report.recommended_model.installed ? "installé" : "à installer"})` : "",
     "",
@@ -8411,6 +8552,12 @@ document.addEventListener("click", async (event) => {
     els.benchmarkPromptInput.value = profile.prompt;
     els.chatPromptInput.value = profile.prompt;
     setStatus(`Profil ${profile.label} prêt`, "ok");
+    return;
+  }
+  const usageProfileButton = event.target?.closest?.("[data-usage-profile]");
+  const usageProfileKey = usageProfileButton?.getAttribute?.("data-usage-profile");
+  if (usageProfileKey && USAGE_PROFILES[usageProfileKey]) {
+    applyUsageProfile(usageProfileKey);
     return;
   }
   const modelInfoButton = event.target?.closest?.("[data-model-info]");
