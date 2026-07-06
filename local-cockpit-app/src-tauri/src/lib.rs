@@ -304,7 +304,7 @@ fn scan_machine() -> Result<MachineScan, String> {
                 "default_distribution": wsl_default_distribution,
                 "distributions": wsl_distributions,
                 "ollama_ready": ollama_wsl.installed,
-                "install_command": if cfg!(target_os = "windows") { Some("wsl.exe --install -d Ubuntu") } else { None::<&str> },
+                "install_command": if cfg!(target_os = "windows") { Some("wsl.exe --install") } else { None::<&str> },
                 "ollama_install_command": if cfg!(target_os = "windows") { Some("wsl.exe sh -lc \"curl -fsSL https://ollama.com/install.sh | sh\"") } else { None::<&str> },
                 "ollama_test_command": if cfg!(target_os = "windows") { Some("wsl.exe ollama run qwen3:0.6b") } else { None::<&str> }
             }
@@ -2416,7 +2416,7 @@ fn wsl_runtime_state(ollama_native: bool, ollama_wsl: bool, wsl_installed: bool)
 
 #[tauri::command]
 fn install_wsl_runtime(app: AppHandle) -> Result<InstallModelResult, String> {
-    let model = "wsl-ubuntu".to_string();
+    let model = "wsl".to_string();
     let started = Instant::now();
 
     if !cfg!(target_os = "windows") {
@@ -2435,7 +2435,7 @@ fn install_wsl_runtime(app: AppHandle) -> Result<InstallModelResult, String> {
     if run_command("wsl.exe", &["--version"]).is_some()
         || run_command("wsl", &["--version"]).is_some()
     {
-        let message = "WSL est déjà installé. Lance le scan pour vérifier Ollama dans Ubuntu.";
+        let message = "WSL est déjà installé. Lance le scan pour vérifier la distribution Linux et Ollama côté WSL.";
         emit_install_progress(&app, &model, "ok", message, true, true);
         return Ok(InstallModelResult {
             model,
@@ -2447,20 +2447,10 @@ fn install_wsl_runtime(app: AppHandle) -> Result<InstallModelResult, String> {
         });
     }
 
-    match Command::new("wsl.exe")
-        .args(["--install", "-d", "Ubuntu"])
-        .spawn()
-    {
+    match Command::new("wsl.exe").arg("--install").spawn() {
         Ok(_) => {
-            let message = "Installation WSL Ubuntu lancée. Windows peut demander une confirmation administrateur ou un redémarrage.";
-            emit_install_progress(
-                &app,
-                &model,
-                "cmd",
-                "wsl.exe --install -d Ubuntu",
-                false,
-                false,
-            );
+            let message = "Installation WSL lancée. Windows peut demander une confirmation administrateur ou un redémarrage.";
+            emit_install_progress(&app, &model, "cmd", "wsl.exe --install", false, false);
             emit_install_progress(&app, &model, "info", message, true, true);
             Ok(InstallModelResult {
                 model,
@@ -3562,7 +3552,7 @@ fn runtime_label(scan: &MachineScan) -> String {
             None
         }
     }) {
-        return format!("Ollama WSL Ubuntu ({label})");
+        return format!("Ollama WSL ({label})");
     }
     "non detecte".to_string()
 }

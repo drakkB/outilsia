@@ -956,7 +956,7 @@ function hasUsableOllamaRuntime(scan = state.scan) {
 function ollamaRuntimeLabel(scan = state.scan) {
   const runtimes = scan?.runtimes || {};
   if (runtimes.ollama?.installed) return "Ollama Windows";
-  if (runtimes.ollama_wsl?.installed) return "Ollama WSL Ubuntu";
+  if (runtimes.ollama_wsl?.installed) return "Ollama WSL";
   if (runtimes.wsl?.installed) return "WSL détecté, Ollama absent";
   return "Ollama non détecté";
 }
@@ -977,7 +977,7 @@ function wslRuntimeInfo(scan = state.scan) {
   const wslReady = Boolean(runtimes.ollama_wsl?.installed || wsl.ollama_ready);
   const wslInstalled = Boolean(wsl.installed);
   const distro = wsl.default_distribution || (Array.isArray(wsl.distributions) ? wsl.distributions[0] : "");
-  const installCommand = wsl.install_command || "wsl.exe --install -d Ubuntu";
+  const installCommand = wsl.install_command || "wsl.exe --install";
   const ollamaInstallCommand = wsl.ollama_install_command || "wsl.exe sh -lc \"curl -fsSL https://ollama.com/install.sh | sh\"";
   const testCommand = wsl.ollama_test_command || "wsl.exe ollama run qwen3:0.6b";
 
@@ -985,7 +985,7 @@ function wslRuntimeInfo(scan = state.scan) {
     return {
       kind: "idle",
       title: "Scan requis",
-      detail: "OutilsIA vérifiera si Windows natif ou WSL Ubuntu peut lancer Ollama.",
+      detail: "OutilsIA vérifiera si Windows natif ou WSL peut lancer Ollama.",
       command: installCommand,
       canInstall: false,
       canCopy: false
@@ -1007,7 +1007,7 @@ function wslRuntimeInfo(scan = state.scan) {
     return {
       kind: "warning",
       title: distro ? `WSL détecté · ${distro}` : "WSL détecté",
-      detail: `Installe Ollama dans Ubuntu si tu veux lancer les modèles côté WSL. Commande : ${ollamaInstallCommand}`,
+      detail: `Installe Ollama dans ta distribution WSL si tu veux lancer les modèles côté Linux. Commande : ${ollamaInstallCommand}`,
       command: ollamaInstallCommand,
       canInstall: false,
       canCopy: true
@@ -1018,7 +1018,7 @@ function wslRuntimeInfo(scan = state.scan) {
     return {
       kind: "ready",
       title: "Windows natif prêt",
-      detail: "Ollama Windows fonctionne. WSL reste optionnel pour les workflows Ubuntu, scripts Linux et certains outils dev.",
+      detail: "Ollama Windows fonctionne. WSL reste optionnel pour les workflows Linux, scripts dev et certains outils.",
       command: installCommand,
       canInstall: true,
       canCopy: true
@@ -1028,7 +1028,7 @@ function wslRuntimeInfo(scan = state.scan) {
   return {
     kind: "missing",
     title: "WSL non installé",
-    detail: `Optionnel : installer Ubuntu WSL pour lancer Ollama et scripts Linux depuis Windows. Commande : ${installCommand}`,
+    detail: `Optionnel : installer WSL pour lancer Ollama et scripts Linux depuis Windows. Commande : ${installCommand}`,
     command: installCommand,
     canInstall: true,
     canCopy: true
@@ -1047,8 +1047,8 @@ function renderWslRuntime(scan = state.scan) {
   }
   if (els.installWslBtn) {
     els.installWslBtn.disabled = !info.canInstall;
-    els.installWslBtn.textContent = info.kind === "missing" ? "Installer WSL Ubuntu" : "Préparer WSL";
-    els.installWslBtn.title = info.canInstall ? "Lance wsl.exe --install -d Ubuntu" : "WSL n'a pas besoin d'installation depuis ce panneau.";
+    els.installWslBtn.textContent = info.kind === "missing" ? "Installer WSL" : "Préparer WSL";
+    els.installWslBtn.title = info.canInstall ? "Lance wsl.exe --install" : "WSL n'a pas besoin d'installation depuis ce panneau.";
   }
   if (els.copyWslCommandBtn) {
     els.copyWslCommandBtn.disabled = !info.canCopy;
@@ -1831,9 +1831,9 @@ function hardwareDoctorAnalysis(scan = {}) {
     addAction("Installer Ollama Windows ou préparer Ollama dans WSL.");
   }
 
-  if (wsl.kind === "ready") addCheck("WSL", "ok", "Ollama WSL prêt pour workflows Ubuntu.", 4);
+  if (wsl.kind === "ready") addCheck("WSL", "ok", "Ollama WSL prêt pour workflows Linux.", 4);
   else if (wsl.kind === "detected") addCheck("WSL", "warn", "WSL détecté, Ollama WSL à préparer si besoin.", 1);
-  else if (wsl.kind === "missing" && !hasOllama) addAction("Optionnel : installer WSL Ubuntu pour workflows Linux.");
+  else if (wsl.kind === "missing" && !hasOllama) addAction("Optionnel : installer WSL pour workflows Linux.");
 
   const cudaMajor = parseMajorVersion(probe.cuda_version);
   if (cudaMajor && cudaMajor < 12) {
@@ -7239,7 +7239,7 @@ async function installRecommendedModel(model, button = null) {
       <button type="button" data-install-ollama="true">Installer Ollama</button>
     `;
     appendOperationLine(message, "erreur");
-    appendOperationLine("Clique sur Installer Ollama pour Windows, ou installe Ollama dans Ubuntu WSL puis relance le scan.", "info");
+    appendOperationLine("Clique sur Installer Ollama pour Windows, ou installe Ollama dans ta distribution WSL puis relance le scan.", "info");
     els.operationState.textContent = "bloqué";
     setStatus(message, "bad");
     return;
@@ -7492,18 +7492,18 @@ async function installWslRuntime(button = els.installWslBtn) {
     setStatus("WSL ne nécessite pas d'installation depuis ce panneau", "warn");
     return;
   }
-  resetOperationConsole("Installation WSL Ubuntu demandée");
+  resetOperationConsole("Installation WSL demandée");
   setOperationFocus("Installation WSL en cours", [
     "Windows peut demander une confirmation administrateur.",
-    "Un redémarrage peut être nécessaire avant qu'Ubuntu soit utilisable.",
+    "Un redémarrage peut être nécessaire avant que la distribution Linux soit utilisable.",
     "OutilsIA ne lit aucun fichier personnel."
   ]);
   await ensureInstallProgressListener().catch((error) => {
     appendOperationLine(`Console temps réel non initialisée : ${error}`, "erreur");
   });
   if (button) button.disabled = true;
-  setStatus("Installation WSL Ubuntu...");
-  appendOperationLine(info.command || "wsl.exe --install -d Ubuntu", "cmd");
+  setStatus("Installation WSL...");
+  appendOperationLine(info.command || "wsl.exe --install", "cmd");
   try {
     const result = invoke
       ? await invoke("install_wsl_runtime")
@@ -8580,7 +8580,7 @@ function demoScan() {
         default_distribution: "Ubuntu",
         distributions: ["Ubuntu"],
         ollama_ready: false,
-        install_command: "wsl.exe --install -d Ubuntu",
+        install_command: "wsl.exe --install",
         ollama_install_command: "wsl.exe sh -lc \"curl -fsSL https://ollama.com/install.sh | sh\"",
         ollama_test_command: "wsl.exe ollama run qwen3:0.6b"
       }
@@ -8846,7 +8846,7 @@ function installTestHarness() {
           default_distribution: "Ubuntu",
           distributions: ["Ubuntu"],
           ollama_ready: true,
-          install_command: "wsl.exe --install -d Ubuntu",
+          install_command: "wsl.exe --install",
           ollama_install_command: "wsl.exe sh -lc \"curl -fsSL https://ollama.com/install.sh | sh\"",
           ollama_test_command: "wsl.exe ollama run qwen3:0.6b"
         }
