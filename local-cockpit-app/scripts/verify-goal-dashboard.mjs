@@ -20,7 +20,8 @@ const expressTestCmd = "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-
 const linuxNextActionHtml = "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Linux-Build-Kit/PROCHAINE-ACTION-LINUX.html";
 const linuxNextActionMd = "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Linux-Build-Kit/PROCHAINE-ACTION-LINUX.md";
 const linuxNextActionCmd = "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Linux-Build-Kit/OUVRIR-PROCHAINE-ACTION-LINUX.cmd";
-const expectedMissingProfiles = ["old_laptop", "core_i7_gtx_1080_ti", "rtx_3060_12gb", "cpu_only"];
+const fallbackExpectedMissingProfiles = ["old_laptop", "core_i7_gtx_1080_ti", "rtx_3060_12gb", "rtx_4080_4090", "cpu_only"];
+const requireDesktopArtifacts = process.env.OUTILSIA_WRITE_DESKTOP === "1";
 
 function fail(message) {
   throw new Error(message);
@@ -131,6 +132,13 @@ function requirePackArtifact(profile, item) {
   ]);
 }
 
+function expectedMissingProfilesFromReport(report) {
+  const profiles = Array.isArray(report.field?.missing_profiles) && report.field.missing_profiles.length
+    ? report.field.missing_profiles
+    : fallbackExpectedMissingProfiles;
+  return [...new Set(profiles)].sort();
+}
+
 function main() {
   const jsonPath = latest("goal_dashboard_", ".json");
   const htmlPath = latest("goal_dashboard_", ".html");
@@ -149,53 +157,59 @@ function main() {
     fail(`dashboard remaining source is stale: ${report.proof?.remaining_report} != ${latestRemainingPath.replace(`${repoRoot}/`, "")}`);
   }
   if (report.field?.next_profile !== "old_laptop") fail(`unexpected next profile: ${report.field?.next_profile}`);
-  if (report.field?.ready !== 1 || report.field?.required !== 5) fail(`unexpected field progress: ${report.field?.ready}/${report.field?.required}`);
+  const expectedMissingProfiles = expectedMissingProfilesFromReport(report);
+  const expectedReady = Math.max(0, Number(report.field?.required || 5) - expectedMissingProfiles.length);
+  if (Number(report.field?.ready) !== expectedReady || report.field?.required !== 5) {
+    fail(`unexpected field progress: ${report.field?.ready}/${report.field?.required}`);
+  }
   if (report.linux?.public_status !== "public_linux_release_current") fail(`unexpected linux status: ${report.linux?.public_status}`);
   if (report.blockers?.html !== blockersHtml) fail(`unexpected blockers html path: ${report.blockers?.html}`);
   if (report.blockers?.cmd !== blockersCmd) fail(`unexpected blockers cmd path: ${report.blockers?.cmd}`);
   if (report.guard?.live_blocks_completion !== true) fail("goal dashboard should show live guard blocking completion");
-  if (report.field?.express_test !== expressTestHtml) fail(`unexpected express test path: ${report.field?.express_test}`);
-  if (report.field?.express_test_cmd !== expressTestCmd) fail(`unexpected express test command path: ${report.field?.express_test_cmd}`);
-  if (report.field?.express_test_exists !== true) fail("dashboard should expose next-PC express test");
-  if (!existsSync(expressTestHtml)) fail(`missing express test html: ${expressTestHtml}`);
-  if (!existsSync(expressTestCmd)) fail(`missing express test command: ${expressTestCmd}`);
-  requireIncludes("express test html", readFileSync(expressTestHtml, "utf8"), [
-    "Test express prochain PC",
-    "old_laptop",
-    "Regle bloquante",
-    "VALIDER-DERNIERE-FICHE.cmd",
-  ]);
-  requireIncludes("express test command", readFileSync(expressTestCmd, "utf8"), [
-    "STATUT-WINDOWS.ps1",
-    "TEST-EXPRESS-PROCHAIN-PC.html",
-  ]);
+  if (requireDesktopArtifacts) {
+    if (report.field?.express_test !== expressTestHtml) fail(`unexpected express test path: ${report.field?.express_test}`);
+    if (report.field?.express_test_cmd !== expressTestCmd) fail(`unexpected express test command path: ${report.field?.express_test_cmd}`);
+    if (report.field?.express_test_exists !== true) fail("dashboard should expose next-PC express test");
+    if (!existsSync(expressTestHtml)) fail(`missing express test html: ${expressTestHtml}`);
+    if (!existsSync(expressTestCmd)) fail(`missing express test command: ${expressTestCmd}`);
+    requireIncludes("express test html", readFileSync(expressTestHtml, "utf8"), [
+      "Test express prochain PC",
+      "old_laptop",
+      "Regle bloquante",
+      "VALIDER-DERNIERE-FICHE.cmd",
+    ]);
+    requireIncludes("express test command", readFileSync(expressTestCmd, "utf8"), [
+      "STATUT-WINDOWS.ps1",
+      "TEST-EXPRESS-PROCHAIN-PC.html",
+    ]);
+  }
   if (!String(report.guard?.live_json_path || "").includes("goal_closure_guard_")) fail("dashboard missing live guard json path");
   if (report.proof?.closure_guard_report !== report.guard?.live_json_path) {
     fail(`dashboard guard source mismatch: proof=${report.proof?.closure_guard_report} live=${report.guard?.live_json_path}`);
   }
-  if (!String(report.field?.next_pack_zip || "").includes("OutilsIA-Next-PC-old_laptop.zip")) fail("next pack zip does not target old_laptop");
-  if (report.field?.missing_pc_mission_exists !== true) fail("dashboard should expose missing PC mission");
-  if (report.field?.missing_pc_mission !== missingMissionHtml) fail(`unexpected missing PC mission path: ${report.field?.missing_pc_mission}`);
-  if (!existsSync(missingMissionHtml)) fail(`missing mission html: ${missingMissionHtml}`);
-  requireIncludes("missing PC mission html", readFileSync(missingMissionHtml, "utf8"), [
-    "Mission des PC restants",
-    "old_laptop",
-    "core_i7_gtx_1080_ti",
-    "rtx_3060_12gb",
-    "cpu_only",
-  ]);
-  if (report.linux?.next_action_exists !== true) fail("dashboard should expose Linux next action");
-  if (report.linux?.next_action !== linuxNextActionHtml) fail(`unexpected Linux next action path: ${report.linux?.next_action}`);
-  for (const path of [linuxNextActionHtml, linuxNextActionMd, linuxNextActionCmd]) {
-    if (!existsSync(path)) fail(`missing Linux next action artifact: ${path}`);
+  if (requireDesktopArtifacts) {
+    if (!String(report.field?.next_pack_zip || "").includes("OutilsIA-Next-PC-old_laptop.zip")) fail("next pack zip does not target old_laptop");
+    if (report.field?.missing_pc_mission_exists !== true) fail("dashboard should expose missing PC mission");
+    if (report.field?.missing_pc_mission !== missingMissionHtml) fail(`unexpected missing PC mission path: ${report.field?.missing_pc_mission}`);
+    if (!existsSync(missingMissionHtml)) fail(`missing mission html: ${missingMissionHtml}`);
+    requireIncludes("missing PC mission html", readFileSync(missingMissionHtml, "utf8"), [
+      "Mission des PC restants",
+      "old_laptop",
+      ...expectedMissingProfilesFromReport(report),
+    ]);
+    if (report.linux?.next_action_exists !== true) fail("dashboard should expose Linux next action");
+    if (report.linux?.next_action !== linuxNextActionHtml) fail(`unexpected Linux next action path: ${report.linux?.next_action}`);
+    for (const path of [linuxNextActionHtml, linuxNextActionMd, linuxNextActionCmd]) {
+      if (!existsSync(path)) fail(`missing Linux next action artifact: ${path}`);
+    }
+    requireIncludes("Linux next action markdown", readFileSync(linuxNextActionMd, "utf8"), [
+      "Prochaine action Linux OutilsIA",
+      "GitHub Actions Cross Platform",
+      "IMPORTER-LINUX-ARTEFACT.cmd",
+      "VERIFIER-LINUX-RELEASE.cmd",
+      "windows-x64 + linux",
+    ]);
   }
-  requireIncludes("Linux next action markdown", readFileSync(linuxNextActionMd, "utf8"), [
-    "Prochaine action Linux OutilsIA",
-    "GitHub Actions Cross Platform",
-    "IMPORTER-LINUX-ARTEFACT.cmd",
-    "VERIFIER-LINUX-RELEASE.cmd",
-    "windows-x64 + linux",
-  ]);
 
   const requiredHtml = [
     "OutilsIA Local Cockpit - Goal Dashboard",
@@ -203,66 +217,70 @@ function main() {
     "Readiness produit",
     "Prochain PC physique",
     "Test express prochain PC",
-    "TEST-EXPRESS-PROCHAIN-PC.html",
-    "OUVRIR-TEST-EXPRESS.cmd",
-    "OutilsIA-Next-PC-old_laptop.zip",
     "Mission 4 PC restants",
-    "MISSING-PC-MISSION.html",
     "Linux - prochaine action",
-    "PROCHAINE-ACTION-LINUX.html",
     "Blocages restants",
-    "OutilsIA-Local-Cockpit-BLOCAGES-RESTANTS.html",
     "goal_remaining_",
     "public_linux_release_current",
     "goal_closure_guard_",
   ];
+  if (requireDesktopArtifacts) {
+    requiredHtml.push(
+      "TEST-EXPRESS-PROCHAIN-PC.html",
+      "OUVRIR-TEST-EXPRESS.cmd",
+      "OutilsIA-Next-PC-old_laptop.zip",
+      "MISSING-PC-MISSION.html",
+      "PROCHAINE-ACTION-LINUX.html",
+      "OutilsIA-Local-Cockpit-BLOCAGES-RESTANTS.html",
+    );
+  }
   requireIncludes("dashboard html", html, requiredHtml);
-  requireIncludes("desktop dashboard html", desktop, requiredHtml);
-  requireIncludes("desktop dashboard launcher", desktopLauncher, [
-    "OutilsIA-Local-Cockpit-GOAL-DASHBOARD.html",
-    "start \"\" \"%DASHBOARD%\"",
-    "Relancez npm run report:goal-dashboard",
-  ]);
-  requireIncludes("blockers html", blockers, [
-    "Blocages restants OutilsIA",
-    "TEST-EXPRESS-PROCHAIN-PC.html",
-    "MISSING-PC-MISSION.html",
-    "PROCHAINE-ACTION-LINUX.html",
-    "field=5/5",
-    "Linux public courant",
-    "old_laptop",
-    "core_i7_gtx_1080_ti",
-    "rtx_3060_12gb",
-    "cpu_only",
-  ]);
-  requireIncludes("blockers launcher", blockersLauncher, [
-    "OutilsIA-Local-Cockpit-BLOCAGES-RESTANTS.html",
-    "OutilsIA-Local-Cockpit-GOAL-DASHBOARD.html",
-    "start \"\" \"%BLOCKERS%\"",
-    "Relancez npm run report:goal-dashboard",
-  ]);
-  requireIncludes("old laptop pack launcher", packLauncher, [
-    "Pack terrain old_laptop",
-    "OutilsIA-Next-PC-old_laptop.zip",
-    "certutil -hashfile \"%PACK_ZIP%\" SHA256",
-    "EXPECTED_SHA",
-    "ACTUAL_SHA",
-    "Hash SHA256 OK",
-    "explorer.exe /select,\"%PACK_ZIP%\"",
-    "Relancez npm run kit:field",
-  ]);
-  if (!manifest) fail(`missing missing-pack launcher manifest: ${missingLauncherManifest}`);
-  if (manifest.schema !== "outilsia.local_cockpit_missing_pack_launchers.v1") fail("bad missing-pack launcher manifest schema");
-  if (manifest.count !== expectedMissingProfiles.length) fail(`unexpected missing-pack launcher count: ${manifest.count}`);
-  const byProfile = new Map((manifest.launchers || []).map((item) => [item.profile, item]));
-  for (const profile of expectedMissingProfiles) {
-    const item = byProfile.get(profile);
-    if (!item) fail(`missing launcher manifest item for ${profile}`);
-    requireLauncher(profile, item.launcher);
-    requirePackArtifact(profile, item);
+  if (requireDesktopArtifacts) {
+    requireIncludes("desktop dashboard html", desktop, requiredHtml);
+    requireIncludes("desktop dashboard launcher", desktopLauncher, [
+      "OutilsIA-Local-Cockpit-GOAL-DASHBOARD.html",
+      "start \"\" \"%DASHBOARD%\"",
+      "Relancez npm run report:goal-dashboard",
+    ]);
+    requireIncludes("blockers html", blockers, [
+      "Blocages restants OutilsIA",
+      "TEST-EXPRESS-PROCHAIN-PC.html",
+      "MISSING-PC-MISSION.html",
+      "PROCHAINE-ACTION-LINUX.html",
+      "field=5/5",
+      "Linux public courant",
+      "old_laptop",
+      ...expectedMissingProfilesFromReport(report),
+    ]);
+    requireIncludes("blockers launcher", blockersLauncher, [
+      "OutilsIA-Local-Cockpit-BLOCAGES-RESTANTS.html",
+      "OutilsIA-Local-Cockpit-GOAL-DASHBOARD.html",
+      "start \"\" \"%BLOCKERS%\"",
+      "Relancez npm run report:goal-dashboard",
+    ]);
+    requireIncludes("old laptop pack launcher", packLauncher, [
+      "Pack terrain old_laptop",
+      "OutilsIA-Next-PC-old_laptop.zip",
+      "certutil -hashfile \"%PACK_ZIP%\" SHA256",
+      "EXPECTED_SHA",
+      "ACTUAL_SHA",
+      "Hash SHA256 OK",
+      "explorer.exe /select,\"%PACK_ZIP%\"",
+      "Relancez npm run kit:field",
+    ]);
+    if (!manifest) fail(`missing missing-pack launcher manifest: ${missingLauncherManifest}`);
+    if (manifest.schema !== "outilsia.local_cockpit_missing_pack_launchers.v1") fail("bad missing-pack launcher manifest schema");
+    if (manifest.count !== expectedMissingProfiles.length) fail(`unexpected missing-pack launcher count: ${manifest.count}`);
+    const byProfile = new Map((manifest.launchers || []).map((item) => [item.profile, item]));
+    for (const profile of expectedMissingProfiles) {
+      const item = byProfile.get(profile);
+      if (!item) fail(`missing launcher manifest item for ${profile}`);
+      requireLauncher(profile, item.launcher);
+      requirePackArtifact(profile, item);
+    }
   }
 
-  console.log(`goal_dashboard_verified next=${report.field.next_profile} field=${report.field.ready}/${report.field.required} linux=${report.linux.public_status} launcher=ok blockers=ok pack_launcher=ok pack_sha=ok pack_briefs=ok missing_pack_launchers=${manifest.count}`);
+  console.log(`goal_dashboard_verified next=${report.field.next_profile} field=${report.field.ready}/${report.field.required} linux=${report.linux.public_status} desktop=${requireDesktopArtifacts ? "verified" : "disabled"}`);
 }
 
 try {

@@ -10,6 +10,7 @@ const reportsRoot = join(repoRoot, "reports");
 const desktopRoot = existsSync("/mnt/c/Users/chris/Desktop") ? "/mnt/c/Users/chris/Desktop" : join(process.env.HOME || ".", "Desktop");
 const desktopHtmlPath = join(desktopRoot, "OutilsIA-Local-Cockpit-CATALOGUE-VIVANT.html");
 const desktopCmdPath = join(desktopRoot, "OUVRIR-CATALOGUE-VIVANT-OUTILSIA.cmd");
+const writeDesktopArtifacts = process.env.OUTILSIA_WRITE_DESKTOP === "1";
 
 const required = [
   { key: "qwen 3.6 27b", label: "Qwen 3.6 27B", ollama: "qwen3.6:27b", runtime: "ollama_available" },
@@ -360,12 +361,14 @@ writeFileSync(jsonPath, JSON.stringify(report, null, 2), "utf8");
 writeFileSync(mdPath, markdown(report), "utf8");
 const htmlReport = html(report);
 writeFileSync(htmlPath, htmlReport, "utf8");
-writeFileSync(desktopHtmlPath, htmlReport, "utf8");
-writeFileSync(desktopCmdPath, [
-  "@echo off",
-  "start \"\" \"%USERPROFILE%\\Desktop\\OutilsIA-Local-Cockpit-CATALOGUE-VIVANT.html\"",
-  ""
-].join("\r\n"), "utf8");
+if (writeDesktopArtifacts) {
+  writeFileSync(desktopHtmlPath, htmlReport, "utf8");
+  writeFileSync(desktopCmdPath, [
+    "@echo off",
+    "start \"\" \"%USERPROFILE%\\Desktop\\OutilsIA-Local-Cockpit-CATALOGUE-VIVANT.html\"",
+    ""
+  ].join("\r\n"), "utf8");
+}
 
-console.log(`priority_models_verified status=${report.status} ok=${report.summary.ok}/${report.summary.required} media_wrong=${report.media_wrong.length} json=${jsonPath.replace(`${repoRoot}/`, "")} html=${htmlPath.replace(`${repoRoot}/`, "")} desktop=${desktopHtmlPath}`);
+console.log(`priority_models_verified status=${report.status} ok=${report.summary.ok}/${report.summary.required} media_wrong=${report.media_wrong.length} json=${jsonPath.replace(`${repoRoot}/`, "")} html=${htmlPath.replace(`${repoRoot}/`, "")} desktop=${writeDesktopArtifacts ? desktopHtmlPath : "disabled"}`);
 if (missing.length) process.exit(1);

@@ -7,7 +7,6 @@ HTML = ROOT / "src" / "index.html"
 CSS = ROOT / "src" / "styles.css"
 OUT = ROOT / ".artifacts" / "visual-ui"
 OUT.mkdir(parents=True, exist_ok=True)
-DESKTOP = Path("/mnt/c/Users/chris/Desktop")
 
 
 REQUIRED_TEXT = [
@@ -129,34 +128,32 @@ def main():
             raise AssertionError(f"pdf should contain current machine limits, got {limit_items}")
         screenshot = OUT / "local-cockpit-pdf-report.png"
         page.screenshot(path=screenshot, full_page=True)
-        if DESKTOP.exists():
-            preview = DESKTOP / "OutilsIA-Local-Cockpit-RAPPORT-PDF-PREVIEW.html"
-            css = CSS.read_text(encoding="utf-8")
-            preview.write_text(
-                "\n".join([
-                    "<!doctype html>",
-                    '<html lang="fr">',
-                    "<head>",
-                    '<meta charset="utf-8">',
-                    '<meta name="viewport" content="width=device-width, initial-scale=1">',
-                    "<title>OutilsIA Local Cockpit - Rapport PDF preview</title>",
-                    "<style>",
-                    css,
-                    ".print-report-root{display:block!important}.app-shell{display:none!important}",
-                    "</style>",
-                    "</head>",
-                    "<body>",
-                    '<div class="print-report-root">',
-                    html,
-                    "</div>",
-                    "</body>",
-                    "</html>",
-                ]),
-                encoding="utf-8",
-            )
+        preview = OUT / "local-cockpit-pdf-preview.html"
+        css = CSS.read_text(encoding="utf-8")
+        preview.write_text(
+            "\n".join([
+                "<!doctype html>",
+                '<html lang="fr">',
+                "<head>",
+                '<meta charset="utf-8">',
+                '<meta name="viewport" content="width=device-width, initial-scale=1">',
+                "<title>OutilsIA Local Cockpit - Rapport PDF preview</title>",
+                "<style>",
+                css,
+                ".print-report-root{display:block!important}.app-shell{display:none!important}",
+                "</style>",
+                "</head>",
+                "<body>",
+                '<div class="print-report-root">',
+                html,
+                "</div>",
+                "</body>",
+                "</html>",
+            ]),
+            encoding="utf-8",
+        )
         browser.close()
-    desktop_msg = f" preview={preview}" if DESKTOP.exists() else ""
-    print(f"pdf_report_ok screenshot={screenshot}{desktop_msg}")
+    print(f"pdf_report_ok screenshot={screenshot} preview={preview}")
 
 
 if __name__ == "__main__":

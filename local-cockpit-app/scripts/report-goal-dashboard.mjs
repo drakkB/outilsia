@@ -16,6 +16,7 @@ const blockersDesktopHtml = join(desktopRoot, "OutilsIA-Local-Cockpit-BLOCAGES-R
 const blockersDesktopCmd = join(desktopRoot, "OUVRIR-BLOCAGES-RESTANTS-OUTILSIA.cmd");
 const nextPackDesktopCmd = join(desktopRoot, "OUVRIR-PACK-OLD-LAPTOP-OUTILSIA.cmd");
 const missingPackLauncherManifest = join(desktopRoot, "OutilsIA-Missing-Pack-Launchers.json");
+const writeDesktopArtifacts = process.env.OUTILSIA_WRITE_DESKTOP === "1";
 
 function fail(message) {
   throw new Error(message);
@@ -93,6 +94,7 @@ function buildDashboard() {
   const linuxPublicationChecklistMarkdownPath = join(linuxKitRoot, "LINUX-PUBLICATION-CHECKLIST.md");
   const linuxPublicationChecklistJsonPath = join(linuxKitRoot, "LINUX-PUBLICATION-CHECKLIST.json");
   const linuxPublicationChecklistCmdPath = join(linuxKitRoot, "OUVRIR-CHECKLIST-PUBLICATION-LINUX.cmd");
+  const fieldStatusExists = existsSync(fieldStatusPath);
 
   const progress = progressPath ? readJson(progressPath) : {};
   const remaining = remainingPath ? readJson(remainingPath) : {};
@@ -105,9 +107,13 @@ function buildDashboard() {
   const liveClosurePath = guardRun.json_path && existsSync(guardRun.json_path) ? guardRun.json_path : closurePath;
   const closure = liveClosurePath ? readJson(liveClosurePath) : {};
 
-  const nextProfile = field.next_profile_to_test || progress.field?.next_profile || nextPack.profile || "old_laptop";
-  const missingProfiles = field.profiles_missing || progress.field?.missing_profiles || [];
-  const readyProfiles = field.profiles_ready || progress.field?.ready_profiles || [];
+  const nextProfile = field.next_profile_to_test || (fieldStatusExists ? progress.field?.next_profile : "") || nextPack.profile || "old_laptop";
+  const missingProfiles = Array.isArray(field.profiles_missing)
+    ? field.profiles_missing
+    : (fieldStatusExists && Array.isArray(progress.field?.missing_profiles) ? progress.field.missing_profiles : ["old_laptop", "core_i7_gtx_1080_ti", "rtx_3060_12gb", "rtx_4080_4090", "cpu_only"]);
+  const readyProfiles = Array.isArray(field.profiles_ready)
+    ? field.profiles_ready
+    : [];
   const nextZip = nextPack.zip || "";
   const nextZipSha = nextPack.zip_sha256 || "";
   const nextZipShaFile = nextPack.zip_sha256_file || "";
@@ -148,8 +154,8 @@ function buildDashboard() {
       live_md_path: rel(guardRun.md_path),
     },
     field: {
-      status: field.status || progress.field?.status || "unknown",
-      ready: readyProfiles.length || progress.field?.ready || 0,
+      status: field.status || (fieldStatusExists ? progress.field?.status : "FIELD_TESTS_NOT_LOADED") || "unknown",
+      ready: Array.isArray(field.profiles_ready) ? readyProfiles.length : (fieldStatusExists ? (progress.field?.ready || 0) : 0),
       required: Array.isArray(field.profiles_required) ? field.profiles_required.length : (progress.field?.required || 5),
       ready_profiles: readyProfiles,
       missing_profiles: missingProfiles,
@@ -511,15 +517,17 @@ function main() {
   writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
   writeFileSync(mdPath, markdown(report), "utf8");
   writeFileSync(htmlPath, html(report), "utf8");
-  writeFileSync(dashboardDesktopHtml, html(report), "utf8");
-  writeFileSync(dashboardDesktopCmd, dashboardLauncher(), "utf8");
-  writeFileSync(blockersDesktopHtml, blockersHtml(report), "utf8");
-  writeFileSync(blockersDesktopCmd, blockersLauncher(), "utf8");
-  writeFileSync(nextPackDesktopCmd, nextPackLauncher(report), "utf8");
-  writeMissingPackLaunchers(report);
+  if (writeDesktopArtifacts) {
+    writeFileSync(dashboardDesktopHtml, html(report), "utf8");
+    writeFileSync(dashboardDesktopCmd, dashboardLauncher(), "utf8");
+    writeFileSync(blockersDesktopHtml, blockersHtml(report), "utf8");
+    writeFileSync(blockersDesktopCmd, blockersLauncher(), "utf8");
+    writeFileSync(nextPackDesktopCmd, nextPackLauncher(report), "utf8");
+    writeMissingPackLaunchers(report);
+  }
   console.log(
     `goal_dashboard_report status=${report.status} field=${report.field.ready}/${report.field.required} ` +
-    `next=${report.field.next_profile} linux=${report.linux.public_status} html=${rel(htmlPath)} desktop=${dashboardDesktopHtml} cmd=${dashboardDesktopCmd} blockers=${blockersDesktopHtml} pack_cmd=${nextPackDesktopCmd} missing_pc_pack_launchers_ready=${report.field.missing_pack_launchers.length}`
+    `next=${report.field.next_profile} linux=${report.linux.public_status} html=${rel(htmlPath)} desktop=${writeDesktopArtifacts ? dashboardDesktopHtml : "disabled"} cmd=${writeDesktopArtifacts ? dashboardDesktopCmd : "disabled"} blockers=${writeDesktopArtifacts ? blockersDesktopHtml : "disabled"} pack_cmd=${writeDesktopArtifacts ? nextPackDesktopCmd : "disabled"} missing_pc_pack_launchers_ready=${report.field.missing_pack_launchers.length}`
   );
 }
 
