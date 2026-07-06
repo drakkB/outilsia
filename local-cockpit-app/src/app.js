@@ -1345,6 +1345,95 @@ function recommendedModelState() {
   };
 }
 
+function modelSignalText(model) {
+  const ref = `${modelTitle(model)} ${actionableOllamaRef(model)}`.toLowerCase();
+  const groups = state.contentSignals?.signals || {};
+  const labels = Array.isArray(groups.models) ? groups.models : [];
+  const match = labels.find((item) => {
+    const haystack = `${item.key || ""} ${item.label || ""}`.toLowerCase();
+    return haystack && (ref.includes(String(item.key || "").toLowerCase()) || ref.includes(String(item.label || "").split("/")[0].trim().toLowerCase()));
+  });
+  return match ? `${match.label || match.key}${match.count ? ` (${match.count})` : ""}` : "";
+}
+
+function modelOfMomentState() {
+  const compatibility = state.compatibility?.compatibility || state.compatibility || {};
+  const models = extractModels(compatibility).filter((model) => actionableOllamaRef(model));
+  const profile = currentUsageProfile();
+  const recommended = recommendedModelState();
+  const newModels = compatibility.new || compatibility.new_models || [];
+  const newLabels = Array.isArray(newModels) ? newModels.map((model) => `${modelTitle(model)} ${actionableOllamaRef(model)}`.toLowerCase()) : [];
+  const scoreCandidate = (model) => {
+    const ref = actionableOllamaRef(model);
+    const text = `${modelTitle(model)} ${ref}`.toLowerCase();
+    let score = 0;
+    if (recommended.ref && sameOllamaModel(ref, recommended.ref)) score += 60;
+    if (modelSignalText(model)) score += 35;
+    if (newLabels.some((label) => label && (label.includes(text.split(":")[0]) || text.includes(label.split(":")[0])))) score += 20;
+    if (profile.key === "portable" && /0\.6b|mini|3b|7b|8b|qwen|phi/i.test(text)) score += 30;
+    if (profile.key === "memory" && /hermes/i.test(text)) score += 30;
+    if (profile.key === "code" && /qwen|deepseek|code|coder/i.test(text)) score += 25;
+    if (profile.key === "french" && /mistral|qwen|hermes/i.test(text)) score += 20;
+    if (isOllamaModelInstalled(ref)) score += 18;
+    if (hasSuccessfulBenchmarkFor(ref)) score += 20;
+    if (normalizeOllamaRef(ref) === "qwen3:0.6b" && profile.key !== "portable") score -= 45;
+    if (/\b(32b|70b|72b|109b|123b|235b)\b/i.test(text) && Number(state.scan?.vram_gb || 0) < 24) score -= 35;
+    return score;
+  };
+  const fallback = recommended.model || models[0] || null;
+  const model = models.length ? [...models].sort((left, right) => scoreCandidate(right) - scoreCandidate(left))[0] : fallback;
+  const ref = actionableOllamaRef(model);
+  const installed = ref ? isOllamaModelInstalled(ref) : false;
+  const benchmarked = ref ? hasSuccessfulBenchmarkFor(ref) : false;
+  const signal = model ? modelSignalText(model) : "";
+  const reason = signal
+    ? `Signal catalogue : ${signal}.`
+    : profile.key === "portable"
+      ? "Profil vieux PC : priorité au modèle léger et mesurable."
+      : "Choix issu du diagnostic et des modèles compatibles.";
+  return {
+    model,
+    ref,
+    title: model ? modelTitle(model) : "Après scan",
+    installed,
+    benchmarked,
+    signal,
+    reason,
+    profile
+  };
+}
+
+function renderModelOfMomentCard() {
+  const moment = modelOfMomentState();
+  if (!moment.ref) {
+    return `
+      <div class="moment-model-card empty">
+        <span class="label">Modèle du moment</span>
+        <strong>Scan requis</strong>
+        <p>OutilsIA affichera le modèle à essayer selon le catalogue vivant et la machine.</p>
+      </div>
+    `;
+  }
+  const action = moment.installed
+    ? moment.benchmarked
+      ? `<button type="button" data-post-install-chat="${escapeHtml(moment.ref)}">Dialoguer</button>`
+      : `<button type="button" data-benchmark-model="${escapeHtml(moment.ref)}">Tester maintenant</button>`
+    : `<button type="button" data-install-model="${escapeHtml(moment.ref)}">Installer</button>`;
+  return `
+    <div class="moment-model-card">
+      <div>
+        <span class="label">Modèle du moment</span>
+        <strong>${escapeHtml(moment.title)}</strong>
+        <p>${escapeHtml(moment.reason)} ${escapeHtml(moment.profile.label)} · ${escapeHtml(moment.installed ? moment.benchmarked ? "installé et mesuré" : "installé" : "à installer")}</p>
+      </div>
+      <div class="moment-model-actions">
+        <span>${escapeHtml(moment.ref)}</span>
+        ${action}
+      </div>
+    </div>
+  `;
+}
+
 function preferredModelCommand(models = []) {
   const recommended = recommendedModelState();
   if (recommended.ref) {
@@ -2544,6 +2633,7 @@ function renderCatalogStatus(compatibility = state.compatibility?.compatibility 
     <div><strong>Catalogue upgrades</strong><span>${escapeHtml(upgradeVersion)}${snapshot.upgrade_count ? ` - ${escapeHtml(snapshot.upgrade_count)} upgrade(s) proposés` : ""}</span></div>
     <div><strong>Signaux contenus</strong><span>${escapeHtml(signalsVersion)}${snapshot.content_pages_scanned ? ` - ${escapeHtml(snapshot.content_pages_scanned)} pages scannées` : ""}</span></div>
     <div><strong>Modèles chauds</strong><span>${snapshot.top_model_signals.length ? escapeHtml(snapshot.top_model_signals.join(", ")) : "En attente du radar éditorial."}</span></div>
+    <div><strong>Modèle du moment</strong><span>${escapeHtml(modelOfMomentState().title)}${modelOfMomentState().ref ? ` - ${escapeHtml(modelOfMomentState().ref)}` : ""}</span></div>
     <div><strong>Matériel chaud</strong><span>${snapshot.top_hardware_signals.length ? escapeHtml(snapshot.top_hardware_signals.join(", ")) : "En attente du radar éditorial."}</span></div>
     <div><strong>Nouveautés machine</strong><span>${snapshot.new_count ? escapeHtml(snapshot.new_models.join(", ")) : "Aucune nouveauté compatible signalée pour l'instant."}</span></div>
     <div><strong>Veille Hermes Agent</strong><span>${escapeHtml(HERMES_AGENT_WATCH.version)} - ${escapeHtml(HERMES_AGENT_WATCH.release)} (${escapeHtml(HERMES_AGENT_WATCH.date)}) : ${escapeHtml(HERMES_AGENT_WATCH.summary)}</span></div>
@@ -3068,6 +3158,7 @@ function renderPreparePanel() {
         </div>
       `).join("")}
     </div>
+    ${renderModelOfMomentCard()}
     <div class="usage-profile-box" aria-label="Profil d'usage">
       <div class="usage-profile-head">
         <div>

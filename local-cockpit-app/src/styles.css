@@ -2819,6 +2819,61 @@ dd {
   min-height: 34px;
 }
 
+.moment-model-card {
+  align-items: center;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(252, 211, 77, 0.13), transparent 34%),
+    linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.006)),
+    var(--surface-2);
+  border: 1px solid rgba(252, 211, 77, 0.24);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 10px;
+}
+
+.moment-model-card.empty {
+  border-color: rgba(139, 163, 174, 0.18);
+}
+
+.moment-model-card strong,
+.moment-model-card span,
+.moment-model-card p {
+  display: block;
+}
+
+.moment-model-card strong {
+  font-size: 13px;
+}
+
+.moment-model-card p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  margin: 4px 0 0;
+}
+
+.moment-model-actions {
+  display: grid;
+  gap: 7px;
+  justify-items: end;
+}
+
+.moment-model-actions span {
+  background: rgba(255,255,255,.045);
+  border: 1px solid rgba(139, 163, 174, 0.16);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  max-width: 210px;
+  overflow: hidden;
+  padding: 4px 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .usage-profile-box {
   background:
     radial-gradient(circle at 0% 0%, rgba(120, 220, 232, 0.12), transparent 34%),
@@ -3486,6 +3541,14 @@ dd {
 
   .prepare-journey {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .moment-model-card {
+    grid-template-columns: 1fr;
+  }
+
+  .moment-model-actions {
+    justify-items: start;
   }
 
   .cockpit-focus {
