@@ -1592,10 +1592,126 @@ function formatDoctorNumber(value, suffix = "") {
   return `${rounded}${suffix}`;
 }
 
+function parseMajorVersion(value) {
+  const match = String(value || "").match(/(\d+)/);
+  return match ? Number(match[1]) : 0;
+}
+
+function hardwareDoctorAnalysis(scan = {}) {
+  const probe = scan?.raw_scan?.gpu_probe || {};
+  const vram = Number(scan.vram_gb || probe.vram_gb || 0);
+  const ram = Number(scan.ram_gb || 0);
+  const temp = Number(probe.temperature_c || 0);
+  const powerDraw = Number(probe.power_draw_w || 0);
+  const powerLimit = Number(probe.power_limit_w || 0);
+  const pcieCurrent = Number(probe.pcie_link_width_current || 0);
+  const pcieMax = Number(probe.pcie_link_width_max || 0);
+  const pcieGenCurrent = Number(probe.pcie_link_gen_current || 0);
+  const pcieGenMax = Number(probe.pcie_link_gen_max || 0);
+  const hasNvidiaSignals = probe.source === "nvidia-smi" || Boolean(probe.driver_version || probe.cuda_version);
+  const hasOllama = hasUsableOllamaRuntime(scan);
+  const wsl = wslRuntimeInfo(scan);
+  let score = 35;
+  const checks = [];
+  const actions = [];
+
+  const addCheck = (label, state, detail, points = 0) => {
+    score += points;
+    checks.push({ label, state, detail });
+  };
+  const addAction = (text) => {
+    if (text && !actions.includes(text)) actions.push(text);
+  };
+
+  if (vram >= 24) addCheck("VRAM", "ok", `${formatGb(vram)} : gros modèles quantifiés et contexte confortable.`, 22);
+  else if (vram >= 16) addCheck("VRAM", "ok", `${formatGb(vram)} : très bon palier 7B-14B, certains 32B à valider.`, 18);
+  else if (vram >= 12) addCheck("VRAM", "ok", `${formatGb(vram)} : ticket sérieux pour 7B/8B et plusieurs 14B quantifiés.`, 14);
+  else if (vram >= 8) {
+    addCheck("VRAM", "warn", `${formatGb(vram)} : utile, mais il faut rester sur petits modèles ou quantization agressive.`, 8);
+    addAction("Tester un 7B/8B avant tout achat.");
+  } else {
+    addCheck("VRAM", "bad", vram ? `${formatGb(vram)} : limite pour gros LLM.` : "Aucune VRAM dédiée fiable détectée.", 1);
+    addAction("Commencer par qwen3:0.6b ou CPU/RAM, puis envisager 12-16 Go VRAM.");
+  }
+
+  if (ram >= 64) addCheck("RAM", "ok", `${formatGb(ram)} : bon niveau RAG, multitâche, offload CPU.`, 12);
+  else if (ram >= 32) addCheck("RAM", "ok", `${formatGb(ram)} : suffisant pour cockpit local et modèles courants.`, 9);
+  else if (ram >= 16) {
+    addCheck("RAM", "warn", `${formatGb(ram)} : utilisable, mais attention aux gros contextes.`, 5);
+    addAction("Fermer les apps lourdes pendant les benchmarks.");
+  } else {
+    addCheck("RAM", "bad", `${formatGb(ram)} : faible pour IA locale confortable.`, 1);
+    addAction("Viser 32 Go RAM si le PC le permet.");
+  }
+
+  if (hasNvidiaSignals) addCheck("Driver/CUDA", "ok", `NVIDIA mesuré${probe.cuda_version ? ` · CUDA ${probe.cuda_version}` : ""}.`, 16);
+  else if (scan.gpu_name) {
+    addCheck("Driver/CUDA", "warn", "GPU détecté, mais métriques fines absentes.", 6);
+    addAction("Vérifier le driver GPU si les performances semblent anormales.");
+  } else {
+    addCheck("Driver/CUDA", "warn", "Pas de signal GPU dédié exploitable.", 0);
+  }
+
+  if (temp >= 84) {
+    addCheck("Thermique", "warn", `${formatDoctorNumber(temp, " °C")} : risque de throttling pendant un long test.`, -8);
+    addAction("Surveiller température/ventilation avant un gros modèle.");
+  } else if (temp > 0) {
+    addCheck("Thermique", "ok", `${formatDoctorNumber(temp, " °C")} : marge correcte au moment du scan.`, 8);
+  }
+
+  if (powerDraw > 0 && powerLimit > 0) {
+    const ratio = powerDraw / powerLimit;
+    if (ratio >= 0.92) {
+      addCheck("Puissance", "warn", `${formatDoctorNumber(powerDraw, " W")} / ${formatDoctorNumber(powerLimit, " W")} : faible marge.`, -4);
+      addAction("Éviter de lancer plusieurs gros tests en parallèle.");
+    } else {
+      addCheck("Puissance", "ok", `${formatDoctorNumber(powerDraw, " W")} / ${formatDoctorNumber(powerLimit, " W")} : marge disponible.`, 5);
+    }
+  }
+
+  if (pcieCurrent && pcieMax) {
+    const gen = pcieGenCurrent ? ` Gen${pcieGenCurrent}${pcieGenMax ? `/${pcieGenMax}` : ""}` : "";
+    if (pcieCurrent < pcieMax) {
+      addCheck("PCIe", "warn", `x${pcieCurrent}/x${pcieMax}${gen} : lien réduit détecté.`, -4);
+      addAction("Vérifier slot PCIe, BIOS ou économie d'énergie si les perfs sont basses.");
+    } else {
+      addCheck("PCIe", "ok", `x${pcieCurrent}/x${pcieMax}${gen} : lien cohérent.`, 5);
+    }
+  }
+
+  if (hasOllama) addCheck("Runtime IA", "ok", `${ollamaRuntimeLabel(scan)} prêt.`, 10);
+  else {
+    addCheck("Runtime IA", "bad", "Ollama non prêt pour lancer un modèle.", -8);
+    addAction("Installer Ollama Windows ou préparer Ollama dans WSL.");
+  }
+
+  if (wsl.kind === "ready") addCheck("WSL", "ok", "Ollama WSL prêt pour workflows Ubuntu.", 4);
+  else if (wsl.kind === "detected") addCheck("WSL", "warn", "WSL détecté, Ollama WSL à préparer si besoin.", 1);
+  else if (wsl.kind === "missing" && !hasOllama) addAction("Optionnel : installer WSL Ubuntu pour workflows Linux.");
+
+  const cudaMajor = parseMajorVersion(probe.cuda_version);
+  if (cudaMajor && cudaMajor < 12) {
+    addCheck("CUDA", "warn", `CUDA ${probe.cuda_version} : compatible selon runtime, mais à surveiller.`, -2);
+    addAction("Mettre à jour le driver NVIDIA si un modèle échoue côté GPU.");
+  }
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  const headline = score >= 85 ? "Machine mature" : score >= 70 ? "Base solide" : score >= 50 ? "À cadrer" : "Mode prudent";
+  const summary = score >= 85
+    ? "Le matériel expose assez de signaux pour recommander, tester et comparer proprement."
+    : score >= 70
+      ? "La machine est exploitable, avec quelques points à vérifier selon les gros modèles."
+      : score >= 50
+        ? "Le diagnostic peut fonctionner, mais il faut valider par benchmark court avant d'acheter."
+        : "OutilsIA doit privilégier les petits modèles et les recommandations prudentes.";
+  return { score, headline, summary, checks, actions: actions.slice(0, 4), source: probe.source || "scan système" };
+}
+
 function renderHardwareDoctor(scan) {
   if (!els.hardwareDoctorBox) return;
   const probe = scan?.raw_scan?.gpu_probe || {};
-  const source = probe.source || "scan système";
+  const analysis = hardwareDoctorAnalysis(scan);
+  const source = analysis.source;
   const rows = [];
   if (probe.driver_version) rows.push(["Driver", probe.driver_version]);
   if (probe.cuda_version) rows.push(["CUDA", probe.cuda_version]);
@@ -1612,30 +1728,32 @@ function renderHardwareDoctor(scan) {
     rows.push(["PCIe", width]);
   }
 
-  const temp = Number(probe.temperature_c || 0);
-  const hasNvidiaSignals = source === "nvidia-smi" || probe.driver_version || probe.cuda_version;
-  const status = temp >= 84
-    ? "à surveiller"
-    : hasNvidiaSignals
-      ? "GPU mesuré"
-      : scan?.gpu_name
-        ? "GPU détecté"
-        : "CPU/RAM";
-  const detail = hasNvidiaSignals
-    ? "Signaux NVIDIA lus localement. OutilsIA les utilise pour affiner diagnostic, WSL et upgrades."
-    : scan?.gpu_name
-      ? "Le GPU est identifié. Les métriques fines dépendent du driver et du runtime disponibles."
-      : "Aucun GPU dédié détecté. OutilsIA orientera vers petits modèles, CPU ou upgrade.";
+  const hasWarning = analysis.checks.some((check) => check.state === "warn" || check.state === "bad");
 
-  els.hardwareDoctorBox.className = `hardware-doctor-box ${temp >= 84 ? "is-warning" : hasNvidiaSignals ? "is-ready" : ""}`.trim();
+  els.hardwareDoctorBox.className = `hardware-doctor-box ${hasWarning ? "is-warning" : "is-ready"}`.trim();
   els.hardwareDoctorBox.innerHTML = `
     <div class="hardware-doctor-head">
       <div>
         <span class="label">Hardware Doctor</span>
-        <strong>${escapeHtml(status)}</strong>
-        <p>${escapeHtml(detail)}</p>
+        <strong>${escapeHtml(analysis.headline)}</strong>
+        <p>${escapeHtml(analysis.summary)}</p>
       </div>
+      <div class="doctor-score">
+        <strong>${escapeHtml(analysis.score)}</strong>
+        <span>/100</span>
+      </div>
+    </div>
+    <div class="doctor-status-row">
       <span class="doctor-source">${escapeHtml(source)}</span>
+      ${analysis.actions.length ? `<span>${escapeHtml(analysis.actions[0])}</span>` : "<span>Aucune action urgente détectée.</span>"}
+    </div>
+    <div class="doctor-checks">
+      ${analysis.checks.slice(0, 6).map((check) => `
+        <div class="doctor-check ${escapeHtml(check.state)}">
+          <strong>${escapeHtml(check.label)}</strong>
+          <span>${escapeHtml(check.detail)}</span>
+        </div>
+      `).join("")}
     </div>
     ${rows.length ? `<dl class="doctor-grid">${rows.map(([label, value]) => `
       <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>
