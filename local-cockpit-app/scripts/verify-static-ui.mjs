@@ -70,6 +70,12 @@ const requiredFeatureText = [
   ["js readiness build section", js, "## Build et release"],
   ["js beta report build id", js, "Build ID public"],
   ["js beta report native checklist", js, "Deuxieme modele recommande visible OK"],
+  ["js benchmark quality verdict", js, "benchmarkQualityVerdict"],
+  ["js benchmark quality short label", js, "Qualité courte"],
+  ["js post install test now", js, "Tester maintenant"],
+  ["js benchmark keep action", js, "data-keep-installed-model"],
+  ["js benchmark delete action", js, "data-delete-model"],
+  ["js benchmark compare action", js, "data-post-install-arena"],
 ];
 
 const missingFeature = requiredFeatureText.filter(([, text, needle]) => !text.includes(needle));
