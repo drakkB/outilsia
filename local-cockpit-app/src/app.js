@@ -1219,9 +1219,15 @@ function renderModelActions(model, options = {}) {
     buttons.push(`<button type="button" data-install-model="${escapeHtml(ref)}" ${(installing || installLocked) ? "disabled" : ""}>${installing ? "Télécharge..." : installLocked ? "Attends" : options.primaryLabel || "Installer"}</button>`);
   }
   buttons.push(`<button type="button" data-model-info="${escapeHtml(ref)}">Fiche</button>`);
-  buttons.push(`<button type="button" data-benchmark-model="${escapeHtml(ref)}" ${ollamaMissing ? "disabled" : ""}>Bench</button>`);
+  buttons.push(`<button type="button" data-benchmark-model="${escapeHtml(ref)}" ${ollamaMissing ? "disabled" : ""}>${escapeHtml(benchmarkButtonLabel(ref))}</button>`);
   buttons.push(`<button type="button" data-copy-command="${escapeHtml(`${ollamaRuntimeCommandLabel(ref)} run ${ref}`)}">Copier</button>`);
   return `<div class="model-actions">${buttons.join("")}</div>`;
+}
+
+function benchmarkButtonLabel(ref, installedLabel = "Bench", missingLabel = "Installer + bench") {
+  if (!ref || isOllamaModelInstalled(ref)) return installedLabel;
+  if (isOllamaModelInstalling(ref)) return "Téléchargement...";
+  return missingLabel;
 }
 
 function renderModelCard(model, index = 0, extraClass = "") {
@@ -1451,7 +1457,7 @@ function renderModelOfMomentCard() {
   const action = moment.installed
     ? moment.benchmarked
       ? `<button type="button" data-post-install-chat="${escapeHtml(moment.ref)}">Dialoguer</button>`
-      : `<button type="button" data-benchmark-model="${escapeHtml(moment.ref)}">Tester maintenant</button>`
+      : `<button type="button" data-benchmark-model="${escapeHtml(moment.ref)}">${escapeHtml(benchmarkButtonLabel(moment.ref, "Tester maintenant", "Installer + tester"))}</button>`
     : `<button type="button" data-install-model="${escapeHtml(moment.ref)}">Installer</button>`;
   return `
     <div class="moment-model-card">
@@ -3100,7 +3106,7 @@ function renderCommands(models) {
             <code>${escapeHtml(command)}</code>
             ${primaryAction}
             <button type="button" data-copy-command="${escapeHtml(command)}">Copier</button>
-            <button type="button" data-benchmark-model="${escapeHtml(actionRef)}" ${ollamaMissing ? "disabled" : ""}>Bench</button>
+            <button type="button" data-benchmark-model="${escapeHtml(actionRef)}" ${ollamaMissing ? "disabled" : ""}>${escapeHtml(benchmarkButtonLabel(actionRef))}</button>
           </div>
         </div>
       `;
@@ -4600,7 +4606,7 @@ function renderFirstTestPanel() {
     cta = `<button class="first-test-primary" type="button" data-install-model="${model}">Installer le modèle de test</button>`;
   } else if (modelReady && !benchmarkReady) {
     stateLabel = "test prêt";
-    cta = `<button class="first-test-primary" type="button" data-benchmark-model="${model}">Lancer le benchmark recommandé</button>`;
+    cta = `<button class="first-test-primary" type="button" data-benchmark-model="${model}">${escapeHtml(benchmarkButtonLabel(model, "Lancer le benchmark recommandé", "Installer + benchmarker"))}</button>`;
   } else if (benchmarkReady) {
     stateLabel = "test réussi";
     cta = `
@@ -7943,7 +7949,7 @@ function renderDesktopUpdates(payload) {
     const guide = item.buying_guides?.[0];
     const commands = (item.recommended_commands || []).slice(0, 2).map((command) => `
       <button type="button" data-copy-command="${escapeHtml(command.ollama ? `${ollamaRuntimeCommandLabel(command.ollama)} run ${command.ollama}` : command.command || "")}">${escapeHtml(command.ollama ? `${ollamaRuntimeCommandLabel(command.ollama)} run ${command.ollama}` : command.command || `${ollamaRuntimeCommandLabel()} run`)}</button>
-      <button type="button" data-benchmark-model="${escapeHtml(command.ollama || "")}">Bench</button>
+      <button type="button" data-benchmark-model="${escapeHtml(command.ollama || "")}">${escapeHtml(benchmarkButtonLabel(command.ollama || ""))}</button>
     `).join("");
     return `
       <div class="list-item">
