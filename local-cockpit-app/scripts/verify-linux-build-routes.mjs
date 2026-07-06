@@ -44,7 +44,7 @@ const linuxMissionCmd = "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Linux
 const linuxActionsCmd = "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Linux-Build-Kit/OUVRIR-GITHUB-ACTIONS.cmd";
 const linuxWorkflowCmd = "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Linux-Build-Kit/OUVRIR-WORKFLOW-LINUX.cmd";
 const crossWorkflowCmd = "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Linux-Build-Kit/OUVRIR-WORKFLOW-CROSS-PLATFORM.cmd";
-const linuxWslInstallCmd = "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Linux-Build-Kit/INSTALLER-WSL-UBUNTU.cmd";
+const linuxWslInstallCmd = "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Linux-Build-Kit/INSTALLER-WSL.cmd";
 const linuxWslPreflightCmd = "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Linux-Build-Kit/VERIFIER-WSL-LINUX.cmd";
 const linuxWslPrepareCmd = "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Linux-Build-Kit/PREPARER-WSL-LINUX.cmd";
 
@@ -332,7 +332,7 @@ if (!centerCmdText.includes("CENTRE-RELEASE-LINUX.html")) {
   console.error("linux route verification failed: center helper does not open CENTRE-RELEASE-LINUX.html");
   process.exit(1);
 }
-for (const needle of ["INSTALLER-WSL-UBUNTU.cmd", "VERIFIER-WSL-LINUX.cmd", "PREPARER-WSL-LINUX.cmd", "scripts/preflight-linux.sh", "sudo apt-get"]) {
+for (const needle of ["INSTALLER-WSL.cmd", "VERIFIER-WSL-LINUX.cmd", "PREPARER-WSL-LINUX.cmd", "scripts/preflight-linux.sh", "sudo apt-get"]) {
   if (!startHereText.includes(needle)) {
     console.error(`linux route verification failed: start-here html missing WSL helper detail ${needle}`);
     process.exit(1);
@@ -442,7 +442,7 @@ const unblockChecklistText = [
 for (const needle of [
   "Checklist déblocage Linux OutilsIA",
   "LINUX-TERRAIN-GATE.html",
-  "INSTALLER-WSL-UBUNTU.cmd",
+  "INSTALLER-WSL.cmd",
   "OUVRIR-WORKFLOW-CROSS-PLATFORM.cmd",
   "IMPORTER-LINUX-ARTEFACT.cmd",
   "VERIFIER-LINUX-RELEASE.cmd",

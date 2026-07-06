@@ -68,8 +68,8 @@ def main():
                     "wsl": {
                         "installed": True,
                         "version": "WSL version demo",
-                        "default_distribution": "Ubuntu",
-                        "distributions": ["Ubuntu"],
+                        "default_distribution": "Debian",
+                        "distributions": ["Debian"],
                         "ollama_ready": True,
                         "install_command": "wsl.exe --install",
                         "ollama_install_command": "wsl.exe sh -lc \"curl -fsSL https://ollama.com/install.sh | sh\"",
@@ -113,7 +113,7 @@ def main():
         raise AssertionError(f"native ready title mismatch: {native_ready}")
     if native_ready.get("canInstall") is not True:
         raise AssertionError("native ready should allow optional WSL installation")
-    if wsl_ready.get("title") != "WSL prêt · Ubuntu":
+    if wsl_ready.get("title") != "WSL prêt · Debian":
         raise AssertionError(f"WSL ready title mismatch: {wsl_ready}")
     if wsl_ready.get("command") != "wsl.exe ollama run qwen3:0.6b":
         raise AssertionError(f"WSL ready command mismatch: {wsl_ready}")

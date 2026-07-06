@@ -61,7 +61,7 @@ PREFLIGHT_LOCAL_JSON="$KIT_DIR/LINUX-PREFLIGHT-LOCAL.json"
 PREFLIGHT_LOCAL_MD="$KIT_DIR/LINUX-PREFLIGHT-LOCAL.md"
 PREFLIGHT_LOCAL_HTML="$KIT_DIR/LINUX-PREFLIGHT-LOCAL.html"
 PREFLIGHT_LOCAL_CMD="$KIT_DIR/OUVRIR-PREFLIGHT-LINUX.cmd"
-WSL_INSTALL_CMD="$KIT_DIR/INSTALLER-WSL-UBUNTU.cmd"
+WSL_INSTALL_CMD="$KIT_DIR/INSTALLER-WSL.cmd"
 CI_STATUS_JSON="$KIT_DIR/CI-STATUS.json"
 CI_STATUS_MD="$KIT_DIR/CI-STATUS.md"
 PUBLIC_BUILD_ID_FILE="$KIT_DIR/BUILD-ID-PUBLIC-WINDOWS.txt"
@@ -443,8 +443,8 @@ cat > "$START_HTML" <<'EOF'
   <section>
     <h2>Raccourcis</h2>
     <div class="actions">
-      <div class="action"><b>Installer WSL Ubuntu</b><code>INSTALLER-WSL-UBUNTU.cmd</code><p>Active WSL/Ubuntu si la distro n'existe pas encore, puis relance le préflight.</p></div>
-      <div class="action"><b>Vérifier WSL local</b><code>VERIFIER-WSL-LINUX.cmd</code><p>Contrôle Node, npm, cargo, pkg-config, GTK et WebKit dans Ubuntu.</p></div>
+      <div class="action"><b>Installer WSL</b><code>INSTALLER-WSL.cmd</code><p>Active WSL et la distro configurée si elle n'existe pas encore, puis relance le préflight.</p></div>
+      <div class="action"><b>Vérifier WSL local</b><code>VERIFIER-WSL-LINUX.cmd</code><p>Contrôle Node, npm, cargo, pkg-config, GTK et WebKit dans la distro WSL.</p></div>
       <div class="action"><b>Rapport préflight local</b><code>OUVRIR-PREFLIGHT-LINUX.cmd</code><p>Ouvre la preuve structurée JSON/HTML des dépendances Linux manquantes ou prêtes.</p></div>
       <div class="action"><b>Préparer WSL local</b><code>PREPARER-WSL-LINUX.cmd</code><p>Lance l'installation des dépendances Tauri Linux dans WSL quand sudo est disponible.</p></div>
       <div class="action"><b>Ouvrir GitHub Actions</b><code>OUVRIR-GITHUB-ACTIONS.cmd</code><p>Ouvre la page Actions configurée.</p></div>
@@ -471,9 +471,9 @@ cat > "$START_HTML" <<'EOF'
   <section>
     <h2>Option locale WSL</h2>
     <ol>
-      <li>Si Ubuntu n'existe pas dans WSL, lancer <code>INSTALLER-WSL-UBUNTU.cmd</code>.</li>
+      <li>Si la distro configurée n'existe pas dans WSL, lancer <code>INSTALLER-WSL.cmd</code>.</li>
       <li>Lancer <code>VERIFIER-WSL-LINUX.cmd</code> pour confirmer les dépendances manquantes.</li>
-      <li>Lancer <code>PREPARER-WSL-LINUX.cmd</code> si tu acceptes d'installer les paquets Ubuntu via <code>sudo apt-get</code>.</li>
+      <li>Lancer <code>PREPARER-WSL-LINUX.cmd</code> si tu acceptes d'installer les paquets Linux via <code>sudo apt-get</code>.</li>
       <li>Relancer <code>VERIFIER-WSL-LINUX.cmd</code>. Si le préflight passe, tenter <code>npm run build:beta:linux</code> depuis WSL.</li>
     </ol>
     <p>Ces helpers appellent <code>scripts/preflight-linux.sh</code> puis, si besoin, <code>scripts/install-linux-tauri-deps.sh</code>.</p>
@@ -554,8 +554,8 @@ cat > "$CENTER_HTML" <<'EOF'
   <section>
     <h2>Raccourcis</h2>
     <div class="action"><code>OUVRIR-START-HERE-LINUX.cmd</code><span>Page de démarrage détaillée.</span></div>
-    <div class="action"><code>INSTALLER-WSL-UBUNTU.cmd</code><span>Installe/active WSL Ubuntu si la distro n'existe pas encore.</span></div>
-    <div class="action"><code>VERIFIER-WSL-LINUX.cmd</code><span>Préflight local Ubuntu/WSL : Node, npm, cargo, GTK/WebKit.</span></div>
+    <div class="action"><code>INSTALLER-WSL.cmd</code><span>Installe/active WSL si la distro configurée n'existe pas encore.</span></div>
+    <div class="action"><code>VERIFIER-WSL-LINUX.cmd</code><span>Préflight local WSL : Node, npm, cargo, GTK/WebKit.</span></div>
     <div class="action"><code>OUVRIR-PREFLIGHT-LINUX.cmd</code><span>Rapport structuré du préflight local : statut, dépendances manquantes, commandes.</span></div>
     <div class="action"><code>PREPARER-WSL-LINUX.cmd</code><span>Installe les dépendances Tauri Linux si <code>sudo</code> est disponible.</span></div>
     <div class="action"><code>OUVRIR-GITHUB-ACTIONS.cmd</code><span>Voie recommandée si WSL local bloque.</span></div>
@@ -654,14 +654,14 @@ EOF
 cat > "$WSL_INSTALL_CMD" <<EOF
 @echo off
 setlocal
-echo Module WSL OutilsIA - installation Ubuntu
+echo Module WSL OutilsIA - installation WSL
 echo.
-echo Cette commande verifie WSL, installe Ubuntu si necessaire, puis relance le preflight Linux.
+echo Cette commande verifie WSL, installe la distro configuree si necessaire, puis relance le preflight Linux.
 echo Elle peut demander un redemarrage Windows si WSL n'etait pas active.
 echo.
 wsl.exe -l -q | findstr /I "^$WSL_DISTRO$" >nul
 if not errorlevel 1 goto already
-echo Ubuntu non detecte dans WSL. Installation de $WSL_DISTRO...
+echo $WSL_DISTRO non detecte dans WSL. Installation de $WSL_DISTRO...
 wsl.exe --install -d "$WSL_DISTRO"
 if errorlevel 1 goto fail
 echo.
@@ -674,7 +674,7 @@ echo $WSL_DISTRO est deja present. Verification du preflight...
 wsl -d "$WSL_DISTRO" -- bash -lc "cd '$REPO_ROOT_WSL/local-cockpit-app' && bash scripts/preflight-linux.sh"
 if errorlevel 1 goto needdeps
 echo.
-echo WSL Ubuntu est pret pour le build Linux local.
+echo WSL est pret pour le build Linux local avec $WSL_DISTRO.
 pause
 exit /b 0
 
@@ -717,7 +717,7 @@ cat > "$KIT_DIR/PREPARER-WSL-LINUX.cmd" <<EOF
 @echo off
 setlocal
 echo Preparation WSL Linux pour Tauri ($WSL_DISTRO)
-echo Cette commande peut demander le mot de passe sudo dans Ubuntu.
+echo Cette commande peut demander le mot de passe sudo dans la distro WSL.
 echo.
 wsl -d "$WSL_DISTRO" -- bash -lc "cd '$REPO_ROOT_WSL/local-cockpit-app' && bash scripts/preflight-linux.sh || true; echo; echo 'Installation des dependances Tauri Linux...'; bash scripts/install-linux-tauri-deps.sh; echo; bash scripts/preflight-linux.sh"
 if errorlevel 1 goto fail
@@ -1413,7 +1413,7 @@ cat > "$UNBLOCK_CHECKLIST_MD" <<EOF
 
 1. Ouvrir \`LINUX-TERRAIN-GATE.html\` et vérifier si le gate terrain est ouvert.
 2. Si le gate est fermé, tester le prochain profil terrain \`$FIELD_NEXT\` ou documenter explicitement une décision manuelle.
-3. Si WSL est utile et absent, lancer \`INSTALLER-WSL-UBUNTU.cmd\`.
+3. Si WSL est utile et absent, lancer \`INSTALLER-WSL.cmd\`.
 4. Lancer \`VERIFIER-WSL-LINUX.cmd\`, puis \`PREPARER-WSL-LINUX.cmd\` seulement si sudo est disponible.
 5. Lancer \`OUVRIR-WORKFLOW-CROSS-PLATFORM.cmd\`.
 6. Télécharger \`local-cockpit-cross-platform-web-release\`.
@@ -1686,7 +1686,7 @@ $required = @(
   "OUVRIR-GITHUB-ACTIONS.cmd",
   "OUVRIR-WORKFLOW-LINUX.cmd",
   "OUVRIR-WORKFLOW-CROSS-PLATFORM.cmd",
-  "INSTALLER-WSL-UBUNTU.cmd",
+  "INSTALLER-WSL.cmd",
   "VERIFIER-WSL-LINUX.cmd",
   "PREPARER-WSL-LINUX.cmd",
   "IMPORTER-LINUX-ARTEFACT.cmd",
