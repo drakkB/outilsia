@@ -913,7 +913,36 @@ function topRuntimeOllama(scan) {
   return extras.length ? `Prêt · ${extras.join(" · ")}` : "Prêt";
 }
 
-function defaultOllamaRuntime() {
+function modelRuntimeFromSource(source) {
+  const clean = String(source || "").trim().toLowerCase();
+  if (clean.includes("wsl")) return "wsl";
+  if (clean.includes("ollama")) return "native";
+  return "";
+}
+
+function installedOllamaRuntimeFor(model, { includeOptimistic = true } = {}) {
+  const clean = normalizeOllamaRef(model);
+  if (!clean) return "";
+  const aliases = new Set(ollamaRefAliases(clean));
+  for (const installed of state.scan?.installed_models || []) {
+    const ref = modelLabel(installed);
+    if (!ref) continue;
+    const matches = ollamaRefAliases(ref).some((alias) => aliases.has(alias));
+    if (!matches) continue;
+    const runtime = modelRuntimeFromSource(installed.source || installed.runtime);
+    if (runtime) return runtime;
+  }
+  if (includeOptimistic) {
+    for (const ref of state.optimisticInstalledModels || []) {
+      if (ollamaRefAliases(ref).some((alias) => aliases.has(alias))) return "";
+    }
+  }
+  return "";
+}
+
+function defaultOllamaRuntime(model = "") {
+  const modelRuntime = installedOllamaRuntimeFor(model, { includeOptimistic: false });
+  if (modelRuntime) return modelRuntime;
   const runtimes = state.scan?.runtimes || {};
   if (runtimes.ollama?.installed) return "native";
   if (runtimes.ollama_wsl?.installed) return "wsl";
@@ -932,13 +961,13 @@ function ollamaRuntimeLabel(scan = state.scan) {
   return "Ollama non détecté";
 }
 
-function ollamaRuntimePayload() {
-  const runtime = defaultOllamaRuntime();
+function ollamaRuntimePayload(model = "") {
+  const runtime = defaultOllamaRuntime(model);
   return runtime === "wsl" ? { runtime: "wsl" } : {};
 }
 
-function ollamaRuntimeCommandLabel() {
-  return defaultOllamaRuntime() === "wsl" ? "wsl.exe ollama" : "ollama";
+function ollamaRuntimeCommandLabel(model = "") {
+  return defaultOllamaRuntime(model) === "wsl" ? "wsl.exe ollama" : "ollama";
 }
 
 function wslRuntimeInfo(scan = state.scan) {
@@ -1187,7 +1216,7 @@ function renderModelActions(model, options = {}) {
   }
   buttons.push(`<button type="button" data-model-info="${escapeHtml(ref)}">Fiche</button>`);
   buttons.push(`<button type="button" data-benchmark-model="${escapeHtml(ref)}" ${ollamaMissing ? "disabled" : ""}>Bench</button>`);
-  buttons.push(`<button type="button" data-copy-command="${escapeHtml(`${ollamaRuntimeCommandLabel()} run ${ref}`)}">Copier</button>`);
+  buttons.push(`<button type="button" data-copy-command="${escapeHtml(`${ollamaRuntimeCommandLabel(ref)} run ${ref}`)}">Copier</button>`);
   return `<div class="model-actions">${buttons.join("")}</div>`;
 }
 
@@ -1441,7 +1470,7 @@ function preferredModelCommand(models = []) {
     return {
       title: recommended.title || recommended.ref,
       ref: recommended.ref,
-      command: `${ollamaRuntimeCommandLabel()} run ${recommended.ref}`,
+      command: `${ollamaRuntimeCommandLabel(recommended.ref)} run ${recommended.ref}`,
       installed: Boolean(recommended.installed),
       benchmarked: Boolean(recommended.benchmarked)
     };
@@ -1451,7 +1480,7 @@ function preferredModelCommand(models = []) {
   return ref ? {
     title: modelTitle(model),
     ref,
-    command: `${ollamaRuntimeCommandLabel()} run ${ref}`,
+    command: `${ollamaRuntimeCommandLabel(ref)} run ${ref}`,
     installed: isOllamaModelInstalled(ref),
     benchmarked: hasSuccessfulBenchmarkFor(ref)
   } : null;
@@ -2995,7 +3024,7 @@ function renderCommands(models) {
   const starter = {
     label: "Premier test conseillé",
     ollama: "qwen3:0.6b",
-    command: `${ollamaRuntimeCommandLabel()} run qwen3:0.6b`,
+    command: `${ollamaRuntimeCommandLabel("qwen3:0.6b")} run qwen3:0.6b`,
     reason: "Modèle ultra léger pour vérifier que le téléchargement, le lancement et le benchmark fonctionnent."
   };
   const commands = models
@@ -3004,7 +3033,7 @@ function renderCommands(models) {
     .map((model) => ({
       label: `${model.name || "Modele"} ${model.params || ""}`.trim(),
       ollama: actionableOllamaRef(model),
-      command: `${ollamaRuntimeCommandLabel()} run ${actionableOllamaRef(model)}`,
+      command: `${ollamaRuntimeCommandLabel(actionableOllamaRef(model))} run ${actionableOllamaRef(model)}`,
       reason: modelLine(model)
     }));
   const deduped = [
@@ -3016,7 +3045,7 @@ function renderCommands(models) {
   els.commandList.innerHTML = deduped.length
     ? deduped.map((item, index) => {
         const actionRef = ollamaActionRef(item.ollama);
-        const command = `${ollamaRuntimeCommandLabel()} run ${actionRef}`;
+        const command = `${ollamaRuntimeCommandLabel(actionRef)} run ${actionRef}`;
         const installed = isOllamaModelInstalled(actionRef);
         const installing = isOllamaModelInstalling(actionRef);
         const installLocked = hasActiveInstall() && !installing;
@@ -3292,7 +3321,7 @@ function readinessReport() {
   const arena = arenaRun ? arenaWinners(arenaRun.results || []) : null;
   const models = extractModels(compatibility).slice(0, 5).map((model) => ({
     title: modelTitle(model),
-    command: actionableOllamaRef(model) ? `${ollamaRuntimeCommandLabel()} run ${actionableOllamaRef(model)}` : "",
+    command: actionableOllamaRef(model) ? `${ollamaRuntimeCommandLabel(actionableOllamaRef(model))} run ${actionableOllamaRef(model)}` : "",
     reason: modelLine(model)
   }));
   const upgrades = (compatibility.upgrades || compatibility.recommended_upgrades || compatibility.shopping_list || [])
@@ -3962,7 +3991,7 @@ function memoryModelCards(report = readinessReport()) {
       `- Limite: ${info.limit}`,
       `- Taille estimée: ${ref ? estimatedModelSizeLabel(ref) : "variable"}`,
       benchmark ? `- Dernier benchmark: ${benchmark.estimated_tokens_per_second} tok/s, ${benchmark.elapsed_ms} ms` : "- Dernier benchmark: non mesuré",
-      ref ? `- Commande: ${ollamaRuntimeCommandLabel()} run ${ref}` : "- Commande: non fournie"
+      ref ? `- Commande: ${ollamaRuntimeCommandLabel(ref)} run ${ref}` : "- Commande: non fournie"
     );
   };
   const starter = { name: "Qwen3 test léger", params: "0.6B", ollama: "qwen3:0.6b" };
@@ -5448,7 +5477,7 @@ async function runAutomaticArena() {
               model: ref,
               prompt,
               timeout_seconds: 60,
-              ...ollamaRuntimePayload()
+              ...ollamaRuntimePayload(ref)
             }
           })
         : demoBenchmark(ref);
@@ -6167,7 +6196,7 @@ function topModels(models) {
   return (Array.isArray(models) ? models : []).slice(0, 5).map((model) => ({
     name: model.name || model.model_name || model.model || "modèle",
     detail: modelLine(model),
-    command: model.ollama ? `${ollamaRuntimeCommandLabel()} run ${model.ollama}` : ""
+    command: model.ollama ? `${ollamaRuntimeCommandLabel(model.ollama)} run ${model.ollama}` : ""
   }));
 }
 
@@ -6549,7 +6578,7 @@ async function runBenchmark(options = {}) {
             model,
             prompt: els.benchmarkPromptInput.value.trim(),
             timeout_seconds: 45,
-            ...ollamaRuntimePayload()
+            ...ollamaRuntimePayload(model)
           }
         })
       : demoBenchmark(model);
@@ -6847,7 +6876,7 @@ async function runLocalChat() {
             model,
             prompt,
             timeout_seconds: 90,
-            ...ollamaRuntimePayload()
+            ...ollamaRuntimePayload(model)
           }
         })
       : demoChat(model, prompt);
@@ -7194,7 +7223,7 @@ async function installRecommendedModel(model, button = null) {
     appendOperationLine(`Référence corrigée : ${requested} -> ${clean}`, "info");
   }
   setOperationFocus(`Téléchargement en cours : ${clean}`, [
-    `Commande : ${ollamaRuntimeCommandLabel()} pull ${clean}`,
+    `Commande : ${ollamaRuntimeCommandLabel(clean)} pull ${clean}`,
     `Taille estimée : ${estimatedModelSizeLabel(clean)}`,
     "La progression apparaît ici et dans la console détaillée."
   ]);
@@ -7229,14 +7258,14 @@ async function installRecommendedModel(model, button = null) {
     <span>Ollama télécharge le modèle. L'app reste utilisable pendant l'opération.</span>
   `;
   setStatus(`Téléchargement ${clean}...`);
-  appendOperationLine(`Commande lancée : ${ollamaRuntimeCommandLabel()} pull ${clean}`, "cmd");
+  appendOperationLine(`Commande lancée : ${ollamaRuntimeCommandLabel(clean)} pull ${clean}`, "cmd");
   try {
     const result = invoke
       ? await invoke("install_ollama_model", {
           request: {
             model: clean,
             timeout_seconds: 1800,
-            ...ollamaRuntimePayload()
+            ...ollamaRuntimePayload(clean)
           }
         })
       : { success: true, model: clean, output_preview: "Démo navigateur" };
@@ -7347,7 +7376,7 @@ async function deleteInstalledModel(model, button = null) {
   await ensureInstallProgressListener().catch((error) => {
     appendOperationLine(`Console temps réel non initialisée : ${error}`, "erreur");
   });
-  appendOperationLine(`Commande lancée : ${ollamaRuntimeCommandLabel()} rm ${clean}`, "cmd");
+  appendOperationLine(`Commande lancée : ${ollamaRuntimeCommandLabel(clean)} rm ${clean}`, "cmd");
   if (button) button.disabled = true;
   setStatus(`Suppression ${clean}...`);
   els.operationState.textContent = "suppression";
@@ -7357,7 +7386,7 @@ async function deleteInstalledModel(model, button = null) {
           request: {
             model: clean,
             timeout_seconds: 120,
-            ...ollamaRuntimePayload()
+            ...ollamaRuntimePayload(clean)
           }
         })
       : { success: true, model: clean, output_preview: "Démo navigateur" };
@@ -7880,7 +7909,7 @@ function renderDesktopUpdates(payload) {
     const unlocked = (item.unlocked_by_primary_upgrade || []).slice(0, 3).map(modelTitle).join(", ");
     const guide = item.buying_guides?.[0];
     const commands = (item.recommended_commands || []).slice(0, 2).map((command) => `
-      <button type="button" data-copy-command="${escapeHtml(command.ollama ? `${ollamaRuntimeCommandLabel()} run ${command.ollama}` : command.command || "")}">${escapeHtml(command.ollama ? `${ollamaRuntimeCommandLabel()} run ${command.ollama}` : command.command || `${ollamaRuntimeCommandLabel()} run`)}</button>
+      <button type="button" data-copy-command="${escapeHtml(command.ollama ? `${ollamaRuntimeCommandLabel(command.ollama)} run ${command.ollama}` : command.command || "")}">${escapeHtml(command.ollama ? `${ollamaRuntimeCommandLabel(command.ollama)} run ${command.ollama}` : command.command || `${ollamaRuntimeCommandLabel()} run`)}</button>
       <button type="button" data-benchmark-model="${escapeHtml(command.ollama || "")}">Bench</button>
     `).join("");
     return `
@@ -8673,6 +8702,10 @@ function installTestHarness() {
     demoBenchmark,
     strategyArenaReadiness,
     setViewMode,
+    defaultOllamaRuntime,
+    ollamaRuntimePayload,
+    ollamaRuntimeCommandLabel,
+    installedOllamaRuntimeFor,
     applyDemoState() {
       const scan = demoScan();
       renderScan(scan);
@@ -8797,6 +8830,42 @@ function installTestHarness() {
         action: primaryActionState(),
         reportReady: prepareFlowState().reportReady,
         readinessVisible: Boolean(els.readinessPanel?.offsetParent)
+      };
+    },
+    applyDualRuntimeWslModelState() {
+      const scan = demoScan();
+      scan.runtimes = {
+        ...(scan.runtimes || {}),
+        ollama: { installed: true, version: "ollama windows", source: "ollama-cli" },
+        ollama_wsl: { installed: true, version: "ollama wsl", source: "ollama-wsl" },
+        wsl: {
+          installed: true,
+          version: "WSL version demo",
+          state: "wsl_ready",
+          source: "wsl.exe",
+          default_distribution: "Ubuntu",
+          distributions: ["Ubuntu"],
+          ollama_ready: true,
+          install_command: "wsl.exe --install -d Ubuntu",
+          ollama_install_command: "wsl.exe sh -lc \"curl -fsSL https://ollama.com/install.sh | sh\"",
+          ollama_test_command: "wsl.exe ollama run qwen3:0.6b"
+        }
+      };
+      scan.installed_models = [
+        { model_name: "qwen3", model_tag: "0.6b", size_gb: 0.5, runtime: "ollama-wsl", source: "ollama-wsl" },
+        { model_name: "hermes3", model_tag: "8b", size_gb: 4.7, runtime: "ollama", source: "ollama" }
+      ];
+      renderScan(scan);
+      renderPrimaryAction();
+      return {
+        qwenRuntime: installedOllamaRuntimeFor("qwen3:0.6b"),
+        qwenDefault: defaultOllamaRuntime("qwen3:0.6b"),
+        qwenPayload: ollamaRuntimePayload("qwen3:0.6b"),
+        qwenCommand: ollamaRuntimeCommandLabel("qwen3:0.6b"),
+        hermesRuntime: installedOllamaRuntimeFor("hermes3:8b"),
+        hermesDefault: defaultOllamaRuntime("hermes3:8b"),
+        hermesPayload: ollamaRuntimePayload("hermes3:8b"),
+        hermesCommand: ollamaRuntimeCommandLabel("hermes3:8b")
       };
     },
     applyInstallProgressState() {

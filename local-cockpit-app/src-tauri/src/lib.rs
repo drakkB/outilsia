@@ -14,6 +14,7 @@ use sysinfo::System;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const OUTILSIA_ENDPOINT: &str = "https://outilsia.fr";
+const DETECTION_COMMAND_TIMEOUT: Duration = Duration::from_secs(12);
 
 #[derive(Default)]
 struct ActiveInstalls(Mutex<HashMap<String, u32>>);
@@ -2513,8 +2514,15 @@ fn run_ollama_command(args: &[&str]) -> Option<String> {
 }
 
 fn run_ollama_command_for(runtime: OllamaRuntime, args: &[&str]) -> Option<String> {
-    let output = build_ollama_command(runtime).args(args).output().ok()?;
-    if !output.status.success() {
+    let mut command = build_ollama_command(runtime);
+    command.args(args);
+    let (output, timed_out) = command_output_with_timeout(
+        command,
+        DETECTION_COMMAND_TIMEOUT,
+        &format!("Detection {}", ollama_runtime_name(runtime)),
+    )
+    .ok()?;
+    if timed_out || !output.status.success() {
         return None;
     }
     String::from_utf8(output.stdout)
@@ -2598,8 +2606,11 @@ fn parse_size_gb(value: &str, unit: &str) -> Option<f64> {
 }
 
 fn run_command(program: &str, args: &[&str]) -> Option<String> {
-    let output = Command::new(program).args(args).output().ok()?;
-    if !output.status.success() {
+    let mut command = Command::new(program);
+    command.args(args);
+    let (output, timed_out) =
+        command_output_with_timeout(command, DETECTION_COMMAND_TIMEOUT, program).ok()?;
+    if timed_out || !output.status.success() {
         return None;
     }
     String::from_utf8(output.stdout)

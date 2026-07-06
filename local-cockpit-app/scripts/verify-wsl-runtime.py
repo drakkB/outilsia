@@ -97,6 +97,7 @@ def main():
                 }
             },
         )
+        dual_runtime = page.evaluate("""() => window.__OUTILSIA_TEST__.applyDualRuntimeWslModelState()""")
         browser.close()
 
     if not hidden_in_essential:
@@ -120,6 +121,14 @@ def main():
         raise AssertionError(f"missing title mismatch: {missing}")
     if missing.get("canInstall") is not True or missing.get("canCopy") is not True:
         raise AssertionError(f"missing WSL should expose install/copy actions: {missing}")
+    if dual_runtime.get("qwenRuntime") != "wsl" or dual_runtime.get("qwenDefault") != "wsl":
+        raise AssertionError(f"qwen installed only in WSL should use WSL runtime: {dual_runtime}")
+    if dual_runtime.get("qwenPayload") != {"runtime": "wsl"}:
+        raise AssertionError(f"qwen WSL payload mismatch: {dual_runtime}")
+    if dual_runtime.get("qwenCommand") != "wsl.exe ollama":
+        raise AssertionError(f"qwen WSL command mismatch: {dual_runtime}")
+    if dual_runtime.get("hermesRuntime") != "native" or dual_runtime.get("hermesPayload") != {}:
+        raise AssertionError(f"hermes native runtime mismatch: {dual_runtime}")
 
     print(
         "wsl_runtime_ok "
