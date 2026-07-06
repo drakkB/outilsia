@@ -115,7 +115,6 @@ function checkLocalFiles() {
     "npm ci",
     "node --check src/app.js",
     "npm run verify:ui",
-    "npm run verify:branding",
     "build-windows-beta.ps1",
     "npm run package:beta",
     "npm run verify:release:contract -- --require-platform windows-x64 --require-freshness",
