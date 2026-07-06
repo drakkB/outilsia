@@ -8450,7 +8450,7 @@ function localHistoryMarkdown(snapshots = state.localSnapshots) {
     lines.push(`- CPU: ${scan.cpu_name || "inconnu"} (${scan.cpu_cores || 0} coeurs)`);
     lines.push(`- RAM: ${scan.ram_gb || 0} Go`);
     lines.push(`- GPU: ${scan.gpu_name || "non détecté"}`);
-    lines.push(`- VRAM: ${scan.vram_gb || 0} Go`);
+    lines.push(`- VRAM: ${formatVram(scan.vram_gb).replace(" VRAM", "")}`);
     lines.push(`- OS: ${[scan.os_name, scan.os_version].filter(Boolean).join(" ") || "inconnu"}`);
     lines.push(`- Ollama: ${runtimeOllama(scan)}`);
     lines.push(`- Modèles installés: ${(scan.installed_models || []).map(modelLabel).slice(0, 8).join(", ") || "aucun"}`);
