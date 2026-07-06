@@ -7526,15 +7526,38 @@ async function syncBenchmark() {
   }
 }
 
+function benchmarkQualityVerdict(result) {
+  if (!result?.success) return "Qualité courte : échec ou réponse incomplète, ne pas retenir ce modèle sans retest.";
+  const tps = Number(result.estimated_tokens_per_second || 0);
+  const elapsed = Number(result.elapsed_ms || 0);
+  const preview = String(result.output_preview || "").trim();
+  if (tps >= 40 && elapsed <= 6000 && preview.length >= 80) {
+    return "Qualité courte : très bon candidat, réponse exploitable et vitesse confortable.";
+  }
+  if (tps >= 12 && preview.length >= 60) {
+    return "Qualité courte : correct pour valider la machine, à comparer avec un modèle plus qualitatif.";
+  }
+  if (tps > 0 && preview.length >= 30) {
+    return "Qualité courte : utilisable pour test léger, mais probablement limité au quotidien.";
+  }
+  return "Qualité courte : preuve technique obtenue, qualité à confirmer avec un prompt plus long.";
+}
+
 function renderBenchmark(result) {
+  const model = ollamaActionRef(result.model || "");
+  const quality = benchmarkQualityVerdict(result);
   els.benchmarkResult.innerHTML = `
     <div class="benchmark-card">
       <strong>${escapeHtml(result.success ? "Test réussi" : "Test terminé avec erreur")} - ${escapeHtml(result.model)}</strong>
       <span>Temps de réponse : ${escapeHtml(result.elapsed_ms ?? 0)} ms${result.timed_out ? " - test interrompu" : ""}</span>
       <span>Vitesse estimée : ${escapeHtml(result.estimated_tokens_per_second ?? 0)} tok/s</span>
+      <span>${escapeHtml(quality)}</span>
       <span>${escapeHtml(result.error || result.output_preview || "Sortie vide")}</span>
     </div>
     <div class="row-actions">
+      ${model ? `<button type="button" data-keep-installed-model="${escapeHtml(model)}">Garder</button>` : ""}
+      ${model ? `<button type="button" data-delete-model="${escapeHtml(model)}">Supprimer</button>` : ""}
+      ${model ? `<button type="button" data-post-install-arena="${escapeHtml(model)}">Comparer</button>` : ""}
       <button type="button" data-copy-test-report="true">Copier le rapport</button>
       <button type="button" data-focus-feedback="true">Signaler un résultat</button>
     </div>
