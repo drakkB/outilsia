@@ -38,6 +38,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Test Rust core
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
       - name: Verify public CI surface
         run: |
           node --check src/app.js

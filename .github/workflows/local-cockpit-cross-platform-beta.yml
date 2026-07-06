@@ -46,6 +46,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Test Rust core
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
       - name: Verify UI
         run: npm run verify:ui
 
@@ -108,6 +111,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Test Rust core
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
 
       - name: Build Linux beta package
         run: npm run build:beta:linux

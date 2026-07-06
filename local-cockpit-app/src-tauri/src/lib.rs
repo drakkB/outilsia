@@ -1132,29 +1132,50 @@ fn run_ollama_prompt(
             )
         })?;
 
+    let stdout_preview = Arc::new(Mutex::new(String::new()));
+    let stderr_preview = Arc::new(Mutex::new(String::new()));
+    let mut readers = Vec::new();
+
+    if let Some(stdout) = child.stdout.take() {
+        readers.push(spawn_output_collector(stdout, stdout_preview.clone()));
+    }
+    if let Some(stderr) = child.stderr.take() {
+        readers.push(spawn_output_collector(stderr, stderr_preview.clone()));
+    }
+
     let mut timed_out = false;
-    loop {
-        if child
+    let status = loop {
+        if let Some(status) = child
             .try_wait()
             .map_err(|err| format!("Benchmark Ollama illisible: {err}"))?
-            .is_some()
         {
-            break;
+            break status;
         }
         if started.elapsed() >= timeout {
             timed_out = true;
             let _ = child.kill();
-            break;
+            break child
+                .wait()
+                .map_err(|err| format!("Fin Ollama indisponible: {err}"))?;
         }
         std::thread::sleep(Duration::from_millis(120));
+    };
+
+    for reader in readers {
+        let _ = reader.join();
     }
 
-    let output = child
-        .wait_with_output()
-        .map_err(|err| format!("Sortie Ollama indisponible: {err}"))?;
     let elapsed_ms = started.elapsed().as_millis();
-    let stdout = clean_benchmark_output(&String::from_utf8_lossy(&output.stdout));
-    let stderr = clean_benchmark_output(&String::from_utf8_lossy(&output.stderr));
+    let stdout_raw = stdout_preview
+        .lock()
+        .map(|value| value.clone())
+        .unwrap_or_default();
+    let stderr_raw = stderr_preview
+        .lock()
+        .map(|value| value.clone())
+        .unwrap_or_default();
+    let stdout = clean_benchmark_output(&stdout_raw);
+    let stderr = clean_benchmark_output(&stderr_raw);
     let output_chars = stdout.chars().count();
     let estimated_tokens = ((output_chars as f64) / 4.0).round().max(0.0) as u32;
     let seconds = (elapsed_ms as f64 / 1000.0).max(0.001);
@@ -1167,10 +1188,10 @@ fn run_ollama_prompt(
         output_chars,
         estimated_tokens,
         estimated_tokens_per_second,
-        success: output.status.success() && !timed_out,
+        success: status.success() && !timed_out,
         timed_out,
         output_preview: stdout.chars().take(700).collect(),
-        error: if output.status.success() && !timed_out {
+        error: if status.success() && !timed_out {
             None
         } else if timed_out {
             Some(format!(
@@ -1232,6 +1253,25 @@ fn append_install_output(output: &Arc<Mutex<String>>, text: &str) {
             *value = tail.chars().rev().collect();
         }
     }
+}
+
+fn spawn_output_collector<R: Read + Send + 'static>(
+    mut reader: R,
+    output: Arc<Mutex<String>>,
+) -> thread::JoinHandle<()> {
+    thread::spawn(move || {
+        let mut buffer = [0_u8; 1024];
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(size) => {
+                    let text = String::from_utf8_lossy(&buffer[..size]).to_string();
+                    append_install_output(&output, &text);
+                }
+                Err(_) => break,
+            }
+        }
+    })
 }
 
 fn strip_ansi_sequences(input: &str) -> String {
@@ -2010,7 +2050,11 @@ fn detect_windows_memory_probe(total_gb: Option<u32>) -> Option<MemoryProbe> {
     if modules.is_empty() {
         return None;
     }
-    Some(memory_probe_from_modules(total_gb, modules, "win32_physical_memory"))
+    Some(memory_probe_from_modules(
+        total_gb,
+        modules,
+        "win32_physical_memory",
+    ))
 }
 
 fn detect_linux_memory_probe(total_gb: Option<u32>) -> Option<MemoryProbe> {
@@ -2034,7 +2078,9 @@ fn parse_memory_module_lines(output: &str) -> Vec<MemoryModule> {
                 return None;
             }
             let parts: Vec<&str> = clean.split('|').collect();
-            let capacity_bytes = parts.first().and_then(|value| value.trim().parse::<u64>().ok());
+            let capacity_bytes = parts
+                .first()
+                .and_then(|value| value.trim().parse::<u64>().ok());
             let size_gb = capacity_bytes.map(bytes_to_gb);
             if size_gb.unwrap_or_default() == 0 {
                 return None;
@@ -2136,7 +2182,10 @@ fn memory_probe_from_modules(
     source: &str,
 ) -> MemoryProbe {
     let module_count = modules.len() as u32;
-    let configured_clock_mhz = modules.iter().filter_map(|module| module.configured_clock_mhz).min();
+    let configured_clock_mhz = modules
+        .iter()
+        .filter_map(|module| module.configured_clock_mhz)
+        .min();
     let speed_mhz = modules.iter().filter_map(|module| module.speed_mhz).min();
     let channel_mode = if module_count >= 4 {
         "multi_channel_estimated"
@@ -2525,8 +2574,7 @@ fn run_ollama_command_for(runtime: OllamaRuntime, args: &[&str]) -> Option<Strin
     if timed_out || !output.status.success() {
         return None;
     }
-    String::from_utf8(output.stdout)
-        .ok()
+    decode_command_stdout(&output.stdout)
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
 }
@@ -2613,10 +2661,39 @@ fn run_command(program: &str, args: &[&str]) -> Option<String> {
     if timed_out || !output.status.success() {
         return None;
     }
-    String::from_utf8(output.stdout)
-        .ok()
+    decode_command_stdout(&output.stdout)
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+}
+
+fn decode_command_stdout(bytes: &[u8]) -> Option<String> {
+    if bytes.is_empty() {
+        return None;
+    }
+    let nul_count = bytes.iter().filter(|byte| **byte == 0).count();
+    if nul_count > 0 && bytes.len() >= 2 {
+        let mut words = Vec::with_capacity(bytes.len() / 2);
+        for chunk in bytes.chunks_exact(2) {
+            words.push(u16::from_le_bytes([chunk[0], chunk[1]]));
+        }
+        if !words.is_empty() {
+            return Some(String::from_utf16_lossy(&words));
+        }
+    }
+    if let Ok(value) = std::str::from_utf8(bytes) {
+        return Some(value.to_string());
+    }
+    if bytes.len() % 2 != 0 {
+        return None;
+    }
+    let mut words = Vec::with_capacity(bytes.len() / 2);
+    for chunk in bytes.chunks_exact(2) {
+        words.push(u16::from_le_bytes([chunk[0], chunk[1]]));
+    }
+    if words.is_empty() {
+        return None;
+    }
+    Some(String::from_utf16_lossy(&words))
 }
 
 fn build_machine_name(cpu_name: Option<&str>, gpu_name: Option<&str>) -> String {
@@ -3922,5 +3999,23 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184
         assert_eq!(probe.channel_mode, "dual_channel_estimated");
         assert_eq!(probe.configured_clock_mhz, Some(6000));
         assert_eq!(probe.speed_mhz, Some(5600));
+    }
+
+    #[test]
+    fn decodes_utf16le_command_output_from_wsl() {
+        let text = "Ubuntu\r\nDebian\r\n";
+        let bytes: Vec<u8> = text
+            .encode_utf16()
+            .flat_map(|word| word.to_le_bytes())
+            .collect();
+        assert_eq!(decode_command_stdout(&bytes).unwrap(), text);
+    }
+
+    #[test]
+    fn keeps_utf8_command_output_preferred() {
+        assert_eq!(
+            decode_command_stdout("ollama version is 0.18.2\n".as_bytes()).unwrap(),
+            "ollama version is 0.18.2\n"
+        );
     }
 }
