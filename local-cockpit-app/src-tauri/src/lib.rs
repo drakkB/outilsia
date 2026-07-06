@@ -3859,4 +3859,57 @@ mod tests {
         assert_eq!(probe.speed_mhz, Some(5600));
         assert_eq!(probe.module_count, Some(2));
     }
+
+    #[test]
+    fn parses_ollama_list_with_namespaces_and_sizes() {
+        let output = "\
+NAME                                      ID              SIZE      MODIFIED
+qwen3:0.6b                                abc123          522 MB    2 days ago
+hermes3:8b                                def456          4.7 GB    1 week ago
+adrienbrault/nous-hermes2theta-llama3-8b:q4 ghi789       4,9 GB    1 month ago
+big-model:latest                          zzz999          1.2 TB    1 year ago
+";
+        let models = parse_ollama_list_with_source(output, "ollama-wsl");
+        assert_eq!(models.len(), 4);
+        assert_eq!(models[0].name, "qwen3");
+        assert_eq!(models[0].tag.as_deref(), Some("0.6b"));
+        assert_eq!(models[0].source, "ollama-wsl");
+        assert!(models[0].size_gb.unwrap() > 0.50 && models[0].size_gb.unwrap() < 0.52);
+        assert_eq!(models[2].name, "adrienbrault/nous-hermes2theta-llama3-8b");
+        assert_eq!(models[2].tag.as_deref(), Some("q4"));
+        assert_eq!(models[2].size_gb, Some(4.9));
+        assert_eq!(models[3].size_gb, Some(1228.8));
+    }
+
+    #[test]
+    fn chooses_discrete_windows_gpu_over_virtual_or_igpu() {
+        let output = "\
+Name|AdapterRAM
+Microsoft Basic Render Driver|0
+Intel(R) UHD Graphics|2147483648
+NVIDIA GeForce RTX 4080 SUPER|17179869184
+";
+        let (name, vram_gb) = preferred_windows_gpu_from_output(output).unwrap();
+        assert_eq!(name, "NVIDIA GeForce RTX 4080 SUPER");
+        assert_eq!(vram_gb, Some(16));
+    }
+
+    #[test]
+    fn parses_windows_memory_modules_and_clock() {
+        let output = "\
+34359738368|6000|5600|Kingston|KF560C36|A2
+34359738368|6000|5600|Kingston|KF560C36|B2
+0|0|0|||
+";
+        let modules = parse_memory_module_lines(output);
+        assert_eq!(modules.len(), 2);
+        assert_eq!(modules[0].size_gb, Some(32));
+        assert_eq!(modules[0].configured_clock_mhz, Some(6000));
+        assert_eq!(modules[0].speed_mhz, Some(5600));
+        assert_eq!(modules[0].slot.as_deref(), Some("A2"));
+        let probe = memory_probe_from_modules(Some(64), modules, "test-win32");
+        assert_eq!(probe.channel_mode, "dual_channel_estimated");
+        assert_eq!(probe.configured_clock_mhz, Some(6000));
+        assert_eq!(probe.speed_mhz, Some(5600));
+    }
 }
