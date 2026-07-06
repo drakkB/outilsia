@@ -3989,6 +3989,8 @@ $reportObj = [pscustomobject]@{
   schema = "outilsia.local_cockpit_field_entries_validation.v1"
   generated_at = (Get-Date).ToUniversalTime().ToString("o")
   status = $(if ($valid) { "FIELD_ENTRIES_VALID" } else { "FIELD_ENTRIES_INCOMPLETE" })
+  report_network_verified = $false
+  note = "Validation locale Windows (schema + doublons + plausibilite). La preuve reseau des rapports /r/ (existence + coherence avec la fiche) est verifiee a l'assemblage networked (COLLECTER-ET-ASSEMBLER / VALIDER-GOAL). FIELD_ENTRIES_VALID ici ne ferme pas le goal terrain."
   entries_dir = $EntriesDir
   files_read = $files.Count
   profiles_required = $requiredProfiles
@@ -4012,7 +4014,12 @@ $reportObj | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $OutJson -Encodi
 $lines = @(
   "# Validation fiches terrain OutilsIA",
   "",
+  "> Validation LOCALE Windows (schema + doublons + plausibilite). La preuve reseau",
+  "> des rapports /r/ est verifiee a l'assemblage (COLLECTER-ET-ASSEMBLER / VALIDER-GOAL).",
+  "> Un statut VALID ici ne ferme pas le goal terrain tant que les rapports ne sont pas verifies en reseau.",
+  "",
   "- Statut: $($reportObj.status)",
+  "- Preuve reseau des rapports: verifiee a l'assemblage (non ici)",
   "- Dossier: $EntriesDir",
   "- Fichiers lus: $($files.Count)",
   "- Profils valides: $($ready.Count)/$($requiredProfiles.Count)",

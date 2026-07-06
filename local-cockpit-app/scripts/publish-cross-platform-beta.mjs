@@ -118,16 +118,18 @@ function terrainGateStatus() {
   const ready = Number(status.ready || status.profiles_ready?.length || 0);
   const required = Number(status.required || status.profiles_required?.length || 5);
   const minimum = Number(status.minimum_ready_before_linux_publication || 2);
+  const networkVerified = Boolean(status.report_network_verified);
   return {
-    ok: ready >= minimum,
+    ok: ready >= minimum && networkVerified,
     source: path,
     ready,
     required,
     minimum,
+    network_verified: networkVerified,
     next: status.next_profile_to_test || status.next_profile || "",
-    reason: ready >= minimum
-      ? `gate terrain ouvert: ${ready}/${required}, minimum ${minimum}`
-      : `gate terrain fermé: ${ready}/${required}, minimum ${minimum}`,
+    reason: ready >= minimum && networkVerified
+      ? `gate terrain ouvert: ${ready}/${required}, minimum ${minimum}, rapports réseau vérifiés`
+      : `gate terrain fermé: ${ready}/${required}, minimum ${minimum}, report_network_verified=${networkVerified}`,
   };
 }
 

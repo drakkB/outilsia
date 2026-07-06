@@ -145,32 +145,58 @@ function assertShareUrl(value, label) {
   }
 }
 
-function assertShareUrlReachable(value, label, options = {}) {
+// Vérifie que le rapport /r/ existe ET que son titre est cohérent avec le
+// profil de la fiche (une fiche old_laptop ne peut pas pointer vers le rapport
+// d'une RTX 4080). Reste synchrone (spawnSync) pour ne pas casser l'assemblage.
+function assertShareUrlReachable(machine, profile, label, options = {}) {
   if (options.verifyShareUrls === false) return;
-  const text = String(value || "").trim();
+  const text = String(machine?.share_url || machine || "").trim();
   const script = `
-import sys
-import urllib.request
-url = sys.argv[1]
-request = urllib.request.Request(url, headers={"User-Agent": "OutilsIA-FieldValidator/1.0"})
+import sys, re, urllib.request
+url, profile, tps = sys.argv[1], sys.argv[2], float(sys.argv[3] or 0)
+RULE = {
+  "rtx_4080_4090": {"require": ["4080","4090"]},
+  "rtx_3060_12gb": {"require": ["3060"]},
+  "core_i7_gtx_1080_ti": {"require": ["1080"]},
+  "old_laptop": {"forbid": ["4090","4080","4070","3090","3080","3070","3060","2080"]},
+  "cpu_only": {"forbid": ["4090","4080","4070","4060","3090","3080","3070","3060","3050","2080","2070","2060","1080","1070","1060"]},
+}
+def headline(t):
+  parts = []
+  for pat in [r'<title[^>]*>([^<]+)</title>', r'name=["\\']description["\\'][^>]*content=["\\']([^"\\']+)["\\']', r'content=["\\']([^"\\']+)["\\'][^>]*name=["\\']description["\\']', r'property=["\\']og:(?:title|description)["\\'][^>]*content=["\\']([^"\\']+)["\\']', r'<h1[^>]*>(.*?)</h1>']:
+    m = re.search(pat, t, re.I | re.S)
+    if m: parts.append(re.sub(r'<[^>]+>', ' ', m.group(1)))
+  for m in re.finditer(r'"(?:headline|name|description|alternativeHeadline)"\\s*:\\s*"([^"]+)"', t, re.I):
+    parts.append(m.group(1))
+  return ' '.join(parts).lower()
+req = urllib.request.Request(url, headers={"User-Agent": "OutilsIA-FieldValidator/1.0"})
 try:
-    with urllib.request.urlopen(request, timeout=12) as response:
-        status = int(getattr(response, "status", response.getcode()))
-        body = response.read(4096)
-    if status < 200 or status >= 400:
-        raise SystemExit(f"status {status}")
-    if not body:
-        raise SystemExit("empty response")
-except Exception as exc:
-    raise SystemExit(str(exc))
+    with urllib.request.urlopen(req, timeout=15) as r:
+        status = int(getattr(r, "status", r.getcode()))
+        body = r.read(200000).decode("utf-8","replace")
+    if status < 200 or status >= 400: raise SystemExit(f"status {status}")
+    if not body: raise SystemExit("empty response")
+except SystemExit: raise
+except Exception as exc: raise SystemExit(f"unreachable: {exc}")
+h = headline(body); rule = RULE.get(profile, {})
+if rule.get("require") and not any(tok in h for tok in rule["require"]):
+    raise SystemExit(f"incoherent: titre du rapport sans {'/'.join(rule['require'])}")
+if rule.get("forbid"):
+    seen = [tok for tok in rule["forbid"] if tok in h]
+    if seen: raise SystemExit(f"incoherent: titre du rapport {profile} incompatible ({','.join(seen)})")
+rep_tps = [float(x.replace(',','.')) for x in re.findall(r'([0-9]+(?:[.,][0-9]+)?)\\s*tok/s', body.lower())]
+rep_tps = [x for x in rep_tps if x > 0]
+if rep_tps and tps > 0 and not any(abs(x-tps) <= max(1.0, tps*0.1) for x in rep_tps):
+    raise SystemExit(f"incoherent: tok/s fiche {tps} absent du rapport")
 `;
-  const result = spawnSync("python3", ["-c", script, text], {
+  const tps = String(Number(machine?.benchmark_tokens_per_second || 0));
+  const result = spawnSync("python3", ["-c", script, text, String(profile || ""), tps], {
     encoding: "utf8",
-    timeout: 15000,
+    timeout: 20000,
   });
   if (result.status !== 0) {
     const detail = String(result.stderr || result.stdout || result.error?.message || "unreachable").trim();
-    fail(`${label} must resolve to a public OutilsIA report (${detail})`);
+    fail(`${label} rapport /r/ invalide (${detail})`);
   }
 }
 
@@ -254,7 +280,7 @@ export function validateFieldTests(payload, options = {}) {
     assertBooleanTrue(machine.arena_ok, `${profile}.arena_ok`);
     assertBooleanTrue(machine.report_ok, `${profile}.report_ok`);
     assertShareUrl(machine.share_url, `${profile}.share_url`);
-    assertShareUrlReachable(machine.share_url, `${profile}.share_url`, options);
+    assertShareUrlReachable(machine, profile, `${profile}.share_url`, options);
     const shareUrl = String(machine.share_url || "").trim().toLowerCase();
     if (shareUrls.has(shareUrl)) fail(`Duplicate share_url across field machines: ${machine.share_url}`);
     shareUrls.add(shareUrl);

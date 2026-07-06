@@ -4,6 +4,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { REQUIRED_PROFILES } from "./import-field-tests.mjs";
 import { validateSingleFieldEntry } from "./validate-single-field-entry.mjs";
+import { verifyShareReport } from "./verify-share-report.mjs";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const desktopKit = existsSync("/mnt/c/Users/chris/Desktop")
@@ -15,17 +16,18 @@ const fieldKitManifest = join(desktopKit, "FIELD-KIT-MANIFEST.txt");
 
 function usage() {
   console.log(`Usage:
-  node scripts/report-field-test-status.mjs [--dir entries] [--out FIELD-TESTS-STATUS.json] [--fail-on-incomplete]
+  node scripts/report-field-test-status.mjs [--dir entries] [--out FIELD-TESTS-STATUS.json] [--fail-on-incomplete] [--offline]
 
 Reads single-machine field-test exports and reports:
   - profiles present;
   - profiles missing;
   - incomplete fields per profile;
-  - next machine to test.`);
+  - next machine to test;
+  - shared /r/ report network proof, unless --offline is used.`);
 }
 
 function parseArgs(argv) {
-  const opts = { dir: defaultDir, out: defaultOut, failOnIncomplete: false };
+  const opts = { dir: defaultDir, out: defaultOut, failOnIncomplete: false, offline: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") {
@@ -42,6 +44,10 @@ function parseArgs(argv) {
     }
     if (arg === "--fail-on-incomplete") {
       opts.failOnIncomplete = true;
+      continue;
+    }
+    if (arg === "--offline") {
+      opts.offline = true;
       continue;
     }
     throw new Error(`Unknown argument: ${arg}`);
@@ -187,6 +193,10 @@ function buildStatus(opts) {
     schema: "outilsia.local_cockpit_field_status.v1",
     generated_at: new Date().toISOString(),
     status: missingProfiles.length || incompleteProfiles.length || unreadable.length || metadataMixed ? "FIELD_TESTS_INCOMPLETE" : "FIELD_TESTS_READY",
+    // "ready" = schéma + plausibilité (hors-ligne). La preuve réseau des rapports
+    // /r/ (existence + cohérence avec la fiche) est contrôlée à l'assemblage et
+    // par scripts/audit_beta_field_goal.py, qui seuls ferment le goal terrain.
+    report_network_verified: false,
     entries_dir: opts.dir,
     files_read: files.length,
     profiles_required: REQUIRED_PROFILES,
@@ -203,6 +213,65 @@ function buildStatus(opts) {
   };
 }
 
+async function buildStatusWithReports(opts) {
+  const status = buildStatus(opts);
+  const networkUnverified = [];
+  const reportIncomplete = [];
+
+  for (const profile of status.profiles) {
+    if (profile.status !== "ready") continue;
+    if (opts.offline) {
+      profile.status = "network_unverified";
+      profile.missing_fields = ["rapport /r/ non vérifié (--offline)"];
+      networkUnverified.push(profile.profile);
+      continue;
+    }
+    const sourceEntry = profile.source_file ? readJson(profile.source_file) : null;
+    const entries = extractMachines(sourceEntry, profile.source_file || "");
+    const entry = entries.find((item) => item.profile === profile.profile) || null;
+    if (!entry) {
+      profile.status = "incomplete";
+      profile.missing_fields = ["fiche source introuvable pour vérification réseau"];
+      reportIncomplete.push(profile.profile);
+      continue;
+    }
+    const report = await verifyShareReport(entry);
+    profile.report_status = report.status;
+    profile.report_http_status = report.http_status || 0;
+    profile.report_mismatches = report.mismatches || [];
+    if (report.status === "coherent") {
+      profile.report_network_verified = true;
+      profile.missing_fields = profile.missing_fields || [];
+      continue;
+    }
+    profile.report_network_verified = false;
+    if (report.status === "unreachable" || report.status === "invalid_format") {
+      profile.status = "network_unverified";
+      profile.missing_fields = [`rapport /r/ non vérifié: ${report.mismatches?.join("; ") || report.status}`];
+      networkUnverified.push(profile.profile);
+    } else {
+      profile.status = "incomplete";
+      profile.missing_fields = [`rapport /r/ incohérent: ${report.mismatches?.join("; ") || report.status}`];
+      reportIncomplete.push(profile.profile);
+    }
+  }
+
+  const missingProfiles = status.profiles.filter((item) => item.status === "missing").map((item) => item.profile);
+  const incompleteProfiles = status.profiles.filter((item) => item.status === "incomplete").map((item) => item.profile);
+  const readyProfiles = status.profiles.filter((item) => item.status === "ready").map((item) => item.profile);
+  status.profiles_ready = readyProfiles;
+  status.profiles_missing = missingProfiles;
+  status.profiles_incomplete = incompleteProfiles;
+  status.profiles_network_unverified = networkUnverified;
+  status.profiles_report_incomplete = reportIncomplete;
+  status.report_network_verified = !opts.offline && readyProfiles.length === status.profiles_required.length && networkUnverified.length === 0 && reportIncomplete.length === 0;
+  status.status = missingProfiles.length || incompleteProfiles.length || networkUnverified.length || status.unreadable.length || status.metadata_mixed
+    ? "FIELD_TESTS_INCOMPLETE"
+    : "FIELD_TESTS_READY";
+  status.next_profile_to_test = missingProfiles[0] || incompleteProfiles[0] || networkUnverified[0] || (status.metadata_mixed ? readyProfiles[0] || "" : "");
+  return status;
+}
+
 function markdown(status) {
   const lines = [
     "# Statut fiches terrain OutilsIA",
@@ -211,6 +280,9 @@ function markdown(status) {
     `- Dossier: \`${status.entries_dir}\``,
     `- Fichiers lus: ${status.files_read}`,
     `- Profils prêts: ${status.profiles_ready.length}/${status.profiles_required.length}`,
+    `- Rapports /r/ vérifiés réseau: ${status.report_network_verified ? "oui" : "non"}`,
+    status.profiles_network_unverified?.length ? `- Profils non vérifiés réseau: ${status.profiles_network_unverified.join(", ")}` : "",
+    status.profiles_report_incomplete?.length ? `- Profils avec rapport incohérent: ${status.profiles_report_incomplete.join(", ")}` : "",
     `- Builds prêts: ${status.build_ids?.length ? status.build_ids.join(", ") : "aucun"}`,
     `- Versions app prêtes: ${status.app_versions?.length ? status.app_versions.join(", ") : "aucune"}`,
     `- Métadonnées mélangées: ${status.metadata_mixed ? "oui" : "non"}`,
@@ -563,21 +635,23 @@ function commandCenterHtml(status) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  (async () => {
   try {
     const opts = parseArgs(process.argv.slice(2));
-    const status = buildStatus(opts);
+    const status = await buildStatusWithReports(opts);
     mkdirSync(dirname(opts.out), { recursive: true });
     writeFileSync(opts.out, `${JSON.stringify(status, null, 2)}\n`, "utf8");
     writeFileSync(opts.out.replace(/\.json$/i, ".md"), markdown(status), "utf8");
     writeFileSync(join(dirname(opts.out), "MISSION-TERRAIN.html"), missionHtml(status), "utf8");
     writeFileSync(join(dirname(opts.out), "PROCHAIN-PC.html"), nextProfileHtml(status), "utf8");
     writeFileSync(join(dirname(opts.out), "CENTRE-TERRAIN.html"), commandCenterHtml(status), "utf8");
-    console.log(`field_test_status_${status.status.toLowerCase()} ready=${status.profiles_ready.length}/${status.profiles_required.length} next=${status.next_profile_to_test || "none"} out=${opts.out}`);
+    console.log(`field_test_status_${status.status.toLowerCase()} ready=${status.profiles_ready.length}/${status.profiles_required.length} network_verified=${status.report_network_verified} next=${status.next_profile_to_test || "none"} out=${opts.out}`);
     if (opts.failOnIncomplete && status.status !== "FIELD_TESTS_READY") process.exit(1);
   } catch (error) {
     console.error(error.message || String(error));
     process.exit(1);
   }
+  })();
 }
 
-export { buildStatus, markdown, missionHtml, nextProfileHtml, commandCenterHtml };
+export { buildStatus, buildStatusWithReports, markdown, missionHtml, nextProfileHtml, commandCenterHtml };

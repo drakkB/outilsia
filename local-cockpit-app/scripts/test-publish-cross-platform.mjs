@@ -135,6 +135,16 @@ try {
   const previousFieldStatus = process.env.OUTILSIA_FIELD_STATUS_JSON;
   process.env.OUTILSIA_FIELD_STATUS_JSON = fieldStatus;
   runExpectFailure(["--windows", windows, "--linux", linux, "--release-dir", join(root, "deploy-blocked"), "--deploy"], "Linux public deploy blocked");
+  writeFileSync(fieldStatus, `${JSON.stringify({
+    schema: "outilsia.local_cockpit_field_status.v1",
+    required: 5,
+    minimum_ready_before_linux_publication: 2,
+    report_network_verified: false,
+    profiles_ready: ["rtx_4080_4090", "rtx_3060_12gb"],
+    profiles_missing: ["old_laptop", "core_i7_gtx_1080_ti", "cpu_only"],
+    next_profile_to_test: "old_laptop",
+  }, null, 2)}\n`);
+  runExpectFailure(["--windows", windows, "--linux", linux, "--release-dir", join(root, "deploy-network-blocked"), "--deploy"], "report_network_verified=false");
   if (previousFieldStatus === undefined) delete process.env.OUTILSIA_FIELD_STATUS_JSON;
   else process.env.OUTILSIA_FIELD_STATUS_JSON = previousFieldStatus;
   console.log(`publish_cross_platform_test_ok ${release.files.length} file(s)`);

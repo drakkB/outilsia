@@ -82,6 +82,7 @@
     "test:field-tests": "node scripts/test-field-tests-import.mjs",
     "test:field-entry": "node scripts/test-single-field-entry.mjs",
     "test:field-entries": "node scripts/test-validate-field-entries.mjs",
+    "test:field-report-coherence": "node scripts/test-field-report-coherence.mjs",
     "test:assemble-field-tests": "node scripts/test-assemble-field-tests.mjs",
     "test:goal-closure": "node scripts/test-goal-closure-guard.mjs",
     "verify:windows:artifacts": "powershell -ExecutionPolicy Bypass -File scripts/verify-windows-artifacts.ps1",

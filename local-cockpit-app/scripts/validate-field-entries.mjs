@@ -4,6 +4,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { REQUIRED_PROFILES } from "./import-field-tests.mjs";
 import { validateSingleFieldEntry } from "./validate-single-field-entry.mjs";
+import { verifyShareReport } from "./verify-share-report.mjs";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const desktopKit = existsSync("/mnt/c/Users/chris/Desktop")
@@ -21,7 +22,7 @@ Validates every exported field-test fiche before final assembly.`);
 }
 
 function parseArgs(argv) {
-  const opts = { dir: defaultDir, out: defaultOut, failOnIncomplete: false };
+  const opts = { dir: defaultDir, out: defaultOut, failOnIncomplete: false, offline: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") {
@@ -38,6 +39,10 @@ function parseArgs(argv) {
     }
     if (arg === "--fail-on-incomplete") {
       opts.failOnIncomplete = true;
+      continue;
+    }
+    if (arg === "--offline" || arg === "--no-verify-reports") {
+      opts.offline = true;
       continue;
     }
     throw new Error(`Unknown argument: ${arg}`);
@@ -300,6 +305,10 @@ function html(report) {
 }
 
 export function validateFieldEntries(opts) {
+  return finalizeReport(buildFieldEntriesContext(opts));
+}
+
+function buildFieldEntriesContext(opts) {
   const files = candidateFilesFromDir(opts.dir);
   const { byProfile, unreadable, unexpected, duplicates } = latestEntriesByProfile(files);
   const profiles = REQUIRED_PROFILES.map((profile) => {
@@ -369,27 +378,61 @@ export function validateFieldEntries(opts) {
     }
   }
   const duplicate_benchmark_tokens_per_second = [...tpsCounts.entries()].filter(([, count]) => count > 1).map(([value]) => value);
-  const ok = ready.length === REQUIRED_PROFILES.length && !unreadable.length && !unexpected.length && !metadataMixed && !duplicateShareUrls.length && !duplicate_benchmark_tokens_per_second.length;
-  const nextProfileToFix = missing[0] || incomplete[0] || (metadataMixed || duplicateShareUrls.length || duplicate_benchmark_tokens_per_second.length ? ready[0] || "" : "");
+  return {
+    opts,
+    profiles,
+    files,
+    unreadable,
+    unexpected,
+    duplicates,
+    buildIds,
+    appVersions,
+    metadataMixed,
+    duplicateShareUrls,
+    duplicate_benchmark_tokens_per_second,
+    reportVerified: false,
+  };
+}
+
+// Assemble le rapport final, recalcule ok/status/next à partir des statuts
+// courants des profils, puis écrit md/json/html. Sert au chemin sync (schéma)
+// et au chemin async (après vérification réseau des rapports /r/).
+function finalizeReport(ctx) {
+  const { opts } = ctx;
+  const profiles = ctx.profiles;
+  const ready = profiles.filter((row) => row.status === "ready").map((row) => row.profile);
+  const missing = profiles.filter((row) => row.status === "missing").map((row) => row.profile);
+  const incomplete = profiles.filter((row) => row.status === "incomplete").map((row) => row.profile);
+  const networkUnverified = profiles.filter((row) => row.status === "network_unverified").map((row) => row.profile);
+  const metadataMixed = ctx.metadataMixed;
+  const duplicateShareUrls = ctx.duplicateShareUrls;
+  const duplicate_benchmark_tokens_per_second = ctx.duplicate_benchmark_tokens_per_second;
+  const ok = ready.length === REQUIRED_PROFILES.length
+    && !ctx.unreadable.length && !ctx.unexpected.length && !metadataMixed
+    && !duplicateShareUrls.length && !duplicate_benchmark_tokens_per_second.length;
+  const nextProfileToFix = missing[0] || incomplete[0] || networkUnverified[0]
+    || (metadataMixed || duplicateShareUrls.length || duplicate_benchmark_tokens_per_second.length ? ready[0] || "" : "");
   const report = {
     schema: "outilsia.local_cockpit_field_entries_validation.v1",
     generated_at: new Date().toISOString(),
     status: ok ? "FIELD_ENTRIES_VALID" : "FIELD_ENTRIES_INCOMPLETE",
+    report_network_verified: Boolean(ctx.reportVerified),
     entries_dir: opts.dir,
-    files_read: files.length,
+    files_read: ctx.files.length,
     profiles_required: REQUIRED_PROFILES,
     profiles_ready: ready,
     profiles_missing: missing,
     profiles_incomplete: incomplete,
-    build_ids: buildIds,
-    app_versions: appVersions,
+    profiles_network_unverified: networkUnverified,
+    build_ids: ctx.buildIds,
+    app_versions: ctx.appVersions,
     metadata_mixed: metadataMixed,
     duplicate_share_urls: duplicateShareUrls,
     duplicate_benchmark_tokens_per_second,
     next_profile_to_fix: nextProfileToFix,
-    duplicates,
-    unreadable,
-    unexpected,
+    duplicates: ctx.duplicates,
+    unreadable: ctx.unreadable,
+    unexpected: ctx.unexpected,
     profiles,
   };
   mkdirSync(dirname(opts.out), { recursive: true });
@@ -402,16 +445,54 @@ export function validateFieldEntries(opts) {
   return report;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    const report = validateFieldEntries(parseArgs(process.argv.slice(2)));
-    console.log(
-      `field_entries_validation ${report.status} ready=${report.profiles_ready.length}/${report.profiles_required.length} ` +
-      `next=${report.next_profile_to_fix || "none"}`
-    );
-    if (report.status !== "FIELD_ENTRIES_VALID") process.exitCode = 1;
-  } catch (error) {
-    console.error(error.message || String(error));
-    process.exit(1);
+// Chemin async : reconstruit sans écrire, vérifie chaque rapport /r/ en réseau,
+// déclasse les profils dont le rapport est injoignable (network_unverified) ou
+// incohérent (incomplete), puis écrit le rapport final. FIELD_ENTRIES_VALID
+// exige donc au moins 5 rapports réels ET cohérents.
+export async function validateFieldEntriesWithReports(opts) {
+  const base = buildFieldEntriesContext(opts);
+  if (opts.offline) {
+    for (const row of base.profiles) {
+      if (row.status === "ready") {
+        row.report_verification = { status: "skipped_offline", detail: "vérification réseau non effectuée (--offline)" };
+        row.status = "network_unverified";
+        row.error = "rapport /r/ non vérifié (mode hors-ligne) : relancer avec réseau";
+      }
+    }
+    return finalizeReport({ ...base, opts, reportVerified: false });
   }
+  const readyRows = base.profiles.filter((row) => row.status === "ready");
+  await Promise.all(readyRows.map(async (row) => {
+    const entry = { profile: row.profile, share_url: row.report, benchmark_model: row.benchmark_model, benchmark_tokens_per_second: row.benchmark_tokens_per_second, app_version: row.app_version };
+    const verdict = await verifyShareReport(entry);
+    row.report_verification = { status: verdict.status, http_status: verdict.http_status, mismatches: verdict.mismatches || [] };
+    if (verdict.status === "coherent") return;
+    if (verdict.status === "unreachable") {
+      row.status = "network_unverified";
+      row.error = `rapport /r/ injoignable (${verdict.mismatches?.join(", ") || "réseau"}) : relancer quand le lien répond`;
+    } else {
+      row.status = "incomplete";
+      row.error = `rapport /r/ incohérent avec la fiche : ${verdict.mismatches?.join(" | ") || verdict.status}`;
+    }
+  }));
+  return finalizeReport({ ...base, opts, reportVerified: true });
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  (async () => {
+    try {
+      const opts = parseArgs(process.argv.slice(2));
+      const report = await validateFieldEntriesWithReports(opts);
+      console.log(
+        `field_entries_validation ${report.status} ready=${report.profiles_ready.length}/${report.profiles_required.length} ` +
+        `network_verified=${report.report_network_verified} ` +
+        (report.profiles_network_unverified?.length ? `network_unverified=${report.profiles_network_unverified.join(",")} ` : "") +
+        `next=${report.next_profile_to_fix || "none"}`
+      );
+      if (report.status !== "FIELD_ENTRIES_VALID") process.exitCode = 1;
+    } catch (error) {
+      console.error(error.message || String(error));
+      process.exit(1);
+    }
+  })();
 }
