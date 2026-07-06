@@ -8,7 +8,14 @@ import { fileURLToPath } from "node:url";
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(appRoot, "..");
 const desktopRoot = existsSync("/mnt/c/Users/chris/Desktop") ? "/mnt/c/Users/chris/Desktop" : join(process.env.HOME || ".", "Desktop");
-const kitDir = join(desktopRoot, "OutilsIA-Local-Cockpit-Field-Test-Kit");
+function argValue(name) {
+  const index = process.argv.indexOf(name);
+  if (index === -1) return "";
+  return process.argv[index + 1] || "";
+}
+
+const kitDir = resolve(argValue("--kit-dir") || process.env.OUTILSIA_FIELD_KIT_DIR || join(desktopRoot, "OutilsIA-Local-Cockpit-Field-Test-Kit"));
+const zipRoot = resolve(argValue("--zip-dir") || process.env.OUTILSIA_FIELD_ZIP_DIR || desktopRoot);
 const releasePath = join(repoRoot, "server-work", "static", "downloads", "local-cockpit", "release.json");
 
 function fail(message) {
@@ -42,6 +49,13 @@ function assertFile(path, minBytes = 1) {
   return size;
 }
 
+function toWslPath(path) {
+  const value = String(path || "");
+  const match = value.match(/^([a-zA-Z]):[\\/](.*)$/);
+  if (!match) return value;
+  return `/mnt/${match[1].toLowerCase()}/${match[2].replaceAll("\\", "/")}`;
+}
+
 function listZipEntries(zipPath) {
   const script = [
     "import sys, zipfile",
@@ -59,7 +73,7 @@ if (!buildId) fail("release build_id missing");
 if (!primary.name || !primary.sha256) fail("release primary download incomplete");
 
 const installerPath = join(kitDir, "installer", primary.name);
-const zipPath = join(desktopRoot, `OutilsIA-Local-Cockpit-Field-Test-Kit-${buildId}.zip`);
+const zipPath = join(zipRoot, `OutilsIA-Local-Cockpit-Field-Test-Kit-${buildId}.zip`);
 const zipManifestPath = `${zipPath}.sha256.txt`;
 const kitManifestPath = join(kitDir, "FIELD-KIT-MANIFEST.txt");
 const proofManifestPath = join(kitDir, "FIELD-PROOF-MANIFEST.json");
@@ -505,8 +519,9 @@ const missingZipEntries = requiredZipEntries.filter((entry) => !entries.includes
 if (missingZipEntries.length) fail(`zip missing entries: ${missingZipEntries.join(", ")}`);
 
 const nextProfile = status.next_profile_to_test || "old_laptop";
-const nextPackDir = join(desktopRoot, `OutilsIA-Next-PC-${nextProfile}`);
-const nextPackZip = `${nextPackDir}.zip`;
+const nextPackManifest = readJson(join(kitDir, "NEXT-PC-PACK.json"));
+const nextPackDir = toWslPath(nextPackManifest.target_dir || join(desktopRoot, `OutilsIA-Next-PC-${nextProfile}`));
+const nextPackZip = toWslPath(nextPackManifest.zip || `${nextPackDir}.zip`);
 const nextPackZipSha = `${nextPackZip}.sha256.txt`;
 const nextProfileCommand = profileCommandName(nextProfile);
 const requiredNextPackFiles = [

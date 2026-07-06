@@ -10,8 +10,30 @@ const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(appRoot, "..");
 const releasePath = join(repoRoot, "server-work", "static", "downloads", "local-cockpit", "release.json");
 const modelCatalogPath = join(repoRoot, "server-work", "static", "data", "local-ai-models.json");
+function argValue(name) {
+  const index = process.argv.indexOf(name);
+  if (index === -1) return "";
+  return process.argv[index + 1] || "";
+}
+
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+  console.log(`Usage:
+  node scripts/make-field-test-kit.mjs [--kit-dir <path>] [--zip-dir <path>] [--wsl-distro <name>]
+
+Defaults keep the field kit on the Windows Desktop. Use --kit-dir for scratch/test
+generation without writing Desktop artifacts.`);
+  process.exit(0);
+}
+
 const desktopRoot = existsSync("/mnt/c/Users/chris/Desktop") ? "/mnt/c/Users/chris/Desktop" : join(process.env.HOME || ".", "Desktop");
-const kitDir = join(desktopRoot, "OutilsIA-Local-Cockpit-Field-Test-Kit");
+const defaultKitDir = join(desktopRoot, "OutilsIA-Local-Cockpit-Field-Test-Kit");
+const kitDir = resolve(argValue("--kit-dir") || process.env.OUTILSIA_FIELD_KIT_DIR || defaultKitDir);
+const zipRoot = resolve(argValue("--zip-dir") || process.env.OUTILSIA_FIELD_ZIP_DIR || desktopRoot);
+const wslDistro = argValue("--wsl-distro") || process.env.OUTILSIA_WSL_DISTRO || "";
+const wslRepoRoot = process.env.OUTILSIA_WSL_REPO_ROOT || "/home/chris/projects/outilsia";
+const entriesDir = join(kitDir, "entries");
+const fieldTestsJsonPath = join(kitDir, "FIELD-TESTS.json");
+const fieldStatusJsonPath = join(kitDir, "FIELD-TESTS-STATUS.json");
 const PROFILE_GUIDES = {
   old_laptop: {
     title: "Vieux laptop / portable modeste",
@@ -332,6 +354,30 @@ function toWindowsPath(path) {
 
 function psSingleQuoted(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
+}
+
+function absoluteDownloadUrl(url) {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith("/")) return `https://outilsia.fr${url}`;
+  return `https://outilsia.fr/${url}`;
+}
+
+function shSingleQuoted(value) {
+  return `'${String(value).replaceAll("'", "'\"'\"'")}'`;
+}
+
+function wslCommand(workingDir, command) {
+  const distroArg = wslDistro ? `-d ${wslDistro} ` : "";
+  return `wsl.exe ${distroArg}--cd ${workingDir} -- bash -lc ${JSON.stringify(command)}`;
+}
+
+function appCommand(command) {
+  return wslCommand(`${wslRepoRoot}/local-cockpit-app`, command);
+}
+
+function repoCommand(command) {
+  return wslCommand(wslRepoRoot, command);
 }
 
 function writeProofManifest(kitDir, proof) {
@@ -1498,7 +1544,7 @@ function writeStrictProfileRecipes(kitDir, release) {
 function main() {
   const release = existsSync(releasePath) ? readJson(releasePath) : {};
   mkdirSync(kitDir, { recursive: true });
-  mkdirSync(join(kitDir, "entries"), { recursive: true });
+  mkdirSync(entriesDir, { recursive: true });
   const installerDir = join(kitDir, "installer");
   mkdirSync(installerDir, { recursive: true });
 
@@ -1514,7 +1560,7 @@ function main() {
   };
 
   const templatePath = join(kitDir, "FIELD-TESTS.template.json");
-  const fieldTestsPath = join(kitDir, "FIELD-TESTS.json");
+  const fieldTestsPath = fieldTestsJsonPath;
   const primaryDownload = release.primary_download || {};
   const installerSource = primaryDownload.name
     ? join(repoRoot, "server-work", "static", "downloads", "local-cockpit", primaryDownload.name)
@@ -1525,8 +1571,21 @@ function main() {
     }
   }
   const installerTarget = primaryDownload.name ? join(installerDir, primaryDownload.name) : "";
-  const installerCopied = installerSource && existsSync(installerSource);
-  if (installerCopied) copyFileSync(installerSource, installerTarget);
+  let installerCopied = Boolean(installerSource && existsSync(installerSource));
+  if (installerCopied) {
+    copyFileSync(installerSource, installerTarget);
+  } else if (primaryDownload.name && primaryDownload.url) {
+    try {
+      execFileSync("curl", ["-fsSL", absoluteDownloadUrl(primaryDownload.url), "-o", installerTarget], { stdio: "pipe" });
+      installerCopied = existsSync(installerTarget);
+    } catch (error) {
+      installerCopied = false;
+    }
+  }
+  if (installerCopied && primaryDownload.sha256 && sha256(installerTarget) !== primaryDownload.sha256) {
+    rmSync(installerTarget, { force: true });
+    throw new Error(`Installer SHA mismatch for ${primaryDownload.name}`);
+  }
 
   writeFileSync(templatePath, `${JSON.stringify(template, null, 2)}\n`, "utf8");
   if (shouldRefreshFieldTestsJson(fieldTestsPath)) {
@@ -1546,8 +1605,8 @@ function main() {
     "Commande finale :",
     "",
     "```bash",
-    "npm run assemble:field-tests -- --dir /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/entries --out /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/FIELD-TESTS.json",
-    "npm run import:field-tests -- --input /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/FIELD-TESTS.json",
+    `npm run assemble:field-tests -- --dir ${entriesDir} --out ${fieldTestsJsonPath}`,
+    `npm run import:field-tests -- --input ${fieldTestsJsonPath}`,
     "```",
     "",
     "L'assembleur refuse les fiches sans `build_id` et les collectes avec `build_id` mélangés. Les 5 machines doivent venir du même build public.",
@@ -1555,6 +1614,9 @@ function main() {
   ].join("\n"), "utf8");
   writeFileSync(join(kitDir, "FIELD-KIT-MANIFEST.txt"), [
     `field_test_kit=${kitDir}`,
+    `zip_dir=${zipRoot}`,
+    `wsl_distro=${wslDistro}`,
+    `wsl_repo_root=${wslRepoRoot}`,
     `build_id=${release.build_id || ""}`,
     `version=${release.version || ""}`,
     `installer=${installerCopied ? installerTarget : "missing"}`,
@@ -1680,8 +1742,8 @@ function main() {
     "",
     "```bash",
     "cd local-cockpit-app",
-    "npm run assemble:field-tests -- --dir /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/entries --out /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/FIELD-TESTS.json",
-    "npm run import:field-tests -- --input /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/FIELD-TESTS.json",
+    `npm run assemble:field-tests -- --dir ${entriesDir} --out ${fieldTestsJsonPath}`,
+    `npm run import:field-tests -- --input ${fieldTestsJsonPath}`,
     "```",
     "",
     "Important : l'assemblage refuse les fiches sans `build_id` ou avec des `build_id` mélangés. Les 5 preuves terrain doivent venir du même build public.",
@@ -1690,7 +1752,7 @@ function main() {
     "",
     "```bash",
     "cd local-cockpit-app",
-    "npm run import:field-tests -- --input /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/FIELD-TESTS.json",
+    `npm run import:field-tests -- --input ${fieldTestsJsonPath}`,
     "```",
     "",
     "Le validateur refuse les tests incomplets. Tant que les 5 machines ne sont pas remplies avec benchmark et rapport, l'audit global reste incomplet.",
@@ -2880,7 +2942,7 @@ exit 0
 
   writeFileSync(join(kitDir, "ASSEMBLER.cmd"), [
     "@echo off",
-    "wsl.exe -d Ubuntu --cd /home/chris/projects/outilsia/local-cockpit-app -- bash -lc \"npm run assemble:field-tests -- --dir /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/entries --out /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/FIELD-TESTS.json\"",
+    appCommand(`npm run assemble:field-tests -- --dir ${shSingleQuoted(entriesDir)} --out ${shSingleQuoted(fieldTestsJsonPath)}`),
     "pause",
     ""
   ].join("\r\n"), "utf8");
@@ -4694,6 +4756,15 @@ function Sha256($path) {
   return (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
 }
 
+function WslPathToWindows($path) {
+  if ($path -match '^/mnt/([a-zA-Z])/(.*)$') {
+    $drive = $matches[1].ToUpperInvariant()
+    $tail = $matches[2] -replace '/', '\'
+    return ($drive + ':\' + $tail)
+  }
+  return $path
+}
+
 $kitDir = $PSScriptRoot
 $desktop = [Environment]::GetFolderPath("Desktop")
 $manifestPath = Join-Path $kitDir "FIELD-KIT-MANIFEST.txt"
@@ -4706,7 +4777,10 @@ $buildId = [string]$proof.build_id
 if ([string]::IsNullOrWhiteSpace($buildId)) { Fail "build_id absent du manifeste preuve" }
 
 $zipName = "OutilsIA-Local-Cockpit-Field-Test-Kit-$buildId.zip"
-$zipPath = Join-Path $desktop $zipName
+$zipPath = WslPathToWindows ([string]$proof.zip.path)
+if ([string]::IsNullOrWhiteSpace($zipPath)) {
+  $zipPath = Join-Path $desktop $zipName
+}
 $zipShaPath = "$zipPath.sha256.txt"
 if (!(Test-Path -LiteralPath $zipPath)) { Fail "zip terrain introuvable: $zipPath" }
 if (!(Test-Path -LiteralPath $zipShaPath)) { Fail "manifeste sha introuvable: $zipShaPath" }
@@ -4966,7 +5040,7 @@ $htmlRows
     "set \"ENTRY_DIR=%KIT_DIR%entries\"",
     "if not exist \"%ENTRY_DIR%\" mkdir \"%ENTRY_DIR%\"",
     "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$kit='%~dp0'; $entry=Join-Path $kit 'entries'; $download=Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads'; New-Item -ItemType Directory -Force -Path $entry | Out-Null; $files=Get-ChildItem -Path $download -Filter 'outilsia-field-test-*.json' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending; if($files){ foreach($file in $files){ Copy-Item $file.FullName (Join-Path $entry $file.Name) -Force; Write-Host ('fiche_collectee ' + $file.Name) }; Write-Host ('total=' + $files.Count) } else { Write-Host 'Aucune nouvelle fiche trouvee dans Telechargements; tentative assemblage avec entries existant.' }\"",
-    "wsl.exe -d Ubuntu --cd /home/chris/projects/outilsia/local-cockpit-app -- bash -lc \"npm run assemble:field-tests -- --dir /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/entries --out /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/FIELD-TESTS.json\"",
+    appCommand(`npm run assemble:field-tests -- --dir ${shSingleQuoted(entriesDir)} --out ${shSingleQuoted(fieldTestsJsonPath)}`),
     "pause",
     ""
   ].join("\r\n"), "utf8");
@@ -4978,11 +5052,11 @@ $htmlRows
     "set \"ENTRY_DIR=%KIT_DIR%entries\"",
     "if not exist \"%ENTRY_DIR%\" mkdir \"%ENTRY_DIR%\"",
     "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$kit='%~dp0'; $entry=Join-Path $kit 'entries'; $download=Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads'; New-Item -ItemType Directory -Force -Path $entry | Out-Null; $files=Get-ChildItem -Path $download -Filter 'outilsia-field-test-*.json' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending; if($files){ foreach($file in $files){ Copy-Item $file.FullName (Join-Path $entry $file.Name) -Force; Write-Host ('fiche_collectee ' + $file.Name) }; Write-Host ('total=' + $files.Count) } else { Write-Host 'Aucune nouvelle fiche trouvee dans Telechargements; validation avec entries existant.' }\"",
-    "wsl.exe -d Ubuntu --cd /home/chris/projects/outilsia -- bash -lc \"npm --prefix local-cockpit-app run status:field-tests -- --dir /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/entries --out /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/FIELD-TESTS-STATUS.json && npm --prefix local-cockpit-app run assemble:field-tests -- --dir /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/entries --out /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/FIELD-TESTS.json\"",
+    repoCommand(`npm --prefix local-cockpit-app run status:field-tests -- --dir ${shSingleQuoted(entriesDir)} --out ${shSingleQuoted(fieldStatusJsonPath)} && npm --prefix local-cockpit-app run assemble:field-tests -- --dir ${shSingleQuoted(entriesDir)} --out ${shSingleQuoted(fieldTestsJsonPath)}`),
     "if errorlevel 1 goto fail",
-    "wsl.exe -d Ubuntu --cd /home/chris/projects/outilsia -- bash -lc \"npm --prefix local-cockpit-app run import:field-tests -- --input /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/FIELD-TESTS.json\"",
+    repoCommand(`npm --prefix local-cockpit-app run import:field-tests -- --input ${shSingleQuoted(fieldTestsJsonPath)}`),
     "if errorlevel 1 goto fail",
-    "wsl.exe -d Ubuntu --cd /home/chris/projects/outilsia -- bash -lc \"python3 scripts/audit_beta_field_goal.py\"",
+    repoCommand("python3 scripts/audit_beta_field_goal.py"),
     "if errorlevel 1 goto fail",
     "echo.",
     "echo Validation terrain terminee. Si l'audit indique encore GOAL_NOT_COMPLETE, lire le dernier rapport dans reports/.",
@@ -4998,7 +5072,7 @@ $htmlRows
 
   writeFileSync(join(kitDir, "IMPORTER.cmd"), [
     "@echo off",
-    "wsl.exe -d Ubuntu --cd /home/chris/projects/outilsia/local-cockpit-app -- bash -lc \"npm run import:field-tests -- --input /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/FIELD-TESTS.json\"",
+    appCommand(`npm run import:field-tests -- --input ${shSingleQuoted(fieldTestsJsonPath)}`),
     "pause",
     ""
   ].join("\r\n"), "utf8");
@@ -5116,8 +5190,9 @@ ${postRows}
 `, "utf8");
 
   const zipName = `OutilsIA-Local-Cockpit-Field-Test-Kit-${release.build_id || "beta"}.zip`;
-  const zipPath = join(desktopRoot, zipName);
-  const zipManifestPath = join(desktopRoot, `${zipName}.sha256.txt`);
+  mkdirSync(zipRoot, { recursive: true });
+  const zipPath = join(zipRoot, zipName);
+  const zipManifestPath = join(zipRoot, `${zipName}.sha256.txt`);
   let zipInfo = {
     zip: zipPath,
     zip_name: zipName,
@@ -5173,9 +5248,9 @@ ${postRows}
       start_here_html: join(kitDir, "START-HERE.html"),
     },
     validation_commands: [
-      "npm run status:field-tests -- --dir /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/entries --out /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/FIELD-TESTS-STATUS.json",
-      "npm run assemble:field-tests -- --dir /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/entries --out /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/FIELD-TESTS.json",
-      "npm run import:field-tests -- --input /mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit/FIELD-TESTS.json",
+      `npm run status:field-tests -- --dir ${entriesDir} --out ${fieldStatusJsonPath}`,
+      `npm run assemble:field-tests -- --dir ${entriesDir} --out ${fieldTestsJsonPath}`,
+      `npm run import:field-tests -- --input ${fieldTestsJsonPath}`,
       "python3 scripts/audit_beta_field_goal.py",
     ],
   };
