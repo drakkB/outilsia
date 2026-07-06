@@ -10,13 +10,14 @@ const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const desktopKit = existsSync("/mnt/c/Users/chris/Desktop")
   ? "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit"
   : join(process.env.HOME || ".", "Desktop", "OutilsIA-Local-Cockpit-Field-Test-Kit");
-const defaultDir = join(desktopKit, "entries");
-const defaultOut = join(desktopKit, "FIELD-TESTS-STATUS.json");
-const fieldKitManifest = join(desktopKit, "FIELD-KIT-MANIFEST.txt");
+const defaultKit = process.env.OUTILSIA_FIELD_KIT_DIR ? resolve(process.env.OUTILSIA_FIELD_KIT_DIR) : desktopKit;
+const defaultDir = join(defaultKit, "entries");
+const defaultOut = join(defaultKit, "FIELD-TESTS-STATUS.json");
+let fieldKitManifest = join(defaultKit, "FIELD-KIT-MANIFEST.txt");
 
 function usage() {
   console.log(`Usage:
-  node scripts/report-field-test-status.mjs [--dir entries] [--out FIELD-TESTS-STATUS.json] [--fail-on-incomplete] [--offline]
+  node scripts/report-field-test-status.mjs [--kit-dir field-kit] [--dir entries] [--out FIELD-TESTS-STATUS.json] [--fail-on-incomplete] [--offline]
 
 Reads single-machine field-test exports and reports:
   - profiles present;
@@ -28,6 +29,8 @@ Reads single-machine field-test exports and reports:
 
 function parseArgs(argv) {
   const opts = { dir: defaultDir, out: defaultOut, failOnIncomplete: false, offline: false };
+  let explicitDir = false;
+  let explicitOut = false;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") {
@@ -36,10 +39,19 @@ function parseArgs(argv) {
     }
     if (arg === "--dir") {
       opts.dir = resolve(argv[++i] || "");
+      explicitDir = true;
       continue;
     }
     if (arg === "--out") {
       opts.out = resolve(argv[++i] || "");
+      explicitOut = true;
+      continue;
+    }
+    if (arg === "--kit-dir") {
+      const kitDir = resolve(argv[++i] || "");
+      fieldKitManifest = join(kitDir, "FIELD-KIT-MANIFEST.txt");
+      if (!explicitDir) opts.dir = join(kitDir, "entries");
+      if (!explicitOut) opts.out = join(kitDir, "FIELD-TESTS-STATUS.json");
       continue;
     }
     if (arg === "--fail-on-incomplete") {

@@ -8,13 +8,15 @@ const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const desktopKit = existsSync("/mnt/c/Users/chris/Desktop")
   ? "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit"
   : join(process.env.HOME || ".", "Desktop", "OutilsIA-Local-Cockpit-Field-Test-Kit");
-const defaultOut = join(desktopKit, "FIELD-TESTS.json");
-const defaultReport = join(desktopKit, "FIELD-TESTS.md");
+const defaultKit = process.env.OUTILSIA_FIELD_KIT_DIR ? resolve(process.env.OUTILSIA_FIELD_KIT_DIR) : desktopKit;
+const defaultOut = join(defaultKit, "FIELD-TESTS.json");
+const defaultReport = join(defaultKit, "FIELD-TESTS.md");
 
 function usage() {
   console.log(`Usage:
   node scripts/assemble-field-tests.mjs --input <entry.json> [--input <entry2.json> ...] [--out <FIELD-TESTS.json>]
   node scripts/assemble-field-tests.mjs --dir <folder-with-entry-json> [--out <FIELD-TESTS.json>]
+  node scripts/assemble-field-tests.mjs --kit-dir <field-kit>
 
 Each input can be:
 - a single machine object exported by OutilsIA;
@@ -31,6 +33,8 @@ function fail(message) {
 
 function parseArgs(argv) {
   const opts = { inputs: [], dirs: [], out: defaultOut, tester: "", notes: "", verifyShareUrls: true };
+  let explicitOut = false;
+  let explicitDir = false;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") {
@@ -43,10 +47,18 @@ function parseArgs(argv) {
     }
     if (arg === "--dir") {
       opts.dirs.push(resolve(argv[++i] || ""));
+      explicitDir = true;
       continue;
     }
     if (arg === "--out") {
       opts.out = resolve(argv[++i] || "");
+      explicitOut = true;
+      continue;
+    }
+    if (arg === "--kit-dir") {
+      const kitDir = resolve(argv[++i] || "");
+      if (!explicitDir && opts.dirs.length === 0) opts.dirs.push(join(kitDir, "entries"));
+      if (!explicitOut) opts.out = join(kitDir, "FIELD-TESTS.json");
       continue;
     }
     if (arg === "--tester") {
