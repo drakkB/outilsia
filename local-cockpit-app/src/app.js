@@ -1725,6 +1725,32 @@ function parseMajorVersion(value) {
   return match ? Number(match[1]) : 0;
 }
 
+function gpuConfidenceLabel(probe = {}, scan = {}) {
+  const source = String(probe.source || "").toLowerCase();
+  if (source === "nvidia-smi") return "GPU NVIDIA mesuré par nvidia-smi";
+  if (source.includes("videocontroller")) return "GPU détecté par Windows, VRAM estimée";
+  if (source === "lspci") return "GPU détecté par Linux, VRAM à confirmer";
+  if (source === "system_profiler") return scan?.unified_memory ? "Mémoire unifiée détectée, VRAM dédiée non applicable" : "GPU macOS détecté, mémoire à confirmer";
+  if (source === "none") return "Aucun GPU dédié confirmé";
+  return source ? `Source ${source}, à confirmer par benchmark` : "Source GPU inconnue";
+}
+
+function memoryConfidenceLabel(memory = {}) {
+  const confidence = String(memory.confidence || "");
+  if (confidence === "estimated_from_populated_modules") return "Canal/fréquence estimés depuis les barrettes détectées";
+  if (confidence === "capacity_only") return "Capacité RAM seule, canal et fréquence non confirmés";
+  return confidence ? confidence.replaceAll("_", " ") : "Confiance mémoire inconnue";
+}
+
+function vramConfidenceSuffix(probe = {}, scan = {}) {
+  const source = String(probe.source || "").toLowerCase();
+  if (source === "nvidia-smi") return "mesurés";
+  if (scan?.unified_memory) return "mémoire unifiée";
+  if (source.includes("videocontroller")) return "estimés";
+  if (source === "none") return "non confirmés";
+  return "à confirmer";
+}
+
 function hardwareDoctorAnalysis(scan = {}) {
   const probe = scan?.raw_scan?.gpu_probe || {};
   const memory = scan?.raw_scan?.memory_probe || {};
@@ -1743,6 +1769,7 @@ function hardwareDoctorAnalysis(scan = {}) {
   const hasNvidiaSignals = probe.source === "nvidia-smi" || Boolean(probe.driver_version || probe.cuda_version);
   const hasOllama = hasUsableOllamaRuntime(scan);
   const wsl = wslRuntimeInfo(scan);
+  const vramSuffix = vramConfidenceSuffix(probe, scan);
   let score = 35;
   const checks = [];
   const actions = [];
@@ -1755,14 +1782,14 @@ function hardwareDoctorAnalysis(scan = {}) {
     if (text && !actions.includes(text)) actions.push(text);
   };
 
-  if (vram >= 24) addCheck("VRAM", "ok", `${formatGb(vram)} : gros modèles quantifiés et contexte confortable.`, 22);
-  else if (vram >= 16) addCheck("VRAM", "ok", `${formatGb(vram)} : très bon palier 7B-14B, certains 32B à valider.`, 18);
-  else if (vram >= 12) addCheck("VRAM", "ok", `${formatGb(vram)} : ticket sérieux pour 7B/8B et plusieurs 14B quantifiés.`, 14);
+  if (vram >= 24) addCheck("VRAM", "ok", `${formatGb(vram)} ${vramSuffix} : gros modèles quantifiés et contexte confortable.`, 22);
+  else if (vram >= 16) addCheck("VRAM", "ok", `${formatGb(vram)} ${vramSuffix} : très bon palier 7B-14B, certains 32B à valider.`, 18);
+  else if (vram >= 12) addCheck("VRAM", "ok", `${formatGb(vram)} ${vramSuffix} : ticket sérieux pour 7B/8B et plusieurs 14B quantifiés.`, 14);
   else if (vram >= 8) {
-    addCheck("VRAM", "warn", `${formatGb(vram)} : utile, mais il faut rester sur petits modèles ou quantization agressive.`, 8);
+    addCheck("VRAM", "warn", `${formatGb(vram)} ${vramSuffix} : utile, mais il faut rester sur petits modèles ou quantization agressive.`, 8);
     addAction("Tester un 7B/8B avant tout achat.");
   } else {
-    addCheck("VRAM", "bad", vram ? `${formatGb(vram)} : limite pour gros LLM.` : "Aucune VRAM dédiée fiable détectée.", 1);
+    addCheck("VRAM", "bad", vram ? `${formatGb(vram)} ${vramSuffix} : limite pour gros LLM.` : "Aucune VRAM dédiée fiable détectée.", 1);
     addAction("Commencer par qwen3:0.6b ou CPU/RAM, puis envisager 12-16 Go VRAM.");
   }
 
@@ -1790,12 +1817,12 @@ function hardwareDoctorAnalysis(scan = {}) {
     addCheck("Canal mémoire", "warn", "Canal non confirmé par le système.", 0);
   }
 
-  if (hasNvidiaSignals) addCheck("Driver/CUDA", "ok", `NVIDIA mesuré${probe.cuda_version ? ` · CUDA ${probe.cuda_version}` : ""}.`, 16);
+  if (hasNvidiaSignals) addCheck("Driver/CUDA", "ok", `NVIDIA mesuré${probe.cuda_version ? ` · CUDA ${probe.cuda_version}` : " · CUDA à confirmer selon runtime"}.`, 16);
   else if (scan.gpu_name) {
-    addCheck("Driver/CUDA", "warn", "GPU détecté, mais métriques fines absentes.", 6);
+    addCheck("Mesure GPU", "warn", `${gpuConfidenceLabel(probe, scan)}.`, 6);
     addAction("Vérifier le driver GPU si les performances semblent anormales.");
   } else {
-    addCheck("Driver/CUDA", "warn", "Pas de signal GPU dédié exploitable.", 0);
+    addCheck("Mesure GPU", "warn", "Pas de signal GPU dédié exploitable.", 0);
   }
 
   if (temp >= 84) {
@@ -1860,6 +1887,8 @@ function renderHardwareDoctor(scan) {
   const analysis = hardwareDoctorAnalysis(scan);
   const source = analysis.source;
   const rows = [];
+  rows.push(["Confiance GPU", gpuConfidenceLabel(probe, scan)]);
+  rows.push(["Confiance RAM", memoryConfidenceLabel(memory)]);
   if (probe.driver_version) rows.push(["Driver", probe.driver_version]);
   if (probe.cuda_version) rows.push(["CUDA", probe.cuda_version]);
   if (probe.temperature_c != null) rows.push(["Température", formatDoctorNumber(probe.temperature_c, " °C")]);
