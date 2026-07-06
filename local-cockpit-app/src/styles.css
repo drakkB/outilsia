@@ -2733,6 +2733,87 @@ dd {
   color: var(--text);
 }
 
+.usage-pack-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(134, 239, 172, 0.10), transparent 36%),
+    rgba(4, 9, 12, 0.34);
+  border: 1px solid rgba(134, 239, 172, 0.18);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.usage-pack-head {
+  align-items: start;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.usage-pack-head strong {
+  display: block;
+  font-size: 13px;
+}
+
+.usage-pack-head p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.usage-pack-head em {
+  background: rgba(134, 239, 172, 0.11);
+  border: 1px solid rgba(134, 239, 172, 0.22);
+  border-radius: 999px;
+  color: var(--good);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  padding: 4px 7px;
+  text-transform: uppercase;
+}
+
+.usage-pack-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.usage-pack-grid div {
+  background: rgba(255,255,255,.035);
+  border: 1px solid rgba(139, 163, 174, 0.14);
+  border-radius: 7px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.usage-pack-grid strong,
+.usage-pack-grid span {
+  display: block;
+}
+
+.usage-pack-grid strong {
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.usage-pack-grid span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.usage-pack-actions {
+  gap: 7px;
+}
+
 .readiness-box {
   display: grid;
   gap: 10px;
@@ -3296,6 +3377,10 @@ dd {
   }
 
   .model-card-profile {
+    grid-template-columns: 1fr;
+  }
+
+  .usage-pack-grid {
     grid-template-columns: 1fr;
   }
 

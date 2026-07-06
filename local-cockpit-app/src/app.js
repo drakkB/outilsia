@@ -1681,6 +1681,46 @@ function usageProfileModelRef(profileKey = readUsageProfileKey()) {
   return arena?.compromise?.model || recommendedModelState().ref || Array.from(installedOllamaRefs())[0] || "qwen3:0.6b";
 }
 
+function usageProfilePack(profileKey = readUsageProfileKey()) {
+  const profile = USAGE_PROFILES[profileKey] || USAGE_PROFILES.polyvalent;
+  const test = TEST_PROFILES[profile.test] || TEST_PROFILES.simple;
+  const model = usageProfileModelRef(profileKey);
+  const installed = model ? isOllamaModelInstalled(model) : false;
+  const benchmarked = model ? hasSuccessfulBenchmarkFor(model) : false;
+  const vram = Number(state.scan?.vram_gb || 0);
+  const ram = Number(state.scan?.ram_gb || 0);
+  const context = (() => {
+    if (profileKey === "portable") return "Contexte court 2k-4k, réponse concise.";
+    if (profileKey === "memory") return vram >= 16 || ram >= 48 ? "Contexte long 8k-16k si le runtime suit." : "Contexte 4k-8k, notes courtes.";
+    if (profileKey === "code") return "Contexte 4k-8k, snippets et debug court.";
+    if (profileKey === "french") return "Contexte moyen, sortie française naturelle.";
+    return vram >= 12 ? "Contexte 8k conseillé après benchmark." : "Contexte 4k conseillé pour rester fluide.";
+  })();
+  const quantization = (() => {
+    if (profileKey === "portable" || vram <= 8) return "Q4 prioritaire pour préserver vitesse/RAM.";
+    if (vram >= 16) return "Q4/Q5 selon qualité voulue, à valider au benchmark.";
+    return "Q4 recommandé, Q5 seulement si le modèle reste fluide.";
+  })();
+  const action = !model
+    ? { label: "Choisir un modèle", detail: "Lance le scan et charge les recommandations." }
+    : !installed
+      ? { label: "Installer le modèle du pack", detail: model }
+      : !benchmarked
+        ? { label: "Benchmarker le pack", detail: model }
+        : { label: "Dialoguer avec le pack", detail: `${model} déjà mesuré` };
+  return {
+    key: profileKey,
+    profile,
+    test,
+    model,
+    installed,
+    benchmarked,
+    context,
+    quantization,
+    action
+  };
+}
+
 function applyUsageProfile(profileKey) {
   const profile = USAGE_PROFILES[profileKey];
   if (!profile) return;
@@ -1698,6 +1738,22 @@ function applyUsageProfile(profileKey) {
   renderReadinessPanel();
   renderChatPresets();
   setStatus(`Profil ${profile.label} prêt`, "ok");
+}
+
+function useUsageProfilePack(target = "benchmark") {
+  const pack = usageProfilePack();
+  applyUsageProfile(pack.key);
+  if (target === "chat") {
+    if (pack.model && els.chatModelInput) els.chatModelInput.value = pack.model;
+    if (els.chatPromptInput) els.chatPromptInput.value = pack.profile.chat || pack.test.prompt;
+    els.chatPromptInput?.focus?.();
+    setStatus(`Pack ${pack.profile.label} prêt pour le dialogue`, "ok");
+    return;
+  }
+  if (pack.model && els.benchmarkModelInput) els.benchmarkModelInput.value = pack.model;
+  if (els.benchmarkPromptInput) els.benchmarkPromptInput.value = pack.test.prompt;
+  els.benchmarkPromptInput?.focus?.();
+  setStatus(`Pack ${pack.profile.label} prêt pour benchmark`, "ok");
 }
 
 function renderScan(scan) {
@@ -2740,6 +2796,7 @@ function renderPreparePanel() {
   const recommended = flow.recommended;
   const usage = currentUsageProfile();
   const usageModel = usageProfileModelRef(usage.key);
+  const usagePack = usageProfilePack(usage.key);
   const testSpeed = flow.benchmarkReady ? `${benchmarkSpeedFor(flow.testModel) ?? "--"} tok/s` : "à mesurer";
   const reportLabel = flow.reportReady ? "Journal MemoryForge prêt" : flow.benchmarkReady ? "à générer" : "après benchmark";
   const secondLabel = recommended.ref
@@ -2783,6 +2840,43 @@ function renderPreparePanel() {
             ${escapeHtml(profile.label)}
           </button>
         `).join("")}
+      </div>
+      <div class="usage-pack-card">
+        <div class="usage-pack-head">
+          <div>
+            <span class="label">Pack conseillé</span>
+            <strong>${escapeHtml(usagePack.action.label)}</strong>
+            <p>${escapeHtml(usagePack.action.detail)}</p>
+          </div>
+          <em>${escapeHtml(usagePack.benchmarked ? "mesuré" : usagePack.installed ? "installé" : "à préparer")}</em>
+        </div>
+        <div class="usage-pack-grid">
+          <div>
+            <strong>Modèle</strong>
+            <span>${escapeHtml(usagePack.model || "après scan")}</span>
+          </div>
+          <div>
+            <strong>Test</strong>
+            <span>${escapeHtml(usagePack.test.label)}</span>
+          </div>
+          <div>
+            <strong>Contexte</strong>
+            <span>${escapeHtml(usagePack.context)}</span>
+          </div>
+          <div>
+            <strong>Quantization</strong>
+            <span>${escapeHtml(usagePack.quantization)}</span>
+          </div>
+        </div>
+        <div class="row-actions compact-actions usage-pack-actions">
+          <button type="button" data-usage-pack="benchmark">Utiliser pour benchmark</button>
+          <button type="button" data-usage-pack="chat">Utiliser pour dialogue</button>
+          ${usagePack.model
+            ? usagePack.installed
+              ? `<button type="button" data-benchmark-model="${escapeHtml(usagePack.model)}">${usagePack.benchmarked ? "Retester le pack" : "Benchmarker le pack"}</button>`
+              : `<button type="button" data-install-model="${escapeHtml(usagePack.model)}">Installer le pack</button>`
+            : ""}
+        </div>
       </div>
     </div>
     <div class="cockpit-focus">
@@ -2840,6 +2934,7 @@ function readinessReport() {
   const scan = state.scan || {};
   const usage = currentUsageProfile();
   const usageModel = usageProfileModelRef(usage.key);
+  const usagePack = usageProfilePack(usage.key);
   const compatibility = state.compatibility?.compatibility || state.compatibility || {};
   const score = normalizeScore(compatibility.score ?? compatibility.compatibility_score ?? null);
   const verdict = compatibility.summary
@@ -2903,7 +2998,10 @@ function readinessReport() {
       label: usage.label,
       detail: usage.detail,
       recommended_model: usageModel,
-      arena_profile: usage.arena
+      arena_profile: usage.arena,
+      benchmark_test: usagePack.test.label,
+      context: usagePack.context,
+      quantization: usagePack.quantization
     },
     test_model: flow.testModel,
     recommended_model: flow.recommended?.ref ? {
@@ -8558,6 +8656,12 @@ document.addEventListener("click", async (event) => {
   const usageProfileKey = usageProfileButton?.getAttribute?.("data-usage-profile");
   if (usageProfileKey && USAGE_PROFILES[usageProfileKey]) {
     applyUsageProfile(usageProfileKey);
+    return;
+  }
+  const usagePackButton = event.target?.closest?.("[data-usage-pack]");
+  const usagePackTarget = usagePackButton?.getAttribute?.("data-usage-pack");
+  if (usagePackTarget) {
+    useUsageProfilePack(usagePackTarget);
     return;
   }
   const modelInfoButton = event.target?.closest?.("[data-model-info]");
