@@ -1,0 +1,510 @@
+{
+  "version": "2026-07-06",
+  "updated_at": "2026-07-06",
+  "categories": [
+    {
+      "name": "Petits modeles rapides",
+      "icon": "OK",
+      "models": [
+        {
+          "name": "Phi-4 Mini",
+          "params": "3.8B",
+          "kind": "text",
+          "use_case": "portable, test rapide, assistant léger",
+          "vram_q4": 2.5,
+          "vram_q8": 4.5,
+          "vram_fp16": 8,
+          "ollama": "phi4-mini",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "Llama 3.2",
+          "params": "3B",
+          "kind": "text",
+          "use_case": "vieux PC, CPU/RAM, chat léger",
+          "vram_q4": 2,
+          "vram_q8": 3.5,
+          "vram_fp16": 6,
+          "ollama": "llama3.2:3b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "Qwen 3",
+          "params": "4B",
+          "kind": "text",
+          "use_case": "raisonnement court, français, test qualité/vitesse",
+          "vram_q4": 2.5,
+          "vram_q8": 4.5,
+          "vram_fp16": 8,
+          "ollama": "qwen3:4b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "Gemma 3",
+          "params": "4B",
+          "kind": "text",
+          "use_case": "assistant général léger",
+          "vram_q4": 2.5,
+          "vram_q8": 4.5,
+          "vram_fp16": 8,
+          "ollama": "gemma3:4b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        }
+      ]
+    },
+    {
+      "name": "Sweet spot 7B-9B",
+      "icon": "MID",
+      "models": [
+        {
+          "name": "Llama 3.1",
+          "params": "8B",
+          "kind": "text",
+          "use_case": "usage général, compatibilité outils, comparaison Llama",
+          "vram_q4": 5,
+          "vram_q8": 9,
+          "vram_fp16": 16,
+          "ollama": "llama3.1:8b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "Mistral v0.3",
+          "params": "7B",
+          "kind": "text",
+          "use_case": "français, rédaction, assistant quotidien",
+          "vram_q4": 4.5,
+          "vram_q8": 8,
+          "vram_fp16": 14,
+          "ollama": "mistral:7b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "Qwen 3",
+          "params": "8B",
+          "kind": "text",
+          "use_case": "raisonnement court, français, technique",
+          "vram_q4": 5,
+          "vram_q8": 9,
+          "vram_fp16": 16,
+          "ollama": "qwen3:8b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "DeepSeek R1 Distill",
+          "params": "8B",
+          "kind": "text",
+          "use_case": "code, explication technique, raisonnement",
+          "vram_q4": 5,
+          "vram_q8": 9,
+          "vram_fp16": 16,
+          "ollama": "deepseek-r1:8b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "Hermes 3",
+          "params": "8B",
+          "kind": "text",
+          "use_case": "Hermes Agent, mémoire, décisions, Obsidian",
+          "vram_q4": 5,
+          "vram_q8": 9,
+          "vram_fp16": 16,
+          "ollama": "hermes3:8b",
+          "date_added": "2026-06-22",
+          "actionable_text": true
+        }
+      ]
+    },
+    {
+      "name": "Modeles 13B-27B",
+      "icon": "PRO",
+      "models": [
+        {
+          "name": "Qwen 3",
+          "params": "14B",
+          "kind": "text",
+          "use_case": "qualité supérieure, raisonnement court, français",
+          "vram_q4": 9,
+          "vram_q8": 16,
+          "vram_fp16": 28,
+          "ollama": "qwen3:14b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "DeepSeek R1 Distill",
+          "params": "14B",
+          "kind": "text",
+          "use_case": "code, raisonnement, debug",
+          "vram_q4": 9,
+          "vram_q8": 16,
+          "vram_fp16": 28,
+          "ollama": "deepseek-r1:14b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "Phi-4",
+          "params": "14B",
+          "kind": "text",
+          "use_case": "assistant général, raisonnement compact",
+          "vram_q4": 9,
+          "vram_q8": 16,
+          "vram_fp16": 28,
+          "ollama": "phi4:14b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "Mistral Small 3",
+          "params": "24B",
+          "kind": "text",
+          "use_case": "qualité, français, rédaction longue",
+          "vram_q4": 15,
+          "vram_q8": 26,
+          "vram_fp16": 48,
+          "ollama": "mistral-small3.1:24b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "Gemma 3",
+          "params": "27B",
+          "kind": "text",
+          "use_case": "qualité, contexte plus large",
+          "vram_q4": 16,
+          "vram_q8": 30,
+          "vram_fp16": 54,
+          "ollama": "gemma3:27b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "Nous Hermes 2 Mixtral",
+          "params": "8x7B",
+          "kind": "text",
+          "use_case": "assistant/persona, mémoire, workflows Hermes",
+          "vram_q4": 14,
+          "vram_q8": 26,
+          "vram_fp16": 90,
+          "ollama": "nous-hermes2-mixtral:8x7b",
+          "date_added": "2026-06-22",
+          "actionable_text": true
+        }
+      ]
+    },
+    {
+      "name": "Modeles 32B-70B",
+      "icon": "XL",
+      "models": [
+        {
+          "name": "Qwen 3",
+          "params": "32B",
+          "kind": "text",
+          "use_case": "qualité, raisonnement, contexte long",
+          "vram_q4": 20,
+          "vram_q8": 36,
+          "vram_fp16": 64,
+          "ollama": "qwen3:32b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "DeepSeek R1 Distill",
+          "params": "32B",
+          "kind": "text",
+          "use_case": "code, raisonnement, analyse technique",
+          "vram_q4": 20,
+          "vram_q8": 36,
+          "vram_fp16": 64,
+          "ollama": "deepseek-r1:32b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "Qwen 3 Coder",
+          "params": "32B",
+          "kind": "text",
+          "use_case": "code avancé, génération de scripts",
+          "vram_q4": 20,
+          "vram_q8": 36,
+          "vram_fp16": 64,
+          "ollama": "qwen3-coder:32b",
+          "date_added": "2026-06-22",
+          "actionable_text": true
+        },
+        {
+          "name": "Llama 3.3",
+          "params": "70B",
+          "kind": "text",
+          "use_case": "gros modèle, contexte, qualité si VRAM/RAM suffisantes",
+          "vram_q4": 40,
+          "vram_q8": 75,
+          "vram_fp16": 140,
+          "ollama": "llama3.3:70b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "DeepSeek R1 Distill",
+          "params": "70B",
+          "kind": "text",
+          "use_case": "gros modèle code/raisonnement, machine 48 Go+ recommandée",
+          "vram_q4": 40,
+          "vram_q8": 75,
+          "vram_fp16": 140,
+          "ollama": "deepseek-r1:70b",
+          "date_added": "2026-05-01",
+          "actionable_text": true
+        },
+        {
+          "name": "Qwen 3",
+          "params": "30B-A3B",
+          "kind": "text",
+          "use_case": "raisonnement, agent, contexte 256K, très bon palier 24 Go",
+          "vram_q4": 19,
+          "vram_q8": 36,
+          "vram_fp16": 60,
+          "ollama": "qwen3:30b",
+          "date_added": "2026-07-04",
+          "actionable_text": true,
+          "pilotable_text": true,
+          "runtime_status": "ollama_available",
+          "source_url": "https://ollama.com/library/qwen3:30b"
+        },
+        {
+          "name": "Qwen 3.6",
+          "params": "27B",
+          "kind": "text",
+          "use_case": "agentic coding, thinking preservation, workflows dev avec contexte 256K",
+          "vram_q4": 17,
+          "vram_q8": 32,
+          "vram_fp16": 54,
+          "ollama": "qwen3.6:27b",
+          "date_added": "2026-07-04",
+          "actionable_text": true,
+          "pilotable_text": true,
+          "runtime_status": "ollama_available",
+          "source_url": "https://ollama.com/library/qwen3.6:27b"
+        },
+        {
+          "name": "Qwen 3.6",
+          "params": "35B-A3B",
+          "kind": "text",
+          "use_case": "agentic coding avancé, raisonnement long, Hermes/Codex/OpenCode local",
+          "vram_q4": 24,
+          "vram_q8": 46,
+          "vram_fp16": 70,
+          "ollama": "qwen3.6:35b",
+          "date_added": "2026-07-04",
+          "actionable_text": true,
+          "pilotable_text": true,
+          "runtime_status": "ollama_available",
+          "source_url": "https://ollama.com/library/qwen3.6"
+        },
+        {
+          "name": "Qwen3-Coder-Next",
+          "params": "80B-A3B",
+          "kind": "text",
+          "use_case": "code agentique, compréhension repo 256K, génération/correction de projets",
+          "vram_q4": 52,
+          "vram_q8": 85,
+          "vram_fp16": 160,
+          "ollama": "qwen3-coder-next",
+          "date_added": "2026-07-04",
+          "actionable_text": true,
+          "pilotable_text": true,
+          "runtime_status": "ollama_available",
+          "source_url": "https://ollama.com/library/qwen3-coder-next"
+        }
+      ]
+    },
+    {
+      "name": "MoE et frontier local",
+      "icon": "MOE",
+      "models": [
+        {
+          "name": "Llama 4 Scout",
+          "params": "17B actifs",
+          "kind": "text",
+          "use_case": "MoE à surveiller, compatibilité runtime non validée",
+          "vram_q4": 11,
+          "vram_q8": 19,
+          "vram_fp16": 34,
+          "ollama": "",
+          "date_added": "2026-05-01",
+          "actionable_text": false
+        },
+        {
+          "name": "Llama 4 Maverick",
+          "params": "109B MoE",
+          "kind": "text",
+          "use_case": "frontier local très lourd, à éviter sans grosse VRAM",
+          "vram_q4": 65,
+          "vram_q8": 120,
+          "vram_fp16": 220,
+          "ollama": "",
+          "date_added": "2026-05-01",
+          "actionable_text": false
+        },
+        {
+          "name": "Mistral Large 3",
+          "params": "123B",
+          "kind": "text",
+          "use_case": "frontier local très lourd, workstation uniquement",
+          "vram_q4": 70,
+          "vram_q8": 130,
+          "vram_fp16": 246,
+          "ollama": "",
+          "date_added": "2026-05-01",
+          "actionable_text": false
+        },
+        {
+          "name": "Qwen 3",
+          "params": "235B MoE",
+          "kind": "text",
+          "use_case": "frontier local extrême, Qwen3-235B-A22B, workstation multi-GPU uniquement",
+          "vram_q4": 142,
+          "vram_q8": 260,
+          "vram_fp16": 470,
+          "ollama": "qwen3:235b",
+          "date_added": "2026-07-04",
+          "actionable_text": true,
+          "pilotable_text": false,
+          "runtime_status": "ollama_frontier_available",
+          "source_url": "https://ollama.com/library/qwen3:235b"
+        },
+        {
+          "name": "Mistral Medium 3.5",
+          "params": "128B",
+          "kind": "text",
+          "use_case": "gros modèle pro, raisonnement, code, français, contexte 256K et vision optionnelle",
+          "vram_q4": 80,
+          "vram_q8": 150,
+          "vram_fp16": 256,
+          "ollama": "mistral-medium-3.5",
+          "date_added": "2026-07-04",
+          "actionable_text": true,
+          "pilotable_text": true,
+          "runtime_status": "ollama_available",
+          "source_url": "https://ollama.com/library/mistral-medium-3.5"
+        },
+        {
+          "name": "NVIDIA Nemotron 3 Super",
+          "params": "120B MoE",
+          "kind": "text",
+          "use_case": "MoE NVIDIA pro, agents collaboratifs, raisonnement, workloads lourds",
+          "vram_q4": 87,
+          "vram_q8": 170,
+          "vram_fp16": 240,
+          "ollama": "nemotron-3-super",
+          "date_added": "2026-07-04",
+          "actionable_text": true,
+          "pilotable_text": false,
+          "runtime_status": "frontier_watchlist",
+          "source_url": "https://build.nvidia.com/nvidia/nemotron-3-super-120b-a12b"
+        },
+        {
+          "name": "GLM-5.2",
+          "params": "744B-A40B MoE",
+          "kind": "text",
+          "use_case": "veille frontier open-weights, code agentique long-horizon, pas adapté à un PC grand public",
+          "vram_q4": 430,
+          "vram_q8": 820,
+          "vram_fp16": 1500,
+          "ollama": "",
+          "date_added": "2026-07-06",
+          "actionable_text": false,
+          "pilotable_text": false,
+          "runtime_status": "frontier_watchlist",
+          "source_url": "https://huggingface.co/zai-org/GLM-5.2"
+        }
+      ]
+    },
+    {
+      "name": "Image, video et audio",
+      "icon": "MEDIA",
+      "models": [
+        {
+          "name": "Stable Diffusion 1.5",
+          "params": "Image",
+          "kind": "image",
+          "use_case": "image locale légère, hors chat Ollama",
+          "vram_q4": 4,
+          "vram_q8": 4,
+          "vram_fp16": 4,
+          "ollama": "",
+          "date_added": "2026-05-01",
+          "actionable_text": false
+        },
+        {
+          "name": "SDXL",
+          "params": "Image",
+          "kind": "image",
+          "use_case": "image qualité, runtime image dédié requis",
+          "vram_q4": 8,
+          "vram_q8": 8,
+          "vram_fp16": 8,
+          "ollama": "",
+          "date_added": "2026-05-01",
+          "actionable_text": false
+        },
+        {
+          "name": "Flux Schnell",
+          "params": "Image",
+          "kind": "image",
+          "use_case": "image rapide, runtime image dédié requis",
+          "vram_q4": 8,
+          "vram_q8": 10,
+          "vram_fp16": 12,
+          "ollama": "",
+          "date_added": "2026-05-01",
+          "actionable_text": false
+        },
+        {
+          "name": "Flux Dev",
+          "params": "Image",
+          "kind": "image",
+          "use_case": "image qualité, VRAM 12 Go+",
+          "vram_q4": 12,
+          "vram_q8": 14,
+          "vram_fp16": 24,
+          "ollama": "",
+          "date_added": "2026-05-01",
+          "actionable_text": false
+        },
+        {
+          "name": "Wan 2.1",
+          "params": "Video",
+          "kind": "video",
+          "use_case": "vidéo locale, runtime dédié, machine très solide",
+          "vram_q4": 24,
+          "vram_q8": 36,
+          "vram_fp16": 60,
+          "ollama": "",
+          "date_added": "2026-05-01",
+          "actionable_text": false
+        },
+        {
+          "name": "Whisper Large v3",
+          "params": "Audio",
+          "kind": "audio",
+          "use_case": "transcription audio, non piloté comme chat Ollama",
+          "vram_q4": 3,
+          "vram_q8": 5,
+          "vram_fp16": 10,
+          "ollama": "",
+          "date_added": "2026-05-01",
+          "actionable_text": false
+        }
+      ]
+    }
+  ]
+}
