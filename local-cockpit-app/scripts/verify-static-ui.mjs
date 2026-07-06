@@ -17,6 +17,13 @@ const rustCommands = new Set(
 );
 const missingCommands = [...invoked].filter((command) => !rustCommands.has(command));
 
+const scanIsAsync = /async\s+fn\s+scan_machine\s*\(/.test(rust)
+  && rust.includes("spawn_blocking(scan_machine_inner)");
+if (!scanIsAsync) {
+  console.error("scan_machine must remain async and delegate blocking hardware detection to spawn_blocking(scan_machine_inner)");
+  process.exit(1);
+}
+
 if (missingIds.length || missingCommands.length) {
   if (missingIds.length) {
     console.error("Missing HTML ids:", missingIds.join(", "));

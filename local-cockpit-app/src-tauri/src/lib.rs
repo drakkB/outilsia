@@ -222,7 +222,13 @@ pub struct ObsidianVaultExport {
 }
 
 #[tauri::command]
-fn scan_machine() -> Result<MachineScan, String> {
+async fn scan_machine() -> Result<MachineScan, String> {
+    tauri::async_runtime::spawn_blocking(scan_machine_inner)
+        .await
+        .map_err(|err| format!("Scan materiel interrompu: {err}"))?
+}
+
+fn scan_machine_inner() -> Result<MachineScan, String> {
     let mut system = System::new_all();
     system.refresh_all();
 
