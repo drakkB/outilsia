@@ -43,7 +43,7 @@ python3 scripts/smoke-live-desktop-account.py https://outilsia.fr
 Avec nettoyage du compte temporaire sur le VPS :
 
 ```bash
-python3 scripts/smoke-live-desktop-account.py https://outilsia.fr --ssh-cleanup root@72.62.183.66
+python3 scripts/smoke-live-desktop-account.py https://outilsia.fr --ssh-cleanup user@host
 ```
 
 Verification statique UI/Tauri :

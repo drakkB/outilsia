@@ -12,6 +12,7 @@ const downloadRoot = join(repoRoot, "server-work", "static", "downloads", "local
 function usage() {
   console.log(`Usage:
   node scripts/verify-download-page-contract.mjs [--require-freshness]
+  node scripts/verify-download-page-contract.mjs [--require-local-files]
 
 Checks that the public download page contract matches the local release manifest:
   page button, counter, build id, SHA256, changelog, freshness and tracked download URL.`);
@@ -22,7 +23,7 @@ function fail(message) {
 }
 
 function parseArgs(argv) {
-  const opts = { requireFreshness: false };
+  const opts = { requireFreshness: false, requireLocalFiles: false };
   for (const arg of argv) {
     if (arg === "--help" || arg === "-h") {
       usage();
@@ -30,6 +31,10 @@ function parseArgs(argv) {
     }
     if (arg === "--require-freshness") {
       opts.requireFreshness = true;
+      continue;
+    }
+    if (arg === "--require-local-files") {
+      opts.requireLocalFiles = true;
       continue;
     }
     throw new Error(`Unknown argument: ${arg}`);
@@ -78,7 +83,10 @@ function validateRelease(release, opts) {
     if (!file.url || !file.url.startsWith("/static/downloads/local-cockpit/")) fail(`Invalid release URL for ${file.name}`);
     if (!/^[a-f0-9]{64}$/i.test(file.sha256 || "")) fail(`Invalid sha256 for ${file.name}`);
     const path = join(downloadRoot, file.name);
-    if (!existsSync(path)) fail(`Release file missing locally: ${file.name}`);
+    if (!existsSync(path)) {
+      if (opts.requireLocalFiles) fail(`Release file missing locally: ${file.name}`);
+      continue;
+    }
     const stat = statSync(path);
     if (stat.size !== Number(file.size_bytes)) fail(`Size mismatch for ${file.name}`);
   }

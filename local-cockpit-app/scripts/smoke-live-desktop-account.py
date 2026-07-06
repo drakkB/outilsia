@@ -17,7 +17,7 @@ from http.cookiejar import CookieJar
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Live smoke test for the OutilsIA desktop account flow.")
     parser.add_argument("base_url", nargs="?", default="https://outilsia.fr")
-    parser.add_argument("--ssh-cleanup", default="", help="Optional SSH target used to remove the temporary user, e.g. root@72.62.183.66")
+    parser.add_argument("--ssh-cleanup", default="", help="Optional SSH target used to remove the temporary user, e.g. user@host")
     parser.add_argument("--remote-db", default="/var/www/outilsia/outilsia.db")
     return parser.parse_args()
 

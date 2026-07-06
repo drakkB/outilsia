@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(appRoot, "..");
 const defaultReleaseDir = join(repoRoot, "server-work", "static", "downloads", "local-cockpit");
-const defaultRemote = "root@72.62.183.66";
+const defaultRemote = process.env.OUTILSIA_DEPLOY_REMOTE || "";
 const defaultRemoteDir = "/var/www/outilsia/static/downloads/local-cockpit";
 
 function usage() {
@@ -17,7 +17,7 @@ function usage() {
 
 Default:
   --release-dir ${defaultReleaseDir}
-  --remote ${defaultRemote}
+  --remote ${defaultRemote || "<set OUTILSIA_DEPLOY_REMOTE or pass --remote>"}
   --remote-dir ${defaultRemoteDir}
 
 Without --deploy, the script validates only and prints the planned deployment.`);
@@ -197,6 +197,9 @@ try {
     console.log(`dry_run remote=${opts.remote} remote_dir=${opts.remoteDir}`);
     console.log("Add --deploy to publish this release.");
     process.exit(0);
+  }
+  if (!opts.remote) {
+    fail("Missing deploy target. Set OUTILSIA_DEPLOY_REMOTE or pass --remote <user@host>.");
   }
   deploy(validated, opts);
   console.log("deploy_complete");
