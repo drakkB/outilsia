@@ -1935,29 +1935,15 @@ fn detect_windows_gpu() -> Option<GpuProbe> {
         return None;
     }
 
-    let name = run_command(
+    let output = run_command(
         "powershell",
         &[
             "-NoProfile",
             "-Command",
-            "Get-CimInstance Win32_VideoController | Select-Object -First 1 -ExpandProperty Name",
+            "Get-CimInstance Win32_VideoController | ForEach-Object { \"$($_.Name)|$($_.AdapterRAM)\" }",
         ],
-    )?
-    .lines()
-    .find(|line| !line.trim().is_empty())?
-    .trim()
-    .to_string();
-
-    let vram_gb = run_command(
-        "powershell",
-        &[
-            "-NoProfile",
-            "-Command",
-            "Get-CimInstance Win32_VideoController | Select-Object -First 1 -ExpandProperty AdapterRAM",
-        ],
-    )
-    .and_then(|value| value.trim().parse::<u64>().ok())
-    .map(bytes_to_gb);
+    )?;
+    let (name, vram_gb) = preferred_windows_gpu_from_output(&output)?;
 
     Some(GpuProbe {
         vendor: Some(detect_vendor(&name)),
@@ -1976,6 +1962,27 @@ fn detect_windows_gpu() -> Option<GpuProbe> {
         pcie_link_gen_current: None,
         pcie_link_gen_max: None,
     })
+}
+
+fn preferred_windows_gpu_from_output(output: &str) -> Option<(String, Option<u32>)> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let clean = line.trim().trim_matches('\u{feff}').trim();
+            if clean.is_empty() {
+                return None;
+            }
+            let (name, adapter_ram) = clean.split_once('|').unwrap_or((clean, ""));
+            let name = clean_gpu_device_name(name);
+            if name.is_empty() || is_placeholder_gpu_name(&name) {
+                return None;
+            }
+            let vram_gb = adapter_ram.trim().parse::<u64>().ok().map(bytes_to_gb);
+            Some((name, vram_gb))
+        })
+        .max_by_key(|(name, vram_gb)| {
+            gpu_preference_score(name).saturating_add(vram_gb.unwrap_or(0).min(32) as u8)
+        })
 }
 
 fn detect_macos_gpu() -> Option<GpuProbe> {
@@ -2406,6 +2413,65 @@ fn detect_vendor(name: &str) -> String {
     } else {
         "Unknown".to_string()
     }
+}
+
+fn clean_gpu_device_name(value: &str) -> String {
+    value.trim().trim_matches('\u{feff}').trim().to_string()
+}
+
+fn is_placeholder_gpu_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    name.eq_ignore_ascii_case("name")
+        || lower.contains("microsoft basic")
+        || lower.contains("basic render")
+        || lower.contains("remote display")
+        || lower.contains("remote desktop")
+        || lower.contains("virtual")
+        || lower.contains("vmware")
+        || lower.contains("virtualbox")
+        || lower.contains("citrix")
+        || lower.contains("parsec")
+}
+
+fn gpu_preference_score(name: &str) -> u8 {
+    let lower = name.to_ascii_lowercase();
+    let mut score: u8 = if lower.contains("nvidia")
+        || lower.contains("geforce")
+        || lower.contains("rtx")
+        || lower.contains("gtx")
+        || lower.contains("quadro")
+        || lower.contains("tesla")
+    {
+        80
+    } else if lower.contains("amd") || lower.contains("radeon") {
+        60
+    } else if lower.contains("intel") || lower.contains("arc") {
+        30
+    } else {
+        0
+    };
+
+    if lower.contains("rtx 50") || lower.contains("rtx 40") || lower.contains("rx 79") {
+        score += 12;
+    } else if lower.contains("rtx 30") || lower.contains("rx 78") || lower.contains("rx 77") {
+        score += 10;
+    } else if lower.contains("rtx 20") || lower.contains("gtx") || lower.contains("rx 6") {
+        score += 6;
+    }
+
+    if lower.contains(" arc ") || lower.contains("arc(tm)") || lower.contains("arc graphics") {
+        score += 8;
+    }
+    if lower.contains("uhd graphics")
+        || lower.contains("iris")
+        || lower.contains("radeon(tm) graphics")
+    {
+        score = score.saturating_sub(8);
+    }
+    if lower.contains("laptop gpu") || lower.contains("super") || lower.contains(" ti") {
+        score += 2;
+    }
+    score
 }
 
 fn gpu_category(name: &str) -> String {
