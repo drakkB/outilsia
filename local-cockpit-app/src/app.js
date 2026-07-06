@@ -29,9 +29,18 @@ const PROMPT_LIBRARY_KEY = "outilsia.localCockpit.promptLibrary.v1";
 const CHAT_HISTORY_KEY = "outilsia.localCockpit.chatHistory.v1";
 const FIELD_TEST_PROFILE_KEY = "outilsia.localCockpit.fieldTestProfile.v1";
 const USAGE_PROFILE_KEY = "outilsia.localCockpit.usageProfile.v1";
+const UPGRADE_SIM_TARGET_KEY = "outilsia.localCockpit.upgradeSimTarget.v1";
 const MAX_BENCHMARK_HISTORY = 80;
 const MAX_PROMPT_LIBRARY = 40;
 const MAX_CHAT_HISTORY = 60;
+
+const UPGRADE_SIM_TARGETS = [
+  { key: "auto", label: "Auto", reason: "Upgrade prioritaire proposé par OutilsIA." },
+  { key: "vram12", label: "12 Go VRAM", reason: "Palier entrée sérieuse : 7B/8B confortables, quelques 14B quantifiés.", effects: { vram_gb: 12 } },
+  { key: "vram16", label: "16 Go VRAM", reason: "Palier confortable : 14B plus sereins, image IA et contexte plus large.", effects: { vram_gb: 16 } },
+  { key: "vram24", label: "24 Go VRAM", reason: "Gros palier local : 32B quantifiés, gros contextes et plus de marge.", effects: { vram_gb: 24 } },
+  { key: "ram64", label: "64 Go RAM", reason: "Palier RAG, multitâche, offload CPU et gros contextes.", effects: { ram_gb: 64 } }
+];
 
 const TEST_PROFILES = {
   simple: {
@@ -2144,8 +2153,47 @@ function applyUpgradeEffects(scan, upgrade) {
   return next;
 }
 
-function buildUpgradeImpact(compatibility, blocked, upgrades) {
-  const primary = Array.isArray(upgrades) ? upgrades.find((item) => item && typeof item === "object") : null;
+function readUpgradeSimTargetKey() {
+  try {
+    const saved = localStorage.getItem(UPGRADE_SIM_TARGET_KEY);
+    if (saved && UPGRADE_SIM_TARGETS.some((target) => target.key === saved)) return saved;
+  } catch (_) {
+    // Best effort only.
+  }
+  return "auto";
+}
+
+function setUpgradeSimTarget(key) {
+  const next = UPGRADE_SIM_TARGETS.some((target) => target.key === key) ? key : "auto";
+  try {
+    localStorage.setItem(UPGRADE_SIM_TARGET_KEY, next);
+  } catch (_) {
+    // Best effort only.
+  }
+  const compatibility = state.compatibility?.compatibility || state.compatibility || {};
+  renderUpgradeImpact(
+    compatibility,
+    compatibility.blocked_next || compatibility.blocked || [],
+    compatibility.upgrades || compatibility.recommended_upgrades || compatibility.shopping_list || []
+  );
+  setStatus(`Simulation upgrade : ${UPGRADE_SIM_TARGETS.find((target) => target.key === next)?.label || "Auto"}`, "ok");
+}
+
+function upgradeSimulationPrimary(upgrades, targetKey = readUpgradeSimTargetKey()) {
+  const target = UPGRADE_SIM_TARGETS.find((item) => item.key === targetKey) || UPGRADE_SIM_TARGETS[0];
+  if (target.key === "auto") return Array.isArray(upgrades) ? upgrades.find((item) => item && typeof item === "object") : null;
+  return {
+    name: target.label,
+    label: target.label,
+    reason: target.reason,
+    effects: target.effects || {},
+    simulated: true
+  };
+}
+
+function buildUpgradeImpact(compatibility, blocked, upgrades, targetKey = readUpgradeSimTargetKey()) {
+  const selectedTarget = UPGRADE_SIM_TARGETS.find((item) => item.key === targetKey) || UPGRADE_SIM_TARGETS[0];
+  const primary = upgradeSimulationPrimary(upgrades, selectedTarget.key);
   const scan = state.scan || {};
   const current = {
     vram_gb: numberOrZero(scan.vram_gb),
@@ -2169,7 +2217,8 @@ function buildUpgradeImpact(compatibility, blocked, upgrades) {
     guide: primary?.guide_url ? absolutize(primary.guide_url) : "",
     url: primary?.url || primary?.affiliate_url || "",
     price: primary?.price_range_eur || "",
-    avoid: primary?.avoid || ""
+    avoid: primary?.avoid || "",
+    target: selectedTarget
   };
 }
 
@@ -2181,6 +2230,7 @@ function upgradeImpactMarkdown(impact = currentUpgradeImpact()) {
     `- Date: ${new Date().toISOString()}`,
     `- Machine: ${state.scan?.name || "non scannée"}`,
     `- Score actuel: ${impact.score === null ? "non calculé" : `${impact.score}/100`}`,
+    `- Simulation: ${impact.target?.label || "Auto"}`,
     `- Upgrade prioritaire: ${title}`,
     impact.price ? `- Prix indicatif: ${impact.price}` : "",
     impact.guide ? `- Guide: ${impact.guide}` : "",
@@ -2207,16 +2257,28 @@ function currentUpgradeImpact() {
   return buildUpgradeImpact(
     compatibility,
     compatibility.blocked_next || compatibility.blocked || [],
-    compatibility.upgrades || compatibility.recommended_upgrades || compatibility.shopping_list || []
+    compatibility.upgrades || compatibility.recommended_upgrades || compatibility.shopping_list || [],
+    readUpgradeSimTargetKey()
   );
 }
 
 function renderUpgradeImpact(compatibility, blocked, upgrades) {
-  const impact = buildUpgradeImpact(compatibility, blocked, upgrades);
+  const selectedTarget = readUpgradeSimTargetKey();
+  const impact = buildUpgradeImpact(compatibility, blocked, upgrades, selectedTarget);
   if (!impact.primary) {
     els.upgradeImpactState.textContent = "aucun upgrade";
     els.upgradeImpactBox.className = "upgrade-impact-box empty";
-    els.upgradeImpactBox.textContent = "Aucun upgrade prioritaire structure dans ce diagnostic.";
+    els.upgradeImpactBox.innerHTML = `
+      <div class="upgrade-simulator">
+        <strong>Simulateur upgrade</strong>
+        <span>Aucun upgrade prioritaire structuré. Choisis un palier pour simuler ce que la machine débloquerait.</span>
+        <div class="upgrade-sim-actions">
+          ${UPGRADE_SIM_TARGETS.filter((target) => target.key !== "auto").map((target) => `
+            <button type="button" data-upgrade-sim-target="${escapeHtml(target.key)}">${escapeHtml(target.label)}</button>
+          `).join("")}
+        </div>
+      </div>
+    `;
     els.copyUpgradeImpactBtn.disabled = true;
     return;
   }
@@ -2224,9 +2286,20 @@ function renderUpgradeImpact(compatibility, blocked, upgrades) {
   const vramDelta = impact.next.vram_gb > impact.current.vram_gb ? `${impact.current.vram_gb || "?"} -> ${impact.next.vram_gb} Go VRAM` : "VRAM stable";
   const ramDelta = impact.next.ram_gb > impact.current.ram_gb ? `${impact.current.ram_gb || "?"} -> ${impact.next.ram_gb} Go RAM` : "RAM stable";
   const storageDelta = impact.next.storage_free_gb > impact.current.storage_free_gb ? `${impact.current.storage_free_gb || "?"} -> ${impact.next.storage_free_gb} Go libres` : "Stockage stable";
-  els.upgradeImpactState.textContent = impact.newlyReachable.length ? `${impact.newlyReachable.length} débloqué` : "impact calculé";
+  els.upgradeImpactState.textContent = impact.newlyReachable.length ? `${impact.newlyReachable.length} débloqué` : impact.primary.simulated ? "simulation" : "impact calculé";
   els.upgradeImpactBox.className = "upgrade-impact-box";
   els.upgradeImpactBox.innerHTML = `
+    <div class="upgrade-simulator">
+      <strong>Simulateur upgrade</strong>
+      <span>Compare rapidement les paliers sans changer le diagnostic de base.</span>
+      <div class="upgrade-sim-actions">
+        ${UPGRADE_SIM_TARGETS.map((target) => `
+          <button type="button" data-upgrade-sim-target="${escapeHtml(target.key)}" class="${target.key === selectedTarget ? "active" : ""}">
+            ${escapeHtml(target.label)}
+          </button>
+        `).join("")}
+      </div>
+    </div>
     <strong>${escapeHtml(title)}</strong>
     <span>${escapeHtml(impact.primary.reason || "Upgrade prioritaire selon le diagnostic.")}</span>
     <div class="impact-deltas">
@@ -8662,6 +8735,12 @@ document.addEventListener("click", async (event) => {
   const usagePackTarget = usagePackButton?.getAttribute?.("data-usage-pack");
   if (usagePackTarget) {
     useUsageProfilePack(usagePackTarget);
+    return;
+  }
+  const upgradeSimButton = event.target?.closest?.("[data-upgrade-sim-target]");
+  const upgradeSimTarget = upgradeSimButton?.getAttribute?.("data-upgrade-sim-target");
+  if (upgradeSimTarget) {
+    setUpgradeSimTarget(upgradeSimTarget);
     return;
   }
   const modelInfoButton = event.target?.closest?.("[data-model-info]");
