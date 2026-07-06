@@ -318,6 +318,35 @@ def check_scanned_view(browser, width: int, height: int, label: str):
     if "Optimiser" in quick_action or "PromptForge" in quick_action:
         raise AssertionError(f"{label}: PromptForge leaked into top action: {quick_action}")
 
+    report_state = page.evaluate("""() => window.__OUTILSIA_TEST__.applyReportNeededState()""")
+    if report_state["action"]["key"] != "report":
+        raise AssertionError(f"{label}: report state should target report action, got {report_state['action']}")
+    if report_state["reportReady"]:
+        raise AssertionError(f"{label}: report state should start without a generated report")
+    page.click("#quickActionBtn")
+    page.wait_for_timeout(250)
+    report_after_click = page.evaluate(
+        """() => {
+          const panel = document.querySelector('.readiness-panel');
+          const box = document.querySelector('#readinessBox');
+          const text = document.querySelector('#memoryText');
+          return {
+            panelVisible: !!panel && panel.offsetParent !== null && getComputedStyle(panel).display !== 'none',
+            boxText: box?.innerText || '',
+            memoryText: text?.value || '',
+            quickAction: document.querySelector('#quickActionText')?.innerText || ''
+          };
+        }"""
+    )
+    if not report_after_click["panelVisible"]:
+        raise AssertionError(f"{label}: generated readiness report should stay visible in essential mode")
+    if "Machine prête pour l'IA locale" not in report_after_click["boxText"]:
+        raise AssertionError(f"{label}: readiness panel does not show final report {report_after_click['boxText'][:500]}")
+    if "# MEMORY - OutilsIA Local Cockpit" not in report_after_click["memoryText"]:
+        raise AssertionError(f"{label}: generated report did not populate MemoryForge markdown")
+    if "Sauvegarder" not in report_after_click["quickAction"]:
+        raise AssertionError(f"{label}: next action should advance after report generation {report_after_click}")
+
     install_state = page.evaluate("""() => window.__OUTILSIA_TEST__.applyInstallProgressState()""")
     if "Téléchargement en cours" not in install_state["operationTitle"]:
         raise AssertionError(f"{label}: install progress title unclear {install_state}")

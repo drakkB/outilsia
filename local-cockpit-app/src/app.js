@@ -8758,6 +8758,47 @@ function installTestHarness() {
           .map((panel) => panel.className)
       };
     },
+    applyReportNeededState() {
+      const scan = demoScan();
+      scan.installed_models = [
+        ...(scan.installed_models || []),
+        { model_name: "qwen3", model_tag: "0.6b", size_gb: 0.5, runtime: "ollama" }
+      ];
+      const qwen = demoBenchmark("qwen3:0.6b");
+      const hermes = { ...demoBenchmark("hermes3:8b"), estimated_tokens_per_second: 28.4, elapsed_ms: 2500 };
+      renderScan(scan);
+      renderCompatibility(demoCompatibility());
+      state.benchmark = qwen;
+      state.chatResult = demoChat("hermes3:8b", "Résume cette machine pour Obsidian.");
+      writeBenchmarkHistory([qwen, hermes]);
+      writeLastArenaRun({
+        id: "arena-report-harness",
+        created_at_ms: Date.now(),
+        prompt: "Pourquoi la VRAM est importante pour un LLM local ?",
+        machine: {
+          name: scan.name,
+          gpu_name: scan.gpu_name,
+          vram_gb: scan.vram_gb,
+          ram_gb: scan.ram_gb,
+          machine_key: scan.machine_key
+        },
+        results: [qwen, hermes]
+      });
+      state.markdown = "";
+      els.memoryText.value = "";
+      renderBenchmark(qwen);
+      renderPreparePanel();
+      renderReadinessPanel();
+      renderArenaPanel();
+      renderStrategyBridgePanel();
+      renderFieldTestPanel();
+      renderPrimaryAction();
+      return {
+        action: primaryActionState(),
+        reportReady: prepareFlowState().reportReady,
+        readinessVisible: Boolean(els.readinessPanel?.offsetParent)
+      };
+    },
     applyInstallProgressState() {
       const scan = demoScan();
       renderScan(scan);
