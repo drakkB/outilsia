@@ -713,6 +713,15 @@ h2 {
   color: #b8d4d0;
 }
 
+.quick-action-btn {
+  background: linear-gradient(180deg, #8af1ce, #2cb8a8);
+  border-color: rgba(170, 255, 232, 0.70);
+  color: #021511;
+  margin-top: 10px;
+  min-height: 38px;
+  width: 100%;
+}
+
 .sticky-action-strip {
   align-items: center;
   background:
@@ -829,7 +838,8 @@ h2 {
 }
 
 .mode-essential .status-strip,
-.mode-essential .operation-monitor {
+.mode-essential .operation-monitor,
+.mode-essential .sticky-action-strip {
   display: none;
 }
 

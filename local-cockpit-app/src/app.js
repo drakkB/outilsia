@@ -199,6 +199,7 @@ const els = {
   scoreText: $("scoreText"),
   quickActionText: $("quickActionText"),
   quickActionDetail: $("quickActionDetail"),
+  quickActionBtn: $("quickActionBtn"),
   quickModelText: $("quickModelText"),
   quickModelDetail: $("quickModelDetail"),
   quickProofText: $("quickProofText"),
@@ -1576,6 +1577,14 @@ function renderStickyAction(action = primaryActionState()) {
     els.stickyActionBtn.dataset.primaryCommand = action.command;
     if (action.model) els.stickyActionBtn.dataset.primaryModel = action.model;
     else delete els.stickyActionBtn.dataset.primaryModel;
+  }
+  if (els.quickActionBtn) {
+    els.quickActionBtn.textContent = state.scan ? action.label : "Analyser ce PC";
+    els.quickActionBtn.title = state.scan ? action.status : "Analyse le matériel, détecte Ollama et charge les recommandations modèles.";
+    els.quickActionBtn.dataset.primaryCommand = state.scan ? action.command : "analyze";
+    if (state.scan && action.model) els.quickActionBtn.dataset.primaryModel = action.model;
+    else delete els.quickActionBtn.dataset.primaryModel;
+    els.quickActionBtn.disabled = Boolean(primaryAnalysisBusy);
   }
 }
 
@@ -8908,6 +8917,7 @@ function demoDesktopUpdates() {
 
 els.prepareBtn.addEventListener("click", handlePrimaryAction);
 els.stickyActionBtn?.addEventListener("click", handlePrimaryAction);
+els.quickActionBtn?.addEventListener("click", handlePrimaryAction);
 if (els.viewEssentialBtn) els.viewEssentialBtn.addEventListener("click", () => setViewMode("essential"));
 if (els.viewAdvancedBtn) els.viewAdvancedBtn.addEventListener("click", () => setViewMode("advanced"));
 els.preparePanelBtn.addEventListener("click", prepareLocalAiFlow);

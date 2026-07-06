@@ -127,6 +127,29 @@ def assert_sticky_action_hidden_in_essential(page, label: str):
         raise AssertionError(f"{label}: sticky action duplicates the primary action in essential mode")
 
 
+def assert_quick_action_button(page, label: str):
+    quick = page.locator("#quickActionText").inner_text(timeout=5000).strip()
+    button_text = page.locator("#quickActionBtn").inner_text(timeout=5000).strip()
+    if quick != button_text:
+        raise AssertionError(f"{label}: quick action button mismatch quick={quick!r} button={button_text!r}")
+    state = page.evaluate(
+        """() => {
+          const btn = document.querySelector('#quickActionBtn');
+          return {
+            visible: !!btn && btn.offsetParent !== null && getComputedStyle(btn).display !== 'none',
+            command: btn?.dataset?.primaryCommand || '',
+            disabled: !!btn?.disabled
+          };
+        }"""
+    )
+    if not state["visible"]:
+        raise AssertionError(f"{label}: quick action button is not visible in essential mode")
+    if not state["command"] or state["command"] == "analyze":
+        raise AssertionError(f"{label}: quick action button is not wired to the next command {state}")
+    if state["disabled"]:
+        raise AssertionError(f"{label}: quick action button should be enabled while idle {state}")
+
+
 def check_scanned_view(browser, width: int, height: int, label: str):
     page = browser.new_page(viewport={"width": width, "height": height}, device_scale_factor=1)
     page.goto(HTML.as_uri(), wait_until="load")
@@ -147,7 +170,8 @@ def check_scanned_view(browser, width: int, height: int, label: str):
     assert_text(page, "#quickModelDetail", "benchmarké", f"{label} quick model")
     assert_text(page, "#quickProofText", "qwen3:0.6b", f"{label} quick proof")
     assert_text(page, "#quickUpgradeText", "Gros LLM", f"{label} quick upgrade")
-    assert_sticky_action_visible(page, label)
+    assert_quick_action_button(page, label)
+    assert_sticky_action_hidden_in_essential(page, label)
     assert_text(page, "#readinessBox", "Machine à compléter", f"{label} readiness")
     assert_text(page, "#readinessBox", "Installer qwen3:0.6b", f"{label} readiness next step")
     assert_text(page, "#arenaBox", "Meilleur compromis", f"{label} arena")
