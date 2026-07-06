@@ -1674,17 +1674,16 @@ fn delete_ollama_model(
     );
 
     let mut command = build_ollama_command(runtime);
-    let output = command.arg("rm").arg(&model).output().map_err(|err| {
-        format!(
-            "Impossible de lancer {}: {err}",
-            ollama_runtime_name(runtime)
-        )
-    })?;
+    command.arg("rm").arg(&model);
+    let (output, timed_out) = command_output_with_timeout(
+        command,
+        timeout,
+        &format!("Suppression {}", ollama_runtime_name(runtime)),
+    )?;
 
     let elapsed = started.elapsed();
     let stdout = clean_benchmark_output(&String::from_utf8_lossy(&output.stdout));
     let stderr = clean_benchmark_output(&String::from_utf8_lossy(&output.stderr));
-    let timed_out = elapsed >= timeout;
     let success = output.status.success() && !timed_out;
     let message = if success {
         format!("{model} supprimé.")
@@ -1724,6 +1723,39 @@ fn delete_ollama_model(
         error: if success { None } else { Some(message) },
         created_at_ms: now_ms(),
     })
+}
+
+fn command_output_with_timeout(
+    mut command: Command,
+    timeout: Duration,
+    label: &str,
+) -> Result<(std::process::Output, bool), String> {
+    let started = Instant::now();
+    let mut child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|err| format!("Impossible de lancer {label}: {err}"))?;
+    let mut timed_out = false;
+    loop {
+        if child
+            .try_wait()
+            .map_err(|err| format!("{label} illisible: {err}"))?
+            .is_some()
+        {
+            break;
+        }
+        if started.elapsed() >= timeout {
+            timed_out = true;
+            let _ = child.kill();
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(120));
+    }
+    let output = child
+        .wait_with_output()
+        .map_err(|err| format!("Sortie {label} indisponible: {err}"))?;
+    Ok((output, timed_out))
 }
 
 #[tauri::command]
@@ -3746,4 +3778,85 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running OutilsIA Local Cockpit");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(target_os = "windows")]
+    fn sleep_command(milliseconds: u64) -> Command {
+        let mut command = Command::new("powershell.exe");
+        command.args([
+            "-NoProfile",
+            "-Command",
+            &format!("Start-Sleep -Milliseconds {milliseconds}; Write-Output done"),
+        ]);
+        command
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn sleep_command(milliseconds: u64) -> Command {
+        let mut command = Command::new("sh");
+        command.args([
+            "-c",
+            &format!("sleep {}; printf done", (milliseconds as f64) / 1000.0),
+        ]);
+        command
+    }
+
+    #[test]
+    fn validates_ollama_model_refs() {
+        assert_eq!(
+            validate_ollama_model_ref("qwen3:0.6b").unwrap(),
+            "qwen3:0.6b"
+        );
+        assert_eq!(
+            validate_ollama_model_ref("adrienbrault/nous-hermes2theta-llama3-8b:q4").unwrap(),
+            "adrienbrault/nous-hermes2theta-llama3-8b:q4"
+        );
+        assert!(validate_ollama_model_ref("").is_err());
+        assert!(validate_ollama_model_ref("qwen3:8b && rm -rf /").is_err());
+    }
+
+    #[test]
+    fn command_output_timeout_marks_slow_process() {
+        let (_output, timed_out) = command_output_with_timeout(
+            sleep_command(900),
+            Duration::from_millis(100),
+            "test-timeout",
+        )
+        .unwrap();
+        assert!(timed_out);
+    }
+
+    #[test]
+    fn memory_probe_estimates_channels_from_modules() {
+        let probe = memory_probe_from_modules(
+            Some(64),
+            vec![
+                MemoryModule {
+                    size_gb: Some(32),
+                    configured_clock_mhz: Some(6000),
+                    speed_mhz: Some(5600),
+                    manufacturer: Some("Demo".to_string()),
+                    part_number: None,
+                    slot: Some("A2".to_string()),
+                },
+                MemoryModule {
+                    size_gb: Some(32),
+                    configured_clock_mhz: Some(6000),
+                    speed_mhz: Some(5600),
+                    manufacturer: Some("Demo".to_string()),
+                    part_number: None,
+                    slot: Some("B2".to_string()),
+                },
+            ],
+            "test",
+        );
+        assert_eq!(probe.channel_mode, "dual_channel_estimated");
+        assert_eq!(probe.configured_clock_mhz, Some(6000));
+        assert_eq!(probe.speed_mhz, Some(5600));
+        assert_eq!(probe.module_count, Some(2));
+    }
 }
