@@ -61,6 +61,16 @@ struct GpuProbe {
     category: Option<String>,
     vram_gb: Option<u32>,
     source: String,
+    driver_version: Option<String>,
+    cuda_version: Option<String>,
+    temperature_c: Option<f64>,
+    utilization_percent: Option<f64>,
+    power_draw_w: Option<f64>,
+    power_limit_w: Option<f64>,
+    pcie_link_width_current: Option<u32>,
+    pcie_link_width_max: Option<u32>,
+    pcie_link_gen_current: Option<u32>,
+    pcie_link_gen_max: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -327,8 +337,8 @@ fn write_windows_recipe_file(content: String) -> Result<String, String> {
     serde_json::from_str::<Value>(&content)
         .map_err(|err| format!("Recette JSON invalide: {err}"))?;
 
-    let exe_path = env::current_exe()
-        .map_err(|err| format!("Impossible de localiser l'executable: {err}"))?;
+    let exe_path =
+        env::current_exe().map_err(|err| format!("Impossible de localiser l'executable: {err}"))?;
     let exe_dir = exe_path
         .parent()
         .ok_or_else(|| "Dossier executable introuvable.".to_string())?;
@@ -991,13 +1001,13 @@ fn export_obsidian_vault(
         cockpit_journal_markdown(&scan, &memory_content),
     )?;
     write_vault_file(&dir, &mut files, "INDEX.md", vault_index_markdown(&scan))?;
-    write_vault_file(&dir, &mut files, "MANIFESTE.md", vault_manifest_markdown(&scan))?;
     write_vault_file(
         &dir,
         &mut files,
-        "MEMORY.md",
-        memory_content,
+        "MANIFESTE.md",
+        vault_manifest_markdown(&scan),
     )?;
+    write_vault_file(&dir, &mut files, "MEMORY.md", memory_content)?;
     write_vault_file(
         &dir,
         &mut files,
@@ -1229,9 +1239,7 @@ fn strip_orphan_csi_sequences(input: &str) -> String {
         if chars[index] == '[' {
             let mut cursor = index + 1;
             if cursor < chars.len()
-                && (chars[cursor] == '?'
-                    || chars[cursor].is_ascii_digit()
-                    || chars[cursor] == ';')
+                && (chars[cursor] == '?' || chars[cursor].is_ascii_digit() || chars[cursor] == ';')
             {
                 cursor += 1;
                 while cursor < chars.len()
@@ -1640,16 +1648,12 @@ fn delete_ollama_model(
     );
 
     let mut command = build_ollama_command(runtime);
-    let output = command
-        .arg("rm")
-        .arg(&model)
-        .output()
-        .map_err(|err| {
-            format!(
-                "Impossible de lancer {}: {err}",
-                ollama_runtime_name(runtime)
-            )
-        })?;
+    let output = command.arg("rm").arg(&model).output().map_err(|err| {
+        format!(
+            "Impossible de lancer {}: {err}",
+            ollama_runtime_name(runtime)
+        )
+    })?;
 
     let elapsed = started.elapsed();
     let stdout = clean_benchmark_output(&String::from_utf8_lossy(&output.stdout));
@@ -1840,6 +1844,16 @@ fn detect_gpu() -> GpuProbe {
         category: Some("cpu-only".to_string()),
         vram_gb: Some(0),
         source: "none".to_string(),
+        driver_version: None,
+        cuda_version: None,
+        temperature_c: None,
+        utilization_percent: None,
+        power_draw_w: None,
+        power_limit_w: None,
+        pcie_link_width_current: None,
+        pcie_link_width_max: None,
+        pcie_link_gen_current: None,
+        pcie_link_gen_max: None,
     }
 }
 
@@ -1847,7 +1861,7 @@ fn detect_nvidia_smi() -> Option<GpuProbe> {
     let output = run_command(
         "nvidia-smi",
         &[
-            "--query-gpu=name,memory.total",
+            "--query-gpu=name,memory.total,driver_version,temperature.gpu,utilization.gpu,power.draw,power.limit,pcie.link.width.current,pcie.link.width.max,pcie.link.gen.current,pcie.link.gen.max",
             "--format=csv,noheader,nounits",
         ],
     )?;
@@ -1855,6 +1869,15 @@ fn detect_nvidia_smi() -> Option<GpuProbe> {
     let mut parts = line.split(',').map(str::trim);
     let name = parts.next()?.to_string();
     let memory_mb = parts.next().and_then(|value| value.parse::<u32>().ok());
+    let driver_version = parts.next().and_then(clean_optional_string);
+    let temperature_c = parts.next().and_then(parse_optional_f64);
+    let utilization_percent = parts.next().and_then(parse_optional_f64);
+    let power_draw_w = parts.next().and_then(parse_optional_f64);
+    let power_limit_w = parts.next().and_then(parse_optional_f64);
+    let pcie_link_width_current = parts.next().and_then(parse_optional_u32);
+    let pcie_link_width_max = parts.next().and_then(parse_optional_u32);
+    let pcie_link_gen_current = parts.next().and_then(parse_optional_u32);
+    let pcie_link_gen_max = parts.next().and_then(parse_optional_u32);
 
     Some(GpuProbe {
         name: Some(name.clone()),
@@ -1862,6 +1885,48 @@ fn detect_nvidia_smi() -> Option<GpuProbe> {
         category: Some(gpu_category(&name)),
         vram_gb: memory_mb.map(|mb| ((mb as f64) / 1024.0).round() as u32),
         source: "nvidia-smi".to_string(),
+        driver_version,
+        cuda_version: detect_nvidia_cuda_version(),
+        temperature_c,
+        utilization_percent,
+        power_draw_w,
+        power_limit_w,
+        pcie_link_width_current,
+        pcie_link_width_max,
+        pcie_link_gen_current,
+        pcie_link_gen_max,
+    })
+}
+
+fn clean_optional_string(value: &str) -> Option<String> {
+    let clean = value.trim();
+    if clean.is_empty()
+        || clean.eq_ignore_ascii_case("[not supported]")
+        || clean.eq_ignore_ascii_case("n/a")
+    {
+        None
+    } else {
+        Some(clean.to_string())
+    }
+}
+
+fn parse_optional_f64(value: &str) -> Option<f64> {
+    clean_optional_string(value)?.parse::<f64>().ok()
+}
+
+fn parse_optional_u32(value: &str) -> Option<u32> {
+    clean_optional_string(value)?.parse::<u32>().ok()
+}
+
+fn detect_nvidia_cuda_version() -> Option<String> {
+    let output = run_command("nvidia-smi", &[])?;
+    let marker = "CUDA Version:";
+    output.lines().find_map(|line| {
+        let (_, right) = line.split_once(marker)?;
+        right
+            .split_whitespace()
+            .next()
+            .and_then(clean_optional_string)
     })
 }
 
@@ -1900,6 +1965,16 @@ fn detect_windows_gpu() -> Option<GpuProbe> {
         name: Some(name),
         vram_gb,
         source: "powershell-win32-videocontroller".to_string(),
+        driver_version: None,
+        cuda_version: None,
+        temperature_c: None,
+        utilization_percent: None,
+        power_draw_w: None,
+        power_limit_w: None,
+        pcie_link_width_current: None,
+        pcie_link_width_max: None,
+        pcie_link_gen_current: None,
+        pcie_link_gen_max: None,
     })
 }
 
@@ -1922,6 +1997,16 @@ fn detect_macos_gpu() -> Option<GpuProbe> {
         name: Some(name),
         vram_gb: None,
         source: "system_profiler".to_string(),
+        driver_version: None,
+        cuda_version: None,
+        temperature_c: None,
+        utilization_percent: None,
+        power_draw_w: None,
+        power_limit_w: None,
+        pcie_link_width_current: None,
+        pcie_link_width_max: None,
+        pcie_link_gen_current: None,
+        pcie_link_gen_max: None,
     })
 }
 
@@ -1947,6 +2032,16 @@ fn detect_linux_lspci() -> Option<GpuProbe> {
         name: Some(name),
         vram_gb: None,
         source: "lspci".to_string(),
+        driver_version: None,
+        cuda_version: None,
+        temperature_c: None,
+        utilization_percent: None,
+        power_draw_w: None,
+        power_limit_w: None,
+        pcie_link_width_current: None,
+        pcie_link_width_max: None,
+        pcie_link_gen_current: None,
+        pcie_link_gen_max: None,
     })
 }
 
@@ -1996,7 +2091,8 @@ fn detect_wsl_distributions() -> Vec<String> {
         return Vec::new();
     }
 
-    let output = run_command("wsl.exe", &["-l", "-q"]).or_else(|| run_command("wsl", &["-l", "-q"]));
+    let output =
+        run_command("wsl.exe", &["-l", "-q"]).or_else(|| run_command("wsl", &["-l", "-q"]));
     output
         .unwrap_or_default()
         .replace('\0', "")
@@ -2039,7 +2135,9 @@ fn install_wsl_runtime(app: AppHandle) -> Result<InstallModelResult, String> {
         });
     }
 
-    if run_command("wsl.exe", &["--version"]).is_some() || run_command("wsl", &["--version"]).is_some() {
+    if run_command("wsl.exe", &["--version"]).is_some()
+        || run_command("wsl", &["--version"]).is_some()
+    {
         let message = "WSL est déjà installé. Lance le scan pour vérifier Ollama dans Ubuntu.";
         emit_install_progress(&app, &model, "ok", message, true, true);
         return Ok(InstallModelResult {
@@ -2052,10 +2150,20 @@ fn install_wsl_runtime(app: AppHandle) -> Result<InstallModelResult, String> {
         });
     }
 
-    match Command::new("wsl.exe").args(["--install", "-d", "Ubuntu"]).spawn() {
+    match Command::new("wsl.exe")
+        .args(["--install", "-d", "Ubuntu"])
+        .spawn()
+    {
         Ok(_) => {
             let message = "Installation WSL Ubuntu lancée. Windows peut demander une confirmation administrateur ou un redémarrage.";
-            emit_install_progress(&app, &model, "cmd", "wsl.exe --install -d Ubuntu", false, false);
+            emit_install_progress(
+                &app,
+                &model,
+                "cmd",
+                "wsl.exe --install -d Ubuntu",
+                false,
+                false,
+            );
             emit_install_progress(&app, &model, "info", message, true, true);
             Ok(InstallModelResult {
                 model,
@@ -2405,7 +2513,8 @@ fn vault_index_markdown(scan: &MachineScan) -> String {
         "- [[07-Rapport-partageable]] : synthese claire a copier ou publier.".to_string(),
         "- [[08-Fiches-modeles]] : forces, usages et limites des modeles locaux.".to_string(),
         "- [[09-Catalogues-OutilsIA]] : versions catalogues, nouveautes et paliers.".to_string(),
-        "- [[10-Journal-cockpit]] : rapport, Arena, PromptForge, dialogues et benchmarks exportes.".to_string(),
+        "- [[10-Journal-cockpit]] : rapport, Arena, PromptForge, dialogues et benchmarks exportes."
+            .to_string(),
         "- [[MEMORY]] : memoire principale reutilisable par IA locale.".to_string(),
         "- [[HERMES]] : charte locale pour Hermes Agent.".to_string(),
         String::new(),
@@ -2762,7 +2871,11 @@ fn shopping_list_markdown(compat: &Value, scan: &MachineScan) -> String {
     lines.join("\n")
 }
 
-fn share_ready_report_markdown(scan: &MachineScan, compat: &Value, benchmark: Option<&Value>) -> String {
+fn share_ready_report_markdown(
+    scan: &MachineScan,
+    compat: &Value,
+    benchmark: Option<&Value>,
+) -> String {
     let score = compat_score_label(compat);
     let models = compatible_models(compat);
     let upgrades = compat
@@ -2816,7 +2929,10 @@ fn share_ready_report_markdown(scan: &MachineScan, compat: &Value, benchmark: Op
     lines.push("## Preuve locale".to_string());
     lines.push(String::new());
     if let Some(value) = benchmark {
-        let model = value.get("model").and_then(Value::as_str).unwrap_or("modele");
+        let model = value
+            .get("model")
+            .and_then(Value::as_str)
+            .unwrap_or("modele");
         let speed = value
             .get("estimated_tokens_per_second")
             .and_then(Value::as_f64)
@@ -2859,8 +2975,12 @@ fn share_ready_report_markdown(scan: &MachineScan, compat: &Value, benchmark: Op
     lines.push("## Suite conseillee".to_string());
     lines.push(String::new());
     lines.push("- Lancer au moins deux benchmarks comparables dans l'Arena locale.".to_string());
-    lines.push("- Exporter le vault Obsidian si cette machine devient un vrai cockpit IA.".to_string());
-    lines.push("- Synchroniser avec le compte OutilsIA pour creer un rapport partageable.".to_string());
+    lines.push(
+        "- Exporter le vault Obsidian si cette machine devient un vrai cockpit IA.".to_string(),
+    );
+    lines.push(
+        "- Synchroniser avec le compte OutilsIA pour creer un rapport partageable.".to_string(),
+    );
     lines
         .into_iter()
         .filter(|line| !line.trim().is_empty() || true)
@@ -2949,8 +3069,13 @@ fn catalog_state_markdown(compat: &Value) -> String {
     lines.push("## Principe".to_string());
     lines.push(String::new());
     lines.push("- Le site OutilsIA maintient les catalogues modeles/materiel.".to_string());
-    lines.push("- L'app relit le diagnostic serveur pour rester reactive sans nouvel exe.".to_string());
-    lines.push("- Les choix critiques restent bases sur RAM, VRAM, stockage et benchmarks locaux.".to_string());
+    lines.push(
+        "- L'app relit le diagnostic serveur pour rester reactive sans nouvel exe.".to_string(),
+    );
+    lines.push(
+        "- Les choix critiques restent bases sur RAM, VRAM, stockage et benchmarks locaux."
+            .to_string(),
+    );
     lines.join("\n")
 }
 
@@ -3009,46 +3134,40 @@ fn compat_score_label(compat: &Value) -> String {
 }
 
 fn runtime_label(scan: &MachineScan) -> String {
-    if let Some(label) = scan.runtimes
-        .get("ollama")
-        .and_then(|value| {
-            let installed = value
-                .get("installed")
-                .and_then(Value::as_bool)
-                .unwrap_or(false);
-            let version = value.get("version").and_then(Value::as_str).unwrap_or("");
-            if installed {
-                Some(if version.is_empty() {
-                    "detecte".to_string()
-                } else {
-                    version.to_string()
-                })
+    if let Some(label) = scan.runtimes.get("ollama").and_then(|value| {
+        let installed = value
+            .get("installed")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let version = value.get("version").and_then(Value::as_str).unwrap_or("");
+        if installed {
+            Some(if version.is_empty() {
+                "detecte".to_string()
             } else {
-                None
-            }
-        })
-    {
+                version.to_string()
+            })
+        } else {
+            None
+        }
+    }) {
         return format!("Ollama Windows ({label})");
     }
-    if let Some(label) = scan.runtimes
-        .get("ollama_wsl")
-        .and_then(|value| {
-            let installed = value
-                .get("installed")
-                .and_then(Value::as_bool)
-                .unwrap_or(false);
-            let version = value.get("version").and_then(Value::as_str).unwrap_or("");
-            if installed {
-                Some(if version.is_empty() {
-                    "detecte".to_string()
-                } else {
-                    version.to_string()
-                })
+    if let Some(label) = scan.runtimes.get("ollama_wsl").and_then(|value| {
+        let installed = value
+            .get("installed")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let version = value.get("version").and_then(Value::as_str).unwrap_or("");
+        if installed {
+            Some(if version.is_empty() {
+                "detecte".to_string()
             } else {
-                None
-            }
-        })
-    {
+                version.to_string()
+            })
+        } else {
+            None
+        }
+    }) {
         return format!("Ollama WSL Ubuntu ({label})");
     }
     "non detecte".to_string()

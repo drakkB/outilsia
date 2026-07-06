@@ -167,6 +167,7 @@ const els = {
   vramText: $("vramText"),
   osText: $("osText"),
   ollamaText: $("ollamaText"),
+  hardwareDoctorBox: $("hardwareDoctorBox"),
   wslStateText: $("wslStateText"),
   wslDetailText: $("wslDetailText"),
   installWslBtn: $("installWslBtn"),
@@ -1529,6 +1530,64 @@ function showModelInfo(ref) {
   setStatus(`Fiche modèle ${ref}`, "ok");
 }
 
+function formatDoctorNumber(value, suffix = "") {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "";
+  const rounded = Math.round(number * 10) / 10;
+  return `${rounded}${suffix}`;
+}
+
+function renderHardwareDoctor(scan) {
+  if (!els.hardwareDoctorBox) return;
+  const probe = scan?.raw_scan?.gpu_probe || {};
+  const source = probe.source || "scan système";
+  const rows = [];
+  if (probe.driver_version) rows.push(["Driver", probe.driver_version]);
+  if (probe.cuda_version) rows.push(["CUDA", probe.cuda_version]);
+  if (probe.temperature_c != null) rows.push(["Température", formatDoctorNumber(probe.temperature_c, " °C")]);
+  if (probe.utilization_percent != null) rows.push(["Charge GPU", formatDoctorNumber(probe.utilization_percent, " %")]);
+  if (probe.power_draw_w != null) {
+    const power = probe.power_limit_w != null
+      ? `${formatDoctorNumber(probe.power_draw_w, " W")} / ${formatDoctorNumber(probe.power_limit_w, " W")}`
+      : formatDoctorNumber(probe.power_draw_w, " W");
+    rows.push(["Puissance", power]);
+  }
+  if (probe.pcie_link_width_current || probe.pcie_link_width_max) {
+    const width = `${probe.pcie_link_width_current ? `x${probe.pcie_link_width_current}` : "x?"}${probe.pcie_link_width_max ? ` / x${probe.pcie_link_width_max}` : ""}`;
+    rows.push(["PCIe", width]);
+  }
+
+  const temp = Number(probe.temperature_c || 0);
+  const hasNvidiaSignals = source === "nvidia-smi" || probe.driver_version || probe.cuda_version;
+  const status = temp >= 84
+    ? "à surveiller"
+    : hasNvidiaSignals
+      ? "GPU mesuré"
+      : scan?.gpu_name
+        ? "GPU détecté"
+        : "CPU/RAM";
+  const detail = hasNvidiaSignals
+    ? "Signaux NVIDIA lus localement. OutilsIA les utilise pour affiner diagnostic, WSL et upgrades."
+    : scan?.gpu_name
+      ? "Le GPU est identifié. Les métriques fines dépendent du driver et du runtime disponibles."
+      : "Aucun GPU dédié détecté. OutilsIA orientera vers petits modèles, CPU ou upgrade.";
+
+  els.hardwareDoctorBox.className = `hardware-doctor-box ${temp >= 84 ? "is-warning" : hasNvidiaSignals ? "is-ready" : ""}`.trim();
+  els.hardwareDoctorBox.innerHTML = `
+    <div class="hardware-doctor-head">
+      <div>
+        <span class="label">Hardware Doctor</span>
+        <strong>${escapeHtml(status)}</strong>
+        <p>${escapeHtml(detail)}</p>
+      </div>
+      <span class="doctor-source">${escapeHtml(source)}</span>
+    </div>
+    ${rows.length ? `<dl class="doctor-grid">${rows.map(([label, value]) => `
+      <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>
+    `).join("")}</dl>` : ""}
+  `;
+}
+
 function renderScan(scan) {
   state.scan = scan;
   els.sourceText.textContent = scan.source || "local";
@@ -1546,6 +1605,7 @@ function renderScan(scan) {
   if (els.topVramText) els.topVramText.textContent = formatGb(scan.vram_gb);
   if (els.topOsText) els.topOsText.textContent = `${scan.os_name || "OS"} ${scan.os_version || ""}`.trim();
   if (els.topOllamaText) els.topOllamaText.textContent = topRuntimeOllama(scan);
+  renderHardwareDoctor(scan);
   renderWslRuntime(scan);
   els.checkBtn.disabled = false;
   els.memoryBtn.disabled = false;
