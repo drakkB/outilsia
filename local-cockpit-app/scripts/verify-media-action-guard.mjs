@@ -136,7 +136,7 @@ for (const needle of [
 const candidateFilters = [
   "const candidates = models.filter((model) => actionableOllamaRef(model));",
   ".filter((model) => actionableOllamaRef(model))",
-  "const recommended = extractModels(compatibility).filter((model) => actionableOllamaRef(model)).slice(0, 4);",
+  "sortRecommendedModels(extractModels(compatibility).filter((model) => actionableOllamaRef(model))).slice(0, 4);",
 ];
 for (const needle of candidateFilters) {
   if (!appJs.includes(needle)) fail(`app.js missing actionable filter: ${needle}`);

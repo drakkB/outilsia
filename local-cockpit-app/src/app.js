@@ -1136,6 +1136,61 @@ function actionableOllamaRef(model) {
   return ref;
 }
 
+function modelRequiredVram(model) {
+  const value = Number(model?.vram_q4 ?? model?.vram ?? model?.vram_gb ?? 0);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function modelRecencyScore(model) {
+  const date = String(model?.date_added || "").trim();
+  if (/^2026-07/.test(date)) return 36;
+  if (/^2026-06/.test(date)) return 18;
+  if (/^2026-05/.test(date)) return 8;
+  return 0;
+}
+
+function modelRecommendationScore(model) {
+  const ref = actionableOllamaRef(model);
+  if (!ref) return -10000;
+  const text = `${modelTitle(model)} ${ref} ${model?.use_case || ""}`.toLowerCase();
+  const vram = Number(state.scan?.vram_gb || 0);
+  const need = modelRequiredVram(model);
+  let score = 0;
+
+  if (isOllamaModelInstalled(ref)) score += 80;
+  if (hasSuccessfulBenchmarkFor(ref)) score += 45;
+  score += modelRecencyScore(model);
+
+  if (String(model?.runtime_status || "") === "ollama_available") score += 16;
+  if (String(model?.runtime_status || "") === "ollama_watchlist") score -= 80;
+
+  if (text.includes("gemma 4") || ref.startsWith("gemma4")) score += 34;
+  if (text.includes("ornith") || ref.startsWith("ornith")) score += 30;
+  if (text.includes("qwen 3.6") || ref.startsWith("qwen3.6")) score += 28;
+  if (text.includes("qwen3-coder") || text.includes("coder")) score += 22;
+  if (text.includes("hermes")) score += 22;
+  if (text.includes("mistral")) score += 10;
+
+  if (/\b(7b|8b|9b|12b)\b/.test(text)) score += 16;
+  if (/\b14b\b/.test(text)) score += 10;
+  if (/\b(27b|30b|32b|35b)\b/.test(text)) score += vram >= 24 ? 18 : -20;
+  if (/\b(70b|72b|109b|123b|235b)\b/.test(text)) score -= vram >= 48 ? 10 : 60;
+
+  if (need && vram) {
+    if (need <= vram) score += 28;
+    else score -= 140;
+    if (need <= vram * 0.7) score += 10;
+    if (need >= vram * 0.92) score -= 8;
+  }
+
+  if (normalizeOllamaRef(ref) === "qwen3:0.6b") score -= 70;
+  return score;
+}
+
+function sortRecommendedModels(models = []) {
+  return [...models].sort((left, right) => modelRecommendationScore(right) - modelRecommendationScore(left));
+}
+
 function modelActionability(model) {
   const rawRef = modelOllamaRef(model);
   const ref = actionableOllamaRef(model);
@@ -1352,19 +1407,7 @@ function topRecommendedModel() {
     if (normalizeOllamaRef(actionableOllamaRef(model)) === "qwen3:0.6b") return false;
     return true;
   });
-  const scoreCandidate = (model) => {
-    const ref = actionableOllamaRef(model);
-    const text = `${modelTitle(model)} ${ref}`.toLowerCase();
-    let score = 0;
-    if (isOllamaModelInstalled(ref)) score += 80;
-    if (hasSuccessfulBenchmarkFor(ref)) score += 40;
-    if (text.includes("hermes")) score += 25;
-    if (/\b(7b|8b|9b)\b/.test(text)) score += 12;
-    if (/\b14b\b/.test(text)) score += 8;
-    if (text.includes("mixtral") && !isOllamaModelInstalled(ref)) score -= 25;
-    return score;
-  };
-  const ranked = [...safeCandidates].sort((left, right) => scoreCandidate(right) - scoreCandidate(left));
+  const ranked = sortRecommendedModels(safeCandidates);
   return ranked[0] || candidates.find((model) => normalizeOllamaRef(actionableOllamaRef(model)) !== "qwen3:0.6b") || candidates[0] || null;
 }
 
@@ -2173,10 +2216,15 @@ function renderCompatibility(payload) {
   renderBuyingGuide(compatibility, upgrades);
 
   const models = extractModels(compatibility);
+  const rankedModels = sortRecommendedModels(models.filter((model) => actionableOllamaRef(model)));
+  const visibleModels = [
+    ...rankedModels,
+    ...models.filter((model) => !actionableOllamaRef(model))
+  ];
   els.modelCount.textContent = `${models.length} modèle${models.length > 1 ? "s" : ""}`;
   els.modelList.className = models.length ? "list" : "list empty";
   els.modelList.innerHTML = models.length
-    ? groupedModelCards(models.slice(0, 16))
+    ? groupedModelCards(visibleModels.slice(0, 16))
     : "Aucun modèle renvoyé par l'API pour cette machine.";
 
   const blocked = compatibility.blocked_next || compatibility.blocked || [];
@@ -4639,7 +4687,7 @@ function renderFirstTestPanel() {
 
 function arenaCandidates() {
   const compatibility = state.compatibility?.compatibility || state.compatibility || {};
-  const recommended = extractModels(compatibility).filter((model) => actionableOllamaRef(model)).slice(0, 4);
+  const recommended = sortRecommendedModels(extractModels(compatibility).filter((model) => actionableOllamaRef(model))).slice(0, 4);
   const installed = (state.scan?.installed_models || []).map((model) => {
     const ref = modelLabel(model);
     return {
