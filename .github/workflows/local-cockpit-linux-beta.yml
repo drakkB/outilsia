@@ -1,0 +1,98 @@
+name: Local Cockpit Linux Beta
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        description: "Build id Windows public à rejoindre. Vide = lire server-work/static/downloads/local-cockpit/release.json"
+        required: false
+        default: ""
+  push:
+    paths:
+      - "local-cockpit-app/**"
+      - ".github/workflows/local-cockpit-linux-beta.yml"
+
+jobs:
+  build-linux-beta:
+    name: Build Linux beta
+    runs-on: ubuntu-24.04
+
+    defaults:
+      run:
+        working-directory: local-cockpit-app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux Tauri dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libdbus-1-dev \
+            libglib2.0-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: local-cockpit-app/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: local-cockpit-app/src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Resolve public build id
+        env:
+          REQUESTED_BUILD_ID: ${{ github.event.inputs.build_id }}
+        run: |
+          BUILD_ID="$(node --input-type=module <<'NODE'
+          import { existsSync, readFileSync } from "node:fs";
+          const requested = (process.env.REQUESTED_BUILD_ID || "").trim();
+          let buildId = requested;
+          if (!buildId) {
+            const releasePath = "../server-work/static/downloads/local-cockpit/release.json";
+            if (!existsSync(releasePath)) throw new Error(`Missing public release.json: ${releasePath}`);
+            buildId = String(JSON.parse(readFileSync(releasePath, "utf8")).build_id || "").trim();
+          }
+          if (!/^[0-9A-Za-z._-]{6,32}$/.test(buildId)) throw new Error(`Invalid OUTILSIA_BUILD_ID: ${buildId}`);
+          console.log(buildId);
+          NODE
+          )"
+          echo "OUTILSIA_BUILD_ID=$BUILD_ID" >> "$GITHUB_ENV"
+          echo "Linux build will join OUTILSIA_BUILD_ID=$BUILD_ID"
+
+      - name: Build Linux beta package
+        run: npm run build:beta:linux
+
+      - name: Verify Linux artifacts
+        run: npm run verify:linux:artifacts
+
+      - name: Upload web release payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: outilsia-local-cockpit-linux-web-release
+          path: |
+            server-work/static/downloads/local-cockpit/*
+          if-no-files-found: error
+
+      - name: Upload raw Tauri bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: outilsia-local-cockpit-linux-tauri-bundles
+          path: |
+            local-cockpit-app/src-tauri/target/release/bundle/**
+          if-no-files-found: error

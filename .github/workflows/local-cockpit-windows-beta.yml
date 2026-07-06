@@ -1,0 +1,85 @@
+name: Local Cockpit Windows Beta
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "local-cockpit-app/**"
+      - ".github/workflows/local-cockpit-windows-beta.yml"
+
+jobs:
+  build-windows-beta:
+    name: Build Windows beta
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        working-directory: local-cockpit-app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: local-cockpit-app/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: local-cockpit-app/src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Verify beta preflight
+        run: |
+          npm run verify:ui
+          npm run preflight:beta
+
+      - name: Build fresh Windows beta
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-windows-beta.ps1 -SkipInstall -DesktopFolder "OutilsIA-Local-Cockpit-Beta-Windows"
+
+      - name: Package beta release metadata
+        run: npm run package:beta
+
+      - name: Verify Windows release artifacts
+        run: |
+          npm run verify:release:contract -- --require-platform windows-x64 --require-freshness
+          npm run verify:windows:artifacts
+
+      - name: Verify deploy dry-run
+        run: npm run deploy:beta -- --require-freshness
+
+      - name: Create Windows manual test kit
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\make-windows-test-kit.ps1 -DesktopFolder "OutilsIA-Local-Cockpit-Test-Kit" -ArtifactFolder "OutilsIA-Local-Cockpit-Beta-Windows"
+
+      - name: Upload web release payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: outilsia-local-cockpit-web-release
+          path: |
+            server-work/static/downloads/local-cockpit/*
+          if-no-files-found: error
+
+      - name: Upload raw Tauri bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: outilsia-local-cockpit-tauri-bundles
+          path: |
+            local-cockpit-app/src-tauri/target/release/bundle/**
+          if-no-files-found: error
+
+      - name: Upload Windows manual test kit
+        uses: actions/upload-artifact@v4
+        with:
+          name: outilsia-local-cockpit-windows-test-kit
+          path: |
+            ~/Desktop/OutilsIA-Local-Cockpit-Test-Kit/**
+          if-no-files-found: error

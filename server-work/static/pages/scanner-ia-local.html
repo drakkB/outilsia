@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OutilsIA Local Cockpit : scanner, installer et benchmarker vos modèles IA locaux</title>
+  <meta name="description" content="OutilsIA Local Cockpit scanne votre PC Windows ou Linux, détecte Ollama, recommande les modèles IA locaux compatibles, installe un modèle test, lance un benchmark et prépare un rapport partageable.">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://outilsia.fr/scanner-ia-local">
+  <link rel="stylesheet" href="/static/css/tailwind.min.css">
+  <meta property="og:title" content="OutilsIA Local Cockpit : le cockpit qui dit quel modèle IA votre PC fait tourner">
+  <meta property="og:description" content="Scan PC, Ollama, Qwen, Hermes, Llama, installation guidée, benchmark tokens/s, rapports et MemoryForge.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://outilsia.fr/scanner-ia-local">
+  <meta property="og:image" content="https://outilsia.fr/static/images/local-cockpit/og-local-cockpit-1200x630.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://outilsia.fr/static/images/local-cockpit/og-local-cockpit-1200x630.jpg">
+  <style>
+    body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#080b12;color:#fff}
+    .glass{background:rgba(15,23,42,.72);border:1px solid rgba(148,163,184,.18);backdrop-filter:blur(14px)}
+    .cyan{color:#67e8f9}.muted{color:#94a3b8}.card{border:1px solid rgba(148,163,184,.18);background:#0f172a;border-radius:14px}
+    .btn{display:inline-flex;align-items:center;justify-content:center;border-radius:10px;padding:13px 18px;font-weight:900}
+    .btn-primary{background:#67e8f9;color:#06121f}.btn-secondary{border:1px solid rgba(148,163,184,.35);color:#e2e8f0}
+    .pill{display:inline-flex;border:1px solid rgba(103,232,249,.28);border-radius:999px;padding:5px 10px;color:#67e8f9;font-size:12px;font-weight:800}
+    .grid-bg{background-image:radial-gradient(rgba(103,232,249,.08) 1px,transparent 1px);background-size:28px 28px}
+    .trust{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:22px}.trust div{border:1px solid rgba(148,163,184,.18);background:rgba(15,23,42,.62);border-radius:12px;padding:12px}.trust strong{display:block;font-size:14px}.trust span{display:block;color:#94a3b8;font-size:12px;margin-top:3px}
+    .mini{font-size:13px;color:#94a3b8}
+    @media(max-width:760px){.trust{grid-template-columns:1fr}}
+  </style>
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"SoftwareApplication","name":"OutilsIA Local Cockpit","applicationCategory":"UtilitiesApplication","operatingSystem":"Windows, Linux","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},"url":"https://outilsia.fr/scanner-ia-local","downloadUrl":"https://outilsia.fr/telecharger-scanner-ia-local","screenshot":"https://outilsia.fr/static/images/local-cockpit/og-local-cockpit-1200x630.jpg","description":"Cockpit IA locale pour scanner un PC, détecter Ollama, recommander les modèles IA locaux compatibles, installer un modèle test et mesurer les performances."}
+  </script>
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Quel modèle IA local installer sur mon PC ?","acceptedAnswer":{"@type":"Answer","text":"OutilsIA Local Cockpit scanne CPU, RAM, GPU, VRAM, stockage et Ollama pour proposer un modèle léger de test, un modèle recommandé et les modèles à éviter selon la machine."}},{"@type":"Question","name":"Une GTX 1080 Ti ou une RTX 3060 suffit-elle pour l'IA locale ?","acceptedAnswer":{"@type":"Answer","text":"Oui pour commencer. OutilsIA encourage les machines modestes avec des modèles légers, puis recommande des 7B, 8B ou 14B quantifiés quand la VRAM/RAM le permet."}},{"@type":"Question","name":"Que faire avec 8, 12, 16 ou 24 Go de VRAM ?","acceptedAnswer":{"@type":"Answer","text":"8 Go VRAM vise surtout des 7B/8B quantifiés. 12 Go est un très bon ticket d'entrée pour Qwen, Mistral ou Llama ; Hermes 8B y est possible selon le runtime, à valider au benchmark. 16 Go rend Hermes 8B confortable et ouvre des 14B. 24 Go donne de la marge pour des 32B quantifiés et gros contextes."}},{"@type":"Question","name":"OutilsIA Local Cockpit existe-t-il sous Linux ?","acceptedAnswer":{"@type":"Answer","text":"Oui. La bêta desktop publie un installateur Windows x64 et des paquets Linux .deb/.rpm, avec détection Ollama Windows, Linux et WSL Ubuntu selon la machine."}},{"@type":"Question","name":"OutilsIA remplace-t-il Strategy Arena ?","acceptedAnswer":{"@type":"Answer","text":"Non. OutilsIA prépare la machine IA locale, installe et teste les modèles. Strategy Arena reste l'environnement pour stratégies, backtests CUDA, robustesse et export TradingView."}}]}
+  </script>
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Accueil","item":"https://outilsia.fr/"},{"@type":"ListItem","position":2,"name":"Scanner IA local","item":"https://outilsia.fr/scanner-ia-local"}]}
+  </script>
+</head>
+<body>
+  <nav class="fixed top-0 w-full z-50 glass">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <a href="/" class="font-black text-xl">Outils<span class="cyan">IA</span></a>
+      <div class="hidden md:flex gap-5 text-sm">
+        <a class="muted hover:text-white" href="/simulateur-ia-local">Simulateur</a>
+        <a class="muted hover:text-white" href="/exemples-rapports-ia-locale">Exemples</a>
+        <a class="muted hover:text-white" href="/beta-testeurs-scanner-ia-local">Bêta testeurs</a>
+        <a class="muted hover:text-white" href="/materiel">Matériel</a>
+        <a class="muted hover:text-white" href="/telecharger-scanner-ia-local">Télécharger</a>
+        <a class="muted hover:text-white" href="/securite-confidentialite-scanner">Sécurité</a>
+        <a class="muted hover:text-white" href="/login?next=/compte">Connexion</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="pt-24">
+    <section class="grid-bg px-4 pb-12">
+      <div class="max-w-6xl mx-auto grid lg:grid-cols-2 gap-8 items-center">
+        <div>
+          <span class="pill">Bêta publique : OutilsIA Local Cockpit</span>
+          <h1 class="text-4xl md:text-6xl font-black leading-tight mt-5">Le cockpit IA locale qui dit quoi installer sur votre vrai PC.</h1>
+          <p class="text-xl muted mt-5">OutilsIA passe du simple test web au cockpit desktop : scan CPU, RAM, GPU, VRAM, stockage, détection Ollama, installation de modèles locaux, benchmark tokens/s, rapport partageable et recommandations d'upgrade.</p>
+          <div class="flex flex-wrap gap-3 mt-7">
+            <a class="btn btn-primary" href="/telecharger-scanner-ia-local">Télécharger la bêta</a>
+            <a class="btn btn-secondary" href="/simulateur-ia-local">Faire le test rapide</a>
+            <a class="btn btn-secondary" href="/exemples-rapports-ia-locale">Voir des rapports exemples</a>
+            <a class="btn btn-secondary" href="/beta-testeurs-scanner-ia-local">Devenir bêta testeur</a>
+            <a class="btn btn-secondary" href="/register?next=/compte">Sauver ma config</a>
+          </div>
+          <p class="text-sm muted mt-4">La bêta Windows + Linux : scanner, installer Ollama, télécharger un premier modèle compatible, le lancer, mesurer sa vitesse et garder une trace exploitable.</p>
+          <div class="trust">
+            <div><strong>Aucun fichier personnel</strong><span>Documents, mots de passe, emails et cookies ne sont pas lus.</span></div>
+            <div><strong>Rapport avant sync</strong><span>Vous voyez le diagnostic avant de l'envoyer au compte.</span></div>
+            <div><strong>Compte optionnel</strong><span>Utile pour historique, MemoryForge, rapports et alertes.</span></div>
+          </div>
+          <div class="card p-4 mt-5" style="border-color:rgba(134,239,172,.35);background:rgba(34,197,94,.08)">
+            <strong class="text-green-200">Bêta 0.1.1 : boucle coeur active, campagne terrain en cours</strong>
+            <p class="mini mt-2">Scan PC, détection Ollama, installation de modèle, console visible, benchmark, PromptForge, dialogue local, Arena multi-profils, rapport partageable et upgrade utile. Une preuve Windows native du build public courant est disponible ; la validation terrain multi-machines reste en cours.</p>
+            <div class="flex flex-wrap gap-3 mt-4">
+              <a class="btn btn-primary" href="/r/c9UaPaUTfcLTzpJyWLNLlkJBkhi6acu_">Voir la preuve réelle</a>
+              <a class="btn btn-secondary" href="/exemples-rapports-ia-locale">Comparer les rapports</a>
+            </div>
+          </div>
+        </div>
+        <div class="card p-5">
+          <div class="grid grid-cols-2 gap-3">
+            <div class="card p-4"><span class="muted text-sm">Score IA locale</span><strong class="block text-3xl cyan mt-1">82/100</strong></div>
+            <div class="card p-4"><span class="muted text-sm">Blocage principal</span><strong class="block text-xl mt-1">VRAM</strong></div>
+            <div class="card p-4"><span class="muted text-sm">Compatibles</span><strong class="block mt-1">Qwen, Hermes, Llama, Mistral</strong></div>
+            <div class="card p-4"><span class="muted text-sm">Prochaine action</span><strong class="block mt-1">Installer + benchmarker</strong></div>
+          </div>
+          <div class="mt-4 card p-4">
+            <p class="text-sm muted mb-2">Commande exemple</p>
+            <code class="block bg-black/40 rounded-lg p-3 text-cyan-200">ollama run qwen3:8b</code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-4 py-10">
+      <div class="max-w-6xl mx-auto card p-5 md:p-7" style="border-color:rgba(103,232,249,.35);background:linear-gradient(135deg,rgba(103,232,249,.10),rgba(15,23,42,.92),rgba(168,85,247,.10));">
+        <span class="pill">Pourquoi cette sortie peut compter</span>
+        <h2 class="text-3xl md:text-4xl font-black mt-4">Le but n'est pas d'ajouter un chat local de plus. Le but est de devenir le “Can You Run It” de l'IA locale.</h2>
+        <p class="muted mt-4 text-lg">Un utilisateur ne veut pas deviner quelle quantization choisir, quelle VRAM suffit ou quel modèle installer. Il veut ouvrir l'app, voir son PC reconnu, installer un modèle adapté et obtenir un test réel. C'est exactement la direction d'OutilsIA Local Cockpit.</p>
+        <div class="grid md:grid-cols-4 gap-3 mt-6">
+          <div class="card p-4"><strong class="cyan">1. Scanner</strong><p class="mini mt-2">La machine réelle : CPU, RAM, GPU, VRAM, stockage, Ollama.</p></div>
+          <div class="card p-4"><strong class="cyan">2. Installer</strong><p class="mini mt-2">Un modèle local compatible, sans transformer l'utilisateur en admin système.</p></div>
+          <div class="card p-4"><strong class="cyan">3. Mesurer</strong><p class="mini mt-2">Temps de réponse, vitesse estimée, statut fluide/correct/limité.</p></div>
+          <div class="card p-4"><strong class="cyan">4. Recommander</strong><p class="mini mt-2">Prochain modèle, upgrade utile, rapport et mémoire MemoryForge.</p></div>
+        </div>
+        <p class="mini mt-5">Positionnement clair : OutilsIA prépare l'IA locale généraliste. Les usages quant/backtest restent dans Strategy Arena, qui pourra consommer plus tard les modèles préparés par OutilsIA.</p>
+      </div>
+    </section>
+
+    <section class="px-4 py-10">
+      <div class="max-w-6xl mx-auto card p-5 md:p-7">
+        <span class="pill">Réponse en 30 secondes</span>
+        <h2 class="text-3xl md:text-4xl font-black mt-4">Quels modèles IA locaux tester selon votre machine ?</h2>
+        <p class="muted mt-3 text-lg">Le bon ordre n'est pas “installer le plus gros modèle”. Le bon ordre est : scanner la machine, lancer un modèle léger de preuve, comparer un modèle utile, puis décider si un upgrade GPU/RAM vaut vraiment le coût.</p>
+        <div class="grid md:grid-cols-4 gap-3 mt-6">
+          <article class="card p-4">
+            <strong class="cyan">CPU only / vieux portable</strong>
+            <p class="mini mt-2">Test : qwen3:0.6b ou petit 3B/4B. But : valider Ollama, mesurer la latence et garder une expérience encourageante.</p>
+          </article>
+          <article class="card p-4">
+            <strong class="cyan">8-12 Go VRAM</strong>
+            <p class="mini mt-2">Cible : Qwen 8B, Llama 3.1 8B, Mistral 7B. Hermes 8B possible selon le runtime, à valider au benchmark.</p>
+          </article>
+          <article class="card p-4">
+            <strong class="cyan">16 Go VRAM</strong>
+            <p class="mini mt-2">Cible : Hermes 8B confortable, Qwen 14B, Mistral Nemo 12B, DeepSeek distill 14B. À comparer dans l'Arena locale.</p>
+          </article>
+          <article class="card p-4">
+            <strong class="cyan">24 Go VRAM+</strong>
+            <p class="mini mt-2">Cible : 32B quantifiés, plus grands contextes, Hermes/Mixtral avec marge. Upgrade utile seulement si le besoin est clair.</p>
+          </article>
+        </div>
+        <div class="grid md:grid-cols-3 gap-3 mt-4">
+          <article class="card p-4"><strong>À éviter</strong><p class="mini mt-2">Installer directement un 70B/100B sur une machine sans preuve de VRAM/RAM suffisante.</p></article>
+          <article class="card p-4"><strong>À mesurer</strong><p class="mini mt-2">Temps de première réponse, tokens/s, succès/échec, qualité français/code/mémoire.</p></article>
+          <article class="card p-4"><strong>À garder</strong><p class="mini mt-2">Rapport partageable, historique benchmark, MemoryForge/Obsidian et décision d'upgrade.</p></article>
+        </div>
+        <div class="flex flex-wrap gap-3 mt-6">
+          <a class="btn btn-primary" href="/telecharger-scanner-ia-local">Lancer le scanner desktop</a>
+          <a class="btn btn-secondary" href="/blog/vram-8-12-16-24-quel-modele-2026">Lire le guide VRAM</a>
+          <a class="btn btn-secondary" href="/blog/ollama-windows-vs-wsl-ia-locale-2026">Windows ou WSL Ubuntu</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-4 py-10">
+      <div class="max-w-6xl mx-auto">
+        <span class="pill">Tests terrain attendus</span>
+        <h2 class="text-3xl md:text-4xl font-black mt-4">Vieux PC portable, GTX 1080 Ti, RTX 3060, RTX 4080 ou RTX 3090 : l'app doit dire quoi tenter sans vous démoraliser.</h2>
+        <p class="muted mt-3 text-lg">Le vrai moment produit, c'est quand un utilisateur ouvre OutilsIA Local Cockpit sur sa machine réelle et comprend en moins de 30 secondes : son score, le modèle à installer, la preuve benchmark à obtenir et l'upgrade qui a du sens.</p>
+        <div class="grid md:grid-cols-4 gap-3 mt-6">
+          <div class="card p-4"><strong class="cyan">Vieux laptop</strong><p class="mini mt-2">Commencer par un modèle léger, CPU/RAM possible, pas d'achat avant preuve.</p></div>
+          <div class="card p-4"><strong class="cyan">GTX 1080 Ti 11 Go</strong><p class="mini mt-2">Encore utile pour IA locale : modèles 7B/8B, certains 14B quantifiés à tester.</p></div>
+          <div class="card p-4"><strong class="cyan">RTX 3060 12 Go</strong><p class="mini mt-2">Excellent ticket d'entrée : Qwen, Hermes, Mistral et benchmarks propres.</p></div>
+          <div class="card p-4"><strong class="cyan">RTX 4080 / 3090</strong><p class="mini mt-2">Comparer vitesse, qualité, contexte long et intérêt réel d'un upgrade 24 Go.</p></div>
+        </div>
+        <div class="flex flex-wrap gap-3 mt-6">
+          <a class="btn btn-primary" href="/telecharger-scanner-ia-local">Télécharger la bêta</a>
+          <a class="btn btn-secondary" href="/exemples-rapports-ia-locale">Voir laptop / RTX 3060 / RTX 3090</a>
+          <a class="btn btn-secondary" href="/blog/meilleur-gpu-ia-locale-2026">Comparer les GPU IA locale</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-4 py-10">
+      <div class="max-w-6xl mx-auto card p-5 md:p-7">
+        <span class="pill">Requêtes que l'app doit enfin résoudre</span>
+        <h2 class="text-3xl md:text-4xl font-black mt-4">Quel modèle IA local pour mon GPU, ma VRAM et ma RAM ?</h2>
+        <p class="muted mt-3 text-lg">La recherche IA locale tourne souvent autour des mêmes questions : “quel modèle Ollama pour RTX 3060 ?”, “Qwen ou Hermes sur 16 Go VRAM ?”, “vieux Core i7 sans GPU, possible ou pas ?”. OutilsIA Local Cockpit transforme ces questions en diagnostic concret sur la machine réelle.</p>
+        <div class="grid md:grid-cols-3 gap-4 mt-6">
+          <article class="card p-5"><h3 class="font-black text-xl">Modèle léger de preuve</h3><p class="muted mt-2">Qwen 0.6B, Phi mini ou autre petit modèle sert d'abord à vérifier Ollama, téléchargement, lancement et tokens/s.</p></article>
+          <article class="card p-5"><h3 class="font-black text-xl">Modèle recommandé</h3><p class="muted mt-2">Hermes, Qwen, Mistral, Llama ou DeepSeek sont proposés selon VRAM, RAM, usage assistant, code, français, mémoire et contexte long.</p></article>
+          <article class="card p-5"><h3 class="font-black text-xl">Upgrade justifié</h3><p class="muted mt-2">L'app conseille RAM, GPU 12/16/24 Go ou SSD seulement après avoir montré ce que la machine actuelle sait déjà faire.</p></article>
+        </div>
+        <div class="grid md:grid-cols-2 gap-4 mt-4">
+          <article class="card p-5"><h3 class="font-black text-xl">Exemples de recherches couvertes</h3><p class="muted mt-2">scanner PC IA locale, benchmark Ollama Windows, quel modèle IA local pour RTX 3060, GTX 1080 Ti IA locale, RTX 4080 Hermes, Qwen local 16 Go VRAM.</p><a class="btn btn-secondary mt-4" href="/blog/ollama-windows-vs-wsl-ia-locale-2026">Ollama Windows ou WSL ?</a></article>
+          <article class="card p-5"><h3 class="font-black text-xl">Frontière produit claire</h3><p class="muted mt-2">OutilsIA prépare les modèles locaux. Strategy Arena pourra les utiliser pour ses workflows quant, mais OutilsIA ne génère pas et ne backteste pas de stratégie financière.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-4 py-12">
+      <div class="max-w-6xl mx-auto mb-8 card p-5">
+        <span class="pill">Rapports partageables</span>
+        <h2 class="text-3xl font-black mt-4">À quoi ressemble votre diagnostic ?</h2>
+        <p class="muted mt-3">La bêta génère des rapports anonymisés avec score IA locale, modèles compatibles, limites, commandes Ollama et upgrades utiles. Avant de télécharger l'app, vous pouvez déjà comparer des profils typiques : laptop sans GPU, RTX 3060, RTX 3090, Mac Mini M4 ou Raspberry Pi.</p>
+        <div class="flex flex-wrap gap-3 mt-5">
+          <a class="btn btn-primary" href="/exemples-rapports-ia-locale">Voir les exemples de rapports</a>
+          <a class="btn btn-secondary" href="/simulateur-ia-local">Tester ma config</a>
+          <a class="btn btn-secondary" href="/beta-testeurs-scanner-ia-local">Rejoindre la bêta</a>
+        </div>
+      </div>
+      <div class="max-w-6xl mx-auto">
+        <h2 class="text-3xl font-black mb-6">Ce que le scanner vous dit</h2>
+        <div class="grid md:grid-cols-3 gap-4">
+          <article class="card p-5"><h3 class="font-black text-xl">Quoi installer</h3><p class="muted mt-2">Modèles Ollama, Qwen, Llama, Hermes, Mistral ou Gemma compatibles avec votre machine, en Windows natif ou via Ollama WSL si c'est votre runtime local.</p></article>
+          <article class="card p-5"><h3 class="font-black text-xl">Quoi éviter</h3><p class="muted mt-2">Modèles trop lourds, GPU 8 Go limités, RAM insuffisante, stockage trop juste.</p></article>
+          <article class="card p-5"><h3 class="font-black text-xl">Quoi acheter</h3><p class="muted mt-2">RAM, GPU, SSD ou rien du tout si votre configuration suffit déjà.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-4 py-12 bg-slate-950">
+      <div class="max-w-6xl mx-auto grid lg:grid-cols-2 gap-6 items-start">
+        <div>
+          <span class="pill">Confiance avant installation</span>
+          <h2 class="text-3xl font-black mt-4">Le scanner lit le matériel, pas votre vie privée.</h2>
+          <p class="muted mt-3">Le diagnostic exact a besoin de connaître CPU, RAM, GPU, VRAM, stockage, Ollama Windows ou Ollama WSL et modèles installés. Il n'a pas besoin de lire vos documents, votre historique web, vos emails ou vos mots de passe.</p>
+          <div class="flex flex-wrap gap-3 mt-5">
+            <a class="btn btn-primary" href="/securite-confidentialite-scanner">Voir ce qui est lu</a>
+            <a class="btn btn-secondary" href="/simulateur-ia-local">Tester sans app</a>
+          </div>
+        </div>
+        <div class="card p-5">
+          <div class="grid md:grid-cols-2 gap-3">
+            <div class="card p-4"><strong class="cyan">Lu</strong><p class="mini mt-2">CPU, RAM, GPU, VRAM, OS, stockage libre, Ollama Windows/WSL, modèles Ollama.</p></div>
+            <div class="card p-4"><strong class="text-red-300">Jamais lu</strong><p class="mini mt-2">Documents, photos, mots de passe, cookies, historique web, emails, clés API.</p></div>
+            <div class="card p-4"><strong>Pairing propre</strong><p class="mini mt-2">Connexion par code court, token desktop dédié, cookie web non copié.</p></div>
+            <div class="card p-4"><strong>Rapport partageable</strong><p class="mini mt-2">Lien anonymisé uniquement si vous choisissez de le créer.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-4 py-12">
+      <div class="max-w-6xl mx-auto grid lg:grid-cols-2 gap-6">
+        <div>
+          <h2 class="text-3xl font-black">Ce qui est déjà en ligne</h2>
+          <p class="muted mt-3">Le test web reste l'entrée sans friction ; l'app desktop, déjà publiée en bêta, fait le diagnostic exact.</p>
+        </div>
+        <ol class="space-y-3">
+          <li class="card p-4"><strong>1. Test rapide web — en ligne</strong><p class="muted">GPU, RAM, OS, stockage, score instantané.</p></li>
+          <li class="card p-4"><strong>2. App desktop Windows + Linux — bêta 0.1.1 publiée</strong><p class="muted">Scan réel du PC, détection Ollama, rapport avant envoi, paquets .exe, .deb et .rpm publics.</p></li>
+          <li class="card p-4"><strong>3. Rapport partageable — en ligne</strong><p class="muted">Page privée/anonyme avec score, modèles et commandes.</p></li>
+          <li class="card p-4"><strong>4. MemoryForge — dans la bêta desktop</strong><p class="muted">Vault Obsidian, MEMORY.md, HERMES.md et historique benchmarks.</p></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="px-4 py-12">
+      <div class="max-w-4xl mx-auto text-center">
+        <h2 class="text-3xl font-black">Commencez sans installer l'app</h2>
+        <p class="muted mt-3">Le simulateur donne une estimation sans téléchargement. L'app desktop confirme automatiquement votre vraie configuration.</p>
+        <div class="flex flex-wrap justify-center gap-3 mt-6">
+          <a class="btn btn-primary" href="/simulateur-ia-local">Tester mon PC IA</a>
+          <a class="btn btn-secondary" href="/telecharger-scanner-ia-local">Page téléchargement bêta</a>
+          <a class="btn btn-secondary" href="/securite-confidentialite-scanner">Voir la page sécurité</a>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

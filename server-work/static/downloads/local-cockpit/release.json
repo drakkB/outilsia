@@ -1,0 +1,119 @@
+{
+  "ok": true,
+  "product": "OutilsIA Local Cockpit",
+  "channel": "beta",
+  "version": "0.1.1",
+  "label": "0.1.1-beta",
+  "build_id": "20260704180932",
+  "published_at": "2026-07-05T15:40:44.357Z",
+  "release_notes": [
+    "Bibliothèque Mes prompts : sauvegarder les prompts optimisés, les réutiliser dans Benchmark ou Dialogue, copier/exporter la bibliothèque.",
+    "Parcours guidé étendu : scan, diagnostic, Ollama, modèle test, benchmark, PromptForge, dialogue local, Arena et rapport final MemoryForge.",
+    "PromptForge local intégré : optimiser un prompt de benchmark/dialogue, l'envoyer vers Ollama et le sauvegarder dans MemoryForge.",
+    "Arena locale enrichie : comparaison automatique des modèles installés avec score OutilsIA, plus rapide, plus réactif et meilleur compromis.",
+    "Teasing tenu : les cartes modèles affichent maintenant force, usage, limite et prochaine action sans cacher l'information derrière un bouton.",
+    "Suivi direct renforcé : installer Ollama, télécharger un modèle ou lancer un benchmark met immédiatement le bandeau haut à jour.",
+    "Benchmark moins désorientant : l'app garde le suivi visible en haut au lieu de forcer l'utilisateur à chercher la console en bas.",
+    "UX 30 secondes : action principale unique selon l'état réel de la machine, d'Ollama et du modèle test.",
+    "Premier test et console rapprochés : l'utilisateur voit le déroulement des téléchargements, installations et benchmarks sans scroller.",
+    "Verdict après scan enrichi : encouragement petit PC/ancien GPU, blocage principal, modèle suivant et action immédiate.",
+    "Version 0.1.1 : console visible pendant les téléchargements, installations et benchmarks.",
+    "Gestionnaire de modèles plus clair : installés, recommandés, compatibles, limites proches et à éviter.",
+    "Fiches modèles enrichies, dialogue local, profils de test, Arena locale et rapport partageable plus vendeur.",
+    "Catalogue vivant : l'app récupère les signaux modèles/matériel publiés par les contenus OutilsIA.",
+    "MemoryForge/Obsidian enrichi avec fiches machine, modèles, benchmarks, décisions et état catalogues."
+  ],
+  "freshness": {
+    "newest_source": "local-cockpit-app/package.json",
+    "newest_source_mtime_ms": 1783258993677,
+    "oldest_artifact": "local-cockpit-app/src-tauri/target/release/bundle/deb/OutilsIA Local Cockpit_0.1.1_amd64.deb",
+    "oldest_artifact_mtime_ms": 1783265958910,
+    "allow_stale": false,
+    "stale": false
+  },
+  "primary_download": {
+    "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260704180932-windows-x64.exe",
+    "original_name": "OutilsIA Local Cockpit_0.1.1_x64-setup.exe",
+    "platform": "windows-x64",
+    "size_bytes": 3747948,
+    "sha256": "9ac13fc8eb05122034e3f15153902954ce18bd3e9f2d5a95645835d7c1ce9d56",
+    "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260704180932-windows-x64.exe"
+  },
+  "downloads_by_platform": {
+    "windows-x64": [
+      {
+        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260704180932-windows-x64.exe",
+        "original_name": "OutilsIA Local Cockpit_0.1.1_x64-setup.exe",
+        "platform": "windows-x64",
+        "size_bytes": 3747948,
+        "sha256": "9ac13fc8eb05122034e3f15153902954ce18bd3e9f2d5a95645835d7c1ce9d56",
+        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260704180932-windows-x64.exe"
+      }
+    ],
+    "linux": [
+      {
+        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260704180932-linux.deb",
+        "original_name": "OutilsIA Local Cockpit_0.1.1_amd64.deb",
+        "platform": "linux",
+        "size_bytes": 5540016,
+        "sha256": "42834013f8ca21bc47d4c82caf3204d97a5cec890d2b55d195fb7c1f9e7fae6a",
+        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260704180932-linux.deb"
+      },
+      {
+        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260704180932-linux.rpm",
+        "original_name": "OutilsIA Local Cockpit-0.1.1-1.x86_64.rpm",
+        "platform": "linux",
+        "size_bytes": 5540606,
+        "sha256": "b84f46affd15ae1b351eea4fb523dff4b6f90d01871f3d23abcefe84d55f217a",
+        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260704180932-linux.rpm"
+      }
+    ]
+  },
+  "files": [
+    {
+      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260704180932-windows-x64.exe",
+      "original_name": "OutilsIA Local Cockpit_0.1.1_x64-setup.exe",
+      "platform": "windows-x64",
+      "size_bytes": 3747948,
+      "sha256": "9ac13fc8eb05122034e3f15153902954ce18bd3e9f2d5a95645835d7c1ce9d56",
+      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260704180932-windows-x64.exe"
+    },
+    {
+      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260704180932-linux.deb",
+      "original_name": "OutilsIA Local Cockpit_0.1.1_amd64.deb",
+      "platform": "linux",
+      "size_bytes": 5540016,
+      "sha256": "42834013f8ca21bc47d4c82caf3204d97a5cec890d2b55d195fb7c1f9e7fae6a",
+      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260704180932-linux.deb"
+    },
+    {
+      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260704180932-linux.rpm",
+      "original_name": "OutilsIA Local Cockpit-0.1.1-1.x86_64.rpm",
+      "platform": "linux",
+      "size_bytes": 5540606,
+      "sha256": "b84f46affd15ae1b351eea4fb523dff4b6f90d01871f3d23abcefe84d55f217a",
+      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260704180932-linux.rpm"
+    }
+  ],
+  "build_provenance": {
+    "schema": "outilsia.local_cockpit_build_provenance.v1",
+    "packaged_at": "2026-07-05T15:40:44.357Z",
+    "build_id": "20260704180932",
+    "version": "0.1.1",
+    "ci": false,
+    "runner_os": "linux",
+    "node_platform": "linux",
+    "node_arch": "x64",
+    "artifact_platforms": [
+      "linux"
+    ],
+    "github": {
+      "workflow": "",
+      "run_id": "",
+      "run_attempt": "",
+      "ref": "",
+      "sha": "",
+      "repository": ""
+    }
+  }
+}

@@ -1,0 +1,216 @@
+name: Local Cockpit Cross Platform Beta
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_to_vps:
+        description: "Deploy merged Windows + Linux release to outilsia.fr"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+env:
+  OUTILSIA_BUILD_ID: ${{ github.run_id }}${{ github.run_attempt }}
+
+jobs:
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        working-directory: local-cockpit-app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: local-cockpit-app/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: local-cockpit-app/src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify UI
+        run: npm run verify:ui
+
+      - name: Build Tauri Windows beta
+        run: npm run build:beta
+
+      - name: Package Windows beta release
+        run: npm run package:beta
+
+      - name: Verify Windows release artifacts
+        run: |
+          npm run verify:release:contract -- --require-platform windows-x64 --require-freshness
+          npm run verify:windows:artifacts
+
+      - name: Upload Windows web release
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-cockpit-windows-web-release
+          path: server-work/static/downloads/local-cockpit/*
+          if-no-files-found: error
+
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-24.04
+
+    defaults:
+      run:
+        working-directory: local-cockpit-app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux Tauri dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libdbus-1-dev \
+            libglib2.0-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: local-cockpit-app/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: local-cockpit-app/src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Linux beta package
+        run: npm run build:beta:linux
+
+      - name: Verify Linux artifacts
+        run: npm run verify:linux:artifacts
+
+      - name: Upload Linux web release
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-cockpit-linux-web-release
+          path: server-work/static/downloads/local-cockpit/*
+          if-no-files-found: error
+
+  merge-release:
+    name: Merge public release payload
+    runs-on: ubuntu-24.04
+    needs:
+      - build-windows
+      - build-linux
+
+    defaults:
+      run:
+        working-directory: local-cockpit-app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: local-cockpit-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download Windows release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: local-cockpit-windows-web-release
+          path: local-cockpit-app/.artifacts/windows
+
+      - name: Download Linux release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: local-cockpit-linux-web-release
+          path: local-cockpit-app/.artifacts/linux
+
+      - name: Merge Windows and Linux releases
+        run: |
+          npm run import:beta -- --input .artifacts/windows --replace
+          npm run import:beta -- --input .artifacts/linux --merge
+          npm run deploy:beta -- --release-dir ../server-work/static/downloads/local-cockpit
+          npm run verify:release:contract -- --require-platform windows-x64 --require-platform linux
+          node - <<'NODE'
+          const fs = require("fs");
+          const release = JSON.parse(fs.readFileSync("../server-work/static/downloads/local-cockpit/release.json", "utf8"));
+          const platforms = new Set(release.files.map((file) => file.platform));
+          if (!platforms.has("windows-x64")) throw new Error("merged release missing windows-x64");
+          if (!platforms.has("linux")) throw new Error("merged release missing linux");
+          if (!release.downloads_by_platform?.["windows-x64"]?.length) throw new Error("missing windows downloads_by_platform");
+          if (!release.downloads_by_platform?.linux?.length) throw new Error("missing linux downloads_by_platform");
+          console.log("cross_platform_release_ok", release.version, release.files.length);
+          NODE
+
+      - name: Configure deploy SSH
+        if: ${{ github.event.inputs.deploy_to_vps == 'true' }}
+        env:
+          OUTILSIA_DEPLOY_SSH_KEY: ${{ secrets.OUTILSIA_DEPLOY_SSH_KEY }}
+          OUTILSIA_DEPLOY_HOST: ${{ secrets.OUTILSIA_DEPLOY_HOST }}
+          OUTILSIA_DEPLOY_USER: ${{ secrets.OUTILSIA_DEPLOY_USER }}
+        run: |
+          test -n "$OUTILSIA_DEPLOY_SSH_KEY"
+          test -n "$OUTILSIA_DEPLOY_HOST"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$OUTILSIA_DEPLOY_SSH_KEY" > ~/.ssh/outilsia_deploy_key
+          chmod 600 ~/.ssh/outilsia_deploy_key
+          ssh-keyscan -H "$OUTILSIA_DEPLOY_HOST" >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config <<EOF
+          Host outilsia-deploy
+            HostName $OUTILSIA_DEPLOY_HOST
+            User ${OUTILSIA_DEPLOY_USER:-root}
+            IdentityFile ~/.ssh/outilsia_deploy_key
+            StrictHostKeyChecking yes
+          EOF
+
+      - name: Deploy merged release to outilsia.fr
+        if: ${{ github.event.inputs.deploy_to_vps == 'true' }}
+        env:
+          OUTILSIA_DEPLOY_REMOTE_DIR: ${{ secrets.OUTILSIA_DEPLOY_REMOTE_DIR }}
+        run: |
+          npm run publish:cross-platform -- --input ../server-work/static/downloads/local-cockpit --release-dir .artifacts/deploy-gated-release --remote outilsia-deploy --remote-dir "${OUTILSIA_DEPLOY_REMOTE_DIR:-/var/www/outilsia/static/downloads/local-cockpit}" --deploy
+
+      - name: Verify deployed public release
+        if: ${{ github.event.inputs.deploy_to_vps == 'true' }}
+        run: npm run verify:release:prod
+
+      - name: Upload merged web release
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-cockpit-cross-platform-web-release
+          path: server-work/static/downloads/local-cockpit/*
+          if-no-files-found: error

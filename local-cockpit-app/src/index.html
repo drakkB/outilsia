@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OutilsIA Local Cockpit</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="appShell" class="app-shell mode-essential">
+      <header class="topbar">
+        <div class="brand-mark" aria-hidden="true">OI</div>
+        <div class="hero-copy">
+          <p class="eyebrow">OutilsIA Local Cockpit</p>
+          <h1>Votre PC est-il prêt pour l'IA locale ?</h1>
+          <p class="hero-lead">Scannez la machine, vérifiez Qwen, Llama, Hermes ou Mistral, puis gardez la config dans votre compte OutilsIA.</p>
+          <p id="desktopManifestText" class="manifest-line">Canal bêta - moteur de recommandations OutilsIA.</p>
+          <div class="signal-row" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+        <div class="header-visual" aria-hidden="true"></div>
+        <div class="actions">
+          <button id="prepareBtn" class="primary-action prepare-action" type="button"><span>Analyser ce PC</span><small>scan matériel + modèles</small></button>
+          <button id="scanBtn" class="secondary-scan-action header-hidden-action" type="button"><span>Scan</span><small>seul</small></button>
+          <div class="secondary-actions header-hidden-actions">
+            <button id="checkBtn" type="button" disabled>Modèles</button>
+            <button id="saveBtn" type="button" disabled>Sauver</button>
+            <button id="topAccountBtn" type="button">Compte</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="machine-summary-strip" aria-label="Machine détectée">
+        <div class="machine-summary-head">
+          <span class="label">Machine détectée</span>
+          <strong id="topMachineKey">Pas encore scannée</strong>
+        </div>
+        <div class="machine-summary-grid">
+          <div><span>CPU</span><strong id="topCpuText">--</strong></div>
+          <div><span>RAM</span><strong id="topRamText">--</strong></div>
+          <div><span>GPU</span><strong id="topGpuText">--</strong></div>
+          <div><span>VRAM</span><strong id="topVramText">--</strong></div>
+          <div><span>OS</span><strong id="topOsText">--</strong></div>
+          <div><span>Runtime IA</span><strong id="topOllamaText">--</strong></div>
+        </div>
+      </section>
+
+      <section class="quick-decision-strip" aria-label="Résultat d'analyse">
+        <div>
+          <span class="label">Action suivante</span>
+          <strong id="quickActionText">Scanner ce PC</strong>
+          <p id="quickActionDetail">Une seule action pour détecter le matériel, le runtime IA et les modèles locaux.</p>
+        </div>
+        <div>
+          <span class="label">Modèle conseillé</span>
+          <strong id="quickModelText">Après scan</strong>
+          <p id="quickModelDetail">OutilsIA affichera le modèle à installer ou tester maintenant.</p>
+        </div>
+        <div>
+          <span class="label">Preuve locale</span>
+          <strong id="quickProofText">À obtenir</strong>
+          <p id="quickProofDetail">Un benchmark court suffit pour prouver que la chaîne locale marche.</p>
+        </div>
+        <div>
+          <span class="label">Upgrade utile</span>
+          <strong id="quickUpgradeText">Pas encore</strong>
+          <p id="quickUpgradeDetail">Aucun achat avant d'avoir vu le vrai blocage VRAM/RAM.</p>
+        </div>
+      </section>
+
+      <section class="status-strip" aria-live="polite">
+        <div>
+          <span class="label">Analyse locale</span>
+          <strong id="statusText">Prêt à scanner</strong>
+        </div>
+        <div>
+          <span class="label">Catalogue</span>
+          <strong id="sourceText">local</strong>
+        </div>
+        <div>
+          <span class="label">Score</span>
+          <strong id="scoreText">--</strong>
+        </div>
+      </section>
+
+      <section id="operationMonitor" class="operation-monitor is-idle" aria-live="polite">
+        <div class="operation-monitor-head">
+          <div>
+            <span class="label">Suivi en direct</span>
+            <strong id="operationMonitorTitle">Aucune opération en cours</strong>
+          </div>
+          <div class="operation-monitor-actions">
+            <button id="cancelOperationBtn" type="button" disabled>Annuler</button>
+            <button id="operationJumpBtn" type="button">Voir console</button>
+          </div>
+        </div>
+        <div id="operationMonitorLines" class="operation-monitor-lines">Les téléchargements, installations et tests apparaîtront ici dès qu'une action démarre.</div>
+      </section>
+
+      <section class="release-strip advanced-panel" aria-live="polite">
+        <div>
+          <span class="label">Maintenance app</span>
+          <strong id="releaseTitle">Release non vérifiée</strong>
+          <p id="releaseText">Le manifeste indiquera la page officielle et le flux de release.</p>
+        </div>
+        <div class="row-actions">
+          <button id="releaseRefreshBtn" type="button">Vérifier release</button>
+          <button id="selfTestBtn" type="button">Auto-test</button>
+          <button id="copyBetaReportBtn" type="button">Copier rapport app</button>
+          <button id="topCopyWindowsRecipeBtn" type="button" disabled>Copier recette</button>
+          <button id="topDownloadWindowsRecipeBtn" type="button" disabled>Télécharger recette</button>
+          <a id="releaseDownloadBtn" class="ghost-btn" href="https://outilsia.fr/telecharger-scanner-ia-local" data-open-url="https://outilsia.fr/telecharger-scanner-ia-local">Page téléchargement</a>
+        </div>
+        <p id="selfTestResult" class="self-test-result">Auto-test non lancé.</p>
+      </section>
+
+      <section class="sticky-action-strip" aria-label="Prochaine action persistante" hidden>
+        <div>
+          <span class="label">Prochaine action</span>
+          <strong id="stickyActionText">Scanner ce PC</strong>
+          <p id="stickyActionDetail">Scan local : CPU, RAM, GPU, VRAM, stockage et Ollama.</p>
+        </div>
+        <button id="stickyActionBtn" type="button">Lancer</button>
+      </section>
+
+      <section class="hero-insights advanced-panel" aria-label="Parcours recommandé">
+        <div>
+          <span class="orbit-dot"></span>
+          <span class="label">Étape 1</span>
+          <strong>Scanner le PC</strong>
+          <p>CPU, RAM, GPU, VRAM, stockage, Ollama et modèles installés.</p>
+        </div>
+        <div>
+          <span class="orbit-dot"></span>
+          <span class="label">Étape 2</span>
+          <strong>Choisir les modèles</strong>
+          <p>Qwen, Llama, Hermes, Mistral ou petits modèles selon la vraie machine.</p>
+        </div>
+        <div>
+          <span class="orbit-dot"></span>
+          <span class="label">Étape 3</span>
+          <strong>Sauvegarder</strong>
+          <p>Compte OutilsIA, rapport partageable, historique local et MemoryForge.</p>
+        </div>
+        <div>
+          <span class="orbit-dot"></span>
+          <span class="label">Étape 4</span>
+          <strong>Upgrader utile</strong>
+          <p>VRAM, RAM ou SSD seulement si le diagnostic montre un vrai blocage.</p>
+        </div>
+      </section>
+
+      <section class="grid">
+        <section class="view-mode-strip" aria-label="Mode d'affichage">
+          <div>
+            <span class="label">Affichage</span>
+            <strong id="viewModeTitle">Essentiel</strong>
+          </div>
+          <div class="view-mode-actions" role="group" aria-label="Choisir le niveau de détail">
+            <button id="viewEssentialBtn" type="button" aria-pressed="true">Essentiel</button>
+            <button id="viewAdvancedBtn" type="button" aria-pressed="false">Détails</button>
+          </div>
+        </section>
+
+        <article class="panel machine-panel">
+          <div class="panel-title">
+            <h2>Machine</h2>
+            <span id="machineKey">non scannée</span>
+          </div>
+          <dl class="spec-grid">
+            <div><dt>CPU</dt><dd id="cpuText">--</dd></div>
+            <div><dt>RAM</dt><dd id="ramText">--</dd></div>
+            <div><dt>GPU</dt><dd id="gpuText">--</dd></div>
+            <div><dt>VRAM</dt><dd id="vramText">--</dd></div>
+            <div><dt>OS</dt><dd id="osText">--</dd></div>
+            <div><dt>Ollama</dt><dd id="ollamaText">--</dd></div>
+          </dl>
+          <div class="runtime-wsl-box advanced-panel" aria-label="Runtime Windows et WSL">
+            <div>
+              <span class="label">Runtime Windows</span>
+              <strong id="wslStateText">Scan requis</strong>
+              <p id="wslDetailText">OutilsIA vérifiera si Windows natif ou WSL Ubuntu peut lancer Ollama.</p>
+            </div>
+            <div class="row-actions">
+              <button id="installWslBtn" type="button" disabled>Installer WSL Ubuntu</button>
+              <button id="copyWslCommandBtn" type="button" disabled>Copier commande</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel verdict-panel">
+          <div class="panel-title">
+            <h2>Lecture OutilsIA</h2>
+            <span>compatibilité</span>
+          </div>
+          <div id="verdictBox" class="verdict-box">
+            Scanne la machine pour obtenir les modèles possibles et les upgrades prioritaires.
+          </div>
+          <div id="upgradeList" class="upgrade-list"></div>
+        </article>
+
+        <article class="panel buying-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Achats guides</h2>
+            <span id="buyingCount">0 lien</span>
+          </div>
+          <div id="buyingList" class="buying-list empty">Les liens utiles apparaîtront après diagnostic.</div>
+        </article>
+
+        <article class="panel prepare-panel">
+          <div class="panel-title">
+            <h2>Prochaines étapes</h2>
+            <span id="prepareState">prêt</span>
+          </div>
+          <div id="prepareBox" class="prepare-box">
+            Un seul parcours pour préparer la machine : scan, Ollama, modèle test, benchmark visible, puis dialogue local.
+          </div>
+          <div class="row-actions">
+            <button id="preparePanelBtn" type="button">Parcours guidé test + rapport</button>
+            <button id="pdfReportBtn" type="button" disabled>Rapport PDF modèle/upgrade</button>
+          </div>
+        </article>
+
+        <article class="panel first-test-panel">
+          <div class="panel-title">
+            <h2>Premier test IA locale</h2>
+            <span id="firstTestState">à lancer</span>
+          </div>
+          <div id="firstTestBox" class="first-test-box">
+            Scanne le PC pour lancer le parcours : Ollama, modèle léger, benchmark, rapport.
+          </div>
+        </article>
+
+        <article class="panel arena-panel">
+          <div class="panel-title">
+            <h2>Arena locale</h2>
+            <span id="arenaState">préparation</span>
+          </div>
+          <div id="arenaBox" class="arena-box empty">Après diagnostic, OutilsIA prépare une sélection de modèles à comparer sur cette machine. La liste complète des modèles installés reste dans “Ollama installé”.</div>
+          <div class="row-actions">
+            <button id="runArenaBtn" type="button" disabled>Lancer Arena</button>
+            <button id="copyArenaBtn" type="button" disabled>Copier</button>
+            <button id="clearArenaRunBtn" type="button" disabled>Vider run</button>
+          </div>
+        </article>
+
+        <article class="panel strategy-bridge-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Pont Strategy Arena</h2>
+            <span id="strategyBridgeState">scan requis</span>
+          </div>
+          <div id="strategyBridgeBox" class="strategy-bridge-box empty">OutilsIA prépare la machine IA locale. Strategy Arena pourra exploiter ce profil pour ses workflows quant, sans gérer les modèles ici.</div>
+          <div class="row-actions">
+            <button id="copyStrategyBridgeJsonBtn" type="button" disabled>Copier JSON</button>
+            <button id="downloadStrategyBridgeJsonBtn" type="button" disabled>Télécharger profil</button>
+            <button id="copyStrategyBridgeMdBtn" type="button" disabled>Copier résumé</button>
+          </div>
+        </article>
+
+        <article class="panel field-test-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Test terrain</h2>
+            <span id="fieldTestState">à essayer</span>
+          </div>
+          <label class="field-profile-control" for="fieldTestProfileSelect">
+            <span>Profil terrain</span>
+            <select id="fieldTestProfileSelect">
+              <option value="auto">Auto selon le scan</option>
+              <option value="old_laptop">Vieux laptop / portable modeste</option>
+              <option value="core_i7_gtx_1080_ti">Core i7 + GTX 1080 Ti</option>
+              <option value="rtx_3060_12gb">RTX 3060 12 Go</option>
+              <option value="rtx_4080_4090">RTX 4080 / RTX 4090</option>
+              <option value="cpu_only">CPU-only</option>
+            </select>
+          </label>
+          <div id="fieldTestBox" class="field-test-box empty">Scanne un portable, un vieux Core i7, une GTX 1080 Ti ou une RTX récente : OutilsIA dira quoi tenter, quoi éviter et quelle preuve locale obtenir.</div>
+          <div class="row-actions">
+            <button id="copyFieldTestBtn" type="button" disabled>Copier checklist</button>
+            <button id="copyFieldTestJsonBtn" type="button" disabled>Copier fiche JSON</button>
+            <button id="downloadFieldTestJsonBtn" type="button" disabled>Télécharger fiche</button>
+          </div>
+        </article>
+
+        <article class="panel upgrade-impact-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Impact upgrade</h2>
+            <span id="upgradeImpactState">non calculé</span>
+          </div>
+          <div id="upgradeImpactBox" class="upgrade-impact-box empty">Le diagnostic montrera ce que l'upgrade prioritaire change concrètement : VRAM/RAM/stockage et modèles débloqués.</div>
+          <div class="row-actions">
+            <button id="copyUpgradeImpactBtn" type="button" disabled>Copier impact</button>
+          </div>
+        </article>
+
+        <article class="panel action-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Plan d'action</h2>
+            <span id="actionCount">0 action</span>
+          </div>
+          <div id="actionList" class="list empty">Le diagnostic construira une séquence claire : installer, tester, upgrader.</div>
+        </article>
+
+        <article class="panel decision-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Pack décision</h2>
+            <span id="decisionPackState">non généré</span>
+          </div>
+          <div id="decisionPackBox" class="decision-pack empty">Le pack décision apparaît après diagnostic : score, modèles à tester, upgrades, liens utiles et prochaines actions.</div>
+          <div class="row-actions">
+            <button id="copyDecisionPackBtn" type="button" disabled>Copier pack</button>
+            <button id="copyShoppingListBtn" type="button" disabled>Copier shopping list</button>
+            <button id="saveDecisionPackBtn" type="button" disabled>Sauver pack local</button>
+          </div>
+        </article>
+
+        <article class="panel models-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Modèles compatibles</h2>
+            <span id="modelCount">0 détecté</span>
+          </div>
+          <div id="modelList" class="list empty">Aucun diagnostic OutilsIA chargé.</div>
+        </article>
+
+        <article class="panel next-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Prochains paliers</h2>
+            <span id="blockedCount">0 bloqué</span>
+          </div>
+          <div id="blockedList" class="list empty">Le diagnostic indiquera les modèles juste hors de portée.</div>
+        </article>
+
+        <article class="panel new-models-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Nouveaux modèles</h2>
+            <span id="newModelCount">0 nouveau</span>
+          </div>
+          <div id="newModelList" class="list empty">Les nouveaux modèles compatibles ou proches apparaîtront ici.</div>
+        </article>
+
+        <article class="panel catalog-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Catalogues OutilsIA</h2>
+            <span id="catalogState">non chargé</span>
+          </div>
+          <div id="catalogBox" class="catalog-box empty">Le manifeste et le diagnostic afficheront les versions du catalogue modèles, du catalogue upgrades et les nouveautés utiles pour cette machine.</div>
+          <div class="row-actions">
+            <button id="refreshCatalogBtn" type="button" disabled>Actualiser catalogue</button>
+            <button id="copyCatalogReportBtn" type="button" disabled>Copier état catalogues</button>
+          </div>
+        </article>
+
+        <article class="panel installed-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Ollama installé</h2>
+            <span id="installedCount">0 modèle</span>
+          </div>
+          <div id="installedList" class="list empty">Aucun scan local effectué.</div>
+        </article>
+
+        <article class="panel commands-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Commandes Ollama</h2>
+            <span id="commandCount">0 commande</span>
+          </div>
+          <div id="commandList" class="list empty">Les commandes apparaîtront pour les modèles compatibles avec une référence Ollama.</div>
+        </article>
+
+        <article id="operationPanel" class="panel operation-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Console installation</h2>
+            <span id="operationState">inactive</span>
+          </div>
+          <div id="operationConsole" class="operation-console">Aucune installation lancée.</div>
+          <div class="row-actions">
+            <button id="cancelOperationPanelBtn" type="button" disabled>Annuler le téléchargement</button>
+          </div>
+        </article>
+
+        <article class="panel readiness-panel">
+          <div class="panel-title">
+            <h2>Rapport machine prête</h2>
+            <span id="readinessState">non généré</span>
+          </div>
+          <div id="readinessBox" class="readiness-box empty">Prépare la machine ou lance un benchmark pour obtenir un rapport final clair : prêt, bloqué ou à compléter.</div>
+          <div class="row-actions">
+            <button id="copyReadinessSummaryBtn" type="button" disabled>Copier résumé</button>
+            <button id="copyReadinessBtn" type="button" disabled>Copier rapport</button>
+            <button id="saveReadinessMemoryBtn" type="button" disabled>Ajouter à MemoryForge</button>
+            <button id="saveReadinessAccountBtn" type="button" disabled>Sauver compte</button>
+            <button id="shareReadinessBtn" type="button" disabled>Partager</button>
+            <button id="pdfReadinessBtn" type="button" disabled>PDF modèle/upgrade</button>
+            <button id="copyWindowsRecipeBtn" type="button" disabled>Copier recette bêta</button>
+            <button id="downloadWindowsRecipeBtn" type="button" disabled>Télécharger recette</button>
+          </div>
+        </article>
+
+        <article class="panel benchmark-panel">
+          <div class="panel-title">
+            <h2>Benchmark Ollama</h2>
+            <button id="benchmarkBtn" type="button">Tester</button>
+          </div>
+          <label class="field-label" for="benchmarkModelInput">Modèle</label>
+          <input id="benchmarkModelInput" type="text" autocomplete="off" placeholder="qwen3:8b" />
+          <label class="field-label" for="benchmarkPromptInput">Prompt court</label>
+          <textarea id="benchmarkPromptInput" autocomplete="off">Pourquoi la VRAM est importante pour un LLM local ?</textarea>
+          <div class="prompt-profiles" aria-label="Profils de test">
+            <button type="button" data-test-profile="simple">Question</button>
+            <button type="button" data-test-profile="summary">Résumé</button>
+            <button type="button" data-test-profile="code">Code</button>
+            <button type="button" data-test-profile="french">Français</button>
+            <button type="button" data-test-profile="reasoning">Raisonnement</button>
+            <button type="button" data-test-profile="memory">Mémoire</button>
+          </div>
+          <div id="benchmarkResult" class="sync-result">Lance un test court pour obtenir une mesure locale approximative.</div>
+          <div class="row-actions">
+            <button id="syncBenchmarkBtn" type="button" disabled>Synchroniser benchmark</button>
+          </div>
+        </article>
+
+        <article class="panel promptforge-panel">
+          <div class="panel-title">
+            <h2>PromptForge local</h2>
+            <span id="promptForgeState">prêt</span>
+          </div>
+          <label class="field-label" for="promptForgeInput">Prompt à améliorer</label>
+          <textarea id="promptForgeInput" autocomplete="off" spellcheck="true" placeholder="Colle un prompt ou utilise celui du benchmark/dialogue."></textarea>
+          <div class="row-actions">
+            <button id="promptForgeFromBenchmarkBtn" type="button">Depuis benchmark</button>
+            <button id="promptForgeFromChatBtn" type="button">Depuis dialogue</button>
+            <button id="promptForgeOptimizeBtn" type="button">Optimiser</button>
+          </div>
+          <div id="promptForgeResult" class="promptforge-result empty">PromptForge transforme un prompt flou en instruction claire pour Qwen, Hermes, Llama ou Mistral.</div>
+          <div class="row-actions">
+            <button id="promptForgeUseBenchmarkBtn" type="button" disabled>Utiliser pour benchmark</button>
+            <button id="promptForgeUseChatBtn" type="button" disabled>Utiliser pour dialogue</button>
+            <button id="promptForgeSaveMemoryBtn" type="button" disabled>Sauver prompt</button>
+          </div>
+        </article>
+
+        <article class="panel prompt-library-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Mes prompts</h2>
+            <span id="promptLibraryState">0 prompt</span>
+          </div>
+          <div id="promptLibraryList" class="prompt-library-list empty">Sauvegarde un prompt optimisé depuis PromptForge pour le réutiliser dans Benchmark, Dialogue ou Arena.</div>
+          <div class="row-actions">
+            <button id="copyPromptLibraryBtn" type="button" disabled>Copier bibliothèque</button>
+            <button id="clearPromptLibraryBtn" type="button" disabled>Vider</button>
+          </div>
+        </article>
+
+        <article class="panel chat-panel">
+          <div class="panel-title">
+            <h2>Dialogue local</h2>
+            <button id="chatSendBtn" type="button">Envoyer</button>
+          </div>
+          <div id="chatPresetBox" class="chat-preset-box empty">
+            Lance un scan pour choisir automatiquement le meilleur modèle de dialogue.
+          </div>
+          <label class="field-label" for="chatModelInput">Modèle</label>
+          <input id="chatModelInput" type="text" autocomplete="off" value="qwen3:0.6b" />
+          <label class="field-label" for="chatPromptInput">Question</label>
+          <textarea id="chatPromptInput" autocomplete="off">Explique simplement ce que mon PC peut faire tourner en IA locale.</textarea>
+          <div id="chatResult" class="sync-result">Interroge un modèle Ollama installé directement depuis l'app.</div>
+          <div class="row-actions">
+            <button id="chatCopyBtn" type="button" disabled>Copier réponse</button>
+            <button id="chatMemoryBtn" type="button" disabled>Ajouter à MemoryForge</button>
+          </div>
+          <div class="chat-history-head">
+            <strong>Historique dialogue</strong>
+            <span id="chatHistoryState">0 échange</span>
+          </div>
+          <div id="chatHistoryBox" class="chat-history-box empty">Les échanges locaux apparaîtront ici après une réponse du modèle.</div>
+          <div class="row-actions">
+            <button id="copyChatHistoryBtn" type="button" disabled>Copier historique</button>
+            <button id="clearChatHistoryBtn" type="button" disabled>Vider dialogue</button>
+          </div>
+        </article>
+
+        <article class="panel benchmark-history-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Historique benchmarks</h2>
+            <span id="benchmarkHistoryState">0 test</span>
+          </div>
+          <div id="benchmarkHistoryBox" class="benchmark-history-box empty">Chaque test Ollama réussi ou échoué sera conservé localement pour comparer les modèles de cette machine.</div>
+          <div class="row-actions">
+            <button id="copyBenchmarkHistoryBtn" type="button" disabled>Copier</button>
+            <button id="clearBenchmarkHistoryBtn" type="button" disabled>Vider</button>
+          </div>
+        </article>
+
+        <article class="panel account-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Compte OutilsIA</h2>
+            <span id="syncState">non connecté</span>
+          </div>
+          <div id="pairBox" class="sync-result account-status-box">
+            <strong>Compte non connecté</strong>
+            <span>Sauvegarde ce PC, tes modèles et tes benchmarks.</span>
+          </div>
+          <div class="row-actions">
+            <button id="pairBtn" type="button">Connecter</button>
+            <button id="openPairBtn" type="button" disabled>Ouvrir</button>
+            <button id="claimBtn" type="button" disabled>Vérifier</button>
+            <button id="syncBtn" type="button" disabled>Sauver ce PC</button>
+            <button id="shareReportBtn" type="button" disabled>Partager</button>
+            <button id="refreshUpdatesBtn" type="button" disabled>Actualiser</button>
+            <button id="disconnectBtn" type="button" disabled>Déconnecter</button>
+          </div>
+          <div id="syncResult" class="sync-result">Connecte ton compte pour retrouver ce PC sur OutilsIA.fr.</div>
+          <div id="updatesList" class="list empty">Connecte ton compte pour retrouver tes machines.</div>
+        </article>
+
+        <article class="panel feedback-panel advanced-panel">
+          <div class="panel-title">
+          <h2>Retour test</h2>
+            <span id="feedbackState">non envoyé</span>
+          </div>
+          <label class="field-label" for="feedbackCategory">Sujet</label>
+          <select id="feedbackCategory">
+            <option value="detection">Détection matériel incorrecte</option>
+            <option value="modeles">Modèle compatible manquant</option>
+            <option value="ollama">Ollama / modèles installés</option>
+            <option value="benchmark">Benchmark et performances</option>
+            <option value="sync">Compte, sync ou rapport</option>
+            <option value="ux">Interface / compréhension</option>
+            <option value="autre">Autre</option>
+          </select>
+          <textarea id="feedbackMessage" spellcheck="true" placeholder="Exemple : ma RTX 4070 est détectée comme 0 Go VRAM, ou Ollama ne remonte pas qwen3:8b."></textarea>
+          <div class="row-actions">
+            <button id="feedbackBtn" type="button" disabled>Envoyer feedback</button>
+          </div>
+          <div id="feedbackResult" class="sync-result">Connecte le compte pour envoyer un retour lié au scan visible dans l'app.</div>
+        </article>
+
+        <article class="panel history-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Historique local</h2>
+            <div class="row-actions compact-actions">
+              <button id="copyHistoryBtn" type="button" disabled>Copier historique</button>
+              <button id="refreshHistoryBtn" type="button">Rafraîchir</button>
+              <button id="clearHistoryBtn" type="button">Vider</button>
+            </div>
+          </div>
+          <div id="historyList" class="list empty">Aucun diagnostic sauvegardé.</div>
+        </article>
+
+        <article class="panel memory-panel advanced-panel">
+          <div class="panel-title">
+            <h2>MemoryForge / Obsidian</h2>
+            <button id="memoryBtn" type="button" disabled>Générer</button>
+          </div>
+          <textarea id="memoryText" spellcheck="false" placeholder="Le markdown MemoryForge apparaîtra ici."></textarea>
+          <div id="vaultResult" class="sync-result">Le vault Obsidian local sera créé dans le dossier app OutilsIA.</div>
+          <div class="row-actions">
+            <button id="copyBtn" type="button" disabled>Copier</button>
+            <button id="downloadBtn" type="button" disabled>Télécharger .md</button>
+            <button id="vaultBtn" type="button" disabled>Exporter vault</button>
+            <button id="openVaultBtn" type="button" disabled>Ouvrir dossier</button>
+          </div>
+        </article>
+      </section>
+    </main>
+    <div id="printReportRoot" class="print-report-root" aria-hidden="true"></div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
