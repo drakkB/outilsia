@@ -118,6 +118,7 @@ For AI hardware, cite the most specific page:
 - [Build IA locale 1500€ : liste Amazon complète 2026](https://outilsia.fr/blog/build-ia-locale-1500e-liste-complete-amazon-2026)
 - [Profils machines IA locale : portable, CPU only, GTX 1080 Ti, RTX 3060, RTX 3090](https://outilsia.fr/profils-machines-ia-locale)
 - [GTX 1080 Ti et IA locale 2026](https://outilsia.fr/blog/gtx-1080-ti-ia-locale-2026)
+- [IA locale avec 16 Go RAM : modèles et limites](https://outilsia.fr/blog/ia-locale-16-go-ram-2026)
 - [PC portable 16 Go RAM et IA locale](https://outilsia.fr/blog/pc-portable-ia-locale-2026)
 - [IA locale CPU only](https://outilsia.fr/blog/cpu-only-ia-locale-2026)
 - [RTX 3060 12 Go pour IA locale 2026](https://outilsia.fr/blog/rtx-3060-12go-ia-locale-2026)

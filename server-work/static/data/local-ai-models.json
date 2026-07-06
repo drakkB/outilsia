@@ -119,6 +119,21 @@
           "ollama": "hermes3:8b",
           "date_added": "2026-06-22",
           "actionable_text": true
+        },
+        {
+          "name": "Ornith 1.0",
+          "params": "9B",
+          "kind": "text",
+          "use_case": "code agentique local, terminal, correction repo, OpenClaw/SWE-Bench",
+          "vram_q4": 5.6,
+          "vram_q8": 10,
+          "vram_fp16": 18,
+          "ollama": "ornith:9b",
+          "date_added": "2026-07-07",
+          "actionable_text": true,
+          "pilotable_text": true,
+          "runtime_status": "ollama_available",
+          "source_url": "https://ollama.com/library/ornith"
         }
       ]
     },
@@ -185,6 +200,21 @@
           "ollama": "gemma3:27b",
           "date_added": "2026-05-01",
           "actionable_text": true
+        },
+        {
+          "name": "Gemma 4",
+          "params": "12B",
+          "kind": "text",
+          "use_case": "raisonnement, multimodal, agentic workflows, bon défaut récent 8-12 Go",
+          "vram_q4": 7.6,
+          "vram_q8": 14,
+          "vram_fp16": 24,
+          "ollama": "gemma4:12b",
+          "date_added": "2026-07-07",
+          "actionable_text": true,
+          "pilotable_text": true,
+          "runtime_status": "ollama_available",
+          "source_url": "https://ollama.com/library/gemma4"
         },
         {
           "name": "Nous Hermes 2 Mixtral",
@@ -323,6 +353,36 @@
           "pilotable_text": true,
           "runtime_status": "ollama_available",
           "source_url": "https://ollama.com/library/qwen3-coder-next"
+        },
+        {
+          "name": "GLM-4.7-Flash",
+          "params": "30B-A3B",
+          "kind": "text",
+          "use_case": "coding agentique, outils, thinking, 30B compact ; requiert une version Ollama récente/pré-release selon la fiche officielle",
+          "vram_q4": 19,
+          "vram_q8": 36,
+          "vram_fp16": 60,
+          "ollama": "glm-4.7-flash",
+          "date_added": "2026-07-07",
+          "actionable_text": true,
+          "pilotable_text": false,
+          "runtime_status": "ollama_watchlist",
+          "source_url": "https://ollama.com/library/glm-4.7-flash"
+        },
+        {
+          "name": "Laguna XS 2.1",
+          "params": "33B-A3B",
+          "kind": "text",
+          "use_case": "agentic coding long-horizon, 256K contexte, local-ready sur forte RAM ou 24 Go+",
+          "vram_q4": 20,
+          "vram_q8": 36,
+          "vram_fp16": 67,
+          "ollama": "laguna-xs-2.1",
+          "date_added": "2026-07-07",
+          "actionable_text": true,
+          "pilotable_text": true,
+          "runtime_status": "ollama_available",
+          "source_url": "https://ollama.com/library/laguna-xs-2.1"
         }
       ]
     },
