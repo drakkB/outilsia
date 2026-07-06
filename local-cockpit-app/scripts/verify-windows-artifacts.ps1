@@ -21,7 +21,18 @@ function Require-File($Path) {
 }
 
 function Hash-Lower($Path) {
-  return (Get-FileHash -Algorithm SHA256 $Path).Hash.ToLower()
+  $stream = [System.IO.File]::OpenRead($Path)
+  try {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+      $bytes = $sha.ComputeHash($stream)
+      return (($bytes | ForEach-Object { $_.ToString("x2") }) -join "")
+    } finally {
+      $sha.Dispose()
+    }
+  } finally {
+    $stream.Dispose()
+  }
 }
 
 function Assert-Equal($Label, $Expected, $Actual) {
