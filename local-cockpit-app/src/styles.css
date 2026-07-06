@@ -671,16 +671,25 @@ h2 {
     radial-gradient(circle at 4% 12%, rgba(134, 239, 172, 0.22), transparent 36%),
     linear-gradient(135deg, rgba(12, 54, 49, 0.98), rgba(13, 21, 27, 0.98));
   border-color: rgba(134, 239, 172, 0.42);
-  grid-column: span 5;
+  grid-column: span 4;
 }
 
 .quick-decision-strip > div:nth-child(2) {
-  grid-column: span 3;
+  grid-column: span 2;
 }
 
 .quick-decision-strip > div:nth-child(3),
-.quick-decision-strip > div:nth-child(4) {
+.quick-decision-strip > div:nth-child(4),
+.quick-decision-strip > div:nth-child(5) {
   grid-column: span 2;
+}
+
+.quick-decision-strip .quick-moment-cell {
+  border-color: rgba(252, 211, 77, 0.28);
+}
+
+.quick-decision-strip .quick-moment-cell::after {
+  background: linear-gradient(90deg, rgba(252, 211, 77, 0.52), rgba(120, 220, 232, 0.16), transparent);
 }
 
 .quick-decision-strip .label,
@@ -3575,7 +3584,8 @@ dd {
   .quick-decision-strip > div:nth-child(1),
   .quick-decision-strip > div:nth-child(2),
   .quick-decision-strip > div:nth-child(3),
-  .quick-decision-strip > div:nth-child(4) {
+  .quick-decision-strip > div:nth-child(4),
+  .quick-decision-strip > div:nth-child(5) {
     grid-column: 1 / -1;
   }
 

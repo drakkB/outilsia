@@ -49,7 +49,7 @@
     <section class="hero wrap">
       <span class="pill">Bêta desktop 0.1.1 · Windows + Linux</span>
       <h1>Scannez votre PC, installez Ollama et testez une IA locale.</h1>
-      <p class="lead">OutilsIA Local Cockpit est une vraie application desktop. Elle détecte CPU, RAM, GPU, VRAM et stockage, puis vous guide jusqu'au premier test : installation d'Ollama, modèle léger recommandé, benchmark local et rapport clair.</p>
+      <p class="lead">OutilsIA Local Cockpit est une vraie application desktop. Elle détecte CPU, RAM, GPU, VRAM et stockage, puis vous guide jusqu'au premier test : installation d'Ollama, modèle léger recommandé, benchmark local et rapport clair. Le catalogue vivant met aussi en avant un modèle du moment compatible avec votre machine.</p>
       <div class="actions">
         <a id="downloadBtn" class="btn primary disabled" href="#etat-beta" aria-disabled="true">Chargement des builds bêta</a>
         <a class="btn secondary" href="/simulateur-ia-local">Tester sans téléchargement</a>
@@ -206,13 +206,14 @@ Date: 2026-07-06 (manifeste release.json)</div>
 
     <section class="wrap panel" style="margin-top:18px">
       <span class="pill">Modèles chauds à suivre</span>
-      <h2>Qwen, Hermes, Mistral, GLM : l'app doit dire quoi installer, pas seulement quoi lire.</h2>
-      <p class="muted">Les sorties de modèles font envie, mais toutes ne sont pas actionnables sur un PC. OutilsIA sépare donc les modèles installables maintenant via Ollama des modèles frontier à surveiller pour demain.</p>
+      <h2>Qwen, Gemma, Ornith, Hermes, GLM : l'app doit dire quoi installer, pas seulement quoi lire.</h2>
+      <p class="muted">Les sorties de modèles font envie, mais toutes ne sont pas actionnables sur un PC. OutilsIA sépare donc les modèles installables maintenant via Ollama des modèles frontier à surveiller pour demain, puis fait remonter un modèle du moment selon VRAM, RAM, runtime et benchmarks locaux.</p>
       <div class="answer-grid">
+        <div><b>Gemma 4 12B</b><span class="muted">Nouveau candidat pratique pour machines 8-12 Go VRAM selon runtime : raisonnement, multimodal léger, agentic workflows et usage général à mesurer.</span></div>
+        <div><b>Ornith 9B</b><span class="muted">Modèle code agentique compact, pilotable via Ollama, intéressant pour terminal, correction repo et tests développeur locaux.</span></div>
         <div><b>Qwen 3.6 27B / 35B</b><span class="muted">Très bon signal pour coding et agents locaux. À tester sur 24 Go VRAM, RTX 3090/4090, RTX 5090 ou machines à mémoire unifiée solide.</span></div>
         <div><b>Hermes Agent v0.18</b><span class="muted">Important pour assistant personnel, mémoire, décisions et workflows Obsidian/MemoryForge. Hermes reste un profil clé dans l'Arena locale.</span></div>
-        <div><b>Mistral Small 3.1 / Gemma</b><span class="muted">Candidats utiles pour français, rédaction, multimodal léger et bons compromis selon RAM/VRAM. Le benchmark local tranche.</span></div>
-        <div><b>GLM-5.2</b><span class="muted">Modèle open-weights frontier à surveiller : excellent signal code agentique, mais trop lourd pour une machine grand public aujourd'hui.</span></div>
+        <div><b>GLM-4.7-Flash / GLM-5.2</b><span class="muted">GLM-4.7-Flash devient un signal à surveiller côté Ollama récent ; GLM-5.2 reste frontier, important mais hors machine grand public.</span></div>
       </div>
       <div class="actions" style="margin-top:14px">
         <a class="btn secondary" href="/blog/rtx-3090-qwen-3-6-hermes-ia-locale-2026">Qwen 3.6 + Hermes</a>

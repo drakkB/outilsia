@@ -202,6 +202,8 @@ const els = {
   quickActionBtn: $("quickActionBtn"),
   quickModelText: $("quickModelText"),
   quickModelDetail: $("quickModelDetail"),
+  quickMomentText: $("quickMomentText"),
+  quickMomentDetail: $("quickMomentDetail"),
   quickProofText: $("quickProofText"),
   quickProofDetail: $("quickProofDetail"),
   quickUpgradeText: $("quickUpgradeText"),
@@ -1449,7 +1451,7 @@ function modelOfMomentState() {
   const scoreCandidate = (model) => {
     const ref = actionableOllamaRef(model);
     const text = `${modelTitle(model)} ${ref}`.toLowerCase();
-    let score = 0;
+    let score = modelRecommendationScore(model);
     if (recommended.ref && sameOllamaModel(ref, recommended.ref)) score += 60;
     if (modelSignalText(model)) score += 35;
     if (newLabels.some((label) => label && (label.includes(text.split(":")[0]) || text.includes(label.split(":")[0])))) score += 20;
@@ -1719,6 +1721,13 @@ function renderQuickDecision(action = primaryActionState()) {
     : localCapabilitySentence(compatibility);
   els.quickModelText.textContent = recommendedLabel;
   els.quickModelDetail.textContent = recommendedDetail;
+  const moment = modelOfMomentState();
+  if (els.quickMomentText) {
+    els.quickMomentText.textContent = moment.ref ? moment.title : "Après scan";
+    els.quickMomentDetail.textContent = moment.ref
+      ? `${moment.ref} · ${moment.signal || moment.profile.label} · ${moment.installed ? moment.benchmarked ? "mesuré" : "installé" : "à tester"}`
+      : "Le catalogue vivant choisira un modèle récent compatible.";
+  }
   els.quickProofText.textContent = proofLabel;
   els.quickProofDetail.textContent = proofDetail;
   els.quickUpgradeText.textContent = upgradeLabel;

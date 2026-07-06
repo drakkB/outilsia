@@ -71,7 +71,7 @@
             <a class="btn btn-secondary" href="/beta-testeurs-scanner-ia-local">Devenir bêta testeur</a>
             <a class="btn btn-secondary" href="/register?next=/compte">Sauver ma config</a>
           </div>
-          <p class="text-sm muted mt-4">La bêta Windows + Linux : scanner, installer Ollama, télécharger un premier modèle compatible, le lancer, mesurer sa vitesse et garder une trace exploitable.</p>
+          <p class="text-sm muted mt-4">La bêta Windows + Linux : scanner, installer Ollama, télécharger un premier modèle compatible, le lancer, mesurer sa vitesse et garder une trace exploitable. Le catalogue vivant remonte aussi un “modèle du moment” selon la machine, pas selon la hype.</p>
           <div class="trust">
             <div><strong>Aucun fichier personnel</strong><span>Documents, mots de passe, emails et cookies ne sont pas lus.</span></div>
             <div><strong>Rapport avant sync</strong><span>Vous voyez le diagnostic avant de l'envoyer au compte.</span></div>
@@ -90,12 +90,17 @@
           <div class="grid grid-cols-2 gap-3">
             <div class="card p-4"><span class="muted text-sm">Score IA locale</span><strong class="block text-3xl cyan mt-1">82/100</strong></div>
             <div class="card p-4"><span class="muted text-sm">Blocage principal</span><strong class="block text-xl mt-1">VRAM</strong></div>
-            <div class="card p-4"><span class="muted text-sm">Compatibles</span><strong class="block mt-1">Qwen, Hermes, Llama, Mistral</strong></div>
+            <div class="card p-4"><span class="muted text-sm">Compatibles</span><strong class="block mt-1">Qwen, Gemma, Hermes, Ornith</strong></div>
             <div class="card p-4"><span class="muted text-sm">Prochaine action</span><strong class="block mt-1">Installer + benchmarker</strong></div>
           </div>
           <div class="mt-4 card p-4">
             <p class="text-sm muted mb-2">Commande exemple</p>
             <code class="block bg-black/40 rounded-lg p-3 text-cyan-200">ollama run qwen3:8b</code>
+          </div>
+          <div class="mt-4 card p-4" style="border-color:rgba(252,211,77,.30);background:rgba(252,211,77,.07)">
+            <p class="text-sm muted mb-2">Modèle du moment</p>
+            <strong class="block text-xl mt-1">Gemma 4, Ornith ou Qwen 3.6 si la machine suit</strong>
+            <p class="mini mt-2">L'app trie les modèles pilotables par compatibilité VRAM/RAM, fraîcheur catalogue, statut Ollama, installation locale et benchmarks déjà mesurés.</p>
           </div>
         </div>
       </div>
@@ -145,10 +150,11 @@
           <article class="card p-4"><strong>À garder</strong><p class="mini mt-2">Rapport partageable, historique benchmark, MemoryForge/Obsidian et décision d'upgrade.</p></article>
         </div>
         <div class="grid md:grid-cols-4 gap-3 mt-4">
+          <article class="card p-4"><strong class="cyan">Gemma 4 12B</strong><p class="mini mt-2">Nouveau candidat récent autour du palier 8-12 Go VRAM : raisonnement, multimodal léger et workflows agentiques à benchmarker.</p></article>
+          <article class="card p-4"><strong class="cyan">Ornith 9B</strong><p class="mini mt-2">Signal code agentique local : petit palier pilotable via Ollama, intéressant pour terminal, correction repo et tests OpenClaw/SWE.</p></article>
           <article class="card p-4"><strong class="cyan">Qwen 3.6</strong><p class="mini mt-2">Modèle chaud pour code agentique : 27B/35B à tester surtout sur 24 Go VRAM ou mémoire unifiée solide.</p></article>
           <article class="card p-4"><strong class="cyan">Hermes Agent v0.18</strong><p class="mini mt-2">Signal important côté agents, mémoire visible et preuves de completion. OutilsIA garde Hermes comme profil assistant/mémoire.</p></article>
-          <article class="card p-4"><strong class="cyan">Mistral Small 3.1</strong><p class="mini mt-2">Bon candidat français/long contexte autour du palier 16 Go VRAM, à benchmarker avant de conclure.</p></article>
-          <article class="card p-4"><strong class="cyan">GLM-5.2</strong><p class="mini mt-2">Frontier open-weights à surveiller : très fort en code long-horizon, mais trop lourd pour un PC normal aujourd'hui.</p></article>
+          <article class="card p-4"><strong class="cyan">GLM-4.7-Flash / GLM-5.2</strong><p class="mini mt-2">GLM-4.7-Flash entre en watchlist pratique ; GLM-5.2 reste frontier, trop lourd pour un PC normal aujourd'hui.</p></article>
         </div>
         <div class="flex flex-wrap gap-3 mt-6">
           <a class="btn btn-primary" href="/telecharger-scanner-ia-local">Lancer le scanner desktop</a>
