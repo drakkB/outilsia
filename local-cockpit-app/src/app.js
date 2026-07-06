@@ -1599,8 +1599,12 @@ function parseMajorVersion(value) {
 
 function hardwareDoctorAnalysis(scan = {}) {
   const probe = scan?.raw_scan?.gpu_probe || {};
+  const memory = scan?.raw_scan?.memory_probe || {};
   const vram = Number(scan.vram_gb || probe.vram_gb || 0);
   const ram = Number(scan.ram_gb || 0);
+  const moduleCount = Number(memory.module_count || 0);
+  const memoryClock = Number(memory.configured_clock_mhz || memory.speed_mhz || 0);
+  const channelMode = String(memory.channel_mode || "");
   const temp = Number(probe.temperature_c || 0);
   const powerDraw = Number(probe.power_draw_w || 0);
   const powerLimit = Number(probe.power_limit_w || 0);
@@ -1642,6 +1646,20 @@ function hardwareDoctorAnalysis(scan = {}) {
   } else {
     addCheck("RAM", "bad", `${formatGb(ram)} : faible pour IA locale confortable.`, 1);
     addAction("Viser 32 Go RAM si le PC le permet.");
+  }
+
+  if (channelMode.includes("dual") || channelMode.includes("multi")) {
+    addCheck(
+      "Canal mémoire",
+      "ok",
+      `${moduleCount || "?"} barrette(s) · ${channelMode.includes("multi") ? "multi/dual estimé" : "dual estimé"}${memoryClock ? ` · ${memoryClock} MT/s` : ""}.`,
+      5
+    );
+  } else if (channelMode.includes("single")) {
+    addCheck("Canal mémoire", "warn", `${moduleCount || 1} barrette · single estimé${memoryClock ? ` · ${memoryClock} MT/s` : ""}.`, -4);
+    addAction("Ajouter une barrette jumelle peut améliorer CPU/offload et confort RAG.");
+  } else if (memory.source) {
+    addCheck("Canal mémoire", "warn", "Canal non confirmé par le système.", 0);
   }
 
   if (hasNvidiaSignals) addCheck("Driver/CUDA", "ok", `NVIDIA mesuré${probe.cuda_version ? ` · CUDA ${probe.cuda_version}` : ""}.`, 16);
@@ -1710,6 +1728,7 @@ function hardwareDoctorAnalysis(scan = {}) {
 function renderHardwareDoctor(scan) {
   if (!els.hardwareDoctorBox) return;
   const probe = scan?.raw_scan?.gpu_probe || {};
+  const memory = scan?.raw_scan?.memory_probe || {};
   const analysis = hardwareDoctorAnalysis(scan);
   const source = analysis.source;
   const rows = [];
@@ -1726,6 +1745,15 @@ function renderHardwareDoctor(scan) {
   if (probe.pcie_link_width_current || probe.pcie_link_width_max) {
     const width = `${probe.pcie_link_width_current ? `x${probe.pcie_link_width_current}` : "x?"}${probe.pcie_link_width_max ? ` / x${probe.pcie_link_width_max}` : ""}`;
     rows.push(["PCIe", width]);
+  }
+  if (memory.module_count || memory.configured_clock_mhz || memory.speed_mhz) {
+    const mode = String(memory.channel_mode || "unknown")
+      .replace("dual_channel_estimated", "dual estimé")
+      .replace("multi_channel_estimated", "multi estimé")
+      .replace("single_channel_estimated", "single estimé")
+      .replace("unknown", "inconnu");
+    const clock = memory.configured_clock_mhz || memory.speed_mhz;
+    rows.push(["Mémoire", `${memory.module_count || "?"} module(s) · ${mode}${clock ? ` · ${clock} MT/s` : ""}`]);
   }
 
   const hasWarning = analysis.checks.some((check) => check.state === "warn" || check.state === "bad");
@@ -8322,7 +8350,21 @@ function demoScan() {
       { model_name: "qwen3", model_tag: "latest", size_gb: 5.2, runtime: "ollama" },
       { model_name: "hermes3", model_tag: "8b", size_gb: 4.7, runtime: "ollama" }
     ],
-    raw_scan: {}
+    raw_scan: {
+      memory_probe: {
+        total_gb: 64,
+        module_count: 2,
+        configured_clock_mhz: 6000,
+        speed_mhz: 6000,
+        channel_mode: "dual_channel_estimated",
+        confidence: "estimated_from_populated_modules",
+        source: "demo",
+        modules: [
+          { size_gb: 32, configured_clock_mhz: 6000, speed_mhz: 6000, manufacturer: "Demo", part_number: "DDR5-6000", slot: "A2" },
+          { size_gb: 32, configured_clock_mhz: 6000, speed_mhz: 6000, manufacturer: "Demo", part_number: "DDR5-6000", slot: "B2" }
+        ]
+      }
+    }
   };
 }
 

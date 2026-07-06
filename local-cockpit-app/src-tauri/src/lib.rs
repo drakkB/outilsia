@@ -75,6 +75,30 @@ struct GpuProbe {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "snake_case")]
+struct MemoryProbe {
+    total_gb: Option<u32>,
+    module_count: Option<u32>,
+    configured_clock_mhz: Option<u32>,
+    speed_mhz: Option<u32>,
+    channel_mode: String,
+    confidence: String,
+    source: String,
+    modules: Vec<MemoryModule>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
+struct MemoryModule {
+    size_gb: Option<u32>,
+    configured_clock_mhz: Option<u32>,
+    speed_mhz: Option<u32>,
+    manufacturer: Option<String>,
+    part_number: Option<String>,
+    slot: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
 struct OllamaProbe {
     installed: bool,
     version: Option<String>,
@@ -210,6 +234,7 @@ fn scan_machine() -> Result<MachineScan, String> {
         .filter(|value| !value.is_empty());
     let cpu_cores = Some(system.cpus().len() as u32);
     let ram_gb = Some(bytes_to_gb(system.total_memory()));
+    let memory_probe = detect_memory_probe(ram_gb);
     let gpu = detect_gpu();
     let ollama = detect_ollama();
     let ollama_wsl = detect_ollama_wsl();
@@ -286,6 +311,7 @@ fn scan_machine() -> Result<MachineScan, String> {
         installed_models: merge_installed_models(ollama.models, ollama_wsl.models),
         raw_scan: json!({
             "gpu_probe": gpu,
+            "memory_probe": memory_probe,
             "app_version": env!("CARGO_PKG_VERSION")
         }),
     })
@@ -1928,6 +1954,188 @@ fn detect_nvidia_cuda_version() -> Option<String> {
             .next()
             .and_then(clean_optional_string)
     })
+}
+
+fn detect_memory_probe(total_gb: Option<u32>) -> MemoryProbe {
+    if let Some(probe) = detect_windows_memory_probe(total_gb) {
+        return probe;
+    }
+    if let Some(probe) = detect_linux_memory_probe(total_gb) {
+        return probe;
+    }
+    fallback_memory_probe(total_gb, "sysinfo")
+}
+
+fn detect_windows_memory_probe(total_gb: Option<u32>) -> Option<MemoryProbe> {
+    if !cfg!(target_os = "windows") {
+        return None;
+    }
+    let script = "Get-CimInstance Win32_PhysicalMemory | ForEach-Object { [string]::Join('|', @($_.Capacity,$_.ConfiguredClockSpeed,$_.Speed,$_.Manufacturer,$_.PartNumber,$_.DeviceLocator)) }";
+    let output = run_command("powershell.exe", &["-NoProfile", "-Command", script])
+        .or_else(|| run_command("powershell", &["-NoProfile", "-Command", script]))?;
+    let modules = parse_memory_module_lines(&output);
+    if modules.is_empty() {
+        return None;
+    }
+    Some(memory_probe_from_modules(total_gb, modules, "win32_physical_memory"))
+}
+
+fn detect_linux_memory_probe(total_gb: Option<u32>) -> Option<MemoryProbe> {
+    if cfg!(target_os = "windows") {
+        return None;
+    }
+    let output = run_command("dmidecode", &["-t", "memory"])?;
+    let modules = parse_dmidecode_memory_modules(&output);
+    if modules.is_empty() {
+        return None;
+    }
+    Some(memory_probe_from_modules(total_gb, modules, "dmidecode"))
+}
+
+fn parse_memory_module_lines(output: &str) -> Vec<MemoryModule> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let clean = line.trim();
+            if clean.is_empty() {
+                return None;
+            }
+            let parts: Vec<&str> = clean.split('|').collect();
+            let capacity_bytes = parts.first().and_then(|value| value.trim().parse::<u64>().ok());
+            let size_gb = capacity_bytes.map(bytes_to_gb);
+            if size_gb.unwrap_or_default() == 0 {
+                return None;
+            }
+            Some(MemoryModule {
+                size_gb,
+                configured_clock_mhz: parts.get(1).and_then(|value| parse_optional_u32(value)),
+                speed_mhz: parts.get(2).and_then(|value| parse_optional_u32(value)),
+                manufacturer: parts.get(3).and_then(|value| clean_optional_string(value)),
+                part_number: parts.get(4).and_then(|value| clean_optional_string(value)),
+                slot: parts.get(5).and_then(|value| clean_optional_string(value)),
+            })
+        })
+        .collect()
+}
+
+fn parse_dmidecode_memory_modules(output: &str) -> Vec<MemoryModule> {
+    let mut modules = Vec::new();
+    let mut current = MemoryModule {
+        size_gb: None,
+        configured_clock_mhz: None,
+        speed_mhz: None,
+        manufacturer: None,
+        part_number: None,
+        slot: None,
+    };
+    let mut in_device = false;
+
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if trimmed == "Memory Device" {
+            if in_device && current.size_gb.unwrap_or_default() > 0 {
+                modules.push(current.clone());
+            }
+            in_device = true;
+            current = MemoryModule {
+                size_gb: None,
+                configured_clock_mhz: None,
+                speed_mhz: None,
+                manufacturer: None,
+                part_number: None,
+                slot: None,
+            };
+            continue;
+        }
+        if !in_device {
+            continue;
+        }
+        if let Some((key, value)) = trimmed.split_once(':') {
+            let value = value.trim();
+            match key.trim() {
+                "Size" => current.size_gb = parse_memory_size_gb(value),
+                "Configured Memory Speed" => current.configured_clock_mhz = parse_memory_mhz(value),
+                "Speed" => current.speed_mhz = parse_memory_mhz(value),
+                "Manufacturer" => current.manufacturer = clean_optional_string(value),
+                "Part Number" => current.part_number = clean_optional_string(value),
+                "Locator" | "Bank Locator" => {
+                    if current.slot.is_none() {
+                        current.slot = clean_optional_string(value);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    if in_device && current.size_gb.unwrap_or_default() > 0 {
+        modules.push(current);
+    }
+    modules
+}
+
+fn parse_memory_size_gb(value: &str) -> Option<u32> {
+    let lower = value.trim().to_lowercase();
+    if lower.contains("no module") || lower.contains("unknown") {
+        return None;
+    }
+    let number = lower
+        .split_whitespace()
+        .next()
+        .and_then(|part| part.parse::<f64>().ok())?;
+    if lower.contains("mb") {
+        Some(((number / 1024.0).round() as u32).max(1))
+    } else if lower.contains("gb") {
+        Some(number.round() as u32)
+    } else {
+        None
+    }
+}
+
+fn parse_memory_mhz(value: &str) -> Option<u32> {
+    value
+        .split_whitespace()
+        .find_map(|part| part.trim().parse::<u32>().ok())
+}
+
+fn memory_probe_from_modules(
+    total_gb: Option<u32>,
+    modules: Vec<MemoryModule>,
+    source: &str,
+) -> MemoryProbe {
+    let module_count = modules.len() as u32;
+    let configured_clock_mhz = modules.iter().filter_map(|module| module.configured_clock_mhz).min();
+    let speed_mhz = modules.iter().filter_map(|module| module.speed_mhz).min();
+    let channel_mode = if module_count >= 4 {
+        "multi_channel_estimated"
+    } else if module_count >= 2 {
+        "dual_channel_estimated"
+    } else {
+        "single_channel_estimated"
+    }
+    .to_string();
+    MemoryProbe {
+        total_gb,
+        module_count: Some(module_count),
+        configured_clock_mhz,
+        speed_mhz,
+        channel_mode,
+        confidence: "estimated_from_populated_modules".to_string(),
+        source: source.to_string(),
+        modules,
+    }
+}
+
+fn fallback_memory_probe(total_gb: Option<u32>, source: &str) -> MemoryProbe {
+    MemoryProbe {
+        total_gb,
+        module_count: None,
+        configured_clock_mhz: None,
+        speed_mhz: None,
+        channel_mode: "unknown".to_string(),
+        confidence: "capacity_only".to_string(),
+        source: source.to_string(),
+        modules: Vec::new(),
+    }
 }
 
 fn detect_windows_gpu() -> Option<GpuProbe> {
