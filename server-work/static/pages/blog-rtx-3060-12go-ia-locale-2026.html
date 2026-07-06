@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RTX 3060 12 Go pour IA locale : le vrai ticket d'entrée Ollama 2026</title>
+  <meta name="description" content="RTX 3060 12 Go pour IA locale en 2026 : modèles Ollama compatibles, Qwen, Hermes, Mistral, limites VRAM, benchmarks et upgrades utiles.">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://outilsia.fr/blog/rtx-3060-12go-ia-locale-2026">
+  <meta property="og:title" content="RTX 3060 12 Go : le ticket d'entrée IA locale">
+  <meta property="og:description" content="Quels modèles IA locaux installer sur une RTX 3060 12 Go, quoi éviter et quand passer à 16 ou 24 Go VRAM.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://outilsia.fr/blog/rtx-3060-12go-ia-locale-2026">
+  <meta property="og:image" content="https://outilsia.fr/static/images/local-cockpit/og-local-cockpit-1200x630.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <style>
+    :root{color-scheme:dark;--bg:#080b12;--panel:#101827;--line:rgba(148,163,184,.22);--text:#f8fafc;--muted:#94a3b8;--cyan:#67e8f9;--green:#86efac;--amber:#fcd34d}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 8% 0,rgba(103,232,249,.15),transparent 30%),var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.65}
+    a{color:inherit}.wrap{width:min(940px,calc(100% - 32px));margin:0 auto}.nav{background:#0b1020;border-bottom:1px solid var(--line)}.navin{height:64px;display:flex;align-items:center;justify-content:space-between}.brand{font-weight:950;color:#fff;text-decoration:none}.cyan{color:var(--cyan)}.muted{color:var(--muted)}.hero{padding:50px 0 22px}.pill{display:inline-flex;border:1px solid rgba(103,232,249,.35);border-radius:999px;padding:6px 10px;color:var(--cyan);font-size:12px;font-weight:900;text-transform:uppercase}h1{font-size:clamp(34px,6vw,58px);line-height:1.04;margin:18px 0 12px}h2{font-size:28px;margin-top:34px}.lead{font-size:20px;color:var(--muted)}.box{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:18px;margin:18px 0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.card{border:1px solid rgba(148,163,184,.18);border-radius:12px;padding:14px;background:rgba(255,255,255,.035)}.card strong{display:block}.card span{display:block;color:var(--muted);font-size:14px;margin-top:4px}.btn{display:inline-flex;border-radius:10px;padding:12px 15px;font-weight:950;text-decoration:none;margin:5px 8px 5px 0}.primary{background:var(--cyan);color:#06121f}.secondary{border:1px solid rgba(148,163,184,.28);color:var(--text)}.ok{color:var(--green)}.warn{color:var(--amber)}code{background:#020617;border:1px solid rgba(148,163,184,.18);border-radius:8px;padding:2px 6px;color:var(--cyan)}@media(max-width:760px){.grid{grid-template-columns:1fr}}
+  </style>
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"Article","headline":"RTX 3060 12 Go pour IA locale","url":"https://outilsia.fr/blog/rtx-3060-12go-ia-locale-2026","inLanguage":"fr-FR","about":["RTX 3060","IA locale","Ollama","VRAM 12 Go","Qwen","Hermes"]}
+  </script>
+</head>
+<body>
+  <nav class="nav"><div class="wrap navin"><a class="brand" href="/">Outils<span class="cyan">IA</span></a><a class="muted" href="/profils-machines-ia-locale">Profils machines</a></div></nav>
+  <main class="wrap">
+    <section class="hero">
+      <span class="pill">12 Go VRAM</span>
+      <h1>RTX 3060 12 Go : le premier GPU vraiment confortable pour l'IA locale.</h1>
+      <p class="lead">En 2026, la RTX 3060 12 Go reste une carte très intéressante pour Ollama, Qwen, Mistral, Llama et Hermes 8B. Elle ne fait pas tout, mais elle donne assez de VRAM pour apprendre sérieusement sans exploser le budget.</p>
+      <a class="btn primary" href="/telecharger-scanner-ia-local">Scanner ma RTX 3060</a>
+      <a class="btn secondary" href="/profils-machines-ia-locale">Comparer les profils</a>
+    </section>
+    <section class="box">
+      <h2>Verdict OutilsIA</h2>
+      <div class="grid">
+        <div class="card"><strong class="ok">À tester en premier</strong><span>Qwen 8B, Llama 3.1 8B, Mistral 7B, Hermes 8B selon runtime.</span></div>
+        <div class="card"><strong class="warn">À valider au benchmark</strong><span>Qwen 14B, Mistral Nemo 12B, DeepSeek 14B selon quantization et RAM.</span></div>
+        <div class="card"><strong>Limite</strong><span>Les 32B restent serrés. Les gros contextes et l'image lourde demandent plus de marge.</span></div>
+        <div class="card"><strong>Upgrade logique</strong><span>RTX 4060 Ti 16 Go pour marge, RTX 3090 24 Go pour changer de catégorie.</span></div>
+      </div>
+    </section>
+    <h2>Commandes de départ</h2>
+    <p><code>ollama run qwen3:8b</code>, <code>ollama run llama3.1:8b</code>, <code>ollama run mistral:7b</code>. Le bon réflexe est de benchmarker un petit modèle puis de comparer Hermes ou Qwen sur la même machine.</p>
+    <h2>Pourquoi 12 Go changent tout</h2>
+    <p>Avec 8 Go VRAM, beaucoup de modèles restent possibles mais l'utilisateur doit faire attention. Avec 12 Go, les 7B/8B deviennent plus confortables, les 14B quantifiés deviennent testables, et l'expérience locale ressemble enfin à un vrai assistant quotidien.</p>
+    <h2>Ce que Local Cockpit vérifie</h2>
+    <p>L'application détecte GPU, VRAM, RAM, Ollama Windows/WSL, modèles déjà installés, puis mesure les tokens/s. Elle peut ensuite dire si la RTX 3060 est suffisante pour votre usage ou si le vrai blocage vient de la RAM, du stockage ou du modèle choisi.</p>
+    <section class="box">
+      <h2>Suite logique</h2>
+      <a class="btn primary" href="/telecharger-scanner-ia-local">Télécharger Local Cockpit</a>
+      <a class="btn secondary" href="/blog/gtx-1080-ti-ia-locale-2026">Comparer GTX 1080 Ti</a>
+      <a class="btn secondary" href="/blog/rtx-4060-ti-16go-vs-rtx-3060-ia-locale-2026">Comparer RTX 4060 Ti 16 Go</a>
+      <a class="btn secondary" href="/blog/rtx-3090-qwen-3-6-hermes-ia-locale-2026">Passer à 24 Go</a>
+    </section>
+  </main>
+</body>
+</html>
