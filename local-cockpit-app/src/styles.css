@@ -2803,6 +2803,22 @@ dd {
   overflow-wrap: anywhere;
 }
 
+#oldPortablePresetBtn {
+  border-color: rgba(252, 211, 77, 0.45);
+  color: #fde68a;
+}
+
+.post-install-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.post-install-actions button {
+  min-height: 34px;
+}
+
 .usage-profile-box {
   background:
     radial-gradient(circle at 0% 0%, rgba(120, 220, 232, 0.12), transparent 34%),

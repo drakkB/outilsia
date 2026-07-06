@@ -166,6 +166,7 @@ const els = {
   viewAdvancedBtn: $("viewAdvancedBtn"),
   prepareBtn: $("prepareBtn"),
   preparePanelBtn: $("preparePanelBtn"),
+  oldPortablePresetBtn: $("oldPortablePresetBtn"),
   scanBtn: $("scanBtn"),
   checkBtn: $("checkBtn"),
   memoryBtn: $("memoryBtn"),
@@ -1893,6 +1894,29 @@ function applyUsageProfile(profileKey) {
   renderReadinessPanel();
   renderChatPresets();
   setStatus(`Profil ${profile.label} prêt`, "ok");
+}
+
+function applyOldPortablePreset() {
+  applyUsageProfile("portable");
+  setFieldTestProfile("old_laptop");
+  const model = usageProfileModelRef("portable") || "qwen3:0.6b";
+  const test = TEST_PROFILES.simple;
+  if (els.benchmarkModelInput) els.benchmarkModelInput.value = model;
+  if (els.chatModelInput) els.chatModelInput.value = model;
+  if (els.benchmarkPromptInput) {
+    els.benchmarkPromptInput.value = [
+      "Contexte : tu réponds à un utilisateur sur un vieux PC ou un portable modeste.",
+      "Objectif : dire quoi tester en IA locale sans promettre un gros modèle impossible.",
+      "",
+      test.prompt
+    ].join("\n");
+  }
+  if (els.chatPromptInput) {
+    els.chatPromptInput.value = "Explique simplement ce que ce vieux PC ou portable peut faire tourner en IA locale, avec une première étape concrète et encourageante.";
+  }
+  renderPreparePanel();
+  renderFieldTestPanel();
+  setStatus("Mode vieux PC / portable prêt : petit modèle, contexte court, preuve locale d'abord", "ok");
 }
 
 function useUsageProfilePack(target = "benchmark") {
@@ -7085,7 +7109,14 @@ async function installRecommendedModel(model, button = null) {
       setStatus(confirmed ? `${clean} installé` : `${clean} téléchargé, scan à vérifier`, confirmed ? "ok" : "warn");
       els.benchmarkResult.innerHTML = `
         <strong>${escapeHtml(clean)} ${confirmed ? "installé" : "téléchargé"}</strong>
-        <span>${confirmed ? "Prêt : lance un test court ou sauvegarde ce PC dans ton compte." : "Le téléchargement est terminé, mais le scan local ne l'a pas encore confirmé."}</span>
+        <span>${confirmed ? "Prêt : teste maintenant, dialogue avec ce modèle, compare dans l'Arena ou garde-le installé." : "Le téléchargement est terminé, mais le scan local ne l'a pas encore confirmé."}</span>
+        <div class="post-install-actions">
+          <button type="button" data-benchmark-model="${escapeHtml(clean)}" ${confirmed ? "" : "disabled"}>Tester maintenant</button>
+          <button type="button" data-post-install-chat="${escapeHtml(clean)}" ${confirmed ? "" : "disabled"}>Dialogue</button>
+          <button type="button" data-post-install-arena="${escapeHtml(clean)}" ${confirmed ? "" : "disabled"}>Comparer</button>
+          <button type="button" data-keep-installed-model="${escapeHtml(clean)}" ${confirmed ? "" : "disabled"}>Garder</button>
+          <button type="button" data-delete-model="${escapeHtml(clean)}" ${confirmed ? "" : "disabled"}>Supprimer</button>
+        </div>
       `;
       if (state.compatibility) renderCompatibility(state.compatibility);
       renderPreparePanel();
@@ -8710,6 +8741,7 @@ els.stickyActionBtn?.addEventListener("click", handlePrimaryAction);
 if (els.viewEssentialBtn) els.viewEssentialBtn.addEventListener("click", () => setViewMode("essential"));
 if (els.viewAdvancedBtn) els.viewAdvancedBtn.addEventListener("click", () => setViewMode("advanced"));
 els.preparePanelBtn.addEventListener("click", prepareLocalAiFlow);
+els.oldPortablePresetBtn?.addEventListener("click", applyOldPortablePreset);
 els.scanBtn.addEventListener("click", scanMachine);
 els.checkBtn.addEventListener("click", checkCompatibility);
 els.memoryBtn.addEventListener("click", generateMemory);
@@ -8895,6 +8927,43 @@ document.addEventListener("click", async (event) => {
   const usagePackTarget = usagePackButton?.getAttribute?.("data-usage-pack");
   if (usagePackTarget) {
     useUsageProfilePack(usagePackTarget);
+    return;
+  }
+  const oldPortablePresetButton = event.target?.closest?.("[data-old-portable-preset]");
+  if (oldPortablePresetButton) {
+    applyOldPortablePreset();
+    return;
+  }
+  const postInstallChatButton = event.target?.closest?.("[data-post-install-chat]");
+  const postInstallChatModel = postInstallChatButton?.getAttribute?.("data-post-install-chat");
+  if (postInstallChatModel) {
+    const model = ollamaActionRef(postInstallChatModel);
+    els.chatModelInput.value = model;
+    if (!els.chatPromptInput.value.trim() || /Explique simplement ce que/.test(els.chatPromptInput.value)) {
+      els.chatPromptInput.value = chatPresetPrompt("assistant", model);
+    }
+    els.chatPromptInput.focus();
+    setStatus(`Dialogue prêt avec ${model}`, "ok");
+    return;
+  }
+  const postInstallArenaButton = event.target?.closest?.("[data-post-install-arena]");
+  const postInstallArenaModel = postInstallArenaButton?.getAttribute?.("data-post-install-arena");
+  if (postInstallArenaModel) {
+    const model = ollamaActionRef(postInstallArenaModel);
+    els.benchmarkModelInput.value = model;
+    els.chatModelInput.value = model;
+    if (arenaInstalledCandidates().length >= 2) {
+      await runAutomaticArena();
+    } else {
+      setStatus("Arena prête après installation d'un deuxième modèle", "warn");
+    }
+    return;
+  }
+  const keepInstalledButton = event.target?.closest?.("[data-keep-installed-model]");
+  const keepInstalledModel = keepInstalledButton?.getAttribute?.("data-keep-installed-model");
+  if (keepInstalledModel) {
+    setStatus(`${ollamaActionRef(keepInstalledModel)} gardé installé`, "ok");
+    renderReadinessPanel();
     return;
   }
   const upgradeSimButton = event.target?.closest?.("[data-upgrade-sim-target]");
