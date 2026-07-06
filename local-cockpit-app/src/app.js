@@ -1821,7 +1821,7 @@ function hardwareDoctorAnalysis(scan = {}) {
     addCheck("Canal mémoire", "warn", "Canal non confirmé par le système.", 0);
   }
 
-  if (hasNvidiaSignals) addCheck("Driver/CUDA", "ok", `NVIDIA mesuré${probe.cuda_version ? ` · CUDA ${probe.cuda_version}` : " · CUDA à confirmer selon runtime"}.`, 16);
+  if (hasNvidiaSignals) addCheck("Driver NVIDIA", "ok", `NVIDIA mesuré${probe.cuda_version ? ` · CUDA driver max ${probe.cuda_version}` : " · CUDA à confirmer selon runtime"}.`, 16);
   else if (scan.gpu_name) {
     addCheck("Mesure GPU", "warn", `${gpuConfidenceLabel(probe, scan)}.`, 6);
     addAction("Vérifier le driver GPU si les performances semblent anormales.");
@@ -1868,7 +1868,7 @@ function hardwareDoctorAnalysis(scan = {}) {
 
   const cudaMajor = parseMajorVersion(probe.cuda_version);
   if (cudaMajor && cudaMajor < 12) {
-    addCheck("CUDA", "warn", `CUDA ${probe.cuda_version} : compatible selon runtime, mais à surveiller.`, -2);
+    addCheck("CUDA", "warn", `CUDA driver max ${probe.cuda_version} : compatible selon runtime, mais à surveiller.`, -2);
     addAction("Mettre à jour le driver NVIDIA si un modèle échoue côté GPU.");
   }
 
@@ -1894,7 +1894,7 @@ function renderHardwareDoctor(scan) {
   rows.push(["Confiance GPU", gpuConfidenceLabel(probe, scan)]);
   rows.push(["Confiance RAM", memoryConfidenceLabel(memory)]);
   if (probe.driver_version) rows.push(["Driver", probe.driver_version]);
-  if (probe.cuda_version) rows.push(["CUDA", probe.cuda_version]);
+  if (probe.cuda_version) rows.push(["CUDA driver max", probe.cuda_version]);
   if (probe.temperature_c != null) rows.push(["Température", formatDoctorNumber(probe.temperature_c, " °C")]);
   if (probe.utilization_percent != null) rows.push(["Charge GPU", formatDoctorNumber(probe.utilization_percent, " %")]);
   if (probe.power_draw_w != null) {
