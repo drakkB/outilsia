@@ -887,6 +887,10 @@ function formatGb(value) {
   return Number.isFinite(value) ? `${value} Go` : "--";
 }
 
+function formatVram(value) {
+  return Number.isFinite(value) ? `${value} Go VRAM` : "VRAM non confirmée";
+}
+
 function runtimeOllama(scan) {
   const ollama = scan?.runtimes?.ollama;
   const ollamaWsl = scan?.runtimes?.ollama_wsl;
@@ -5278,7 +5282,7 @@ function arenaRunMarkdown(run = readLastArenaRun()) {
     "",
     `- Date: ${new Date(Number(run.created_at_ms || Date.now())).toISOString()}`,
     `- Machine: ${run.machine?.name || "Machine IA locale"}`,
-    `- GPU: ${run.machine?.gpu_name || "non détecté"} (${run.machine?.vram_gb || 0} Go VRAM)`,
+    `- GPU: ${run.machine?.gpu_name || "non détecté"} (${formatVram(run.machine?.vram_gb)})`,
     `- RAM: ${run.machine?.ram_gb || 0} Go`,
     `- Prompt: ${run.prompt}`,
     `- Meilleur compromis: ${winners.compromise ? `${winners.compromise.model} (score ${arenaDisplayScore(winners.compromise, "compromise")}/100)` : "aucun succès"}`,
@@ -5754,7 +5758,7 @@ function renderStrategyBridgePanel() {
   els.strategyBridgeBox.innerHTML = `
     <div class="bridge-summary">
       <strong>${escapeHtml(profile.label)} - ${escapeHtml(profile.machine.gpu || "GPU non détecté")}</strong>
-      <span>${escapeHtml(profile.machine.vram_gb || 0)} Go VRAM - ${escapeHtml(profile.machine.ram_gb || 0)} Go RAM - ${escapeHtml(profile.runtime_label)}</span>
+      <span>${escapeHtml(formatVram(profile.machine.vram_gb))} - ${escapeHtml(profile.machine.ram_gb || 0)} Go RAM - ${escapeHtml(profile.runtime_label)}</span>
       <span>${escapeHtml(profile.installed_models.length)} modèle(s) installé(s), ${escapeHtml(profile.candidate_models.length)} candidat(s) OutilsIA.</span>
       <span>${escapeHtml(profile.next_action)}</span>
       <span>Commande modèle : ${escapeHtml(profile.runtime_command_prefix)} run &lt;modele&gt;</span>
@@ -5999,7 +6003,7 @@ function fieldTestFirst30sProof({ scan = {}, report = {}, action = {}, profile =
     benchmark_cta_or_proof_visible: benchmarkProof || benchmarkCta,
     upgrade_visible: Boolean(upgradeTitle),
     summary: [
-      hardwareVisible ? `${scan.gpu_name || "GPU"} · ${Number(scan.vram_gb || 0)} Go VRAM · ${Number(scan.ram_gb || 0)} Go RAM` : "matériel à confirmer",
+      hardwareVisible ? `${scan.gpu_name || "GPU"} · ${formatVram(scan.vram_gb)} · ${Number(scan.ram_gb || 0)} Go RAM` : "matériel à confirmer",
       scoreVisible ? `score ${Number(report.score)}/100` : "score absent",
       model ? `modèle ${model}` : "modèle absent",
       benchmarkProof ? `preuve ${benchmark.model || "benchmark"} à ${Number(benchmark.estimated_tokens_per_second || 0).toFixed(1)} tok/s` : "benchmark à lancer",
@@ -7758,7 +7762,7 @@ function benchmarkHistoryMarkdown(items = readBenchmarkHistory()) {
       "",
       `- Date: ${new Date(Number(item.created_at_ms || Date.now())).toISOString()}`,
       `- Machine: ${item.machine?.name || "Machine IA locale"}`,
-      `- GPU: ${item.machine?.gpu_name || "non détecté"} (${item.machine?.vram_gb || 0} Go VRAM)`,
+      `- GPU: ${item.machine?.gpu_name || "non détecté"} (${formatVram(item.machine?.vram_gb)})`,
       `- RAM: ${item.machine?.ram_gb || 0} Go`,
       `- Temps: ${item.elapsed_ms} ms`,
       `- Débit estimé: ${item.estimated_tokens_per_second} tok/s`,
@@ -7944,7 +7948,7 @@ function renderDesktopUpdates(payload) {
     return `
       <div class="list-item">
         <strong>${escapeHtml(item.name || "Machine IA locale")} - ${escapeHtml(score)}/100</strong>
-        <span>${escapeHtml(item.gpu_name || "GPU inconnu")} - ${escapeHtml(item.vram_gb || 0)} Go VRAM - ${escapeHtml(item.ram_gb || 0)} Go RAM</span>
+        <span>${escapeHtml(item.gpu_name || "GPU inconnu")} - ${escapeHtml(formatVram(item.vram_gb))} - ${escapeHtml(item.ram_gb || 0)} Go RAM</span>
         <span>${newModels ? `Nouveaux modèles: ${escapeHtml(newModels)}` : "Watchlist à jour"}</span>
         ${upgrade ? `<span>Upgrade prioritaire: ${escapeHtml(upgrade)}</span>` : ""}
         ${afterScore !== null ? `<span>Score après upgrade: ${escapeHtml(afterScore)}/100</span>` : ""}

@@ -791,7 +791,7 @@ fn generate_memoryforge(scan: MachineScan, compatibility: Option<Value>) -> Resu
         "- GPU: {}",
         scan.gpu_name.as_deref().unwrap_or("non detecte")
     ));
-    lines.push(format!("- VRAM: {} Go", scan.vram_gb.unwrap_or_default()));
+    lines.push(format!("- VRAM: {}", format_optional_gb(scan.vram_gb)));
     lines.push(String::new());
 
     if let Some(value) = compatibility {
@@ -2815,6 +2815,12 @@ fn bytes_to_gb(bytes: u64) -> u32 {
     ((bytes as f64) / 1024_f64.powi(3)).round().max(0.0) as u32
 }
 
+fn format_optional_gb(value: Option<u32>) -> String {
+    value
+        .map(|gb| format!("{gb} Go"))
+        .unwrap_or_else(|| "non confirmee".to_string())
+}
+
 fn is_unified_memory() -> bool {
     cfg!(target_os = "macos")
 }
@@ -3022,7 +3028,7 @@ fn machine_markdown(scan: &MachineScan) -> String {
             "- GPU: {}",
             scan.gpu_name.as_deref().unwrap_or("non detecte")
         ),
-        format!("- VRAM: {} Go", scan.vram_gb.unwrap_or_default()),
+        format!("- VRAM: {}", format_optional_gb(scan.vram_gb)),
         format!(
             "- Memoire unifiee: {}",
             if scan.unified_memory { "oui" } else { "non" }
@@ -3191,7 +3197,7 @@ fn shopping_list_markdown(compat: &Value, scan: &MachineScan) -> String {
             "- GPU actuel: {}",
             scan.gpu_name.as_deref().unwrap_or("non detecte")
         ),
-        format!("- VRAM actuelle: {} Go", scan.vram_gb.unwrap_or_default()),
+        format!("- VRAM actuelle: {}", format_optional_gb(scan.vram_gb)),
         format!("- RAM actuelle: {} Go", scan.ram_gb.unwrap_or_default()),
         String::new(),
         "## Achats prioritaires".to_string(),
@@ -3281,10 +3287,10 @@ fn share_ready_report_markdown(
         "## Verdict".to_string(),
         String::new(),
         format!(
-            "**{}** avec {} Go RAM, {} Go VRAM et {}.",
+            "**{}** avec {} Go RAM, {} et {}.",
             scan.name,
             scan.ram_gb.unwrap_or_default(),
-            scan.vram_gb.unwrap_or_default(),
+            format_optional_gb(scan.vram_gb),
             scan.gpu_name.as_deref().unwrap_or("GPU non detecte")
         ),
         format!("- Score OutilsIA: {score}"),
@@ -3377,9 +3383,9 @@ fn model_cards_markdown(scan: &MachineScan, compat: &Value) -> String {
         "# Fiches modeles locaux".to_string(),
         String::new(),
         format!(
-            "- Machine: {} - {} Go VRAM - {} Go RAM",
+            "- Machine: {} - {} VRAM - {} Go RAM",
             scan.name,
-            scan.vram_gb.unwrap_or_default(),
+            format_optional_gb(scan.vram_gb),
             scan.ram_gb.unwrap_or_default()
         ),
         String::new(),
