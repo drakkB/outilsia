@@ -123,7 +123,7 @@ function main() {
     'La recette Windows native du build courant couvre scan',
     'La campagne terrain 5 machines reste en cours',
     'Quel modèle IA local mon PC peut-il faire tourner ?',
-    'Téléchargement Windows, Linux et WSL Ubuntu',
+    'Téléchargement Windows, Linux et WSL',
     'Linux .deb / .rpm',
     'Captures issues du dernier état UI vérifié',
     'local-cockpit-scanned-desktop-20260703.png?v=202607032140',

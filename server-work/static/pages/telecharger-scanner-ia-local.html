@@ -180,7 +180,7 @@ Date: 2026-07-06 (manifeste release.json)</div>
 
     <section class="wrap cards" style="margin-top:18px">
       <article class="card"><h3>1. Scanner</h3><p class="muted">Détection OS, CPU, RAM, GPU, VRAM, stockage libre, Ollama Windows, Ollama WSL, Docker, WSL, llama.cpp et modèles installés.</p></article>
-      <article class="card"><h3>2. Installer</h3><p class="muted">Si Ollama manque, l'app vous guide vers l'installation. Si Ollama tourne dans Ubuntu WSL, le runtime WSL est identifié séparément.</p></article>
+      <article class="card"><h3>2. Installer</h3><p class="muted">Si Ollama manque, l'app vous guide vers l'installation. Si Ollama tourne dans WSL, le runtime Linux est identifié séparément.</p></article>
       <article class="card"><h3>3. Tester</h3><p class="muted">Téléchargement du modèle léger recommandé, lancement local, vitesse estimée et rapport copiable.</p></article>
       <article class="card"><h3>4. Auto-test</h3><p class="muted">Bouton intégré dans l'app pour vérifier manifeste, release publique, contrat API, token desktop et updates compte.</p></article>
     </section>
@@ -222,8 +222,8 @@ Date: 2026-07-06 (manifeste release.json)</div>
     </section>
 
     <section class="wrap panel" style="margin-top:18px">
-      <h2>Téléchargement Windows, Linux et WSL Ubuntu</h2>
-      <p class="muted">Le chemin principal reste Windows natif pour les débutants, mais la bêta publie aussi des paquets Linux .deb et .rpm. Sur Windows, OutilsIA détecte aussi Ubuntu WSL : si Ollama tourne dedans, le runtime WSL apparaît séparément dans le scan.</p>
+      <h2>Téléchargement Windows, Linux et WSL</h2>
+      <p class="muted">Le chemin principal reste Windows natif pour les débutants, mais la bêta publie aussi des paquets Linux .deb et .rpm. Sur Windows, OutilsIA détecte aussi WSL : si Ollama tourne dans une distribution Linux, le runtime WSL apparaît séparément dans le scan.</p>
       <div class="trust-grid">
         <div><b class="ok">Windows x64</b><span class="muted">Installateur .exe public avec hash SHA256 et manifeste release.json.</span></div>
         <div><b class="ok">Linux .deb / .rpm</b><span class="muted">Paquets bêta pour distributions Debian/Ubuntu et Fedora/RPM compatibles.</span></div>
