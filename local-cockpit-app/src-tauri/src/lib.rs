@@ -4008,4 +4008,42 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184
             "ollama version is 0.18.2\n"
         );
     }
+
+    #[test]
+    fn normalizes_ollama_runtime_inputs() {
+        assert_eq!(normalize_ollama_runtime(Some("wsl")), OllamaRuntime::Wsl);
+        assert_eq!(
+            normalize_ollama_runtime(Some("ollama-wsl")),
+            OllamaRuntime::Wsl
+        );
+        assert_eq!(
+            normalize_ollama_runtime(Some("native")),
+            OllamaRuntime::Native
+        );
+        assert_eq!(normalize_ollama_runtime(None), OllamaRuntime::Native);
+    }
+
+    #[test]
+    fn builds_native_ollama_command() {
+        let command = build_ollama_command(OllamaRuntime::Native);
+        let program = command.get_program().to_string_lossy().to_lowercase();
+        assert!(program.contains("ollama"));
+    }
+
+    #[test]
+    fn builds_wsl_ollama_command_for_current_platform() {
+        let command = build_ollama_command(OllamaRuntime::Wsl);
+        let program = command.get_program().to_string_lossy().to_lowercase();
+        let args: Vec<String> = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect();
+        if cfg!(target_os = "windows") {
+            assert!(program.ends_with("wsl.exe"));
+            assert_eq!(args, vec!["ollama".to_string()]);
+        } else {
+            assert!(program.contains("ollama"));
+            assert!(args.is_empty());
+        }
+    }
 }
