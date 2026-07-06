@@ -4011,11 +4011,13 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184
 
     #[test]
     fn normalizes_ollama_runtime_inputs() {
-        assert_eq!(normalize_ollama_runtime(Some("wsl")), OllamaRuntime::Wsl);
-        assert_eq!(
-            normalize_ollama_runtime(Some("ollama-wsl")),
+        let expected_wsl = if cfg!(target_os = "windows") {
             OllamaRuntime::Wsl
-        );
+        } else {
+            OllamaRuntime::Native
+        };
+        assert_eq!(normalize_ollama_runtime(Some("wsl")), expected_wsl);
+        assert_eq!(normalize_ollama_runtime(Some("ollama-wsl")), expected_wsl);
         assert_eq!(
             normalize_ollama_runtime(Some("native")),
             OllamaRuntime::Native
