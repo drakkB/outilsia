@@ -1942,6 +1942,73 @@ function hardwareDoctorAnalysis(scan = {}) {
   return { score, headline, summary, checks, actions: actions.slice(0, 4), source: probe.source || "scan système" };
 }
 
+function hardwareDoctorSnapshot(scan = state.scan || {}) {
+  if (!scan) return null;
+  if (!scan.machine_key && !scan.cpu_name && !scan.gpu_name && !scan.ram_gb) return null;
+  const probe = scan?.raw_scan?.gpu_probe || {};
+  const memory = scan?.raw_scan?.memory_probe || {};
+  const analysis = hardwareDoctorAnalysis(scan);
+  const wslInfo = wslRuntimeInfo(scan);
+  const clock = Number(memory.configured_clock_mhz || memory.speed_mhz || 0);
+  const channel = String(memory.channel_mode || "unknown")
+    .replace("dual_channel_estimated", "dual estimé")
+    .replace("multi_channel_estimated", "multi estimé")
+    .replace("single_channel_estimated", "single estimé")
+    .replace("unknown", "inconnu");
+  return {
+    score: analysis.score,
+    headline: analysis.headline,
+    summary: analysis.summary,
+    source: analysis.source,
+    checks: analysis.checks,
+    actions: analysis.actions,
+    ram: {
+      total_gb: Number(scan.ram_gb || memory.total_gb || 0),
+      module_count: Number(memory.module_count || 0),
+      channel_mode: channel,
+      configured_clock_mhz: Number(memory.configured_clock_mhz || 0),
+      speed_mhz: Number(memory.speed_mhz || 0),
+      effective_clock_label: clock ? `${clock} MT/s` : "fréquence non confirmée",
+      confidence: memoryConfidenceLabel(memory),
+      source: memory.source || "scan système"
+    },
+    gpu: {
+      confidence: gpuConfidenceLabel(probe, scan),
+      source: probe.source || "scan système",
+      driver_version: probe.driver_version || "",
+      cuda_version: probe.cuda_version || "",
+      temperature_c: Number(probe.temperature_c || 0),
+      utilization_percent: Number(probe.utilization_percent || 0),
+      power_draw_w: Number(probe.power_draw_w || 0),
+      power_limit_w: Number(probe.power_limit_w || 0),
+      pcie_link_width_current: Number(probe.pcie_link_width_current || 0),
+      pcie_link_width_max: Number(probe.pcie_link_width_max || 0),
+      pcie_link_gen_current: Number(probe.pcie_link_gen_current || 0),
+      pcie_link_gen_max: Number(probe.pcie_link_gen_max || 0)
+    },
+    runtime: {
+      ollama: ollamaRuntimeLabel(scan),
+      wsl: wslInfo.title || wslInfo.kind || "non détecté"
+    }
+  };
+}
+
+function hardwareDoctorSummaryLines(snapshot = hardwareDoctorSnapshot()) {
+  if (!snapshot) return ["Hardware Doctor: scan requis."];
+  const lines = [
+    `Hardware Doctor: ${snapshot.score}/100 - ${snapshot.headline}`,
+    `RAM: ${snapshot.ram.total_gb || "?"} Go - ${snapshot.ram.module_count || "?"} module(s) - ${snapshot.ram.channel_mode} - ${snapshot.ram.effective_clock_label}`,
+    `GPU: ${snapshot.gpu.confidence}${snapshot.gpu.driver_version ? ` - driver ${snapshot.gpu.driver_version}` : ""}${snapshot.gpu.cuda_version ? ` - CUDA ${snapshot.gpu.cuda_version}` : ""}`,
+    `Runtime: ${snapshot.runtime.ollama}${snapshot.runtime.wsl ? ` - WSL ${snapshot.runtime.wsl}` : ""}`
+  ];
+  if (snapshot.gpu.temperature_c) lines.push(`Thermique: ${formatDoctorNumber(snapshot.gpu.temperature_c, " °C")}`);
+  if (snapshot.gpu.pcie_link_width_current || snapshot.gpu.pcie_link_width_max) {
+    lines.push(`PCIe: x${snapshot.gpu.pcie_link_width_current || "?"}/x${snapshot.gpu.pcie_link_width_max || "?"}`);
+  }
+  if (snapshot.actions.length) lines.push(`Action doctor: ${snapshot.actions[0]}`);
+  return lines;
+}
+
 function renderHardwareDoctor(scan) {
   if (!els.hardwareDoctorBox) return;
   const probe = scan?.raw_scan?.gpu_probe || {};
@@ -3415,6 +3482,7 @@ function readinessReport() {
   const promptForge = currentPromptForgeResult();
   const arenaRun = readLastArenaRun();
   const arena = arenaRun ? arenaWinners(arenaRun.results || []) : null;
+  const hardwareDoctor = hardwareDoctorSnapshot(scan);
   const models = extractModels(compatibility).slice(0, 5).map((model) => ({
     title: modelTitle(model),
     command: actionableOllamaRef(model) ? `${ollamaRuntimeCommandLabel(actionableOllamaRef(model))} run ${actionableOllamaRef(model)}` : "",
@@ -3461,6 +3529,7 @@ function readinessReport() {
       os: [scan.os_name, scan.os_version].filter(Boolean).join(" ") || "non scanné",
       ollama: runtimeOllama(scan)
     },
+    hardware_doctor: hardwareDoctor,
     usage_profile: {
       key: usage.key,
       label: usage.label,
@@ -3540,6 +3609,15 @@ function readinessMarkdown(report = readinessReport()) {
     `- VRAM: ${report.machine.vram}`,
     `- OS: ${report.machine.os}`,
     `- Ollama: ${report.machine.ollama}`,
+    "",
+    "## Hardware Doctor",
+    "",
+    ...hardwareDoctorSummaryLines(report.hardware_doctor).map((line) => `- ${line}`),
+    ...(report.hardware_doctor?.checks?.length ? [
+      "",
+      "### Signaux",
+      ...report.hardware_doctor.checks.slice(0, 8).map((check) => `- ${check.label}: ${check.detail}`)
+    ] : []),
     `- Profil d'usage: ${report.usage_profile.label}${report.usage_profile.recommended_model ? ` - ${report.usage_profile.recommended_model}` : ""}`,
     `- Modèle test: ${report.test_model}`,
     report.recommended_model ? `- Deuxième modèle recommandé: ${report.recommended_model.ref} (${report.recommended_model.installed ? "installé" : "à installer"})` : "",
@@ -3624,6 +3702,7 @@ function readinessSummaryText(report = readinessReport()) {
     "Résumé OutilsIA Local Cockpit",
     `Machine: ${report.machine.gpu} / ${report.machine.vram} VRAM / ${report.machine.ram} RAM`,
     `Score: ${report.score === null ? "non calculé" : `${report.score}/100`}`,
+    `Hardware Doctor: ${report.hardware_doctor ? `${report.hardware_doctor.score}/100 - ${report.hardware_doctor.headline}` : "non calculé"}`,
     `Build: ${report.release.build_id || report.release.app_version || "non chargé"}`,
     `Preuve locale: ${benchmark}`,
     `Deuxième modèle: ${recommended}`,
@@ -3693,6 +3772,7 @@ function premiumReportHtml(report = readinessReport()) {
   const compatibilityOnlyCount = compatibilityModels.filter((item) => !actionableOllamaRef(item)).length;
   const fieldProfile = state.scan ? effectiveFieldTestProfile(state.scan) : null;
   const fieldSummary = state.scan ? fieldTestProfile() : null;
+  const hardwareDoctor = report.hardware_doctor || hardwareDoctorSnapshot();
   const proofLabel = benchmark
     ? `${benchmark.model} · ${benchmark.estimated_tokens_per_second ?? "--"} tok/s`
     : "Benchmark à lancer";
@@ -3871,6 +3951,14 @@ function premiumReportHtml(report = readinessReport()) {
           <p>RAM : ${escapeHtml(report.machine.ram)} · VRAM : ${escapeHtml(report.machine.vram)}</p>
           <p>OS : ${escapeHtml(report.machine.os)} · Ollama : ${escapeHtml(report.machine.ollama)}</p>
           <p>Build : ${escapeHtml(report.release.build_id || report.release.app_version || "non chargé")} · SHA : ${escapeHtml(shortHash(report.release.sha256) || "non chargé")}</p>
+        </div>
+        <div class="pdf-card pdf-card-wide">
+          <span>Hardware Doctor</span>
+          <strong>${escapeHtml(hardwareDoctor ? `${hardwareDoctor.score}/100 · ${hardwareDoctor.headline}` : "À calculer")}</strong>
+          <p>${escapeHtml(hardwareDoctor?.summary || "Le scan affichera RAM, driver, runtime et signaux GPU disponibles.")}</p>
+          <p>${escapeHtml(hardwareDoctor ? `RAM : ${hardwareDoctor.ram.module_count || "?"} module(s), ${hardwareDoctor.ram.channel_mode}, ${hardwareDoctor.ram.effective_clock_label}` : "RAM : à confirmer")}</p>
+          <p>${escapeHtml(hardwareDoctor ? `GPU : ${hardwareDoctor.gpu.confidence}${hardwareDoctor.gpu.cuda_version ? ` · CUDA ${hardwareDoctor.gpu.cuda_version}` : ""}` : "GPU : à confirmer")}</p>
+          <p>${escapeHtml(hardwareDoctor?.actions?.[0] || "Aucune action doctor urgente détectée.")}</p>
         </div>
         <div class="pdf-card">
           <span>Modèle conseillé</span>
@@ -6049,6 +6137,7 @@ function setFieldTestProfile(value = "auto") {
 
 function fieldTestFirst30sProof({ scan = {}, report = {}, action = {}, profile = {}, benchmark = null, upgrade = null } = {}) {
   const model = report.recommended_model?.ref || report.models?.[0]?.title || report.test_model || "";
+  const doctor = report.hardware_doctor || hardwareDoctorSnapshot(scan);
   const firstAction = action.label || profile.nextActions?.[0] || "";
   const hardwareVisible = Boolean(
     scan.cpu_name &&
@@ -6070,6 +6159,7 @@ function fieldTestFirst30sProof({ scan = {}, report = {}, action = {}, profile =
       scoreVisible ? `score ${Number(report.score)}/100` : "score absent",
       model ? `modèle ${model}` : "modèle absent",
       benchmarkProof ? `preuve ${benchmark.model || "benchmark"} à ${Number(benchmark.estimated_tokens_per_second || 0).toFixed(1)} tok/s` : "benchmark à lancer",
+      doctor ? `doctor ${doctor.score}/100` : "doctor absent",
       `upgrade: ${upgradeTitle}`
     ].join(" | ")
   };
@@ -6086,6 +6176,7 @@ function fieldTestMachineEntry() {
   const arena = readLastArenaRun();
   const successfulArena = (arena?.results || []).some((item) => item?.success);
   const upgrade = report.upgrades[0];
+  const doctor = report.hardware_doctor || hardwareDoctorSnapshot(scan);
   const os = [scan.os_name, scan.os_version].filter(Boolean).join(" ").trim();
   return {
     profile: fieldProfile.profile,
@@ -6097,6 +6188,26 @@ function fieldTestMachineEntry() {
     gpu: scan.gpu_name || (Number(scan.vram_gb || 0) > 0 ? "GPU détecté" : "CPU only / aucun GPU dédié"),
     ram_gb: Number(scan.ram_gb || 0),
     vram_gb: Number(scan.vram_gb || 0),
+    hardware_doctor: doctor ? {
+      score: doctor.score,
+      headline: doctor.headline,
+      summary: doctor.summary,
+      ram_total_gb: doctor.ram.total_gb,
+      ram_modules: doctor.ram.module_count,
+      ram_channel: doctor.ram.channel_mode,
+      ram_clock: doctor.ram.effective_clock_label,
+      ram_confidence: doctor.ram.confidence,
+      gpu_confidence: doctor.gpu.confidence,
+      gpu_driver: doctor.gpu.driver_version,
+      cuda_driver_max: doctor.gpu.cuda_version,
+      temperature_c: doctor.gpu.temperature_c,
+      pcie: doctor.gpu.pcie_link_width_current || doctor.gpu.pcie_link_width_max
+        ? `x${doctor.gpu.pcie_link_width_current || "?"}/x${doctor.gpu.pcie_link_width_max || "?"}`
+        : "",
+      ollama_runtime: doctor.runtime.ollama,
+      wsl_runtime: doctor.runtime.wsl,
+      first_action: doctor.actions[0] || ""
+    } : null,
     scan_ok: Boolean(state.scan),
     score: report.score === null ? 0 : Number(report.score),
     score_label: scoreLabel(report.score),
@@ -6149,12 +6260,17 @@ function renderFieldTestPanel() {
   }
   els.fieldTestState.textContent = profile.benchmarkReady ? "preuve obtenue" : profile.machineClass;
   els.fieldTestBox.className = "field-test-box";
+  const doctor = hardwareDoctorSnapshot(state.scan);
+  const doctorLine = doctor
+    ? `Doctor : ${doctor.score}/100 · ${doctor.ram.module_count || "?"} module(s) RAM · ${doctor.ram.channel_mode} · ${doctor.ram.effective_clock_label}`
+    : "Doctor : signaux à confirmer";
   els.fieldTestBox.innerHTML = `
     <div class="field-test-summary">
       <strong>${escapeHtml(profile.machineClass)}</strong>
       <span>${escapeHtml(profile.verdict)}</span>
       <span>Profil exporté : ${escapeHtml(fieldProfile.label)} · source : ${escapeHtml(fieldProfile.source)}${fieldProfile.source === "manual" ? ` · auto aurait choisi ${escapeHtml(FIELD_TEST_PROFILE_LABELS[fieldProfile.inferred] || fieldProfile.inferred)}` : ""}</span>
       <span>Runtime : ${escapeHtml(profile.ollamaReady ? ollamaRuntimeLabel(state.scan) : "à installer")} · modèles installés : ${escapeHtml(profile.installedCount)} · benchmark : ${profile.benchmarkReady ? "oui" : "non"}</span>
+      <span>${escapeHtml(doctorLine)}</span>
     </div>
     <div class="field-test-steps">
       ${profile.nextActions.map((action, index) => `
@@ -6188,6 +6304,11 @@ function fieldTestMarkdown() {
     `- RAM: ${formatGb(scan.ram_gb)}`,
     `- GPU: ${scan.gpu_name || "non détecté"}`,
     `- VRAM: ${formatGb(scan.vram_gb)}`,
+    "",
+    "## Hardware Doctor",
+    "",
+    ...hardwareDoctorSummaryLines(hardwareDoctorSnapshot(scan)).map((line) => `- ${line}`),
+    "",
     `- Ollama: ${profile.ollamaReady ? "prêt" : "à installer"}`,
     `- Modèles installés: ${profile.installedCount}`,
     `- Benchmark: ${profile.benchmarkReady && benchmark ? `${benchmark.model} - ${benchmark.estimated_tokens_per_second} tok/s` : "non lancé"}`,
