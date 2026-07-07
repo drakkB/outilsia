@@ -357,7 +357,7 @@ if ($hash -eq $expected) { &quot;OutilsIA: SHA256 OK&quot; } else { &quot;Outils
     };
     const shortHash = (hash) => hash ? `${hash.slice(0, 16)}...${hash.slice(-8)}` : "a publier";
     const fmtInt = (value) => new Intl.NumberFormat("fr-FR").format(Number(value || 0));
-    const trackedUrlFor = (file) => file?.name ? `/download/local-cockpit/${encodeURIComponent(file.name)}` : (file?.url || "#");
+    const trackedUrlFor = (file) => file?.url || (file?.name ? `/download/local-cockpit/${encodeURIComponent(file.name)}` : "#");
     const verifyCommandFor = (file) => {
       if(!file?.name || !file?.sha256) return "";
       if(file.platform === "windows-x64"){
