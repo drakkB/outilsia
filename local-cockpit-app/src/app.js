@@ -1151,11 +1151,37 @@ function modelRecencyScore(model) {
   return 0;
 }
 
+function isLegacyPascalMachine(scan = state.scan) {
+  const gpu = String(scan?.gpu_name || "").toLowerCase();
+  if (!gpu.includes("gtx")) return false;
+  return /(1050|1060|1070|1080|titan x|titan xp|p100|p40|p4)\b/.test(gpu);
+}
+
+function isConstrainedLegacyMachine(scan = state.scan) {
+  const ram = Number(scan?.ram_gb || 0);
+  const vram = Number(scan?.vram_gb || 0);
+  return isLegacyPascalMachine(scan) || (ram > 0 && ram <= 16 && (!vram || vram <= 6));
+}
+
+function isStarterModelRef(ref) {
+  return normalizeOllamaRef(ref) === "qwen3:0.6b";
+}
+
+function isAmbitiousForLegacyModel(model) {
+  const ref = actionableOllamaRef(model);
+  const text = `${modelTitle(model)} ${ref} ${model?.params || ""}`.toLowerCase();
+  if (isStarterModelRef(ref)) return false;
+  if (/gemma\s*4|gemma4|12b|14b|27b|30b|32b|35b|70b|72b|109b|123b|235b/.test(text)) return true;
+  const need = modelRequiredVram(model);
+  return Boolean(need && need >= 9);
+}
+
 function modelRecommendationScore(model) {
   const ref = actionableOllamaRef(model);
   if (!ref) return -10000;
   const text = `${modelTitle(model)} ${ref} ${model?.use_case || ""}`.toLowerCase();
   const vram = Number(state.scan?.vram_gb || 0);
+  const legacy = isConstrainedLegacyMachine();
   const need = modelRequiredVram(model);
   let score = 0;
 
@@ -1166,7 +1192,7 @@ function modelRecommendationScore(model) {
   if (String(model?.runtime_status || "") === "ollama_available") score += 16;
   if (String(model?.runtime_status || "") === "ollama_watchlist") score -= 80;
 
-  if (text.includes("gemma 4") || ref.startsWith("gemma4")) score += 34;
+  if (text.includes("gemma 4") || ref.startsWith("gemma4")) score += legacy ? -45 : 34;
   if (text.includes("ornith") || ref.startsWith("ornith")) score += 30;
   if (text.includes("qwen 3.6") || ref.startsWith("qwen3.6")) score += 28;
   if (text.includes("qwen3-coder") || text.includes("coder")) score += 22;
@@ -1185,7 +1211,8 @@ function modelRecommendationScore(model) {
     if (need >= vram * 0.92) score -= 8;
   }
 
-  if (normalizeOllamaRef(ref) === "qwen3:0.6b") score -= 70;
+  if (legacy && isAmbitiousForLegacyModel(model)) score -= 70;
+  if (isStarterModelRef(ref)) score += legacy && !hasSuccessfulBenchmarkFor(ref) ? 110 : -70;
   return score;
 }
 
@@ -1403,14 +1430,19 @@ function topRecommendedModel() {
   const models = extractModels(compatibility);
   const vram = Number(state.scan?.vram_gb || 0);
   const candidates = models.filter((model) => actionableOllamaRef(model));
+  const starter = candidates.find((model) => isStarterModelRef(actionableOllamaRef(model)));
+  if (isConstrainedLegacyMachine() && starter && !hasSuccessfulBenchmarkFor(actionableOllamaRef(starter))) {
+    return starter;
+  }
   const safeCandidates = candidates.filter((model) => {
     const ref = `${modelTitle(model)} ${actionableOllamaRef(model)}`.toLowerCase();
     if (vram > 0 && vram < 20 && /\b(32b|70b|72b|120b|235b)\b/.test(ref)) return false;
-    if (normalizeOllamaRef(actionableOllamaRef(model)) === "qwen3:0.6b") return false;
+    if (isConstrainedLegacyMachine() && isAmbitiousForLegacyModel(model)) return false;
+    if (isStarterModelRef(actionableOllamaRef(model))) return false;
     return true;
   });
   const ranked = sortRecommendedModels(safeCandidates);
-  return ranked[0] || candidates.find((model) => normalizeOllamaRef(actionableOllamaRef(model)) !== "qwen3:0.6b") || candidates[0] || null;
+  return ranked[0] || candidates.find((model) => !isStarterModelRef(actionableOllamaRef(model))) || starter || candidates[0] || null;
 }
 
 function recommendedModelState() {
@@ -1456,12 +1488,14 @@ function modelOfMomentState() {
     if (modelSignalText(model)) score += 35;
     if (newLabels.some((label) => label && (label.includes(text.split(":")[0]) || text.includes(label.split(":")[0])))) score += 20;
     if (profile.key === "portable" && /0\.6b|mini|3b|7b|8b|qwen|phi/i.test(text)) score += 30;
+    if (isConstrainedLegacyMachine() && isStarterModelRef(ref) && !hasSuccessfulBenchmarkFor(ref)) score += 130;
+    if (isConstrainedLegacyMachine() && isAmbitiousForLegacyModel(model)) score -= 95;
     if (profile.key === "memory" && /hermes/i.test(text)) score += 30;
     if (profile.key === "code" && /qwen|deepseek|code|coder/i.test(text)) score += 25;
     if (profile.key === "french" && /mistral|qwen|hermes/i.test(text)) score += 20;
     if (isOllamaModelInstalled(ref)) score += 18;
     if (hasSuccessfulBenchmarkFor(ref)) score += 20;
-    if (normalizeOllamaRef(ref) === "qwen3:0.6b" && profile.key !== "portable") score -= 45;
+    if (isStarterModelRef(ref) && profile.key !== "portable" && !isConstrainedLegacyMachine()) score -= 45;
     if (/\b(32b|70b|72b|109b|123b|235b)\b/i.test(text) && Number(state.scan?.vram_gb || 0) < 24) score -= 35;
     return score;
   };
@@ -2390,6 +2424,7 @@ function scoreLabel(score) {
   if (score >= 85) return "Excellent";
   if (score >= 70) return "Très solide";
   if (score >= 55) return "Correct";
+  if (isLegacyPascalMachine() && score >= 35) return "Ancien mais utile";
   if (score >= 35) return "Limité";
   return "À upgrader";
 }
@@ -3170,6 +3205,15 @@ function hasStorageWarning(model) {
 function friendlyOllamaError(error) {
   const message = String(error || "");
   const lower = message.toLowerCase();
+  if (
+    lower.includes("unsupported toolchain")
+    || lower.includes("cuda error")
+    || lower.includes("llama-server process has terminated")
+    || lower.includes("0xc0000409")
+    || lower.includes("ptx was compiled")
+  ) {
+    return "Ollama a planté côté CUDA sur ce GPU/driver. Sur GTX 10xx/Pascal, teste d'abord un modèle très léger, mets à jour Ollama + pilote NVIDIA, puis compare avec un lancement CPU si le crash revient.";
+  }
   if (lower.includes("impossible de lancer ollama") || lower.includes("no such file") || lower.includes("os error 2")) {
     return "Ollama n'est pas détecté. Installe Ollama, relance l'app, puis réessaie.";
   }
@@ -6826,7 +6870,9 @@ async function runBenchmark(options = {}) {
 function appendBenchmarkToConsole(result) {
   appendOperationLine(`${result.success ? "Test réussi" : "Test terminé avec erreur"} : ${result.model}`, result.success ? "ok" : "erreur");
   appendOperationLine(`Temps: ${result.elapsed_ms ?? 0} ms · Vitesse: ${result.estimated_tokens_per_second ?? 0} tok/s`, "bench");
-  const output = result.error || result.output_preview || "Sortie vide";
+  const output = result.success
+    ? result.output_preview || "Sortie vide"
+    : friendlyOllamaError(result.error || result.output_preview || "Sortie vide");
   appendOperationLine(output, result.success ? "réponse" : "erreur");
 }
 
@@ -7782,7 +7828,11 @@ async function syncBenchmark() {
 }
 
 function benchmarkQualityVerdict(result) {
-  if (!result?.success) return "Qualité courte : échec ou réponse incomplète, ne pas retenir ce modèle sans retest.";
+  if (!result?.success) {
+    const message = friendlyOllamaError(result?.error || result?.output_preview || "");
+    if (message.includes("CUDA")) return "Échec benchmark : problème CUDA/Ollama probable, ne juge pas le modèle tant que le runtime n'est pas stabilisé.";
+    return "Qualité courte : échec ou réponse incomplète, ne pas retenir ce modèle sans retest.";
+  }
   const tps = Number(result.estimated_tokens_per_second || 0);
   const elapsed = Number(result.elapsed_ms || 0);
   const preview = String(result.output_preview || "").trim();
@@ -7801,13 +7851,16 @@ function benchmarkQualityVerdict(result) {
 function renderBenchmark(result) {
   const model = ollamaActionRef(result.model || "");
   const quality = benchmarkQualityVerdict(result);
+  const output = result.success
+    ? result.output_preview || "Sortie vide"
+    : friendlyOllamaError(result.error || result.output_preview || "Sortie vide");
   els.benchmarkResult.innerHTML = `
     <div class="benchmark-card">
       <strong>${escapeHtml(result.success ? "Test réussi" : "Test terminé avec erreur")} - ${escapeHtml(result.model)}</strong>
       <span>Temps de réponse : ${escapeHtml(result.elapsed_ms ?? 0)} ms${result.timed_out ? " - test interrompu" : ""}</span>
       <span>Vitesse estimée : ${escapeHtml(result.estimated_tokens_per_second ?? 0)} tok/s</span>
       <span>${escapeHtml(quality)}</span>
-      <span>${escapeHtml(result.error || result.output_preview || "Sortie vide")}</span>
+      <span>${escapeHtml(output)}</span>
     </div>
     <div class="row-actions">
       ${model ? `<button type="button" data-keep-installed-model="${escapeHtml(model)}">Garder</button>` : ""}
