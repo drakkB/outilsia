@@ -51,7 +51,7 @@
       <h1>Scannez votre PC, installez Ollama et testez une IA locale.</h1>
       <p class="lead">OutilsIA Local Cockpit est une vraie application desktop. Elle détecte CPU, RAM, GPU, VRAM et stockage, puis vous guide jusqu'au premier test : installation d'Ollama, modèle léger recommandé, benchmark local et rapport clair. Le catalogue vivant met aussi en avant un modèle du moment compatible avec votre machine.</p>
       <div class="actions">
-        <a id="downloadBtn" class="btn primary disabled" href="#etat-beta" aria-disabled="true">Chargement des builds bêta</a>
+        <a id="downloadBtn" class="btn primary" href="/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64-driverdoctor.exe" download="OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64-driverdoctor.exe">Télécharger Windows</a>
         <a class="btn secondary" href="/simulateur-ia-local">Tester sans téléchargement</a>
         <a class="btn secondary" href="/exemples-rapports-ia-locale">Voir les rapports exemples</a>
         <a class="btn secondary" href="/beta-testeurs-scanner-ia-local">Devenir bêta testeur</a>
@@ -117,12 +117,12 @@
       </article>
       <aside class="panel">
         <h2>Fichiers bêta</h2>
-        <div id="releaseBox" class="code">Nom: OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64.exe
+        <div id="releaseBox" class="code">Nom: OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64-driverdoctor.exe
 Version: 0.1.1-beta
 Build ID: 20260707105223
 Plateforme: windows-x64
-SHA256: 51393440e1e89349da8c9d2f4ce48e89dfdea16cbf7374ff446a39b41b66ee0b
-URL: /static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64.exe
+SHA256: c0af11f3539b5c0a81e020d9505d8e4f1aab2d7c20b732d1c01bea78dcf776fb
+URL: /static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64-driverdoctor.exe
 Freshness: fresh</div>
         <div id="freshnessBox" class="freshness warn">
           <strong>Preuve de fraîcheur</strong>
@@ -133,10 +133,10 @@ Freshness: fresh</div>
           <div class="download-item">
             <div>
               <strong>Windows x64 · 0.1.1-beta · build 20260707105223</strong>
-              <span>OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64.exe · 3,6 Mo</span>
-              <small>SHA256 51393440e1e89349da8c9d2f4ce48e89dfdea16cbf7374ff446a39b41b66ee0b</small>
+              <span>OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64-driverdoctor.exe · 3,6 Mo</span>
+              <small>SHA256 c0af11f3539b5c0a81e020d9505d8e4f1aab2d7c20b732d1c01bea78dcf776fb</small>
             </div>
-            <a class="btn primary" href="/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64.exe">Télécharger Windows</a>
+            <a class="btn primary" href="/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64-driverdoctor.exe">Télécharger Windows</a>
           </div>
           <div class="download-item">
             <div>
@@ -292,8 +292,8 @@ Freshness: fresh</div>
       <h2>Vérifier le fichier téléchargé</h2>
       <p class="muted">Après téléchargement, comparez le SHA256 du fichier avec le hash officiel affiché sur cette page. Si le hash ne correspond pas, ne lancez pas l'installateur. Le nom du fichier change à chaque build pour éviter les anciens caches.</p>
       <div id="verifyCommands" class="code"># Windows (PowerShell) — build 20260707105223
-$expected = &quot;51393440e1e89349da8c9d2f4ce48e89dfdea16cbf7374ff446a39b41b66ee0b&quot;
-$hash = (Get-FileHash -Algorithm SHA256 &quot;.\OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64.exe&quot;).Hash.ToLower()
+$expected = &quot;c0af11f3539b5c0a81e020d9505d8e4f1aab2d7c20b732d1c01bea78dcf776fb&quot;
+$hash = (Get-FileHash -Algorithm SHA256 &quot;.\OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64-driverdoctor.exe&quot;).Hash.ToLower()
 if ($hash -eq $expected) { &quot;OutilsIA: SHA256 OK&quot; } else { &quot;OutilsIA: SHA256 DIFFERENT - ne lancez pas ce fichier&quot; }
 
 # Linux AppImage : sha256sum ./OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-linux.appimage
@@ -474,7 +474,7 @@ if ($hash -eq $expected) { &quot;OutilsIA: SHA256 OK&quot; } else { &quot;Outils
           `Plateforme: ${file.platform || "windows-x64"}`,
           `Taille: ${fmtBytes(file.size_bytes)}`,
           `SHA256: ${file.sha256 || "a publier"}`,
-          "Signature: a publier",
+          "Signature: non signée, SHA256 public",
           `Date: ${release.published_at || "a publier"}`,
           `Freshness: ${release.freshness ? (release.freshness.stale ? "stale" : "fresh") : "non disponible"}`,
           `Source fraîche: ${release.freshness?.newest_source || "non disponible"}`,

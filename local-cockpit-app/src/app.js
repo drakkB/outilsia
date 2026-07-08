@@ -1163,6 +1163,22 @@ function isConstrainedLegacyMachine(scan = state.scan) {
   return isLegacyPascalMachine(scan) || (ram > 0 && ram <= 16 && (!vram || vram <= 6));
 }
 
+function effectiveModelMemoryGb(scan = state.scan) {
+  const vram = Number(scan?.vram_gb || 0);
+  const ram = Number(scan?.ram_gb || 0);
+  if (!scan?.unified_memory) return vram;
+  if (ram >= 128) return Math.max(vram, 48);
+  if (ram >= 96) return Math.max(vram, 36);
+  if (ram >= 64) return Math.max(vram, 24);
+  if (ram >= 32) return Math.max(vram, 12);
+  return vram;
+}
+
+function memoryDisplayLabel(scan = {}) {
+  if (scan?.unified_memory) return `${formatGb(scan.ram_gb)} unifiée`;
+  return formatGb(scan.vram_gb);
+}
+
 function isStarterModelRef(ref) {
   return normalizeOllamaRef(ref) === "qwen3:0.6b";
 }
@@ -1180,7 +1196,7 @@ function modelRecommendationScore(model) {
   const ref = actionableOllamaRef(model);
   if (!ref) return -10000;
   const text = `${modelTitle(model)} ${ref} ${model?.use_case || ""}`.toLowerCase();
-  const vram = Number(state.scan?.vram_gb || 0);
+  const vram = effectiveModelMemoryGb(state.scan);
   const legacy = isConstrainedLegacyMachine();
   const need = modelRequiredVram(model);
   let score = 0;
@@ -1847,11 +1863,94 @@ function vramConfidenceSuffix(probe = {}, scan = {}) {
   return "à confirmer";
 }
 
+const NVIDIA_DRIVER_URL = "https://www.nvidia.com/Download/index.aspx";
+const AMD_DRIVER_URL = "https://www.amd.com/en/support/download/drivers.html";
+
+function detectedGpuVendor(scan = {}, probe = scan?.raw_scan?.gpu_probe || {}) {
+  const vendor = String(probe.vendor || scan.gpu_vendor || "").toLowerCase();
+  const name = String(probe.name || scan.gpu_name || "").toLowerCase();
+  if (vendor.includes("nvidia") || /\b(rtx|gtx|quadro|tesla)\b/.test(name)) return "nvidia";
+  if (vendor.includes("amd") || vendor.includes("radeon") || /\b(radeon|rx\s?\d|instinct)\b/.test(name)) return "amd";
+  if (vendor.includes("intel") || name.includes("intel")) return "intel";
+  if (name.includes("apple")) return "apple";
+  return "";
+}
+
+function gpuDriverLink(scan = {}, probe = scan?.raw_scan?.gpu_probe || {}) {
+  const vendor = detectedGpuVendor(scan, probe);
+  if (vendor === "nvidia") return { label: "Driver NVIDIA", url: NVIDIA_DRIVER_URL };
+  if (vendor === "amd") return { label: "Driver AMD", url: AMD_DRIVER_URL };
+  return null;
+}
+
+function motherboardLabel(board = {}) {
+  const parts = [board.manufacturer, board.product, board.version]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  return parts.length ? parts.join(" ") : "carte mère non identifiée";
+}
+
+function motherboardRamAdvice(scan = {}) {
+  const board = scan?.raw_scan?.motherboard_probe || {};
+  const memory = scan?.raw_scan?.memory_probe || {};
+  const ram = Number(scan.ram_gb || memory.total_gb || 0);
+  const maxRam = Number(board.max_memory_gb || 0);
+  const slots = Number(board.memory_slots || 0);
+  const modules = Number(memory.module_count || 0);
+  const boardName = motherboardLabel(board);
+  if (!board.source || board.source === "not_detected") {
+    return {
+      state: "warn",
+      detail: "Carte mère non confirmée : vérifier manuel/QVL avant achat RAM.",
+      row: "",
+      action: "Vérifier la capacité RAM maximale de la carte mère avant d'acheter."
+    };
+  }
+  const row = [
+    boardName,
+    maxRam ? `max ${maxRam} Go` : "max RAM à confirmer",
+    slots ? `${modules || "?"}/${slots} slots` : modules ? `${modules} module(s)` : "",
+    board.bios_version ? `BIOS ${board.bios_version}` : ""
+  ].filter(Boolean).join(" · ");
+  if (maxRam && ram >= maxRam) {
+    return {
+      state: "warn",
+      detail: `${boardName} : RAM actuelle proche du plafond détecté (${formatGb(ram)} / ${formatGb(maxRam)}).`,
+      row,
+      action: "Ne pas acheter plus de RAM sans vérifier la fiche carte mère."
+    };
+  }
+  if (slots && modules >= slots && maxRam && ram < maxRam) {
+    return {
+      state: "warn",
+      detail: `${boardName} : tous les slots semblent occupés, upgrade RAM = remplacer le kit.`,
+      row,
+      action: "Prévoir un kit RAM complet plutôt qu'une barrette ajoutée."
+    };
+  }
+  if (maxRam || slots) {
+    return {
+      state: "ok",
+      detail: `${boardName} : ${maxRam ? `${formatGb(maxRam)} max détectés` : "plafond à confirmer"}${slots ? `, ${slots} slot(s)` : ""}.`,
+      row,
+      action: ""
+    };
+  }
+  return {
+    state: "warn",
+    detail: `${boardName} détectée, mais plafond RAM non confirmé.`,
+    row,
+    action: "Vérifier manuel/QVL avant upgrade RAM."
+  };
+}
+
 function hardwareDoctorAnalysis(scan = {}) {
   const probe = scan?.raw_scan?.gpu_probe || {};
   const memory = scan?.raw_scan?.memory_probe || {};
+  const board = scan?.raw_scan?.motherboard_probe || {};
   const vram = Number(scan.vram_gb || probe.vram_gb || 0);
   const ram = Number(scan.ram_gb || 0);
+  const unifiedEffective = effectiveModelMemoryGb(scan);
   const moduleCount = Number(memory.module_count || 0);
   const memoryClock = Number(memory.configured_clock_mhz || memory.speed_mhz || 0);
   const channelMode = String(memory.channel_mode || "");
@@ -1863,9 +1962,11 @@ function hardwareDoctorAnalysis(scan = {}) {
   const pcieGenCurrent = Number(probe.pcie_link_gen_current || 0);
   const pcieGenMax = Number(probe.pcie_link_gen_max || 0);
   const hasNvidiaSignals = probe.source === "nvidia-smi" || Boolean(probe.driver_version || probe.cuda_version);
+  const vendor = detectedGpuVendor(scan, probe);
   const hasOllama = hasUsableOllamaRuntime(scan);
   const wsl = wslRuntimeInfo(scan);
   const vramSuffix = vramConfidenceSuffix(probe, scan);
+  const boardAdvice = motherboardRamAdvice(scan);
   let score = 35;
   const checks = [];
   const actions = [];
@@ -1878,7 +1979,18 @@ function hardwareDoctorAnalysis(scan = {}) {
     if (text && !actions.includes(text)) actions.push(text);
   };
 
-  if (vram >= 24) addCheck("VRAM", "ok", `${formatGb(vram)} ${vramSuffix} : gros modèles quantifiés et contexte confortable.`, 22);
+  if (scan.unified_memory && ram >= 64) {
+    addCheck(
+      "Mémoire unifiée",
+      "ok",
+      `${formatGb(ram)} partagés · enveloppe utile estimée ${formatGb(unifiedEffective)} pour modèles quantifiés.`,
+      18
+    );
+    if (vendor === "amd") addAction("Benchmarker le runtime AMD/ROCm/Vulkan avant de comparer à une RTX CUDA.");
+  } else if (scan.unified_memory) {
+    addCheck("Mémoire unifiée", "warn", `${formatGb(ram)} partagés : utilisable, mais marge limitée pour gros modèles.`, 8);
+    addAction("Tester un modèle léger puis valider le backend GPU/CPU.");
+  } else if (vram >= 24) addCheck("VRAM", "ok", `${formatGb(vram)} ${vramSuffix} : gros modèles quantifiés et contexte confortable.`, 22);
   else if (vram >= 16) addCheck("VRAM", "ok", `${formatGb(vram)} ${vramSuffix} : très bon palier 7B-14B, certains 32B à valider.`, 18);
   else if (vram >= 12) addCheck("VRAM", "ok", `${formatGb(vram)} ${vramSuffix} : ticket sérieux pour 7B/8B et plusieurs 14B quantifiés.`, 14);
   else if (vram >= 8) {
@@ -1913,7 +2025,23 @@ function hardwareDoctorAnalysis(scan = {}) {
     addCheck("Canal mémoire", "warn", "Canal non confirmé par le système.", 0);
   }
 
-  if (hasNvidiaSignals) addCheck("Driver NVIDIA", "ok", `NVIDIA mesuré${probe.cuda_version ? ` · CUDA driver max ${probe.cuda_version}` : " · CUDA à confirmer selon runtime"}.`, 16);
+  if (vendor === "nvidia" && hasNvidiaSignals) {
+    addCheck("Driver NVIDIA", "ok", `Driver ${probe.driver_version || "détecté"}${probe.cuda_version ? ` · CUDA driver max ${probe.cuda_version}` : " · CUDA à confirmer selon runtime"}.`, 16);
+    if (isLegacyPascalMachine(scan)) {
+      addCheck("GTX/Pascal", "warn", "GTX 10xx/Pascal : utile, mais sensible aux versions driver/Ollama/CUDA.", -2);
+      addAction("Mettre à jour le driver NVIDIA puis tester qwen3:0.6b avant upgrade.");
+    }
+  } else if (vendor === "nvidia") {
+    addCheck("Driver NVIDIA", "warn", `${gpuConfidenceLabel(probe, scan)}. Driver/CUDA non confirmés.`, 6);
+    addAction("Installer ou mettre à jour le driver NVIDIA officiel.");
+  } else if (vendor === "amd") {
+    if (probe.rocm_version) {
+      addCheck("AMD/ROCm", "ok", `GPU AMD détecté · ROCm ${probe.rocm_version}.`, 12);
+    } else {
+      addCheck("AMD/ROCm", "warn", "GPU AMD détecté, ROCm non confirmé : valider runtime et backend avant gros modèle.", 4);
+      addAction("Mettre à jour le driver AMD et vérifier ROCm/Adrenalin selon Windows ou Linux.");
+    }
+  } else if (hasNvidiaSignals) addCheck("Driver NVIDIA", "ok", `NVIDIA mesuré${probe.cuda_version ? ` · CUDA driver max ${probe.cuda_version}` : " · CUDA à confirmer selon runtime"}.`, 16);
   else if (scan.gpu_name) {
     addCheck("Mesure GPU", "warn", `${gpuConfidenceLabel(probe, scan)}.`, 6);
     addAction("Vérifier le driver GPU si les performances semblent anormales.");
@@ -1958,6 +2086,13 @@ function hardwareDoctorAnalysis(scan = {}) {
   else if (wsl.kind === "detected") addCheck("WSL", "warn", "WSL détecté, Ollama WSL à préparer si besoin.", 1);
   else if (wsl.kind === "missing" && !hasOllama) addAction("Optionnel : installer WSL pour workflows Linux.");
 
+  if (board.source && board.source !== "not_detected") {
+    addCheck("Carte mère/RAM", boardAdvice.state, boardAdvice.detail, boardAdvice.state === "ok" ? 4 : -1);
+  } else if (ram >= 16) {
+    addCheck("Carte mère/RAM", "warn", boardAdvice.detail, 0);
+  }
+  if (boardAdvice.action) addAction(boardAdvice.action);
+
   const cudaMajor = parseMajorVersion(probe.cuda_version);
   if (cudaMajor && cudaMajor < 12) {
     addCheck("CUDA", "warn", `CUDA driver max ${probe.cuda_version} : compatible selon runtime, mais à surveiller.`, -2);
@@ -1981,8 +2116,11 @@ function hardwareDoctorSnapshot(scan = state.scan || {}) {
   if (!scan.machine_key && !scan.cpu_name && !scan.gpu_name && !scan.ram_gb) return null;
   const probe = scan?.raw_scan?.gpu_probe || {};
   const memory = scan?.raw_scan?.memory_probe || {};
+  const board = scan?.raw_scan?.motherboard_probe || {};
   const analysis = hardwareDoctorAnalysis(scan);
   const wslInfo = wslRuntimeInfo(scan);
+  const driverLink = gpuDriverLink(scan, probe);
+  const boardAdvice = motherboardRamAdvice(scan);
   const clock = Number(memory.configured_clock_mhz || memory.speed_mhz || 0);
   const channel = String(memory.channel_mode || "unknown")
     .replace("dual_channel_estimated", "dual estimé")
@@ -2007,10 +2145,15 @@ function hardwareDoctorSnapshot(scan = state.scan || {}) {
       source: memory.source || "scan système"
     },
     gpu: {
+      unified_memory: Boolean(scan.unified_memory),
+      effective_model_memory_gb: effectiveModelMemoryGb(scan),
       confidence: gpuConfidenceLabel(probe, scan),
       source: probe.source || "scan système",
       driver_version: probe.driver_version || "",
       cuda_version: probe.cuda_version || "",
+      rocm_version: probe.rocm_version || "",
+      driver_url: driverLink?.url || "",
+      driver_label: driverLink?.label || "",
       temperature_c: Number(probe.temperature_c || 0),
       utilization_percent: Number(probe.utilization_percent || 0),
       power_draw_w: Number(probe.power_draw_w || 0),
@@ -2023,6 +2166,17 @@ function hardwareDoctorSnapshot(scan = state.scan || {}) {
     runtime: {
       ollama: ollamaRuntimeLabel(scan),
       wsl: wslInfo.title || wslInfo.kind || "non détecté"
+    },
+    motherboard: {
+      label: motherboardLabel(board),
+      manufacturer: board.manufacturer || "",
+      product: board.product || "",
+      version: board.version || "",
+      bios_version: board.bios_version || "",
+      max_memory_gb: Number(board.max_memory_gb || 0),
+      memory_slots: Number(board.memory_slots || 0),
+      source: board.source || "",
+      advice: boardAdvice.detail
     }
   };
 }
@@ -2032,9 +2186,12 @@ function hardwareDoctorSummaryLines(snapshot = hardwareDoctorSnapshot()) {
   const lines = [
     `Hardware Doctor: ${snapshot.score}/100 - ${snapshot.headline}`,
     `RAM: ${snapshot.ram.total_gb || "?"} Go - ${snapshot.ram.module_count || "?"} module(s) - ${snapshot.ram.channel_mode} - ${snapshot.ram.effective_clock_label}`,
-    `GPU: ${snapshot.gpu.confidence}${snapshot.gpu.driver_version ? ` - driver ${snapshot.gpu.driver_version}` : ""}${snapshot.gpu.cuda_version ? ` - CUDA ${snapshot.gpu.cuda_version}` : ""}`,
+    `GPU: ${snapshot.gpu.confidence}${snapshot.gpu.unified_memory ? ` - mémoire unifiée utile estimée ${snapshot.gpu.effective_model_memory_gb || "?"} Go` : ""}${snapshot.gpu.driver_version ? ` - driver ${snapshot.gpu.driver_version}` : ""}${snapshot.gpu.cuda_version ? ` - CUDA ${snapshot.gpu.cuda_version}` : ""}${snapshot.gpu.rocm_version ? ` - ROCm ${snapshot.gpu.rocm_version}` : ""}`,
+    snapshot.motherboard?.source && snapshot.motherboard.source !== "not_detected"
+      ? `Carte mère: ${snapshot.motherboard.label}${snapshot.motherboard.max_memory_gb ? ` - max RAM ${snapshot.motherboard.max_memory_gb} Go` : ""}${snapshot.motherboard.memory_slots ? ` - ${snapshot.ram.module_count || "?"}/${snapshot.motherboard.memory_slots} slots` : ""}`
+      : "",
     `Runtime: ${snapshot.runtime.ollama}${snapshot.runtime.wsl ? ` - WSL ${snapshot.runtime.wsl}` : ""}`
-  ];
+  ].filter(Boolean);
   if (snapshot.gpu.temperature_c) lines.push(`Thermique: ${formatDoctorNumber(snapshot.gpu.temperature_c, " °C")}`);
   if (snapshot.gpu.pcie_link_width_current || snapshot.gpu.pcie_link_width_max) {
     lines.push(`PCIe: x${snapshot.gpu.pcie_link_width_current || "?"}/x${snapshot.gpu.pcie_link_width_max || "?"}`);
@@ -2047,13 +2204,18 @@ function renderHardwareDoctor(scan) {
   if (!els.hardwareDoctorBox) return;
   const probe = scan?.raw_scan?.gpu_probe || {};
   const memory = scan?.raw_scan?.memory_probe || {};
+  const board = scan?.raw_scan?.motherboard_probe || {};
   const analysis = hardwareDoctorAnalysis(scan);
+  const driverLink = gpuDriverLink(scan, probe);
+  const boardAdvice = motherboardRamAdvice(scan);
   const source = analysis.source;
   const rows = [];
   rows.push(["Confiance GPU", gpuConfidenceLabel(probe, scan)]);
   rows.push(["Confiance RAM", memoryConfidenceLabel(memory)]);
   if (probe.driver_version) rows.push(["Driver", probe.driver_version]);
   if (probe.cuda_version) rows.push(["CUDA driver max", probe.cuda_version]);
+  if (probe.rocm_version) rows.push(["ROCm", probe.rocm_version]);
+  if (boardAdvice.row) rows.push(["Carte mère", boardAdvice.row]);
   if (probe.temperature_c != null) rows.push(["Température", formatDoctorNumber(probe.temperature_c, " °C")]);
   if (probe.utilization_percent != null) rows.push(["Charge GPU", formatDoctorNumber(probe.utilization_percent, " %")]);
   if (probe.power_draw_w != null) {
@@ -2096,13 +2258,18 @@ function renderHardwareDoctor(scan) {
       ${analysis.actions.length ? `<span>${escapeHtml(analysis.actions[0])}</span>` : "<span>Aucune action urgente détectée.</span>"}
     </div>
     <div class="doctor-checks">
-      ${analysis.checks.slice(0, 6).map((check) => `
+      ${analysis.checks.slice(0, 8).map((check) => `
         <div class="doctor-check ${escapeHtml(check.state)}">
           <strong>${escapeHtml(check.label)}</strong>
           <span>${escapeHtml(check.detail)}</span>
         </div>
       `).join("")}
     </div>
+    ${driverLink ? `
+      <div class="row-actions compact-actions doctor-actions">
+        <button type="button" data-open-url="${escapeHtml(driverLink.url)}">${escapeHtml(driverLink.label)}</button>
+      </div>
+    ` : ""}
     ${rows.length ? `<dl class="doctor-grid">${rows.map(([label, value]) => `
       <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>
     `).join("")}</dl>` : ""}
@@ -2261,14 +2428,14 @@ function renderScan(scan) {
   els.cpuText.textContent = scan.cpu_name || "CPU inconnu";
   els.ramText.textContent = formatGb(scan.ram_gb);
   els.gpuText.textContent = scan.gpu_name || "GPU non détecté";
-  els.vramText.textContent = formatGb(scan.vram_gb);
+  els.vramText.textContent = memoryDisplayLabel(scan);
   els.osText.textContent = `${scan.os_name || "OS"} ${scan.os_version || ""}`.trim();
   els.ollamaText.textContent = runtimeOllama(scan);
   if (els.topMachineKey) els.topMachineKey.textContent = scan.machine_key || "machine locale";
   if (els.topCpuText) els.topCpuText.textContent = scan.cpu_name || "CPU inconnu";
   if (els.topRamText) els.topRamText.textContent = formatGb(scan.ram_gb);
   if (els.topGpuText) els.topGpuText.textContent = scan.gpu_name || "GPU non détecté";
-  if (els.topVramText) els.topVramText.textContent = formatGb(scan.vram_gb);
+  if (els.topVramText) els.topVramText.textContent = memoryDisplayLabel(scan);
   if (els.topOsText) els.topOsText.textContent = `${scan.os_name || "OS"} ${scan.os_version || ""}`.trim();
   if (els.topOllamaText) els.topOllamaText.textContent = topRuntimeOllama(scan);
   renderHardwareDoctor(scan);
@@ -2339,7 +2506,7 @@ function renderCompatibility(payload) {
 
   const blocked = compatibility.blocked_next || compatibility.blocked || [];
   renderUpgradeImpact(compatibility, blocked, upgrades);
-  const machineMemory = Math.max(Number(state.scan?.vram_gb || 0), state.scan?.unified_memory ? Number(state.scan?.ram_gb || 0) : Number(state.scan?.vram_gb || 0));
+  const machineMemory = Math.max(Number(state.scan?.vram_gb || 0), effectiveModelMemoryGb(state.scan));
   const blockedRows = Array.isArray(blocked) ? blocked.slice(0, 12) : [];
   const nearBlocked = [];
   const avoidBlocked = [];
@@ -3569,7 +3736,7 @@ function readinessReport() {
       cpu: scan.cpu_name || "non scanné",
       ram: formatGb(scan.ram_gb),
       gpu: scan.gpu_name || "non détecté",
-      vram: formatGb(scan.vram_gb),
+      vram: memoryDisplayLabel(scan),
       os: [scan.os_name, scan.os_version].filter(Boolean).join(" ") || "non scanné",
       ollama: runtimeOllama(scan)
     },
@@ -6244,6 +6411,12 @@ function fieldTestMachineEntry() {
       gpu_confidence: doctor.gpu.confidence,
       gpu_driver: doctor.gpu.driver_version,
       cuda_driver_max: doctor.gpu.cuda_version,
+      rocm_version: doctor.gpu.rocm_version,
+      driver_url: doctor.gpu.driver_url,
+      motherboard: doctor.motherboard?.label || "",
+      motherboard_max_memory_gb: doctor.motherboard?.max_memory_gb || 0,
+      motherboard_slots: doctor.motherboard?.memory_slots || 0,
+      motherboard_bios: doctor.motherboard?.bios_version || "",
       temperature_c: doctor.gpu.temperature_c,
       pcie: doctor.gpu.pcie_link_width_current || doctor.gpu.pcie_link_width_max
         ? `x${doctor.gpu.pcie_link_width_current || "?"}/x${doctor.gpu.pcie_link_width_max || "?"}`
@@ -6497,7 +6670,7 @@ function buildDecisionPack(compatibility, models, blocked, upgrades, newModels =
       cpu: scan.cpu_name || "CPU inconnu",
       ram: formatGb(scan.ram_gb),
       gpu: scan.gpu_name || "GPU non détecté",
-      vram: formatGb(scan.vram_gb),
+      vram: memoryDisplayLabel(scan),
       os: `${scan.os_name || "OS"} ${scan.os_version || ""}`.trim(),
       ollama: runtimeOllama(scan)
     },
@@ -6727,6 +6900,8 @@ function modelLine(model) {
 function fallbackVerdict(scan) {
   const vram = scan?.vram_gb || 0;
   const ram = scan?.ram_gb || 0;
+  if (scan?.unified_memory && ram >= 96) return "Machine mémoire unifiée très intéressante pour IA locale : gros contextes et modèles quantifiés possibles, à valider selon backend AMD/ROCm/Vulkan.";
+  if (scan?.unified_memory && ram >= 64) return "Bonne machine à mémoire unifiée : modèles 7B-14B confortables et certains gros modèles quantifiés à benchmarker selon runtime.";
   if (vram >= 24) return "Machine tres solide pour LLM locaux: Qwen, Hermes, Mixtral quantifie et gros contextes deviennent realistes.";
   if (vram >= 16) return "Bonne machine IA locale: vise les modèles 7B à 14B confortablement, certains 32B quantifiés selon contexte.";
   if (vram >= 12) return "Bon ticket d'entree IA locale: RTX 3060 12 Go ou equivalent, parfait pour debuter avec Ollama.";

@@ -134,8 +134,8 @@ def assert_scanned_contract(page, label: str):
     )
     if not top["modeEssential"]:
         raise AssertionError(f"{label}: app should remain in essential mode by default")
-    if top["quickCards"] != 4:
-        raise AssertionError(f"{label}: quick decision should expose exactly 4 cards, got {top['quickCards']}")
+    if top["quickCards"] != 5:
+        raise AssertionError(f"{label}: quick decision should expose exactly 5 cards, got {top['quickCards']}")
     if len(top["visibleTools"]) > 1:
         raise AssertionError(f"{label}: too many work panels in essential mode: {top['visibleTools']}")
 

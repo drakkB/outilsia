@@ -86,7 +86,7 @@
       "price_range_eur": "60-130 selon DDR4/DDR5",
       "guide_url": "/upgrade-ia",
       "affiliate_url": "https://www.amazon.fr/s?k=kit+RAM+32+Go+DDR4+DDR5&tag=boiral21-21&ascsubtag=outilsia-cockpit-upgrade-ram32",
-      "avoid": "Ajouter seulement 8 Go si la machine sert vraiment à l'IA locale."
+      "avoid": "Acheter sans vérifier le type DDR, le nombre de slots libres et le plafond RAM de la carte mère."
     },
     {
       "id": "ram-64gb",
@@ -100,7 +100,7 @@
       "price_range_eur": "130-260 selon DDR4/DDR5",
       "guide_url": "/upgrade-ia",
       "affiliate_url": "https://www.amazon.fr/s?k=64go+ddr5+6000+cl30&tag=boiral21-21&ascsubtag=outilsia-cockpit-upgrade-ram64",
-      "avoid": "Surinvestir en RAM si la vraie limite est une VRAM GPU trop basse."
+      "avoid": "Surinvestir en RAM si la vraie limite est une VRAM GPU trop basse, ou si la carte mère plafonne à 32 Go."
     },
     {
       "id": "system-strix-halo-128gb",

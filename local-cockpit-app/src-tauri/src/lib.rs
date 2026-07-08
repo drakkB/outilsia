@@ -64,6 +64,7 @@ struct GpuProbe {
     source: String,
     driver_version: Option<String>,
     cuda_version: Option<String>,
+    rocm_version: Option<String>,
     temperature_c: Option<f64>,
     utilization_percent: Option<f64>,
     power_draw_w: Option<f64>,
@@ -96,6 +97,18 @@ struct MemoryModule {
     manufacturer: Option<String>,
     part_number: Option<String>,
     slot: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
+struct MotherboardProbe {
+    manufacturer: Option<String>,
+    product: Option<String>,
+    version: Option<String>,
+    bios_version: Option<String>,
+    max_memory_gb: Option<u32>,
+    memory_slots: Option<u32>,
+    source: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -242,6 +255,7 @@ fn scan_machine_inner() -> Result<MachineScan, String> {
     let cpu_cores = Some(system.cpus().len() as u32);
     let ram_gb = Some(bytes_to_gb(system.total_memory()));
     let memory_probe = detect_memory_probe(ram_gb);
+    let motherboard_probe = detect_motherboard_probe();
     let gpu = detect_gpu();
     let ollama = detect_ollama();
     let ollama_wsl = detect_ollama_wsl();
@@ -267,6 +281,12 @@ fn scan_machine_inner() -> Result<MachineScan, String> {
         ram_gb,
         gpu.vram_gb,
     );
+    let unified_memory = is_unified_memory(
+        cpu_name.as_deref(),
+        gpu.name.as_deref(),
+        ram_gb,
+        gpu.vram_gb,
+    );
 
     Ok(MachineScan {
         name: machine_name,
@@ -281,7 +301,7 @@ fn scan_machine_inner() -> Result<MachineScan, String> {
         gpu_vendor: gpu.vendor.clone(),
         gpu_category: gpu.category.clone(),
         vram_gb: gpu.vram_gb,
-        unified_memory: is_unified_memory(),
+        unified_memory,
         storage_free_gb: detect_storage_free_gb(),
         runtimes: json!({
             "ollama": {
@@ -319,6 +339,7 @@ fn scan_machine_inner() -> Result<MachineScan, String> {
         raw_scan: json!({
             "gpu_probe": gpu,
             "memory_probe": memory_probe,
+            "motherboard_probe": motherboard_probe,
             "app_version": env!("CARGO_PKG_VERSION")
         }),
     })
@@ -330,7 +351,9 @@ fn open_external_url(url: String) -> Result<(), String> {
     if !(trimmed.starts_with("https://outilsia.fr/")
         || trimmed == "https://outilsia.fr"
         || trimmed == "https://ollama.com/download"
-        || trimmed.starts_with("https://ollama.com/download?"))
+        || trimmed.starts_with("https://ollama.com/download?")
+        || trimmed.starts_with("https://www.nvidia.com/")
+        || trimmed.starts_with("https://www.amd.com/"))
     {
         return Err("URL externe refusee.".to_string());
     }
@@ -1951,6 +1974,7 @@ fn detect_gpu() -> GpuProbe {
         source: "none".to_string(),
         driver_version: None,
         cuda_version: None,
+        rocm_version: None,
         temperature_c: None,
         utilization_percent: None,
         power_draw_w: None,
@@ -1992,6 +2016,7 @@ fn detect_nvidia_smi() -> Option<GpuProbe> {
         source: "nvidia-smi".to_string(),
         driver_version,
         cuda_version: detect_nvidia_cuda_version(),
+        rocm_version: None,
         temperature_c,
         utilization_percent,
         power_draw_w,
@@ -2035,6 +2060,23 @@ fn detect_nvidia_cuda_version() -> Option<String> {
     })
 }
 
+fn detect_rocm_version() -> Option<String> {
+    let output = run_command("rocminfo", &[])
+        .or_else(|| run_command("rocm-smi", &["--showdriverversion"]))
+        .or_else(|| run_command("amd-smi", &["version"]))?;
+    output.lines().find_map(|line| {
+        let lower = line.to_lowercase();
+        if !(lower.contains("rocm") || lower.contains("driver")) {
+            return None;
+        }
+        line.split_whitespace()
+            .find(|part| {
+                part.chars().next().is_some_and(|c| c.is_ascii_digit()) && part.contains('.')
+            })
+            .and_then(clean_optional_string)
+    })
+}
+
 fn detect_memory_probe(total_gb: Option<u32>) -> MemoryProbe {
     if let Some(probe) = detect_windows_memory_probe(total_gb) {
         return probe;
@@ -2043,6 +2085,88 @@ fn detect_memory_probe(total_gb: Option<u32>) -> MemoryProbe {
         return probe;
     }
     fallback_memory_probe(total_gb, "sysinfo")
+}
+
+fn detect_motherboard_probe() -> MotherboardProbe {
+    if let Some(probe) = detect_windows_motherboard_probe() {
+        return probe;
+    }
+    if let Some(probe) = detect_linux_motherboard_probe() {
+        return probe;
+    }
+    MotherboardProbe {
+        manufacturer: None,
+        product: None,
+        version: None,
+        bios_version: None,
+        max_memory_gb: None,
+        memory_slots: None,
+        source: "not_detected".to_string(),
+    }
+}
+
+fn detect_windows_motherboard_probe() -> Option<MotherboardProbe> {
+    if !cfg!(target_os = "windows") {
+        return None;
+    }
+    let script = "$bb=Get-CimInstance Win32_BaseBoard | Select-Object -First 1; $bios=Get-CimInstance Win32_BIOS | Select-Object -First 1; $arr=Get-CimInstance Win32_PhysicalMemoryArray | Select-Object -First 1; [string]::Join('|', @($bb.Manufacturer,$bb.Product,$bb.Version,$bios.SMBIOSBIOSVersion,$arr.MaxCapacity,$arr.MemoryDevices))";
+    let output = run_command("powershell.exe", &["-NoProfile", "-Command", script])
+        .or_else(|| run_command("powershell", &["-NoProfile", "-Command", script]))?;
+    parse_windows_motherboard_line(&output)
+}
+
+fn parse_windows_motherboard_line(output: &str) -> Option<MotherboardProbe> {
+    let line = output.lines().find(|line| !line.trim().is_empty())?.trim();
+    let parts: Vec<&str> = line.split('|').collect();
+    let max_memory_gb = parts
+        .get(4)
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .map(|kb| bytes_to_gb(kb.saturating_mul(1024)));
+    Some(MotherboardProbe {
+        manufacturer: parts.first().and_then(|value| clean_optional_string(value)),
+        product: parts.get(1).and_then(|value| clean_optional_string(value)),
+        version: parts.get(2).and_then(|value| clean_optional_string(value)),
+        bios_version: parts.get(3).and_then(|value| clean_optional_string(value)),
+        max_memory_gb,
+        memory_slots: parts.get(5).and_then(|value| parse_optional_u32(value)),
+        source: "win32_baseboard".to_string(),
+    })
+}
+
+fn detect_linux_motherboard_probe() -> Option<MotherboardProbe> {
+    if cfg!(target_os = "windows") {
+        return None;
+    }
+    let baseboard = run_command("dmidecode", &["-t", "baseboard"])?;
+    let bios = run_command("dmidecode", &["-t", "bios"]).unwrap_or_default();
+    let memory = run_command("dmidecode", &["-t", "memory"]).unwrap_or_default();
+    Some(MotherboardProbe {
+        manufacturer: dmidecode_field(&baseboard, "Manufacturer"),
+        product: dmidecode_field(&baseboard, "Product Name"),
+        version: dmidecode_field(&baseboard, "Version"),
+        bios_version: dmidecode_field(&bios, "Version"),
+        max_memory_gb: parse_dmidecode_max_capacity_gb(&memory),
+        memory_slots: dmidecode_field(&memory, "Number Of Devices")
+            .and_then(|value| parse_optional_u32(&value)),
+        source: "dmidecode".to_string(),
+    })
+}
+
+fn dmidecode_field(output: &str, key: &str) -> Option<String> {
+    output.lines().find_map(|line| {
+        let trimmed = line.trim();
+        let (left, right) = trimmed.split_once(':')?;
+        if left.trim() == key {
+            clean_optional_string(right)
+        } else {
+            None
+        }
+    })
+}
+
+fn parse_dmidecode_max_capacity_gb(output: &str) -> Option<u32> {
+    let value = dmidecode_field(output, "Maximum Capacity")?;
+    parse_memory_size_gb(&value)
 }
 
 fn detect_windows_memory_probe(total_gb: Option<u32>) -> Option<MemoryProbe> {
@@ -2171,6 +2295,8 @@ fn parse_memory_size_gb(value: &str) -> Option<u32> {
         Some(((number / 1024.0).round() as u32).max(1))
     } else if lower.contains("gb") {
         Some(number.round() as u32)
+    } else if lower.contains("tb") {
+        Some((number * 1024.0).round() as u32)
     } else {
         None
     }
@@ -2236,10 +2362,10 @@ fn detect_windows_gpu() -> Option<GpuProbe> {
         &[
             "-NoProfile",
             "-Command",
-            "Get-CimInstance Win32_VideoController | ForEach-Object { \"$($_.Name)|$($_.AdapterRAM)\" }",
+            "Get-CimInstance Win32_VideoController | ForEach-Object { \"$($_.Name)|$($_.AdapterRAM)|$($_.DriverVersion)\" }",
         ],
     )?;
-    let (name, vram_gb) = preferred_windows_gpu_from_output(&output)?;
+    let (name, vram_gb, driver_version) = preferred_windows_gpu_from_output(&output)?;
 
     Some(GpuProbe {
         vendor: Some(detect_vendor(&name)),
@@ -2247,8 +2373,9 @@ fn detect_windows_gpu() -> Option<GpuProbe> {
         name: Some(name),
         vram_gb,
         source: "powershell-win32-videocontroller".to_string(),
-        driver_version: None,
+        driver_version,
         cuda_version: None,
+        rocm_version: None,
         temperature_c: None,
         utilization_percent: None,
         power_draw_w: None,
@@ -2260,7 +2387,9 @@ fn detect_windows_gpu() -> Option<GpuProbe> {
     })
 }
 
-fn preferred_windows_gpu_from_output(output: &str) -> Option<(String, Option<u32>)> {
+fn preferred_windows_gpu_from_output(
+    output: &str,
+) -> Option<(String, Option<u32>, Option<String>)> {
     output
         .lines()
         .filter_map(|line| {
@@ -2268,15 +2397,18 @@ fn preferred_windows_gpu_from_output(output: &str) -> Option<(String, Option<u32
             if clean.is_empty() {
                 return None;
             }
-            let (name, adapter_ram) = clean.split_once('|').unwrap_or((clean, ""));
+            let parts: Vec<&str> = clean.split('|').collect();
+            let name = parts.first().copied().unwrap_or(clean);
+            let adapter_ram = parts.get(1).copied().unwrap_or("");
+            let driver_version = parts.get(2).and_then(|value| clean_optional_string(value));
             let name = clean_gpu_device_name(name);
             if name.is_empty() || is_placeholder_gpu_name(&name) {
                 return None;
             }
             let vram_gb = adapter_ram.trim().parse::<u64>().ok().map(bytes_to_gb);
-            Some((name, vram_gb))
+            Some((name, vram_gb, driver_version))
         })
-        .max_by_key(|(name, vram_gb)| {
+        .max_by_key(|(name, vram_gb, _)| {
             gpu_preference_score(name).saturating_add(vram_gb.unwrap_or(0).min(32) as u8)
         })
 }
@@ -2302,6 +2434,7 @@ fn detect_macos_gpu() -> Option<GpuProbe> {
         source: "system_profiler".to_string(),
         driver_version: None,
         cuda_version: None,
+        rocm_version: None,
         temperature_c: None,
         utilization_percent: None,
         power_draw_w: None,
@@ -2329,6 +2462,12 @@ fn detect_linux_lspci() -> Option<GpuProbe> {
         .map(|(_, right)| right.trim().to_string())
         .filter(|value| !value.is_empty())?;
 
+    let rocm_version = if detect_vendor(&name) == "AMD" {
+        detect_rocm_version()
+    } else {
+        None
+    };
+
     Some(GpuProbe {
         vendor: Some(detect_vendor(&name)),
         category: Some(gpu_category(&name)),
@@ -2337,6 +2476,7 @@ fn detect_linux_lspci() -> Option<GpuProbe> {
         source: "lspci".to_string(),
         driver_version: None,
         cuda_version: None,
+        rocm_version,
         temperature_c: None,
         utilization_percent: None,
         power_draw_w: None,
@@ -2810,7 +2950,14 @@ fn gpu_category(name: &str) -> String {
         "performance".to_string()
     } else if lower.contains("3060") || lower.contains("4060") || lower.contains("5060") {
         "entry-local-ai".to_string()
-    } else if lower.contains("apple") || lower.contains("m4") || lower.contains("m3") {
+    } else if lower.contains("apple")
+        || lower.contains("m4")
+        || lower.contains("m3")
+        || lower.contains("strix halo")
+        || lower.contains("ryzen ai max")
+        || lower.contains("radeon 8060s")
+        || lower.contains("radeon 8050s")
+    {
         "unified-memory".to_string()
     } else {
         "unknown".to_string()
@@ -2827,8 +2974,27 @@ fn format_optional_gb(value: Option<u32>) -> String {
         .unwrap_or_else(|| "non confirmee".to_string())
 }
 
-fn is_unified_memory() -> bool {
-    cfg!(target_os = "macos")
+fn is_unified_memory(
+    cpu_name: Option<&str>,
+    gpu_name: Option<&str>,
+    ram_gb: Option<u32>,
+    vram_gb: Option<u32>,
+) -> bool {
+    if cfg!(target_os = "macos") {
+        return true;
+    }
+    let text = format!(
+        "{} {}",
+        cpu_name.unwrap_or_default(),
+        gpu_name.unwrap_or_default()
+    )
+    .to_lowercase();
+    let looks_like_strix_halo = text.contains("strix halo")
+        || text.contains("ryzen ai max")
+        || text.contains("ai max+")
+        || text.contains("radeon 8060s")
+        || text.contains("radeon 8050s");
+    looks_like_strix_halo && ram_gb.unwrap_or_default() >= 32 && vram_gb.unwrap_or_default() <= 16
 }
 
 fn snapshots_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -3974,14 +4140,33 @@ big-model:latest                          zzz999          1.2 TB    1 year ago
     #[test]
     fn chooses_discrete_windows_gpu_over_virtual_or_igpu() {
         let output = "\
-Name|AdapterRAM
+Name|AdapterRAM|DriverVersion
 Microsoft Basic Render Driver|0
-Intel(R) UHD Graphics|2147483648
-NVIDIA GeForce RTX 4080 SUPER|17179869184
+Intel(R) UHD Graphics|2147483648|31.0.101.5522
+NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
 ";
-        let (name, vram_gb) = preferred_windows_gpu_from_output(output).unwrap();
+        let (name, vram_gb, driver_version) = preferred_windows_gpu_from_output(output).unwrap();
         assert_eq!(name, "NVIDIA GeForce RTX 4080 SUPER");
         assert_eq!(vram_gb, Some(16));
+        assert_eq!(driver_version.as_deref(), Some("32.0.15.6603"));
+    }
+
+    #[test]
+    fn parses_windows_motherboard_probe() {
+        let output = "ASUSTeK COMPUTER INC.|Z97-A|Rev 1.xx|3503|33554432|4";
+        let probe = parse_windows_motherboard_line(output).unwrap();
+        assert_eq!(probe.manufacturer.as_deref(), Some("ASUSTeK COMPUTER INC."));
+        assert_eq!(probe.product.as_deref(), Some("Z97-A"));
+        assert_eq!(probe.bios_version.as_deref(), Some("3503"));
+        assert_eq!(probe.max_memory_gb, Some(32));
+        assert_eq!(probe.memory_slots, Some(4));
+    }
+
+    #[test]
+    fn parses_memory_size_units() {
+        assert_eq!(parse_memory_size_gb("8192 MB"), Some(8));
+        assert_eq!(parse_memory_size_gb("32 GB"), Some(32));
+        assert_eq!(parse_memory_size_gb("2 TB"), Some(2048));
     }
 
     #[test]
