@@ -67,6 +67,19 @@ Premier jalon publié au 10 juillet 2026 dans le build `291051072031` : campagne
 - Comparer les performances, l'offload et les thermiques avec l'état précédent.
 - Expliquer la cause probable sans présenter une corrélation comme une certitude.
 
+Premier jalon v1 implémenté le 10 juillet 2026 en source : référence locale explicite par machine et modèle, comparaison stricte des conditions, historique restaurable et export JSON/Markdown. Publication Windows/Linux conditionnée aux gates complètes.
+
+- [x] Enregistrer une référence seulement après benchmark Ollama API réussi et action explicite.
+- [x] Lier chaque capture à la machine, au build, au modèle, au runtime, au protocole, au prompt et au profil Autopilot.
+- [x] Comparer génération, préremplissage, chargement, offload GPU et température avec seuils documentés.
+- [x] Suspendre le verdict si machine, modèle, runtime, mode CPU/GPU, prompt, protocole ou réglage diffèrent.
+- [x] Séparer faits modifiés, causes possibles et causalité non démontrée.
+- [x] Conserver plusieurs références locales, réactiver une référence précédente et exporter JSON/Markdown.
+- [x] Propager un résumé borné vers rapport, MemoryForge, Passport, terrain et Strategy Arena en lecture seule.
+- [x] Garantir que Flight Recorder ne fabrique jamais de preuve terrain physique.
+- [ ] Valider puis publier le build Windows/Linux contenant Flight Recorder v1.
+- [ ] Confirmer les seuils sur les cinq machines physiques et les recaler seulement à partir de mesures réelles.
+
 ## Phase 5 - Upgrade Digital Twin
 
 - Simuler RAM, GPU, VRAM, SSD, alimentation, boîtier et compatibilité carte mère.

@@ -1632,8 +1632,9 @@ h2 {
 .chat-panel { grid-column: span 6; order: 33; }
 .prompt-library-panel { grid-column: span 3; order: 34; }
 .installed-panel { grid-column: span 3; order: 35; }
-.benchmark-history-panel { grid-column: span 3; order: 36; }
+.benchmark-history-panel { grid-column: span 6; order: 36; }
 .model-autopilot-panel { grid-column: span 6; order: 37; }
+.flight-recorder-panel { grid-column: span 12; order: 38; }
 .action-panel { grid-column: span 4; order: 40; }
 .upgrade-impact-panel { grid-column: span 4; order: 41; }
 .next-panel { grid-column: span 4; order: 42; }
@@ -2314,6 +2315,109 @@ dd {
 
 .autopilot-active {
   border-color: rgba(241, 201, 107, 0.32);
+}
+
+.flight-recorder-box {
+  background: rgba(7, 15, 20, 0.86);
+  border: 1px solid rgba(120, 220, 232, 0.22);
+  border-radius: 8px;
+  display: grid;
+  gap: 9px;
+  line-height: 1.4;
+  min-height: 118px;
+  padding: 10px;
+}
+
+.flight-recorder-box.empty {
+  align-items: center;
+  color: var(--muted);
+}
+
+.flight-recorder-head,
+.flight-recorder-list,
+.flight-history {
+  background: rgba(4, 9, 12, 0.54);
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px;
+}
+
+.flight-recorder-head span,
+.flight-recorder-list span,
+.flight-recorder-note,
+.flight-recorder-warning,
+.flight-metric small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.flight-recorder-head.ok,
+.flight-metric.improved {
+  border-color: rgba(134, 239, 172, 0.42);
+}
+
+.flight-recorder-head.warn,
+.flight-metric.watch,
+.flight-metric.informational {
+  border-color: rgba(241, 201, 107, 0.42);
+}
+
+.flight-recorder-head.bad,
+.flight-metric.regression {
+  border-color: rgba(255, 145, 136, 0.48);
+}
+
+.flight-metrics {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.flight-metric {
+  background: rgba(4, 9, 12, 0.54);
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.flight-metric span,
+.flight-metric strong,
+.flight-metric small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.flight-metric span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.flight-metric strong {
+  font-size: 13px;
+}
+
+.flight-recorder-note,
+.flight-recorder-warning {
+  margin: 0;
+}
+
+.flight-recorder-warning {
+  color: var(--amber);
+}
+
+.flight-history button {
+  justify-content: flex-start;
+  min-height: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .bridge-summary,
@@ -3784,6 +3888,7 @@ dd {
 
   .benchmark-panel,
   .model-autopilot-panel,
+  .flight-recorder-panel,
   .chat-panel,
   .promptforge-panel,
   .prompt-library-panel,
@@ -3891,6 +3996,13 @@ dd {
     top: auto;
   }
 
+  .mode-advanced .sticky-action-strip {
+    bottom: auto;
+    left: auto;
+    position: static;
+    right: auto;
+  }
+
   .sticky-action-strip p {
     display: none;
   }
@@ -3916,6 +4028,7 @@ dd {
   .account-panel,
   .benchmark-panel,
   .model-autopilot-panel,
+  .flight-recorder-panel,
   .chat-panel,
   .promptforge-panel,
   .prompt-library-panel,
@@ -4004,6 +4117,10 @@ dd {
   .autopilot-budget,
   .autopilot-results {
     grid-template-columns: 1fr;
+  }
+
+  .flight-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .promptforge-score {

@@ -31,6 +31,7 @@ const BENCHMARK_HISTORY_KEY = "outilsia.localCockpit.benchmarkHistory.v1";
 const ARENA_RUN_KEY = "outilsia.localCockpit.lastArenaRun.v1";
 const RECOMMENDATION_RUN_KEY = "outilsia.localCockpit.recommendationRun.v2";
 const MODEL_AUTOPILOT_PROFILES_KEY = "outilsia.localCockpit.modelAutopilotProfiles.v1";
+const FLIGHT_RECORDER_STORE_KEY = "outilsia.localCockpit.flightRecorder.v1";
 const PROMPT_LIBRARY_KEY = "outilsia.localCockpit.promptLibrary.v1";
 const CHAT_HISTORY_KEY = "outilsia.localCockpit.chatHistory.v1";
 const FIELD_TEST_PROFILE_KEY = "outilsia.localCockpit.fieldTestProfile.v1";
@@ -40,6 +41,8 @@ const MAX_BENCHMARK_HISTORY = 80;
 const MAX_PROMPT_LIBRARY = 40;
 const MAX_CHAT_HISTORY = 60;
 const MODEL_AUTOPILOT_PROTOCOL = "outilsia.autopilot.v1";
+const FLIGHT_RECORDER_PROTOCOL = "outilsia.flight_recorder.v1";
+const MAX_FLIGHT_RECORDER_REFERENCES = 40;
 
 const UPGRADE_SIM_TARGETS = [
   { key: "auto", label: "Auto", reason: "Upgrade prioritaire proposé par OutilsIA." },
@@ -360,6 +363,13 @@ const els = {
   runModelAutopilotBtn: $("runModelAutopilotBtn"),
   applyModelAutopilotBtn: $("applyModelAutopilotBtn"),
   rollbackModelAutopilotBtn: $("rollbackModelAutopilotBtn"),
+  flightRecorderState: $("flightRecorderState"),
+  flightRecorderBox: $("flightRecorderBox"),
+  saveFlightReferenceBtn: $("saveFlightReferenceBtn"),
+  compareFlightReferenceBtn: $("compareFlightReferenceBtn"),
+  restoreFlightReferenceBtn: $("restoreFlightReferenceBtn"),
+  copyFlightRecorderJsonBtn: $("copyFlightRecorderJsonBtn"),
+  copyFlightRecorderMarkdownBtn: $("copyFlightRecorderMarkdownBtn"),
   benchmarkHistoryState: $("benchmarkHistoryState"),
   benchmarkHistoryBox: $("benchmarkHistoryBox"),
   copyBenchmarkHistoryBtn: $("copyBenchmarkHistoryBtn"),
@@ -2932,6 +2942,7 @@ function renderScan(scan) {
   if (els.topOllamaText) els.topOllamaText.textContent = topRuntimeOllama(scan);
   renderHardwareDoctor(scan);
   renderModelAutopilot();
+  renderFlightRecorder();
   renderCapabilityPassportPanel();
   renderWslRuntime(scan);
   els.checkBtn.disabled = false;
@@ -2964,6 +2975,7 @@ function renderScan(scan) {
   renderArenaPanel();
   renderStrategyBridgePanel();
   renderFieldTestPanel();
+  renderFlightRecorder();
   renderPrimaryAction();
 }
 
@@ -3044,6 +3056,7 @@ function renderCompatibility(payload) {
   renderArenaPanel();
   renderStrategyBridgePanel();
   renderFieldTestPanel();
+  renderFlightRecorder();
   renderPrimaryAction();
 }
 
@@ -4296,6 +4309,7 @@ function readinessReport() {
   const arena = arenaRun ? arenaWinners(arenaRun.results || []) : null;
   const recommendationEngine = recommendationReportSnapshot();
   const hardwareDoctor = hardwareDoctorSnapshot(scan);
+  const flightRecorder = flightRecorderSummary();
   const models = extractModels(compatibility).slice(0, 5).map((model) => ({
     title: modelTitle(model),
     command: actionableOllamaRef(model) ? `${ollamaRuntimeCommandLabel(actionableOllamaRef(model))} run ${actionableOllamaRef(model)}` : "",
@@ -4349,6 +4363,7 @@ function readinessReport() {
       ollama: runtimeOllama(scan)
     },
     hardware_doctor: hardwareDoctor,
+    flight_recorder: flightRecorder,
     capability_passport: capabilityPassportSummary(),
     model_autopilot: modelAutopilotSnapshot(),
     usage_profile: {
@@ -4475,6 +4490,11 @@ function readinessMarkdown(report = readinessReport()) {
       : report.model_autopilot?.recommended
         ? `- Model Autopilot: ${report.model_autopilot.recommended.label} recommandé, non appliqué`
         : "- Model Autopilot: non mesuré.",
+    report.flight_recorder?.comparison
+      ? `- Flight Recorder: ${report.flight_recorder.comparison.headline} · comparable ${report.flight_recorder.comparison.comparable ? "oui" : "non"} · confiance ${report.flight_recorder.comparison.confidence}`
+      : "- Flight Recorder: aucune référence locale.",
+    ...(report.flight_recorder?.comparison?.metrics || []).map((item) => `- Flight Recorder ${item.label}: ${item.reference} -> ${item.current} ${item.unit} (${item.status})`),
+    ...(report.flight_recorder?.comparison?.possible_causes || []).map((item) => `- Cause possible Flight Recorder: ${item}`),
     report.benchmark?.output_preview ? `- Réponse: ${report.benchmark.output_preview}` : "",
     `- Dialogue local: ${report.chat_ready ? "réponse reçue" : "non validé"}`,
     report.promptForge ? `- PromptForge: ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100 (${report.promptForge.model})` : "- PromptForge: non utilisé.",
@@ -4555,6 +4575,7 @@ function readinessSummaryText(report = readinessReport()) {
     `Prompt: ${prompt}`,
     `Arena: ${readinessArenaLabel(report)}`,
     `Recommandation mesurée: ${report.recommendation_engine?.winner ? `${report.recommendation_engine.verdict} (${report.recommendation_engine.winner.score}/100, confiance ${report.recommendation_engine.confidence})` : "non lancée"}`,
+    `Flight Recorder: ${report.flight_recorder?.comparison ? `${report.flight_recorder.comparison.headline} (confiance ${report.flight_recorder.comparison.confidence})` : "aucune référence"}`,
     `AI Capability Passport: ${report.capability_passport ? `SHA-256 ${report.capability_passport.digest}` : "non généré"}`,
     `Upgrade utile: ${upgrade}`,
     `Prochaine action: ${report.next[0] || "sauvegarder le rapport"}`
@@ -4622,6 +4643,7 @@ function premiumReportHtml(report = readinessReport()) {
   const fieldProfile = state.scan ? effectiveFieldTestProfile(state.scan) : null;
   const fieldSummary = state.scan ? fieldTestProfile() : null;
   const hardwareDoctor = report.hardware_doctor || hardwareDoctorSnapshot();
+  const flightRecorder = report.flight_recorder || null;
   const proofLabel = benchmark
     ? `${benchmark.model} · ${benchmark.estimated_tokens_per_second ?? "--"} tok/s`
     : "Benchmark à lancer";
@@ -4630,6 +4652,7 @@ function premiumReportHtml(report = readinessReport()) {
     report.promptForge ? `PromptForge : ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100` : "PromptForge non utilisé",
     report.arena?.compromise ? `Arena : ${readinessArenaLabel(report)}` : "Arena locale à comparer",
     recommendation?.winner ? `Recommendation Engine : ${recommendation.verdict} (${recommendation.winner.score}/100)` : "Recommendation Engine v2 à lancer",
+    flightRecorder?.comparison ? `Flight Recorder : ${flightRecorder.comparison.headline} · confiance ${flightRecorder.comparison.confidence}` : "Flight Recorder : aucune référence locale",
     report.capability_passport ? `Capability Passport : SHA-256 ${report.capability_passport.digest}` : "AI Capability Passport à générer dans Détails",
     model.ref ? `Modèle suivant : ${model.ref}` : "Modèle suivant à déterminer"
   ];
@@ -4810,6 +4833,13 @@ function premiumReportHtml(report = readinessReport()) {
           <p>${escapeHtml(hardwareDoctor ? `RAM : ${hardwareDoctor.ram.module_count || "?"} module(s), ${hardwareDoctor.ram.channel_mode}, ${hardwareDoctor.ram.effective_clock_label}` : "RAM : à confirmer")}</p>
           <p>${escapeHtml(hardwareDoctor ? `GPU : ${hardwareDoctor.gpu.confidence}${hardwareDoctor.gpu.cuda_version ? ` · CUDA ${hardwareDoctor.gpu.cuda_version}` : ""}` : "GPU : à confirmer")}</p>
           <p>${escapeHtml(hardwareDoctor?.actions?.[0] || "Aucune action doctor urgente détectée.")}</p>
+        </div>
+        <div class="pdf-card pdf-card-wide">
+          <span>Flight Recorder</span>
+          <strong>${escapeHtml(flightRecorder?.comparison?.headline || "Aucune référence locale")}</strong>
+          <p>${escapeHtml(flightRecorder?.comparison ? `Comparable : ${flightRecorder.comparison.comparable ? "oui" : "non"} · confiance ${flightRecorder.comparison.confidence} · ${flightRecorder.history_count} référence(s)` : "Définissez volontairement une référence après un benchmark exact.")}</p>
+          <p>${escapeHtml(pdfExcerpt(flightRecorder?.comparison?.possible_causes?.[0] || "Les causes restent des hypothèses tant qu'aucun changement déterministe n'est prouvé.", 320))}</p>
+          <p>Référence locale uniquement : ce signal ne valide pas une machine physique de la campagne terrain.</p>
         </div>
         <div class="pdf-card">
           <span>Modèle conseillé</span>
@@ -5322,6 +5352,7 @@ function renderReadinessPanel() {
       <span>${report.arena?.compromise ? `Arena : rapide ${escapeHtml(report.arena.fastest || "n/a")} · assistant ${escapeHtml(report.arena.assistant || "n/a")} · compromis ${escapeHtml(report.arena.compromise)} (${escapeHtml(report.arena.compromise_score)}/100)` : "Arena locale non encore lancée."}</span>
       <span>${report.recommendation_engine?.winner ? `Recommandation mesurée : ${escapeHtml(report.recommendation_engine.verdict)} · ${escapeHtml(report.recommendation_engine.winner.score)}/100 · confiance ${escapeHtml(report.recommendation_engine.confidence)}` : "Recommendation Engine v2 non encore lancé."}</span>
       <span>${report.model_autopilot?.active ? `Profil Ollama : ${escapeHtml(report.model_autopilot.active.label)} · ${escapeHtml(modelAutopilotTuningLabel(report.model_autopilot.active.tuning))}` : report.model_autopilot?.recommended ? `Autopilot : ${escapeHtml(report.model_autopilot.recommended.label)} recommandé, à appliquer dans Détails.` : "Model Autopilot non encore mesuré."}</span>
+      <span>${report.flight_recorder?.comparison ? `Flight Recorder : ${escapeHtml(report.flight_recorder.comparison.headline)} · confiance ${escapeHtml(report.flight_recorder.comparison.confidence)}` : "Flight Recorder : aucune référence locale."}</span>
       <span>${report.capability_passport ? `Passport : SHA-256 ${escapeHtml(`${report.capability_passport.digest.slice(0, 16)}…`)}` : "AI Capability Passport disponible dans Détails après génération."}</span>
       <span>${report.upgrades[0] ? `Upgrade utile : ${escapeHtml(report.upgrades[0].title)}` : "Aucun achat prioritaire pour l'instant."}</span>
       <span>${report.account_ready ? "Compte prêt : rapport partageable disponible après synchronisation." : "Connecte le compte pour sauvegarder et partager ce rapport."}</span>
@@ -7079,6 +7110,7 @@ function strategyArenaReadiness() {
         expose_benchmark_proof: Boolean(benchmark?.success),
         expose_usage_recommendation: Boolean(recommendation?.winner),
         expose_model_autopilot_profile: Boolean(modelAutopilotSnapshot()?.active),
+        expose_flight_recorder_summary_read_only: Boolean(flightRecorderSummary()),
         expose_runtime_command_prefix: true,
         install_or_delete_models_inside_strategy_arena: false,
         run_backtests_inside_outilsia: false
@@ -7168,6 +7200,7 @@ function strategyArenaReadiness() {
       results: recommendation.results
     } : null,
     model_autopilot: modelAutopilotSnapshot(),
+    flight_recorder: flightRecorderSummary(),
     capability_passport: capabilityPassportSummary(),
     recommended_roles: {
       fastest: winners?.fastest?.model || "",
@@ -7210,6 +7243,7 @@ function renderStrategyBridgePanel() {
       <span>${escapeHtml(profile.next_action)}</span>
       <span>Commande modèle : ${escapeHtml(profile.runtime_command_prefix)} run &lt;modele&gt;</span>
       ${profile.model_autopilot?.active ? `<span>Profil Ollama : ${escapeHtml(profile.model_autopilot.active.label)} · ${escapeHtml(modelAutopilotTuningLabel(profile.model_autopilot.active.tuning))}</span>` : ""}
+      ${profile.flight_recorder?.comparison ? `<span>Flight Recorder : ${escapeHtml(profile.flight_recorder.comparison.headline)} · lecture seule</span>` : ""}
     </div>
     <div class="bridge-rules">
       <span>OutilsIA prépare les modèles locaux.</span>
@@ -7241,6 +7275,7 @@ function strategyBridgeMarkdown() {
     `- Résumé: ${profile.bridge_summary}`,
     `- AI Capability Passport: ${profile.capability_passport ? `${profile.capability_passport.schema} · SHA-256 ${profile.capability_passport.digest}` : "non généré"}`,
     `- Model Autopilot: ${profile.model_autopilot?.active ? `${profile.model_autopilot.active.label} · ${modelAutopilotTuningLabel(profile.model_autopilot.active.tuning)}` : "profil Ollama par défaut"}`,
+    `- Flight Recorder: ${profile.flight_recorder?.comparison ? `${profile.flight_recorder.comparison.headline} · confiance ${profile.flight_recorder.comparison.confidence} · lecture seule` : "aucune référence"}`,
     "",
     "## Modèles installés",
     "",
@@ -7328,6 +7363,7 @@ function capabilityPassportSourceRevision() {
     benchmark.created_at_ms || 0,
     benchmark.model || "",
     canonicalJson(modelAutopilotSnapshot() || {}),
+    canonicalJson(flightRecorderSummary() || {}),
     recommendation.created_at_ms || recommendation.id || "",
     arena.created_at_ms || arena.id || "",
     (state.scan?.installed_models || []).map(modelLabel).sort().join(","),
@@ -7421,6 +7457,7 @@ function capabilityPassportDocument() {
       hardware_doctor_v2: doctor?.schema === "outilsia.hardware_doctor.v2",
       recommendation_engine_v2: Boolean(report.recommendation_engine?.winner),
       model_autopilot_v1: Boolean(report.model_autopilot?.active || report.model_autopilot?.recommended),
+      flight_recorder_v1: Boolean(report.flight_recorder?.reference),
       local_arena: Boolean(report.arena),
       strategy_arena_profile_export: true
     },
@@ -7449,6 +7486,7 @@ function capabilityPassportDocument() {
       upgrade: report.upgrades?.[0] || null
     },
     model_autopilot: report.model_autopilot,
+    flight_recorder: report.flight_recorder,
     arena: report.arena,
     strategy_arena_handoff: {
       schema: bridge.schema,
@@ -7469,6 +7507,7 @@ function capabilityPassportDocument() {
       "La fréquence et le canal mémoire peuvent être estimés selon les informations fournies par le système.",
       "La preuve d'offload GPU dépend de la disponibilité de l'API Ollama /api/ps après le benchmark.",
       "Model Autopilot compare des réglages d'exécution sur le même modèle ; il ne mesure pas une nouvelle quantification et n'améliore pas les poids du modèle.",
+      "Flight Recorder compare des mesures locales liées à une référence explicite ; ses causes possibles restent des hypothèses et ne constituent pas une preuve terrain physique.",
       "L'empreinte SHA-256 détecte une modification du document ; elle ne prouve ni l'identité du PC ni celle du propriétaire.",
       "Ce passeport ne constitue pas une validation de stratégie financière ni un résultat de backtest."
     ]
@@ -7786,6 +7825,7 @@ function fieldTestMachineEntry() {
   const doctor = report.hardware_doctor || hardwareDoctorSnapshot(scan);
   const passport = capabilityPassportSummary();
   const autopilot = report.model_autopilot || null;
+  const flightRecorder = report.flight_recorder || null;
   const runtimeEvidence = report.runtime_readiness?.evidence || doctorRuntimeEvidence(scan, benchmark?.model || report.test_model || "qwen3:0.6b");
   const os = [scan.os_name, scan.os_version].filter(Boolean).join(" ").trim();
   return {
@@ -7833,6 +7873,11 @@ function fieldTestMachineEntry() {
     model_autopilot_num_ctx: Number(autopilot?.active?.tuning?.num_ctx || 0),
     model_autopilot_num_batch: Number(autopilot?.active?.tuning?.num_batch || 0),
     model_autopilot_num_thread: Number(autopilot?.active?.tuning?.num_thread || 0),
+    flight_recorder_reference_ok: Boolean(flightRecorder?.reference),
+    flight_recorder_overall: flightRecorder?.comparison?.overall || "not_measured",
+    flight_recorder_comparable: Boolean(flightRecorder?.comparison?.comparable),
+    flight_recorder_confidence: flightRecorder?.comparison?.confidence || "none",
+    flight_recorder_physical_proof: false,
     scan_ok: Boolean(state.scan),
     score: report.score === null ? 0 : Number(report.score),
     score_label: scoreLabel(report.score),
@@ -8696,6 +8741,9 @@ async function runModelAutopilot() {
             };
         const measured = {
           ...result,
+          machine_key: state.scan?.machine_key || "",
+          runtime,
+          benchmark_protocol: MODEL_AUTOPILOT_PROTOCOL,
           protocol: MODEL_AUTOPILOT_PROTOCOL,
           autopilot_profile: profile.key,
           autopilot_label: profile.label,
@@ -8734,6 +8782,7 @@ async function runModelAutopilot() {
   } finally {
     if (state.modelAutopilotRun) state.modelAutopilotRun.running = false;
     renderModelAutopilot();
+    renderFlightRecorder();
     renderReadinessPanel();
   }
 }
@@ -8774,6 +8823,7 @@ function applyModelAutopilotRecommendation() {
   saveBenchmarkHistoryEntry(appliedResult);
   renderBenchmark(appliedResult);
   renderModelAutopilot();
+  renderFlightRecorder();
   renderCapabilityPassportPanel();
   renderReadinessPanel();
   setStatus(`Profil ${active.label} appliqué à ${run.model} dans OutilsIA`, "ok");
@@ -8801,10 +8851,598 @@ function rollbackModelAutopilotProfile() {
   writeModelAutopilotStore(store);
   state.capabilityPassport = null;
   renderModelAutopilot();
+  renderFlightRecorder();
   renderCapabilityPassportPanel();
   renderReadinessPanel();
   const restored = activeModelAutopilotProfile(model);
   setStatus(restored ? `Profil ${restored.label} restauré` : "Réglages Ollama par défaut restaurés", "ok");
+}
+
+function readFlightRecorderStore() {
+  try {
+    const raw = window.localStorage?.getItem(FLIGHT_RECORDER_STORE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed?.schema === FLIGHT_RECORDER_PROTOCOL && Array.isArray(parsed.references)) {
+      return {
+        schema: FLIGHT_RECORDER_PROTOCOL,
+        references: parsed.references.slice(0, MAX_FLIGHT_RECORDER_REFERENCES),
+        active_by_binding: parsed.active_by_binding && typeof parsed.active_by_binding === "object"
+          ? parsed.active_by_binding
+          : {}
+      };
+    }
+  } catch (_) {
+    // A corrupt optional recorder must never block scan or benchmark.
+  }
+  return { schema: FLIGHT_RECORDER_PROTOCOL, references: [], active_by_binding: {} };
+}
+
+function writeFlightRecorderStore(store) {
+  const normalized = {
+    schema: FLIGHT_RECORDER_PROTOCOL,
+    references: Array.isArray(store?.references)
+      ? store.references.slice(0, MAX_FLIGHT_RECORDER_REFERENCES)
+      : [],
+    active_by_binding: store?.active_by_binding && typeof store.active_by_binding === "object"
+      ? store.active_by_binding
+      : {}
+  };
+  try {
+    window.localStorage?.setItem(FLIGHT_RECORDER_STORE_KEY, JSON.stringify(normalized));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function flightRecorderMachineKey(value = {}) {
+  return String(value.machine_key || value.machine?.machine_key || "").trim();
+}
+
+function flightRecorderBenchmarkFor(model) {
+  const clean = normalizeOllamaRef(model);
+  const machineKey = String(state.scan?.machine_key || "").trim();
+  if (!clean || !machineKey) return null;
+  const candidates = [state.benchmark, ...readBenchmarkHistory()].filter(Boolean);
+  return candidates.find((item) => (
+    item.success
+    && sameOllamaModel(item.model, clean)
+    && flightRecorderMachineKey(item) === machineKey
+  )) || null;
+}
+
+function flightRecorderOllamaVersion(scan, runtime) {
+  if (runtime === "wsl") {
+    return scan?.runtimes?.ollama_wsl?.version
+      || scan?.runtimes?.wsl?.ollama_version
+      || "";
+  }
+  return scan?.runtimes?.ollama?.version || "";
+}
+
+function flightRecorderCapture(model = els.benchmarkModelInput?.value || state.benchmark?.model || "") {
+  const scan = state.scan;
+  const clean = normalizeOllamaRef(model);
+  if (!scan?.machine_key || !clean) return null;
+  const benchmark = flightRecorderBenchmarkFor(clean);
+  if (!benchmark) return null;
+  const doctor = hardwareDoctorSnapshot(scan);
+  const proof = releaseProof();
+  const runtime = defaultOllamaRuntime(clean);
+  const runtimeEvidence = doctorRuntimeEvidence(scan, clean);
+  const tuning = benchmark.tuning || activeModelAutopilotProfile(clean)?.tuning || null;
+  const autopilotKey = benchmark.autopilot_active_profile || activeModelAutopilotProfile(clean)?.key || "default";
+  const measurementSource = String(benchmark.measurement_source || "legacy_history");
+  const exactBenchmark = measurementSource === "ollama_api";
+  const runtimeEvidenceSource = benchmark.runtime_evidence_source || runtimeEvidence?.source || "";
+  const capturedAtMs = Number(benchmark.created_at_ms || Date.now());
+  const trustLevel = exactBenchmark && runtimeEvidenceSource
+    ? "high"
+    : exactBenchmark
+      ? "mixed"
+      : "low";
+  return {
+    schema: "outilsia.flight_recorder.capture.v1",
+    captured_at: new Date(capturedAtMs).toISOString(),
+    captured_at_ms: capturedAtMs,
+    binding: {
+      machine_key: scan.machine_key,
+      model: clean,
+      runtime,
+      execution_mode: benchmark.execution_mode || "auto",
+      benchmark_protocol: benchmark.benchmark_protocol || benchmark.protocol || "standard",
+      prompt: benchmark.prompt || "",
+      autopilot_profile: autopilotKey,
+      tuning
+    },
+    release: {
+      app_version: proof.app_version || "",
+      build_id: proof.build_id || "",
+      source_commit: proof.source_commit || ""
+    },
+    machine: {
+      name: scan.name || "Machine IA locale",
+      os: [scan.os_name, scan.os_version].filter(Boolean).join(" "),
+      cpu: scan.cpu_name || "",
+      ram_gb: Number(scan.ram_gb || 0),
+      gpu: scan.gpu_name || "",
+      vram_gb: Number(scan.vram_gb || 0)
+    },
+    environment: {
+      gpu_driver: doctor?.gpu?.driver_version || "",
+      cuda_driver_max: doctor?.gpu?.cuda_version || "",
+      rocm_version: doctor?.gpu?.rocm_version || "",
+      ollama_version: flightRecorderOllamaVersion(scan, runtime),
+      performance_state: doctor?.gpu?.performance_state || "",
+      rebar_status: doctor?.gpu?.rebar_status || "unknown",
+      pcie_link: doctor?.gpu?.pcie_link_width_current || doctor?.gpu?.pcie_link_width_max
+        ? `x${doctor?.gpu?.pcie_link_width_current || "?"}/x${doctor?.gpu?.pcie_link_width_max || "?"}`
+        : ""
+    },
+    metrics: {
+      generation_tokens_per_second: Number(benchmark.estimated_tokens_per_second || 0),
+      prompt_tokens_per_second: Number(benchmark.prompt_tokens_per_second || 0),
+      load_duration_ms: Number(benchmark.load_duration_ms || 0),
+      total_duration_ms: Number(benchmark.total_duration_ms || benchmark.elapsed_ms || 0),
+      eval_duration_ms: Number(benchmark.eval_duration_ms || 0),
+      gpu_offload_percent: Number(benchmark.runtime_gpu_offload_percent ?? runtimeEvidence?.gpu_offload_percent ?? 0),
+      temperature_c: Number(doctor?.gpu?.temperature_c || 0),
+      power_draw_w: Number(doctor?.gpu?.power_draw_w || 0)
+    },
+    provenance: {
+      benchmark_source: measurementSource,
+      runtime_evidence_source: runtimeEvidenceSource,
+      hardware_source: doctor?.gpu?.source || doctor?.source || "scan système",
+      thermal_is_instantaneous: true
+    },
+    trust: {
+      level: trustLevel,
+      reasons: [
+        exactBenchmark ? "métriques exactes Ollama API" : `mesure ${measurementSource || "non documentée"}`,
+        runtimeEvidenceSource ? `allocation ${runtimeEvidenceSource}` : "allocation CPU/GPU non prouvée",
+        doctor?.gpu?.source ? `matériel ${doctor.gpu.source}` : "matériel issu du scan"
+      ],
+      physical_field_proof: false
+    }
+  };
+}
+
+function flightRecorderBindingKey(capture) {
+  if (!capture?.binding?.machine_key || !capture?.binding?.model) return "";
+  return `${capture.binding.machine_key}|${normalizeOllamaRef(capture.binding.model)}`;
+}
+
+function activeFlightRecorderReference(capture = flightRecorderCapture()) {
+  const bindingKey = flightRecorderBindingKey(capture);
+  if (!bindingKey) return null;
+  const store = readFlightRecorderStore();
+  const activeId = store.active_by_binding[bindingKey] || "";
+  return store.references.find((item) => item.id === activeId)
+    || store.references.find((item) => flightRecorderBindingKey(item.capture) === bindingKey)
+    || null;
+}
+
+function flightRecorderMetricDelta(spec, referenceValue, currentValue, comparable) {
+  const reference = Number(referenceValue || 0);
+  const current = Number(currentValue || 0);
+  if (!spec.zero_valid && (reference <= 0 || current <= 0)) return null;
+  if (spec.zero_valid && (!Number.isFinite(reference) || !Number.isFinite(current))) return null;
+  const delta = current - reference;
+  const percent = reference !== 0 ? (delta / Math.abs(reference)) * 100 : null;
+  let rawStatus = "stable";
+  if (spec.kind === "lower_percent") {
+    if (percent <= spec.bad) rawStatus = "regression";
+    else if (percent <= spec.warn) rawStatus = "watch";
+    else if (percent >= Math.abs(spec.warn)) rawStatus = "improved";
+  } else if (spec.kind === "higher_percent") {
+    if (percent >= spec.bad) rawStatus = "regression";
+    else if (percent >= spec.warn) rawStatus = "watch";
+    else if (percent <= -Math.abs(spec.warn)) rawStatus = "improved";
+  } else if (spec.kind === "lower_absolute") {
+    if (delta <= spec.bad) rawStatus = "regression";
+    else if (delta <= spec.warn) rawStatus = "watch";
+    else if (delta >= Math.abs(spec.warn)) rawStatus = "improved";
+  } else if (spec.kind === "higher_absolute") {
+    if (delta >= spec.bad) rawStatus = "regression";
+    else if (delta >= spec.warn) rawStatus = "watch";
+    else if (delta <= -Math.abs(spec.warn)) rawStatus = "improved";
+  }
+  return {
+    key: spec.key,
+    label: spec.label,
+    unit: spec.unit,
+    reference,
+    current,
+    delta: Number(delta.toFixed(2)),
+    delta_percent: percent == null ? null : Number(percent.toFixed(1)),
+    status: comparable ? rawStatus : "informational",
+    raw_status: rawStatus,
+    interpretation: spec.interpretation
+  };
+}
+
+function compareFlightRecorderCaptures(referenceCapture, currentCapture) {
+  if (!referenceCapture || !currentCapture) return null;
+  const sameTuning = canonicalJson(referenceCapture.binding?.tuning || {}) === canonicalJson(currentCapture.binding?.tuning || {});
+  const comparableChecks = [
+    [referenceCapture.binding?.machine_key === currentCapture.binding?.machine_key, "machine différente"],
+    [sameOllamaModel(referenceCapture.binding?.model, currentCapture.binding?.model), "modèle différent"],
+    [referenceCapture.binding?.runtime === currentCapture.binding?.runtime, "runtime différent"],
+    [referenceCapture.binding?.execution_mode === currentCapture.binding?.execution_mode, "mode CPU/GPU différent"],
+    [referenceCapture.binding?.benchmark_protocol === currentCapture.binding?.benchmark_protocol, "protocole différent"],
+    [referenceCapture.binding?.prompt === currentCapture.binding?.prompt, "prompt différent"],
+    [sameTuning, "réglage Autopilot différent"]
+  ];
+  const blockers = comparableChecks.filter(([ok]) => !ok).map(([, label]) => label);
+  const comparable = blockers.length === 0;
+  const specs = [
+    { key: "generation_tokens_per_second", label: "Génération", unit: "tok/s", kind: "lower_percent", warn: -10, bad: -20, interpretation: "Débit de génération Ollama." },
+    { key: "prompt_tokens_per_second", label: "Préremplissage", unit: "tok/s", kind: "lower_percent", warn: -12, bad: -25, interpretation: "Traitement du prompt avant génération." },
+    { key: "load_duration_ms", label: "Chargement", unit: "ms", kind: "higher_percent", warn: 25, bad: 50, interpretation: "Chargement du modèle ; le cache chaud ou froid peut influencer ce signal." },
+    { key: "gpu_offload_percent", label: "Offload GPU", unit: "%", kind: "lower_absolute", warn: -10, bad: -30, zero_valid: true, interpretation: "Part du modèle observée en VRAM par Ollama." },
+    { key: "temperature_c", label: "Température", unit: "°C", kind: "higher_absolute", warn: 10, bad: 18, interpretation: "Instantané du scan, corrélé mais non synchronisé avec toute la charge." }
+  ];
+  const metrics = specs.map((spec) => {
+    if (spec.key === "gpu_offload_percent" && (!referenceCapture.provenance?.runtime_evidence_source || !currentCapture.provenance?.runtime_evidence_source)) return null;
+    if (spec.key === "temperature_c" && (!referenceCapture.metrics?.temperature_c || !currentCapture.metrics?.temperature_c)) return null;
+    return flightRecorderMetricDelta(spec, referenceCapture.metrics?.[spec.key], currentCapture.metrics?.[spec.key], comparable);
+  }).filter(Boolean);
+  const changedFacts = [];
+  const factFields = [
+    ["gpu_driver", "Pilote GPU"],
+    ["cuda_driver_max", "CUDA pilote"],
+    ["rocm_version", "ROCm"],
+    ["ollama_version", "Ollama"],
+    ["performance_state", "État GPU"],
+    ["rebar_status", "ReBAR"],
+    ["pcie_link", "Lien PCIe"]
+  ];
+  for (const [key, label] of factFields) {
+    const before = String(referenceCapture.environment?.[key] || "");
+    const after = String(currentCapture.environment?.[key] || "");
+    if (before && after && before !== after) changedFacts.push({ key, label, before, after });
+  }
+  if (referenceCapture.release?.build_id !== currentCapture.release?.build_id) {
+    changedFacts.push({
+      key: "app_build",
+      label: "Build OutilsIA",
+      before: referenceCapture.release?.build_id || "inconnu",
+      after: currentCapture.release?.build_id || "inconnu"
+    });
+  }
+  const possibleCauses = [];
+  if (changedFacts.some((item) => item.key === "gpu_driver" || item.key === "cuda_driver_max" || item.key === "rocm_version")) {
+    possibleCauses.push("Le pilote ou le runtime GPU a changé ; c'est une cause possible, pas une causalité démontrée.");
+  }
+  if (changedFacts.some((item) => item.key === "ollama_version")) {
+    possibleCauses.push("La version d'Ollama a changé et peut expliquer une partie de l'écart.");
+  }
+  if (metrics.some((item) => item.key === "gpu_offload_percent" && ["watch", "regression"].includes(item.raw_status))) {
+    possibleCauses.push("L'offload GPU observé a diminué ; davantage de calcul peut être reparti vers le CPU ou la RAM.");
+  }
+  if (metrics.some((item) => item.key === "temperature_c" && ["watch", "regression"].includes(item.raw_status))) {
+    possibleCauses.push("La température instantanée est plus haute ; une pression thermique est possible, sans preuve de throttling continu.");
+  }
+  if (comparable && metrics.some((item) => ["watch", "regression"].includes(item.raw_status)) && !possibleCauses.length) {
+    possibleCauses.push("Aucun changement déterministe n'est identifié ; charge système, cache du modèle ou état thermique restent des causes possibles.");
+  }
+  const regressionCount = metrics.filter((item) => item.status === "regression").length;
+  const watchCount = metrics.filter((item) => item.status === "watch").length;
+  const improvedCount = metrics.filter((item) => item.status === "improved").length;
+  const overall = !comparable
+    ? "not_comparable"
+    : regressionCount
+      ? "regression"
+      : watchCount
+        ? "watch"
+        : improvedCount
+          ? "improved"
+          : "stable";
+  const environmentChanged = changedFacts.some((item) => item.key !== "app_build");
+  const confidence = !comparable
+    ? "low"
+    : referenceCapture.trust?.level === "high" && currentCapture.trust?.level === "high" && !environmentChanged
+      ? "high"
+      : "mixed";
+  const headlines = {
+    not_comparable: "Mesures affichées, conclusion suspendue",
+    regression: "Régression locale détectée",
+    watch: "Écart à surveiller",
+    improved: "Performance locale en hausse",
+    stable: "Performance locale stable"
+  };
+  return {
+    schema: "outilsia.flight_recorder.comparison.v1",
+    compared_at: currentCapture.captured_at || new Date().toISOString(),
+    overall,
+    headline: headlines[overall],
+    comparable,
+    blockers,
+    confidence,
+    metrics,
+    changed_facts: changedFacts,
+    possible_causes: possibleCauses,
+    statement: comparable
+      ? "Le verdict compare des mesures locales comparables ; les causes restent des hypothèses sauf preuve explicite."
+      : `Pas de verdict de régression : ${blockers.join(", ")}.`,
+    physical_field_proof: false
+  };
+}
+
+function flightRecorderSnapshot() {
+  const current = flightRecorderCapture();
+  const reference = activeFlightRecorderReference(current);
+  const comparison = reference ? compareFlightRecorderCaptures(reference.capture, current) : null;
+  return { current, reference, comparison };
+}
+
+function flightRecorderSummary() {
+  const snapshot = flightRecorderSnapshot();
+  const bindingKey = flightRecorderBindingKey(snapshot.current);
+  const store = readFlightRecorderStore();
+  const historyCount = bindingKey
+    ? store.references.filter((item) => flightRecorderBindingKey(item.capture) === bindingKey).length
+    : 0;
+  if (!snapshot.reference) return null;
+  return {
+    schema: FLIGHT_RECORDER_PROTOCOL,
+    local_only: true,
+    physical_field_proof: false,
+    history_count: historyCount,
+    reference: {
+      id: snapshot.reference.id,
+      captured_at: snapshot.reference.capture?.captured_at || "",
+      model: snapshot.reference.capture?.binding?.model || "",
+      runtime: snapshot.reference.capture?.binding?.runtime || "",
+      trust: snapshot.reference.capture?.trust?.level || "low"
+    },
+    comparison: snapshot.comparison ? {
+      compared_at: snapshot.comparison.compared_at,
+      overall: snapshot.comparison.overall,
+      headline: snapshot.comparison.headline,
+      comparable: snapshot.comparison.comparable,
+      confidence: snapshot.comparison.confidence,
+      blockers: snapshot.comparison.blockers,
+      metrics: snapshot.comparison.metrics,
+      changed_facts: snapshot.comparison.changed_facts,
+      possible_causes: snapshot.comparison.possible_causes,
+      statement: snapshot.comparison.statement
+    } : null
+  };
+}
+
+function flightRecorderExportDocument() {
+  const snapshot = flightRecorderSnapshot();
+  const store = readFlightRecorderStore();
+  const bindingKey = flightRecorderBindingKey(snapshot.current);
+  return {
+    schema: FLIGHT_RECORDER_PROTOCOL,
+    exported_at: new Date().toISOString(),
+    scope: "local_performance_reference",
+    local_only: true,
+    physical_field_proof: false,
+    current: snapshot.current,
+    active_reference: snapshot.reference,
+    comparison: snapshot.comparison,
+    history: bindingKey
+      ? store.references.filter((item) => flightRecorderBindingKey(item.capture) === bindingKey)
+      : []
+  };
+}
+
+function flightRecorderMarkdown(document = flightRecorderExportDocument()) {
+  const comparison = document.comparison;
+  const reference = document.active_reference?.capture;
+  const current = document.current;
+  if (!reference) return "## Flight Recorder\n\n- Aucune référence locale définie.";
+  const lines = [
+    "## Flight Recorder",
+    "",
+    `- Référence: ${reference.captured_at} · ${reference.binding.model}`,
+    `- Mesure actuelle: ${current?.captured_at || "indisponible"}`,
+    `- Verdict: ${comparison?.headline || "comparaison indisponible"}`,
+    `- Comparable: ${comparison?.comparable ? "oui" : "non"}`,
+    `- Confiance: ${comparison?.confidence || "faible"}`,
+    "- Portée: référence locale uniquement, aucune preuve terrain physique.",
+    ""
+  ];
+  if (comparison?.metrics?.length) {
+    lines.push("### Mesures", "");
+    for (const metric of comparison.metrics) {
+      const delta = metric.delta_percent == null
+        ? `${metric.delta >= 0 ? "+" : ""}${metric.delta}`
+        : `${metric.delta_percent >= 0 ? "+" : ""}${metric.delta_percent} %`;
+      lines.push(`- ${metric.label}: ${metric.reference} -> ${metric.current} ${metric.unit} (${delta}, ${metric.status})`);
+    }
+    lines.push("");
+  }
+  if (comparison?.changed_facts?.length) {
+    lines.push("### Faits modifiés", "", ...comparison.changed_facts.map((item) => `- ${item.label}: ${item.before} -> ${item.after}`), "");
+  }
+  if (comparison?.possible_causes?.length) {
+    lines.push("### Causes possibles", "", ...comparison.possible_causes.map((item) => `- ${item}`), "");
+  }
+  lines.push(`- Limite: ${comparison?.statement || "les causes ne sont pas établies."}`);
+  return lines.join("\n");
+}
+
+function saveFlightRecorderReference() {
+  const capture = flightRecorderCapture();
+  if (!capture || capture.trust?.level === "low" || capture.metrics.generation_tokens_per_second <= 0) {
+    setStatus("Benchmark Ollama API réussi requis avant de définir la référence", "warn");
+    renderFlightRecorder();
+    return;
+  }
+  const store = readFlightRecorderStore();
+  const reference = { id: `flight-${Date.now()}-${store.references.length + 1}`, capture };
+  const bindingKey = flightRecorderBindingKey(capture);
+  store.references = [reference, ...store.references.filter((item) => item.id !== reference.id)];
+  store.active_by_binding[bindingKey] = reference.id;
+  if (!writeFlightRecorderStore(store)) {
+    setStatus("Impossible d'enregistrer la référence locale", "bad");
+    return;
+  }
+  state.capabilityPassport = null;
+  renderFlightRecorder();
+  renderCapabilityPassportPanel();
+  renderReadinessPanel();
+  renderStrategyBridgePanel();
+  renderFieldTestPanel();
+  setStatus("Référence Flight Recorder enregistrée localement", "ok");
+}
+
+function activateFlightRecorderReference(referenceId) {
+  const current = flightRecorderCapture();
+  const store = readFlightRecorderStore();
+  const reference = store.references.find((item) => item.id === referenceId);
+  if (!current || !reference || flightRecorderBindingKey(reference.capture) !== flightRecorderBindingKey(current)) {
+    setStatus("Cette référence ne correspond pas à la machine et au modèle actifs", "warn");
+    return;
+  }
+  store.active_by_binding[flightRecorderBindingKey(current)] = reference.id;
+  writeFlightRecorderStore(store);
+  state.capabilityPassport = null;
+  renderFlightRecorder();
+  renderCapabilityPassportPanel();
+  renderReadinessPanel();
+  renderStrategyBridgePanel();
+  renderFieldTestPanel();
+  setStatus("Référence Flight Recorder réactivée", "ok");
+}
+
+function restorePreviousFlightRecorderReference() {
+  const current = flightRecorderCapture();
+  const bindingKey = flightRecorderBindingKey(current);
+  const store = readFlightRecorderStore();
+  const matching = store.references.filter((item) => flightRecorderBindingKey(item.capture) === bindingKey);
+  const activeId = store.active_by_binding[bindingKey] || matching[0]?.id || "";
+  const previous = matching.find((item) => item.id !== activeId);
+  if (!previous) {
+    setStatus("Aucune ancienne référence disponible", "warn");
+    return;
+  }
+  activateFlightRecorderReference(previous.id);
+}
+
+function compareCurrentFlightRecorder() {
+  const snapshot = flightRecorderSnapshot();
+  if (!snapshot.reference || !snapshot.current) {
+    setStatus("Référence et benchmark actuel requis pour comparer", "warn");
+    renderFlightRecorder();
+    return;
+  }
+  renderFlightRecorder();
+  renderReadinessPanel();
+  renderStrategyBridgePanel();
+  const tone = snapshot.comparison.overall === "regression"
+    ? "bad"
+    : snapshot.comparison.overall === "watch" || !snapshot.comparison.comparable
+      ? "warn"
+      : "ok";
+  setStatus(snapshot.comparison.comparable ? snapshot.comparison.headline : "Comparaison informative : conditions différentes", tone);
+}
+
+async function copyFlightRecorderJson() {
+  await navigator.clipboard.writeText(JSON.stringify(flightRecorderExportDocument(), null, 2));
+  setStatus("Flight Recorder JSON copié", "ok");
+}
+
+async function copyFlightRecorderMarkdown() {
+  await navigator.clipboard.writeText(flightRecorderMarkdown());
+  setStatus("Flight Recorder Markdown copié", "ok");
+}
+
+function renderFlightRecorder() {
+  if (!els.flightRecorderBox) return;
+  const snapshot = flightRecorderSnapshot();
+  const current = snapshot.current;
+  const reference = snapshot.reference;
+  const comparison = snapshot.comparison;
+  const store = readFlightRecorderStore();
+  const bindingKey = flightRecorderBindingKey(current);
+  const history = bindingKey
+    ? store.references.filter((item) => flightRecorderBindingKey(item.capture) === bindingKey)
+    : [];
+  const activeId = reference?.id || "";
+  els.saveFlightReferenceBtn.disabled = !current || current.trust?.level === "low";
+  els.compareFlightReferenceBtn.disabled = !current || !reference;
+  els.restoreFlightReferenceBtn.disabled = history.filter((item) => item.id !== activeId).length === 0;
+  els.copyFlightRecorderJsonBtn.disabled = !reference;
+  els.copyFlightRecorderMarkdownBtn.disabled = !reference;
+  els.saveFlightReferenceBtn.textContent = reference ? "Nouvelle référence" : "Définir la référence";
+  if (!state.scan) {
+    els.flightRecorderState.textContent = "scan requis";
+    els.flightRecorderBox.className = "flight-recorder-box empty";
+    els.flightRecorderBox.textContent = "Scannez la machine puis lancez un benchmark Ollama exact.";
+    return;
+  }
+  if (!current) {
+    els.flightRecorderState.textContent = "benchmark requis";
+    els.flightRecorderBox.className = "flight-recorder-box empty";
+    els.flightRecorderBox.textContent = "Lancez un benchmark sur le modèle choisi. Les anciens tests d'une autre machine ne sont jamais réutilisés comme référence.";
+    return;
+  }
+  if (!reference) {
+    els.flightRecorderState.textContent = "référence à définir";
+    els.flightRecorderBox.className = "flight-recorder-box";
+    els.flightRecorderBox.innerHTML = `
+      <div class="flight-recorder-head neutral">
+        <strong>${escapeHtml(current.binding.model)} prêt pour une référence locale</strong>
+        <span>${escapeHtml(current.metrics.generation_tokens_per_second)} tok/s · ${escapeHtml(current.binding.runtime)} · confiance ${escapeHtml(current.trust.level)}</span>
+      </div>
+      <p class="flight-recorder-note">La sauvegarde est explicite, locale et liée à cette machine. Elle ne devient pas une preuve terrain physique.</p>
+    `;
+    return;
+  }
+  const tone = comparison?.overall === "regression"
+    ? "bad"
+    : comparison?.overall === "watch" || comparison?.overall === "not_comparable"
+      ? "warn"
+      : comparison?.overall === "improved"
+        ? "ok"
+        : "neutral";
+  const metricHtml = (comparison?.metrics || []).map((metric) => {
+    const delta = metric.delta_percent == null
+      ? `${metric.delta >= 0 ? "+" : ""}${metric.delta}`
+      : `${metric.delta_percent >= 0 ? "+" : ""}${metric.delta_percent} %`;
+    return `
+      <div class="flight-metric ${escapeHtml(metric.status)}">
+        <span>${escapeHtml(metric.label)}</span>
+        <strong>${escapeHtml(metric.current)} ${escapeHtml(metric.unit)}</strong>
+        <small>réf. ${escapeHtml(metric.reference)} · ${escapeHtml(delta)}</small>
+      </div>
+    `;
+  }).join("");
+  const factsHtml = comparison?.changed_facts?.length
+    ? `<div class="flight-recorder-list"><strong>Faits modifiés</strong>${comparison.changed_facts.map((item) => `<span>${escapeHtml(item.label)} : ${escapeHtml(item.before)} → ${escapeHtml(item.after)}</span>`).join("")}</div>`
+    : "";
+  const causesHtml = comparison?.possible_causes?.length
+    ? `<div class="flight-recorder-list"><strong>Causes possibles</strong>${comparison.possible_causes.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>`
+    : "";
+  const historyHtml = history.length > 1 ? `
+    <div class="flight-history">
+      <strong>Références locales</strong>
+      ${history.slice(0, 5).map((item) => `
+        <button type="button" data-flight-reference="${escapeHtml(item.id)}" ${item.id === activeId ? "disabled" : ""}>
+          ${item.id === activeId ? "Active · " : ""}${escapeHtml(new Date(item.capture.captured_at).toLocaleString("fr-FR"))} · ${escapeHtml(item.capture.metrics.generation_tokens_per_second)} tok/s
+        </button>
+      `).join("")}
+    </div>
+  ` : "";
+  els.flightRecorderState.textContent = comparison?.headline || "référence prête";
+  els.flightRecorderBox.className = "flight-recorder-box";
+  els.flightRecorderBox.innerHTML = `
+    <div class="flight-recorder-head ${tone}">
+      <strong>${escapeHtml(comparison?.headline || "Référence prête")}</strong>
+      <span>Confiance ${escapeHtml(comparison?.confidence || "faible")} · référence ${escapeHtml(new Date(reference.capture.captured_at).toLocaleString("fr-FR"))}</span>
+    </div>
+    ${comparison?.blockers?.length ? `<p class="flight-recorder-warning">Conclusion suspendue : ${escapeHtml(comparison.blockers.join(", "))}.</p>` : ""}
+    ${metricHtml ? `<div class="flight-metrics">${metricHtml}</div>` : ""}
+    ${factsHtml}
+    ${causesHtml}
+    <p class="flight-recorder-note">${escapeHtml(comparison?.statement || "La référence reste locale.")}</p>
+    ${historyHtml}
+  `;
 }
 
 async function runBenchmark(options = {}) {
@@ -8864,6 +9502,8 @@ async function runBenchmark(options = {}) {
       : { ...demoBenchmark(model), execution_mode: forceCpu ? "cpu" : "auto" };
     const normalizedResult = {
       ...result,
+      machine_key: state.scan?.machine_key || "",
+      runtime: defaultOllamaRuntime(model),
       execution_mode: result.execution_mode || (forceCpu ? "cpu" : "auto"),
       autopilot_active_profile: activeTuning?.key || "",
       tuning: activeTuning?.tuning || null
@@ -8880,6 +9520,7 @@ async function runBenchmark(options = {}) {
     renderStrategyBridgePanel();
     renderFieldTestPanel();
     renderModelAutopilot();
+    renderFlightRecorder();
     await refreshAuthState();
     finishOperationMonitor(normalizedResult.success ? "Benchmark terminé" : "Benchmark terminé avec erreur");
     setStatus(normalizedResult.success ? "Benchmark terminé" : "Benchmark terminé avec erreur", normalizedResult.success ? "ok" : "warn");
@@ -8892,6 +9533,7 @@ async function runBenchmark(options = {}) {
   } finally {
     els.benchmarkBtn.disabled = false;
     renderModelAutopilot();
+    renderFlightRecorder();
   }
 }
 
@@ -9958,6 +10600,7 @@ function renderBenchmark(result) {
       ${cpuRetry}
     </div>
   `;
+  renderFlightRecorder();
 }
 
 function readBenchmarkHistory() {
@@ -9982,6 +10625,8 @@ function benchmarkHistoryEntry(result) {
     id: `bench-${Date.now()}`,
     created_at_ms: Number(result.created_at_ms || Date.now()),
     model: result.model || "modele",
+    machine_key: result.machine_key || scan.machine_key || "",
+    runtime: result.runtime || defaultOllamaRuntime(result.model || ""),
     prompt: result.prompt || "",
     elapsed_ms: Number(result.elapsed_ms || 0),
     estimated_tokens: Number(result.estimated_tokens || 0),
@@ -10000,6 +10645,13 @@ function benchmarkHistoryEntry(result) {
     output_preview: result.output_preview || "",
     error: result.error || "",
     execution_mode: result.execution_mode || "auto",
+    runtime_model_size_bytes: Number(result.runtime_model_size_bytes || 0),
+    runtime_vram_bytes: Number(result.runtime_vram_bytes || 0),
+    runtime_gpu_offload_percent: Number(result.runtime_gpu_offload_percent || 0),
+    runtime_processor: result.runtime_processor || "unknown",
+    runtime_evidence_source: result.runtime_evidence_source || "",
+    autopilot_active_profile: result.autopilot_active_profile || "",
+    tuning: result.tuning || null,
     benchmark_protocol: result.benchmark_protocol || "",
     arena_objective: result.arena_objective || null,
     recommendation_proof: result.recommendation_proof || null,
@@ -11044,6 +11696,8 @@ function demoMarkdown() {
 function demoBenchmark(model) {
   return {
     model,
+    machine_key: state.scan?.machine_key || "demo-local",
+    runtime: "native",
     prompt: els.benchmarkPromptInput.value,
     elapsed_ms: 1200,
     output_chars: 180,
@@ -11140,6 +11794,13 @@ function installTestHarness() {
     modelAutopilotCandidates,
     scoreModelAutopilotResults,
     modelAutopilotSnapshot,
+    flightRecorderCapture,
+    compareFlightRecorderCaptures,
+    flightRecorderSummary,
+    flightRecorderExportDocument,
+    flightRecorderMarkdown,
+    saveFlightRecorderReference,
+    restorePreviousFlightRecorderReference,
     applyModelAutopilotRecommendation,
     rollbackModelAutopilotProfile,
     async applyModelAutopilotState() {
@@ -11210,6 +11871,58 @@ function installTestHarness() {
         field: fieldTestMachineEntry(),
         memory: cockpitMemoryMarkdown(),
         panel: els.capabilityPassportBox?.textContent || ""
+      };
+    },
+    applyFlightRecorderState() {
+      window.localStorage?.removeItem(FLIGHT_RECORDER_STORE_KEY);
+      this.applyDemoState();
+      saveFlightRecorderReference();
+      const baseline = flightRecorderExportDocument();
+      const currentScan = state.scan;
+      state.scan = {
+        ...currentScan,
+        raw_scan: {
+          ...(currentScan.raw_scan || {}),
+          gpu_probe: {
+            ...(currentScan.raw_scan?.gpu_probe || {}),
+            driver_version: "577.10",
+            temperature_c: 66
+          }
+        }
+      };
+      const degraded = {
+        ...demoBenchmark("qwen3:0.6b"),
+        created_at_ms: Date.now() + 10_000,
+        estimated_tokens_per_second: 26,
+        prompt_tokens_per_second: 130,
+        load_duration_ms: 240,
+        runtime_gpu_offload_percent: 60,
+        prompt: baseline.current.binding.prompt
+      };
+      state.benchmark = degraded;
+      writeBenchmarkHistory([degraded, ...readBenchmarkHistory()]);
+      renderBenchmark(degraded);
+      renderFlightRecorder();
+      const regression = flightRecorderExportDocument();
+      const nonComparableCapture = JSON.parse(JSON.stringify(regression.current));
+      nonComparableCapture.binding.tuning = { num_ctx: 8192, num_batch: 128, num_thread: 8 };
+      const nonComparable = compareFlightRecorderCaptures(regression.active_reference.capture, nonComparableCapture);
+      saveFlightRecorderReference();
+      const activeAfterSecondReference = flightRecorderSummary();
+      restorePreviousFlightRecorderReference();
+      const activeAfterRestore = flightRecorderSummary();
+      return {
+        baseline,
+        regression,
+        nonComparable,
+        activeAfterSecondReference,
+        activeAfterRestore,
+        report: readinessReport(),
+        passportDocument: capabilityPassportDocument(),
+        bridge: strategyArenaReadiness(),
+        field: fieldTestMachineEntry(),
+        markdown: flightRecorderMarkdown(),
+        panel: els.flightRecorderBox?.textContent || ""
       };
     },
     applyDemoState() {
@@ -11736,6 +12449,12 @@ els.runModelAutopilotBtn?.addEventListener("click", runModelAutopilot);
 els.applyModelAutopilotBtn?.addEventListener("click", applyModelAutopilotRecommendation);
 els.rollbackModelAutopilotBtn?.addEventListener("click", rollbackModelAutopilotProfile);
 els.benchmarkModelInput?.addEventListener("input", renderModelAutopilot);
+els.benchmarkModelInput?.addEventListener("input", renderFlightRecorder);
+els.saveFlightReferenceBtn?.addEventListener("click", saveFlightRecorderReference);
+els.compareFlightReferenceBtn?.addEventListener("click", compareCurrentFlightRecorder);
+els.restoreFlightReferenceBtn?.addEventListener("click", restorePreviousFlightRecorderReference);
+els.copyFlightRecorderJsonBtn?.addEventListener("click", copyFlightRecorderJson);
+els.copyFlightRecorderMarkdownBtn?.addEventListener("click", copyFlightRecorderMarkdown);
 els.chatSendBtn.addEventListener("click", runLocalChat);
 els.chatCopyBtn.addEventListener("click", copyLocalChatAnswer);
 els.chatMemoryBtn.addEventListener("click", saveLocalChatToMemory);
@@ -11817,6 +12536,12 @@ document.addEventListener("click", async (event) => {
   const restoreSnapshotId = event.target?.getAttribute?.("data-restore-snapshot") || "";
   if (restoreSnapshotId) {
     restoreLocalSnapshot(restoreSnapshotId);
+    return;
+  }
+
+  const flightReferenceId = event.target?.closest?.("[data-flight-reference]")?.getAttribute?.("data-flight-reference") || "";
+  if (flightReferenceId) {
+    activateFlightRecorderReference(flightReferenceId);
     return;
   }
 
@@ -12086,6 +12811,7 @@ restoreViewMode();
 loadHistory();
 renderBenchmarkHistory();
 renderModelAutopilot();
+renderFlightRecorder();
 renderPromptLibrary();
 renderChatHistory();
 renderPreparePanel();

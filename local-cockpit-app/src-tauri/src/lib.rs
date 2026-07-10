@@ -5121,6 +5121,45 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
     }
 
     #[test]
+    fn flight_recorder_benchmark_contract_keeps_exact_metrics() {
+        let mut result = benchmark_result_from_ollama_api(
+            "qwen3:0.6b".to_string(),
+            "référence reproductible".to_string(),
+            json!({
+                "message": { "role": "assistant", "content": "OK" },
+                "done": true,
+                "total_duration": 2_400_000_000_u64,
+                "load_duration": 300_000_000_u64,
+                "prompt_eval_count": 20,
+                "prompt_eval_duration": 200_000_000_u64,
+                "eval_count": 42,
+                "eval_duration": 1_400_000_000_u64
+            }),
+            Duration::from_millis(2400),
+            "auto",
+        )
+        .unwrap();
+        apply_ollama_runtime_evidence(
+            &mut result,
+            OllamaRuntimeEvidence {
+                model_size_bytes: 4_000_000_000,
+                vram_bytes: 3_000_000_000,
+                gpu_offload_percent: 75.0,
+                processor: "cpu/gpu".to_string(),
+                source: "ollama_api_ps".to_string(),
+            },
+        );
+        let value = serde_json::to_value(&result).unwrap();
+        assert_eq!(value["measurement_source"], "ollama_api");
+        assert_eq!(value["load_duration_ms"], 300);
+        assert_eq!(value["prompt_tokens_per_second"], 100.0);
+        assert_eq!(value["estimated_tokens_per_second"], 30.0);
+        assert_eq!(value["runtime_gpu_offload_percent"], 75.0);
+        assert_eq!(value["runtime_processor"], "cpu/gpu");
+        assert_eq!(value["runtime_evidence_source"], "ollama_api_ps");
+    }
+
+    #[test]
     fn app_build_info_always_identifies_the_running_binary() {
         let info = get_app_build_info();
         assert_eq!(info.app_version, env!("CARGO_PKG_VERSION"));

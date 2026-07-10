@@ -463,6 +463,23 @@
           </div>
         </article>
 
+        <article class="panel flight-recorder-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Flight Recorder</h2>
+            <span id="flightRecorderState">benchmark requis</span>
+          </div>
+          <div id="flightRecorderBox" class="flight-recorder-box empty">
+            Enregistrez explicitement une mesure de référence, puis vérifiez si un pilote, Ollama ou un réglage a dégradé les performances locales.
+          </div>
+          <div class="row-actions">
+            <button id="saveFlightReferenceBtn" type="button" disabled>Définir la référence</button>
+            <button id="compareFlightReferenceBtn" type="button" disabled>Comparer maintenant</button>
+            <button id="restoreFlightReferenceBtn" type="button" disabled>Référence précédente</button>
+            <button id="copyFlightRecorderJsonBtn" type="button" disabled>Copier JSON</button>
+            <button id="copyFlightRecorderMarkdownBtn" type="button" disabled>Copier Markdown</button>
+          </div>
+        </article>
+
         <article class="panel promptforge-panel">
           <div class="panel-title">
             <h2>PromptForge local</h2>
