@@ -2628,9 +2628,7 @@ fn parse_dmidecode_memory_modules(output: &str) -> Vec<MemoryModule> {
                 "Manufacturer" => current.manufacturer = clean_optional_string(value),
                 "Part Number" => current.part_number = clean_optional_string(value),
                 "Locator" | "Bank Locator" => {
-                    if current.slot.is_none() {
-                        current.slot = clean_optional_string(value);
-                    }
+                    current.slot = current.slot.or_else(|| clean_optional_string(value));
                 }
                 _ => {}
             }
