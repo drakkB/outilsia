@@ -53,6 +53,39 @@ function checkEffects(effects, id) {
   }
 }
 
+function checkDigitalTwinContract(item, id) {
+  const cost = item.cost_eur;
+  if (!cost || typeof cost !== "object") {
+    fail(`${id}: cost_eur missing`);
+  } else {
+    const min = number(cost.min);
+    const max = number(cost.max);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max < min) fail(`${id}: invalid cost_eur range`);
+    if (!String(cost.basis || "").trim()) fail(`${id}: cost_eur.basis missing`);
+  }
+  const requirements = item.requirements;
+  if (!requirements || typeof requirements !== "object") {
+    fail(`${id}: requirements missing`);
+    return;
+  }
+  if (item.component === "gpu") {
+    if (!(number(requirements.system_power_w) > 0)) fail(`${id}: requirements.system_power_w missing`);
+    if (!(number(requirements.gpu_power_w) > 0)) fail(`${id}: requirements.gpu_power_w missing`);
+    const source = item.spec_source;
+    if (!source || !String(source.url || "").startsWith("https://www.nvidia.com/")) fail(`${id}: official NVIDIA spec_source missing`);
+    if (!String(source.scope || "").trim()) fail(`${id}: spec_source.scope missing`);
+  }
+  if (item.component === "ram") {
+    for (const key of ["memory_type_must_match", "motherboard_limit_must_allow", "slots_must_be_checked"]) {
+      if (requirements[key] !== true) fail(`${id}: requirements.${key} must be true`);
+    }
+  }
+  if (item.component === "storage") {
+    if (requirements.storage_interface_must_be_checked !== true) fail(`${id}: storage interface check missing`);
+    if (requirements.m2_slot_not_detected_by_os !== true) fail(`${id}: OS limitation for M.2 slot missing`);
+  }
+}
+
 if (!existsSync(catalogPath)) {
   console.error(`upgrade_catalog_missing ${catalogPath}`);
   process.exit(1);
@@ -89,6 +122,7 @@ for (const [index, item] of (catalog.upgrades || []).entries()) {
   if (!affiliateUrl.includes(`tag=${amazonTag}`)) fail(`${label}: affiliate_url missing Amazon tag`);
   checkRule(item.applies_when, label);
   checkEffects(item.effects, label);
+  checkDigitalTwinContract(item, label);
 }
 
 for (const required of ["gpu", "ram", "storage"]) {

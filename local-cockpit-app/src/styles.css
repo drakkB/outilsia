@@ -106,7 +106,7 @@ button::before,
 #copyCatalogReportBtn::before,
 #copyHistoryBtn::before,
 #copyBtn::before,
-#downloadBtn::before { content: "⧉"; }
+#downloadBtn::before { content: "▣"; }
 #pairBtn::before,
 #openPairBtn::before,
 #claimBtn::before,
@@ -751,6 +751,10 @@ h2 {
 
 .sticky-action-strip[hidden] {
   display: none !important;
+}
+
+.mode-advanced .sticky-action-strip {
+  position: static;
 }
 
 .sticky-action-strip strong {
@@ -1636,7 +1640,7 @@ h2 {
 .model-autopilot-panel { grid-column: span 6; order: 37; }
 .flight-recorder-panel { grid-column: span 12; order: 38; }
 .action-panel { grid-column: span 4; order: 40; }
-.upgrade-impact-panel { grid-column: span 4; order: 41; }
+.upgrade-impact-panel { grid-column: span 12; order: 41; }
 .next-panel { grid-column: span 4; order: 42; }
 .decision-panel { grid-column: span 6; order: 50; }
 .memory-panel { grid-column: span 6; order: 51; }
@@ -2600,6 +2604,106 @@ dd {
   background: rgba(120, 220, 232, 0.18);
   border-color: rgba(120, 220, 232, 0.42);
   color: var(--text);
+}
+
+.digital-twin-controls {
+  display: grid;
+  gap: 9px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 10px;
+}
+
+.digital-twin-controls .field-label {
+  margin: 0;
+}
+
+.digital-twin-controls input,
+.digital-twin-controls select {
+  margin-top: 5px;
+  min-height: 38px;
+  width: 100%;
+}
+
+.digital-twin-verdict,
+.digital-twin-machine,
+.digital-twin-comparison,
+.digital-twin-history {
+  display: grid;
+  gap: 8px;
+}
+
+.digital-twin-verdict {
+  border-left: 3px solid var(--cyan);
+  padding-left: 10px;
+}
+
+.digital-twin-verdict.is-blocked { border-left-color: var(--red); }
+.digital-twin-verdict.is-unknown { border-left-color: var(--amber); }
+.digital-twin-verdict.is-no-buy { border-left-color: var(--green); }
+
+.digital-twin-grid,
+.digital-twin-checks,
+.digital-twin-scenarios {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.digital-twin-stat,
+.digital-twin-check,
+.digital-twin-scenario {
+  background: rgba(4, 9, 12, 0.34);
+  border: 1px solid rgba(139, 163, 174, 0.16);
+  border-radius: 7px;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.digital-twin-stat strong,
+.digital-twin-check strong,
+.digital-twin-scenario strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.digital-twin-stat span,
+.digital-twin-check span,
+.digital-twin-scenario span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.38;
+  overflow-wrap: anywhere;
+}
+
+.digital-twin-check[data-status="blocked"] { border-color: rgba(248, 113, 113, 0.46); }
+.digital-twin-check[data-status="unknown"] { border-color: rgba(241, 201, 107, 0.42); }
+.digital-twin-check[data-status="confirmed"] { border-color: rgba(134, 239, 172, 0.34); }
+
+.digital-twin-section-title {
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  margin: 4px 0 0;
+  text-transform: uppercase;
+}
+
+.digital-twin-list {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 0 0 0 17px;
+  padding: 0;
+}
+
+.digital-twin-list li { margin: 4px 0; }
+
+.digital-twin-scenario button {
+  justify-self: start;
+  margin-top: 3px;
+  min-height: 30px;
+  padding: 5px 8px;
 }
 
 .impact-unlocks {
@@ -3907,6 +4011,13 @@ dd {
   .account-panel .row-actions {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .digital-twin-controls,
+  .digital-twin-grid,
+  .digital-twin-checks,
+  .digital-twin-scenarios {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -4074,6 +4185,13 @@ dd {
   .row-actions,
   .compact-actions {
     display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .digital-twin-controls,
+  .digital-twin-grid,
+  .digital-twin-checks,
+  .digital-twin-scenarios {
     grid-template-columns: 1fr;
   }
 

@@ -64,6 +64,7 @@ SCREENSHOT_PATHS = [
     "/static/images/local-cockpit/local-cockpit-capability-passport-v1.png?v=20260710",
     "/static/images/local-cockpit/local-cockpit-model-autopilot-v1.png?v=20260710",
     "/static/images/local-cockpit/local-cockpit-flight-recorder-v1.png?v=20260710",
+    "/static/images/local-cockpit/local-cockpit-upgrade-digital-twin-v1.png?v=20260711",
 ]
 
 FALSE_JS_LINK_RE = re.compile(r'(?:href|src)="(?:get[A-Z][^"]*|item\.[^"]*|\$\{[^"]*)')
@@ -250,6 +251,12 @@ def check_download_page(base_url: str) -> dict[str, object]:
         and "causes possibles" in text.lower()
         and "ne compte jamais comme validation physique" in text
     )
+    digital_twin_ok = (
+        "Upgrade Digital Twin v1" in text
+        and "N'achetez rien pour l'instant" in text
+        and "prix ne sont pas en temps réel" in text
+        and "simulation locale ne compte jamais comme validation physique" in text
+    )
     return {
         "status": result.get("status"),
         "title_signal_ok": "Scanner PC IA locale" in text,
@@ -263,6 +270,7 @@ def check_download_page(base_url: str) -> dict[str, object]:
         "model_autopilot_ok": model_autopilot_ok,
         "doctor_passport_ok": doctor_passport_ok,
         "flight_recorder_ok": flight_recorder_ok,
+        "digital_twin_ok": digital_twin_ok,
         "ok": result.get("status") == 200
         and "Scanner PC IA locale" in text
         and all(path in text for path in SCREENSHOT_PATHS)
@@ -273,7 +281,8 @@ def check_download_page(base_url: str) -> dict[str, object]:
         and recommendation_engine_ok
         and model_autopilot_ok
         and doctor_passport_ok
-        and flight_recorder_ok,
+        and flight_recorder_ok
+        and digital_twin_ok,
     }
 
 
@@ -307,6 +316,12 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         and "causes possibles" in text.lower()
         and "ne remplace pas la campagne physique cinq machines" in text
     )
+    digital_twin_ok = (
+        "Upgrade Digital Twin v1" in text
+        and "N'achetez rien pour l'instant" in text
+        and "prix non temps réel" in text
+        and "ne compte jamais comme validation physique" in text
+    )
     return {
         "status": result.get("status"),
         "canonical_ok": canonical == absolute(base_url, "/scanner-ia-local"),
@@ -318,6 +333,7 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         "model_autopilot_ok": model_autopilot_ok,
         "doctor_passport_ok": doctor_passport_ok,
         "flight_recorder_ok": flight_recorder_ok,
+        "digital_twin_ok": digital_twin_ok,
         "ok": result.get("status") == 200
         and canonical == absolute(base_url, "/scanner-ia-local")
         and "/telecharger-scanner-ia-local" in text
@@ -327,7 +343,8 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         and recommendation_engine_ok
         and model_autopilot_ok
         and doctor_passport_ok
-        and flight_recorder_ok,
+        and flight_recorder_ok
+        and digital_twin_ok,
     }
 
 
@@ -359,6 +376,13 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
         and "never proven causality" in text
         and "never count as physical field evidence" in text
     )
+    digital_twin_ok = (
+        "Upgrade Digital Twin v1" in text
+        and "RAM type, maximum capacity and slots" in text
+        and "non-live price ranges" in text
+        and 'say "do not buy yet"' in text
+        and "never count as physical field evidence" in text
+    )
     return {
         "status": result.get("status"),
         "hub_ok": "https://outilsia.fr/scanner-ia-local" in text,
@@ -370,6 +394,7 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
         "model_autopilot_ok": model_autopilot_ok,
         "doctor_passport_ok": doctor_passport_ok,
         "flight_recorder_ok": flight_recorder_ok,
+        "digital_twin_ok": digital_twin_ok,
         "ok": result.get("status") == 200
         and "https://outilsia.fr/scanner-ia-local" in text
         and "https://outilsia.fr/telecharger-scanner-ia-local" in text
@@ -379,7 +404,8 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
         and recommendation_engine_ok
         and model_autopilot_ok
         and doctor_passport_ok
-        and flight_recorder_ok,
+        and flight_recorder_ok
+        and digital_twin_ok,
     }
 
 
@@ -477,15 +503,15 @@ def write_markdown(report: dict[str, object], path: Path) -> None:
     lines += ["", "## Téléchargement et screenshots", ""]
     hub = report["scanner_hub"]
     lines.append(
-        f"- `/scanner-ia-local` status={hub['status']} canonical={hub['canonical_ok']} download={hub['download_link_ok']} proof_engine={hub['proof_engine_ok']} objective_arena={hub['objective_arena_ok']} recommendation_engine={hub['recommendation_engine_ok']} flight_recorder={hub['flight_recorder_ok']} doctor_passport={hub['doctor_passport_ok']} terrain_caveat={hub['terrain_caveat_ok']}"
+        f"- `/scanner-ia-local` status={hub['status']} canonical={hub['canonical_ok']} download={hub['download_link_ok']} proof_engine={hub['proof_engine_ok']} objective_arena={hub['objective_arena_ok']} recommendation_engine={hub['recommendation_engine_ok']} flight_recorder={hub['flight_recorder_ok']} digital_twin={hub['digital_twin_ok']} doctor_passport={hub['doctor_passport_ok']} terrain_caveat={hub['terrain_caveat_ok']}"
     )
     dp = report["download_page"]
     lines.append(
-        f"- `/telecharger-scanner-ia-local` status={dp['status']} title={dp['title_signal_ok']} screenshots={dp['screenshot_refs_ok']} static_links={dp['static_links_ok']} proof_engine={dp['proof_engine_ok']} objective_arena={dp['objective_arena_ok']} recommendation_engine={dp['recommendation_engine_ok']} flight_recorder={dp['flight_recorder_ok']} doctor_passport={dp['doctor_passport_ok']} terrain_caveat={dp['terrain_caveat_ok']}"
+        f"- `/telecharger-scanner-ia-local` status={dp['status']} title={dp['title_signal_ok']} screenshots={dp['screenshot_refs_ok']} static_links={dp['static_links_ok']} proof_engine={dp['proof_engine_ok']} objective_arena={dp['objective_arena_ok']} recommendation_engine={dp['recommendation_engine_ok']} flight_recorder={dp['flight_recorder_ok']} digital_twin={dp['digital_twin_ok']} doctor_passport={dp['doctor_passport_ok']} terrain_caveat={dp['terrain_caveat_ok']}"
     )
     llms = report["llms_txt"]
     lines.append(
-        f"- `/llms.txt` status={llms['status']} hub={llms['hub_ok']} download={llms['download_ok']} proof_engine={llms['proof_engine_ok']} objective_arena={llms['objective_arena_ok']} recommendation_engine={llms['recommendation_engine_ok']} flight_recorder={llms['flight_recorder_ok']} doctor_passport={llms['doctor_passport_ok']} terrain_caveat={llms['terrain_caveat_ok']}"
+        f"- `/llms.txt` status={llms['status']} hub={llms['hub_ok']} download={llms['download_ok']} proof_engine={llms['proof_engine_ok']} objective_arena={llms['objective_arena_ok']} recommendation_engine={llms['recommendation_engine_ok']} flight_recorder={llms['flight_recorder_ok']} digital_twin={llms['digital_twin_ok']} doctor_passport={llms['doctor_passport_ok']} terrain_caveat={llms['terrain_caveat_ok']}"
     )
     lines += ["", "## Promesses terrain", ""]
     for item in report["field_claims"]:

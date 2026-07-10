@@ -1,6 +1,6 @@
 # OutilsIA Local Cockpit - Roadmap produit
 
-Mise à jour : 2026-07-10
+Mise à jour : 2026-07-11
 
 ## Cap produit
 
@@ -86,6 +86,21 @@ Premier jalon v1 publié le 10 juillet 2026 dans le build Windows/Linux `2912047
 - Simuler RAM, GPU, VRAM, SSD, alimentation, boîtier et compatibilité carte mère.
 - Afficher modèles débloqués, gain attendu, coût, consommation et niveau de confiance.
 - Préserver la décision « n'achetez rien » lorsque la preuve locale est déjà suffisante.
+
+Premier jalon v1 implémenté dans les sources le 11 juillet 2026. La publication Windows/Linux reste conditionnée à la réussite de toutes les gates et ne remplace pas la campagne terrain physique.
+
+- [x] Construire un instantané local depuis Hardware Doctor et le Capability Passport : RAM/type/modules/emplacements, carte mère/BIOS, GPU/PCIe/driver/puissance, stockage et runtimes.
+- [x] Comparer des scénarios RAM, GPU/VRAM, SSD, alimentation, longueur de carte et refroidissement sans modifier la machine.
+- [x] Vérifier les contraintes connues et conserver `unknown` quand les connecteurs, dimensions, emplacements M.2 ou limites physiques ne sont pas mesurables.
+- [x] Séparer provenance mesurée, catalogue, déclaration utilisateur et estimation ; afficher fourchettes de coût non temps réel et niveau de confiance.
+- [x] Calculer les modèles/usages potentiellement débloqués et conserver les verdicts bloqué, à mesurer, candidat et « n'achetez rien pour l'instant ».
+- [x] Sauvegarder/restaurer plusieurs scénarios localement et exporter JSON, Markdown et PDF.
+- [x] Propager un résumé borné au rapport, à MemoryForge, au Passport, au terrain et à Strategy Arena en lecture seule.
+- [x] Garantir qu'un scénario Digital Twin reste `simulation_only`, `local_only` et ne constitue jamais une preuve terrain physique.
+- [x] Ajouter les tests Rust, contrat catalogue et recette Playwright desktop/mobile.
+- [x] Documenter la fonction sur le hub, la page de téléchargement, `llms.txt`, le README et le monitoring SEO/GEO.
+- [ ] Publier le build Windows/Linux uniquement après toutes les gates vertes et vérifier les artefacts/SHA-256 en production.
+- [ ] Recaler coûts, consommation et contraintes seulement à partir de sources officielles ou de mesures terrain réelles.
 
 ## Phase 6 - Interopérabilité locale
 

@@ -309,14 +309,68 @@
           </div>
         </article>
 
-        <article class="panel upgrade-impact-panel advanced-panel">
+        <article class="panel upgrade-impact-panel upgrade-digital-twin-panel advanced-panel">
           <div class="panel-title">
-            <h2>Impact upgrade</h2>
+            <h2>Upgrade Digital Twin</h2>
             <span id="upgradeImpactState">non calculé</span>
           </div>
-          <div id="upgradeImpactBox" class="upgrade-impact-box empty">Le diagnostic montrera ce que l'upgrade prioritaire change concrètement : VRAM/RAM/stockage et modèles débloqués.</div>
+          <div class="digital-twin-controls">
+            <label class="field-label" for="digitalTwinScenarioName">Scénario
+              <input id="digitalTwinScenarioName" type="text" maxlength="64" value="Upgrade à étudier" autocomplete="off">
+            </label>
+            <label class="field-label" for="digitalTwinGpuSelect">GPU
+              <select id="digitalTwinGpuSelect">
+                <option value="current">Conserver le GPU actuel</option>
+                <option value="rtx3060_12gb">RTX 3060 12 Go</option>
+                <option value="rtx4060ti_16gb">RTX 4060 Ti 16 Go</option>
+                <option value="rtx3090_24gb">RTX 3090 24 Go</option>
+              </select>
+            </label>
+            <label class="field-label" for="digitalTwinRamSelect">RAM cible
+              <select id="digitalTwinRamSelect">
+                <option value="0">Conserver la RAM actuelle</option>
+                <option value="32">32 Go</option>
+                <option value="64">64 Go</option>
+                <option value="128">128 Go</option>
+              </select>
+            </label>
+            <label class="field-label" for="digitalTwinStorageSelect">Stockage ajouté
+              <select id="digitalTwinStorageSelect">
+                <option value="0">Aucun</option>
+                <option value="1000">SSD 1 To</option>
+                <option value="2000">SSD 2 To</option>
+              </select>
+            </label>
+            <label class="field-label" for="digitalTwinPsuInput">Alimentation prévue (W)
+              <input id="digitalTwinPsuInput" type="number" min="0" max="2000" step="50" value="0" inputmode="numeric">
+            </label>
+            <label class="field-label" for="digitalTwinCaseClearanceInput">Place GPU boîtier (mm)
+              <input id="digitalTwinCaseClearanceInput" type="number" min="0" max="1000" step="1" value="0" inputmode="numeric">
+            </label>
+            <label class="field-label" for="digitalTwinGpuLengthInput">Longueur carte choisie (mm)
+              <input id="digitalTwinGpuLengthInput" type="number" min="0" max="1000" step="1" value="0" inputmode="numeric">
+            </label>
+            <label class="field-label" for="digitalTwinAirflowSelect">Refroidissement boîtier
+              <select id="digitalTwinAirflowSelect">
+                <option value="unknown">À confirmer</option>
+                <option value="standard">Standard</option>
+                <option value="high">Bon flux d'air</option>
+              </select>
+            </label>
+          </div>
           <div class="row-actions">
-            <button id="copyUpgradeImpactBtn" type="button" disabled>Copier impact</button>
+            <button id="simulateDigitalTwinBtn" type="button" disabled>Simuler</button>
+            <button id="saveDigitalTwinBtn" type="button" disabled>Enregistrer</button>
+            <button id="restoreDigitalTwinBtn" type="button" disabled>Scénario précédent</button>
+          </div>
+          <div id="upgradeImpactBox" class="upgrade-impact-box empty">Le scan construira un jumeau matériel sans modifier la machine. Les inconnues physiques resteront à confirmer avant achat.</div>
+          <div class="row-actions">
+            <button id="copyUpgradeImpactBtn" type="button" disabled>Copier impact court</button>
+            <button id="copyDigitalTwinJsonBtn" type="button" disabled>Copier JSON</button>
+            <button id="copyDigitalTwinMarkdownBtn" type="button" disabled>Copier Markdown</button>
+            <button id="downloadDigitalTwinJsonBtn" type="button" disabled>Télécharger JSON</button>
+            <button id="downloadDigitalTwinMarkdownBtn" type="button" disabled>Télécharger Markdown</button>
+            <button id="pdfDigitalTwinBtn" type="button" disabled>Rapport PDF</button>
           </div>
         </article>
 

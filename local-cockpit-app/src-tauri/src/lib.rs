@@ -83,6 +83,7 @@ struct GpuProbe {
 struct MemoryProbe {
     total_gb: Option<u32>,
     module_count: Option<u32>,
+    memory_type: Option<String>,
     configured_clock_mhz: Option<u32>,
     speed_mhz: Option<u32>,
     channel_mode: String,
@@ -95,6 +96,7 @@ struct MemoryProbe {
 #[serde(rename_all = "snake_case")]
 struct MemoryModule {
     size_gb: Option<u32>,
+    memory_type: Option<String>,
     configured_clock_mhz: Option<u32>,
     speed_mhz: Option<u32>,
     manufacturer: Option<String>,
@@ -2803,7 +2805,7 @@ fn detect_windows_memory_probe(total_gb: Option<u32>) -> Option<MemoryProbe> {
     if !cfg!(target_os = "windows") {
         return None;
     }
-    let script = "Get-CimInstance Win32_PhysicalMemory | ForEach-Object { [string]::Join('|', @($_.Capacity,$_.ConfiguredClockSpeed,$_.Speed,$_.Manufacturer,$_.PartNumber,$_.DeviceLocator)) }";
+    let script = "Get-CimInstance Win32_PhysicalMemory | ForEach-Object { [string]::Join('|', @($_.Capacity,$_.ConfiguredClockSpeed,$_.Speed,$_.Manufacturer,$_.PartNumber,$_.DeviceLocator,$_.SMBIOSMemoryType)) }";
     let output = run_command("powershell.exe", &["-NoProfile", "-Command", script])
         .or_else(|| run_command("powershell", &["-NoProfile", "-Command", script]))?;
     let modules = parse_memory_module_lines(&output);
@@ -2847,6 +2849,10 @@ fn parse_memory_module_lines(output: &str) -> Vec<MemoryModule> {
             }
             Some(MemoryModule {
                 size_gb,
+                memory_type: parts
+                    .get(6)
+                    .and_then(|value| value.trim().parse::<u32>().ok())
+                    .and_then(memory_type_from_smbios_code),
                 configured_clock_mhz: parts.get(1).and_then(|value| parse_optional_u32(value)),
                 speed_mhz: parts.get(2).and_then(|value| parse_optional_u32(value)),
                 manufacturer: parts.get(3).and_then(|value| clean_optional_string(value)),
@@ -2861,6 +2867,7 @@ fn parse_dmidecode_memory_modules(output: &str) -> Vec<MemoryModule> {
     let mut modules = Vec::new();
     let mut current = MemoryModule {
         size_gb: None,
+        memory_type: None,
         configured_clock_mhz: None,
         speed_mhz: None,
         manufacturer: None,
@@ -2878,6 +2885,7 @@ fn parse_dmidecode_memory_modules(output: &str) -> Vec<MemoryModule> {
             in_device = true;
             current = MemoryModule {
                 size_gb: None,
+                memory_type: None,
                 configured_clock_mhz: None,
                 speed_mhz: None,
                 manufacturer: None,
@@ -2893,6 +2901,7 @@ fn parse_dmidecode_memory_modules(output: &str) -> Vec<MemoryModule> {
             let value = value.trim();
             match key.trim() {
                 "Size" => current.size_gb = parse_memory_size_gb(value),
+                "Type" => current.memory_type = clean_optional_string(value),
                 "Configured Memory Speed" => current.configured_clock_mhz = parse_memory_mhz(value),
                 "Speed" => current.speed_mhz = parse_memory_mhz(value),
                 "Manufacturer" => current.manufacturer = clean_optional_string(value),
@@ -2936,12 +2945,40 @@ fn parse_memory_mhz(value: &str) -> Option<u32> {
         .find_map(|part| part.trim().parse::<u32>().ok())
 }
 
+fn memory_type_from_smbios_code(code: u32) -> Option<String> {
+    let label = match code {
+        20 => "DDR",
+        21 => "DDR2",
+        24 => "DDR3",
+        26 => "DDR4",
+        27 => "LPDDR",
+        28 => "LPDDR2",
+        29 => "LPDDR3",
+        30 => "LPDDR4",
+        34 => "DDR5",
+        35 => "LPDDR5",
+        _ => return None,
+    };
+    Some(label.to_string())
+}
+
 fn memory_probe_from_modules(
     total_gb: Option<u32>,
     modules: Vec<MemoryModule>,
     source: &str,
 ) -> MemoryProbe {
     let module_count = modules.len() as u32;
+    let mut memory_types: Vec<String> = modules
+        .iter()
+        .filter_map(|module| module.memory_type.clone())
+        .collect();
+    memory_types.sort();
+    memory_types.dedup();
+    let memory_type = if memory_types.len() == 1 {
+        memory_types.into_iter().next()
+    } else {
+        None
+    };
     let configured_clock_mhz = modules
         .iter()
         .filter_map(|module| module.configured_clock_mhz)
@@ -2958,6 +2995,7 @@ fn memory_probe_from_modules(
     MemoryProbe {
         total_gb,
         module_count: Some(module_count),
+        memory_type,
         configured_clock_mhz,
         speed_mhz,
         channel_mode,
@@ -2971,6 +3009,7 @@ fn fallback_memory_probe(total_gb: Option<u32>, source: &str) -> MemoryProbe {
     MemoryProbe {
         total_gb,
         module_count: None,
+        memory_type: None,
         configured_clock_mhz: None,
         speed_mhz: None,
         channel_mode: "unknown".to_string(),
@@ -4733,6 +4772,7 @@ mod tests {
             vec![
                 MemoryModule {
                     size_gb: Some(32),
+                    memory_type: Some("DDR5".to_string()),
                     configured_clock_mhz: Some(6000),
                     speed_mhz: Some(5600),
                     manufacturer: Some("Demo".to_string()),
@@ -4741,6 +4781,7 @@ mod tests {
                 },
                 MemoryModule {
                     size_gb: Some(32),
+                    memory_type: Some("DDR5".to_string()),
                     configured_clock_mhz: Some(6000),
                     speed_mhz: Some(5600),
                     manufacturer: Some("Demo".to_string()),
@@ -4754,6 +4795,7 @@ mod tests {
         assert_eq!(probe.configured_clock_mhz, Some(6000));
         assert_eq!(probe.speed_mhz, Some(5600));
         assert_eq!(probe.module_count, Some(2));
+        assert_eq!(probe.memory_type.as_deref(), Some("DDR5"));
     }
 
     #[test]
@@ -4889,8 +4931,8 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
     #[test]
     fn parses_windows_memory_modules_and_clock() {
         let output = "\
-34359738368|6000|5600|Kingston|KF560C36|A2
-34359738368|6000|5600|Kingston|KF560C36|B2
+34359738368|6000|5600|Kingston|KF560C36|A2|34
+34359738368|6000|5600|Kingston|KF560C36|B2|34
 0|0|0|||
 ";
         let modules = parse_memory_module_lines(output);
@@ -4899,10 +4941,12 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
         assert_eq!(modules[0].configured_clock_mhz, Some(6000));
         assert_eq!(modules[0].speed_mhz, Some(5600));
         assert_eq!(modules[0].slot.as_deref(), Some("A2"));
+        assert_eq!(modules[0].memory_type.as_deref(), Some("DDR5"));
         let probe = memory_probe_from_modules(Some(64), modules, "test-win32");
         assert_eq!(probe.channel_mode, "dual_channel_estimated");
         assert_eq!(probe.configured_clock_mhz, Some(6000));
         assert_eq!(probe.speed_mhz, Some(5600));
+        assert_eq!(probe.memory_type.as_deref(), Some("DDR5"));
     }
 
     #[test]
