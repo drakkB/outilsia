@@ -4,12 +4,12 @@
   "channel": "beta",
   "version": "0.1.1",
   "label": "0.1.1-beta",
-  "build_id": "20260707105223",
-  "published_at": "2026-07-08T14:26:41.461Z",
+  "build_id": "290614767341",
+  "published_at": "2026-07-10T01:09:50.953Z",
   "build_provenance": {
     "schema": "outilsia.local_cockpit_build_provenance.v1",
-    "packaged_at": "2026-07-07T11:01:18.614Z",
-    "build_id": "20260707105223",
+    "packaged_at": "2026-07-10T01:09:50.953Z",
+    "build_id": "290614767341",
     "version": "0.1.1",
     "ci": true,
     "runner_os": "Linux",
@@ -19,19 +19,20 @@
       "linux"
     ],
     "github": {
-      "workflow": "Local Cockpit Linux Beta",
-      "run_id": "28860959229",
+      "workflow": "Local Cockpit Cross Platform Beta",
+      "run_id": "29061476734",
       "run_attempt": "1",
       "ref": "refs/heads/main",
-      "sha": "353bc4d39eaebea2f9fc975f0ee1c3ced9fabb75",
+      "sha": "4e4c79cc8f83f84fa1e89d9a0185319434d1ce8f",
       "repository": "drakkB/outilsia"
     },
-    "manual_windows_patch": true,
-    "windows_patch_commit": "3030b69",
-    "windows_patch_note": "Windows setup rebuilt locally from C:\\Users\\chris\\outilsia-repo with DriverDoctor and unified memory support; Linux artifacts remain from the existing public beta build."
+    "release_candidate_reason": "Build candidate publié pour collecter les tests physiques multi-machines; validation terrain non déclarée."
   },
   "release_notes": [
-    "DriverDoctor Windows : détection driver NVIDIA/AMD/Intel, conseils CUDA/ROCm/Vulkan, RAM dual-channel/fréquence et mémoire unifiée Strix Halo/Ryzen AI Max.",
+    "Retest CPU après erreur CUDA : OutilsIA force num_gpu=0 via l'API Ollama pour distinguer un modèle fonctionnel d'un pilote GPU bloqué.",
+    "Potentiel matériel et état du runtime sont séparés : un score GPU élevé ne masque plus un échec CUDA/Ollama réel.",
+    "DriverDoctor : détection des pilotes NVIDIA/AMD/Intel, conseils CUDA/ROCm/Vulkan, RAM dual-channel, fréquence mémoire et mémoire unifiée.",
+    "Mode Essentiel resserré : une action principale, le matériel directement sous le scan et la preuve benchmark conservée à l'écran.",
     "Bibliothèque Mes prompts : sauvegarder les prompts optimisés, les réutiliser dans Benchmark ou Dialogue, copier/exporter la bibliothèque.",
     "Parcours guidé étendu : scan, diagnostic, Ollama, modèle test, benchmark, PromptForge, dialogue local, Arena et rapport final MemoryForge.",
     "PromptForge local intégré : optimiser un prompt de benchmark/dialogue, l'envoyer vers Ollama et le sauvegarder dans MemoryForge.",
@@ -50,90 +51,106 @@
   ],
   "freshness": {
     "newest_source": "local-cockpit-app/src/styles.css",
-    "newest_source_mtime_ms": 1783421831205,
+    "newest_source_mtime_ms": 1783645399730,
     "oldest_artifact": "local-cockpit-app/src-tauri/target/release/bundle/deb/OutilsIA Local Cockpit_0.1.1_amd64.deb",
-    "oldest_artifact_mtime_ms": 1783421998771,
+    "oldest_artifact_mtime_ms": 1783645711697,
     "allow_stale": false,
     "stale": false
   },
   "primary_download": {
-    "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64-driverdoctor.exe",
+    "name": "OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-windows-x64.exe",
     "original_name": "OutilsIA Local Cockpit_0.1.1_x64-setup.exe",
     "platform": "windows-x64",
-    "size_bytes": 3790369,
-    "sha256": "c0af11f3539b5c0a81e020d9505d8e4f1aab2d7c20b732d1c01bea78dcf776fb",
-    "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64-driverdoctor.exe"
+    "size_bytes": 3787533,
+    "sha256": "bdf6cc5b85bc3e1cda4ae14532f8dd98ed93184757cc100cb9ea94c6e4d99cdb",
+    "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-windows-x64.exe"
   },
   "downloads_by_platform": {
     "windows-x64": [
       {
-        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64-driverdoctor.exe",
+        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-windows-x64.exe",
         "original_name": "OutilsIA Local Cockpit_0.1.1_x64-setup.exe",
         "platform": "windows-x64",
-        "size_bytes": 3790369,
-        "sha256": "c0af11f3539b5c0a81e020d9505d8e4f1aab2d7c20b732d1c01bea78dcf776fb",
-        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64-driverdoctor.exe"
+        "size_bytes": 3787533,
+        "sha256": "bdf6cc5b85bc3e1cda4ae14532f8dd98ed93184757cc100cb9ea94c6e4d99cdb",
+        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-windows-x64.exe"
+      },
+      {
+        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-windows-x64.msi",
+        "original_name": "OutilsIA Local Cockpit_0.1.1_x64_en-US.msi",
+        "platform": "windows-x64",
+        "size_bytes": 5214208,
+        "sha256": "49395b2d9b5835491e2a8f043d31580af15b7699e1bc4e76e785f640ebcd0e5f",
+        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-windows-x64.msi"
       }
     ],
     "linux": [
       {
-        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-linux.appimage",
+        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-linux.appimage",
         "original_name": "OutilsIA Local Cockpit_0.1.1_amd64.AppImage",
         "platform": "linux",
-        "size_bytes": 79882744,
-        "sha256": "191f31c2786fd97fea1883e21f9ca5cc5a72c9a99156c4cbff60132696f534e3",
-        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-linux.appimage"
+        "size_bytes": 79792632,
+        "sha256": "eccfc5e3dea270dbef4b1c7b82620ac792ab8a583fbe1d0e29919ea0dfaef9cd",
+        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-linux.appimage"
       },
       {
-        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-linux.deb",
+        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-linux.deb",
         "original_name": "OutilsIA Local Cockpit_0.1.1_amd64.deb",
         "platform": "linux",
-        "size_bytes": 5540258,
-        "sha256": "ebda7689448b97805819d46ba11fd0ea845274141a8fb809bc1ad00ae1da8af0",
-        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-linux.deb"
+        "size_bytes": 5435794,
+        "sha256": "be77115919aba0c2dce732b8fe775caeb67bff721b1eaf4daa793c68343f50a3",
+        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-linux.deb"
       },
       {
-        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-linux.rpm",
+        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-linux.rpm",
         "original_name": "OutilsIA Local Cockpit-0.1.1-1.x86_64.rpm",
         "platform": "linux",
-        "size_bytes": 5540029,
-        "sha256": "ff40586860a949c873412d7eb294e7baae09935ad70a879846194b98b140c1be",
-        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-linux.rpm"
+        "size_bytes": 5436512,
+        "sha256": "a7ecbd13e12a41fd4e0cbb59c845c824899e36cd97925f7b2786c1e03b30c16c",
+        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-linux.rpm"
       }
     ]
   },
   "files": [
     {
-      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64-driverdoctor.exe",
+      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-windows-x64.exe",
       "original_name": "OutilsIA Local Cockpit_0.1.1_x64-setup.exe",
       "platform": "windows-x64",
-      "size_bytes": 3790369,
-      "sha256": "c0af11f3539b5c0a81e020d9505d8e4f1aab2d7c20b732d1c01bea78dcf776fb",
-      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-windows-x64-driverdoctor.exe"
+      "size_bytes": 3787533,
+      "sha256": "bdf6cc5b85bc3e1cda4ae14532f8dd98ed93184757cc100cb9ea94c6e4d99cdb",
+      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-windows-x64.exe"
     },
     {
-      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-linux.appimage",
+      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-windows-x64.msi",
+      "original_name": "OutilsIA Local Cockpit_0.1.1_x64_en-US.msi",
+      "platform": "windows-x64",
+      "size_bytes": 5214208,
+      "sha256": "49395b2d9b5835491e2a8f043d31580af15b7699e1bc4e76e785f640ebcd0e5f",
+      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-windows-x64.msi"
+    },
+    {
+      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-linux.appimage",
       "original_name": "OutilsIA Local Cockpit_0.1.1_amd64.AppImage",
       "platform": "linux",
-      "size_bytes": 79882744,
-      "sha256": "191f31c2786fd97fea1883e21f9ca5cc5a72c9a99156c4cbff60132696f534e3",
-      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-linux.appimage"
+      "size_bytes": 79792632,
+      "sha256": "eccfc5e3dea270dbef4b1c7b82620ac792ab8a583fbe1d0e29919ea0dfaef9cd",
+      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-linux.appimage"
     },
     {
-      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-linux.deb",
+      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-linux.deb",
       "original_name": "OutilsIA Local Cockpit_0.1.1_amd64.deb",
       "platform": "linux",
-      "size_bytes": 5540258,
-      "sha256": "ebda7689448b97805819d46ba11fd0ea845274141a8fb809bc1ad00ae1da8af0",
-      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-linux.deb"
+      "size_bytes": 5435794,
+      "sha256": "be77115919aba0c2dce732b8fe775caeb67bff721b1eaf4daa793c68343f50a3",
+      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-linux.deb"
     },
     {
-      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-linux.rpm",
+      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-linux.rpm",
       "original_name": "OutilsIA Local Cockpit-0.1.1-1.x86_64.rpm",
       "platform": "linux",
-      "size_bytes": 5540029,
-      "sha256": "ff40586860a949c873412d7eb294e7baae09935ad70a879846194b98b140c1be",
-      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-20260707105223-linux.rpm"
+      "size_bytes": 5436512,
+      "sha256": "a7ecbd13e12a41fd4e0cbb59c845c824899e36cd97925f7b2786c1e03b30c16c",
+      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-290614767341-linux.rpm"
     }
   ]
 }

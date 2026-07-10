@@ -1566,8 +1566,8 @@ function main() {
     ? join(repoRoot, "server-work", "static", "downloads", "local-cockpit", primaryDownload.name)
     : "";
   for (const name of readdirSync(installerDir)) {
-    if (/^OutilsIA-Local-Cockpit-.*-windows-x64\.exe$/i.test(name) && name !== primaryDownload.name) {
-      rmSync(join(installerDir, name), { force: true });
+    if (/^OutilsIA-Local-Cockpit-/i.test(name) && name !== primaryDownload.name) {
+      rmSync(join(installerDir, name), { force: true, recursive: true });
     }
   }
   const installerTarget = primaryDownload.name ? join(installerDir, primaryDownload.name) : "";
@@ -1962,9 +1962,11 @@ Get-Content -LiteralPath $manifestPath -Encoding UTF8 | ForEach-Object {
 }
 $expectedBuildId = [string]$manifest["build_id"]
 $expectedAppVersion = [string]$manifest["version"]
+$expectedInstallerName = [string]$manifest["installer_name"]
 $expectedInstallerSha = ([string]$manifest["installer_sha256"]).ToLowerInvariant()
 if ([string]::IsNullOrWhiteSpace($expectedBuildId)) { Fail "build_id absent du manifeste terrain" }
 if ([string]::IsNullOrWhiteSpace($expectedAppVersion)) { Fail "version absente du manifeste terrain" }
+if ([string]::IsNullOrWhiteSpace($expectedInstallerName)) { Fail "installer_name absent du manifeste terrain" }
 if ([string]::IsNullOrWhiteSpace($expectedInstallerSha)) { Fail "installer_sha256 absent du manifeste terrain" }
 $profile = if ([string]::IsNullOrWhiteSpace($Profile)) { [string]$progress.next_profile } else { [string]$Profile }
 if ([string]::IsNullOrWhiteSpace($profile)) { Fail "aucun profil: la campagne semble deja complete" }
@@ -2081,15 +2083,16 @@ $startHerePackHtml | Set-Content -LiteralPath (Join-Path $target "START-HERE.htm
 
 $installerDir = Join-Path $PSScriptRoot "installer"
 if (!(Test-Path -LiteralPath $installerDir)) { Fail "dossier installer introuvable" }
-$installerFiles = @(Get-ChildItem -LiteralPath $installerDir -File -ErrorAction SilentlyContinue)
-if ($installerFiles.Count -eq 0) { Fail "aucun installeur dans le dossier installer" }
-foreach ($installer in $installerFiles) {
-  Copy-Item -LiteralPath $installer.FullName -Destination (Join-Path (Join-Path $target "installer") $installer.Name) -Force
-}
+$installerPath = Join-Path $installerDir $expectedInstallerName
+if (!(Test-Path -LiteralPath $installerPath -PathType Leaf)) { Fail "installeur attendu introuvable: $expectedInstallerName" }
+$actualInstallerSha = Sha256 $installerPath
+if ($actualInstallerSha -ne $expectedInstallerSha) { Fail "SHA256 installeur source invalide: $expectedInstallerName" }
+Copy-Item -LiteralPath $installerPath -Destination (Join-Path (Join-Path $target "installer") $expectedInstallerName) -Force
 
 Set-Content -LiteralPath (Join-Path $target "EXPECTED-FIELD-PROFILE.txt") -Value $profile -Encoding UTF8
 Set-Content -LiteralPath (Join-Path $target "EXPECTED-BUILD-ID.txt") -Value $expectedBuildId -Encoding UTF8
 Set-Content -LiteralPath (Join-Path $target "EXPECTED-APP-VERSION.txt") -Value $expectedAppVersion -Encoding UTF8
+Set-Content -LiteralPath (Join-Path $target "EXPECTED-INSTALLER-NAME.txt") -Value $expectedInstallerName -Encoding UTF8
 Set-Content -LiteralPath (Join-Path $target "EXPECTED-INSTALLER-SHA256.txt") -Value $expectedInstallerSha -Encoding UTF8
 $readme = @(
   "# OutilsIA - pack prochain PC",
@@ -2309,12 +2312,15 @@ if (!(Test-Path -LiteralPath $expectedProfilePath)) { Fail "EXPECTED-FIELD-PROFI
 $expectedProfile = (Get-Content -LiteralPath $expectedProfilePath -Raw -Encoding UTF8).Trim()
 $expectedBuildPath = Join-Path $PSScriptRoot "EXPECTED-BUILD-ID.txt"
 $expectedVersionPath = Join-Path $PSScriptRoot "EXPECTED-APP-VERSION.txt"
+$expectedInstallerNamePath = Join-Path $PSScriptRoot "EXPECTED-INSTALLER-NAME.txt"
 $expectedInstallerShaPath = Join-Path $PSScriptRoot "EXPECTED-INSTALLER-SHA256.txt"
 if (!(Test-Path -LiteralPath $expectedBuildPath)) { Fail "EXPECTED-BUILD-ID.txt introuvable" }
 if (!(Test-Path -LiteralPath $expectedVersionPath)) { Fail "EXPECTED-APP-VERSION.txt introuvable" }
+if (!(Test-Path -LiteralPath $expectedInstallerNamePath)) { Fail "EXPECTED-INSTALLER-NAME.txt introuvable" }
 if (!(Test-Path -LiteralPath $expectedInstallerShaPath)) { Fail "EXPECTED-INSTALLER-SHA256.txt introuvable" }
 $expectedBuildId = (Get-Content -LiteralPath $expectedBuildPath -Raw -Encoding UTF8).Trim()
 $expectedAppVersion = (Get-Content -LiteralPath $expectedVersionPath -Raw -Encoding UTF8).Trim()
+$expectedInstallerName = (Get-Content -LiteralPath $expectedInstallerNamePath -Raw -Encoding UTF8).Trim()
 $expectedInstallerSha = (Get-Content -LiteralPath $expectedInstallerShaPath -Raw -Encoding UTF8).Trim().ToLowerInvariant()
 $profileCommand = "TESTER-" + $expectedProfile.ToUpperInvariant().Replace("_", "-") + ".cmd"
 $required = @(
@@ -2342,12 +2348,15 @@ foreach ($file in $required) {
 $installerDir = Join-Path $PSScriptRoot "installer"
 $installerFiles = @(Get-ChildItem -LiteralPath $installerDir -File -ErrorAction SilentlyContinue)
 if ($installerFiles.Count -eq 0) { $missing += "installer/*" }
-$firstInstaller = if ($installerFiles.Count -gt 0) { $installerFiles[0] } else { $null }
-$actualInstallerSha = if ($firstInstaller) { Sha256 $firstInstaller.FullName } else { "" }
-if ($firstInstaller -and $expectedBuildId -and !$firstInstaller.Name.Contains($expectedBuildId)) {
+if ($installerFiles.Count -gt 1) { $missing += "installer_count_mismatch" }
+$expectedInstallerPath = Join-Path $installerDir $expectedInstallerName
+$installer = if (Test-Path -LiteralPath $expectedInstallerPath -PathType Leaf) { Get-Item -LiteralPath $expectedInstallerPath } else { $null }
+if (!$installer) { $missing += "installer_name_mismatch" }
+$actualInstallerSha = if ($installer) { Sha256 $installer.FullName } else { "" }
+if ($installer -and $expectedBuildId -and !$installer.Name.Contains($expectedBuildId)) {
   $missing += "installer_build_id_mismatch"
 }
-if ($firstInstaller -and $expectedInstallerSha -and $actualInstallerSha -ne $expectedInstallerSha) {
+if ($installer -and $expectedInstallerSha -and $actualInstallerSha -ne $expectedInstallerSha) {
   $missing += "installer_sha256_mismatch"
 }
 
@@ -2361,7 +2370,8 @@ $result = [ordered]@{
   expected_build_id = $expectedBuildId
   expected_app_version = $expectedAppVersion
   expected_installer_sha256 = $expectedInstallerSha
-  installer = if ($firstInstaller) { $firstInstaller.Name } else { "" }
+  expected_installer_name = $expectedInstallerName
+  installer = if ($installer) { $installer.Name } else { "" }
   installer_sha256 = $actualInstallerSha
   profile_command = $profileCommand
 }
@@ -3246,6 +3256,8 @@ foreach ($file in $requiredFiles) {
 }
 $actualSha = ""
 $installerBytes = 0
+$installerFiles = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot "installer") -File -ErrorAction SilentlyContinue)
+if ($installerFiles.Count -ne 1) { $missing += "le dossier installer doit contenir exactement un fichier" }
 if (Test-Path -LiteralPath $installerPath) {
   $actualSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $installerPath).Hash.ToLowerInvariant()
   $installerBytes = (Get-Item -LiteralPath $installerPath).Length
