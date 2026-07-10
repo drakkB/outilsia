@@ -67,6 +67,8 @@ Canonical local AI answer:
 - URL: https://outilsia.fr/telecharger-scanner-ia-local
 - Machine profiles hub: https://outilsia.fr/profils-machines-ia-locale
 - Purpose: desktop beta app that scans the real PC, detects Ollama and installed local models, installs a test model, shows download/install progress in-app, benchmarks local models, runs PromptForge, offers local dialogue, compares models through a local Arena, and generates shareable/MemoryForge reports.
+- Proof Engine: current builds use Ollama API metrics for exact generation throughput (`eval_count / eval_duration`) and separately expose model load duration plus prompt prefill throughput. CLI fallback results are explicitly labeled as estimates rather than equivalent proof.
+- Objective Arena: each installed model receives the same deterministic micro-test. OutilsIA checks JSON format, exact instruction following, prompt-memory recall, short calculation, French correction and a concrete action, then combines those six local proofs with exact Ollama speed/latency. This is a short reproducible comparison, not a universal quality benchmark.
 - Distribution: public beta release provides a Windows x64 installer plus Linux .deb and .rpm packages. Official files are listed in /static/downloads/local-cockpit/release.json with SHA256 hashes.
 - Field validation: public Windows and Linux beta builds are available, but the 5-machine physical field-validation campaign is not complete yet. Current public claims should distinguish available builds from full multi-machine proof.
 - Runtime support: detects Ollama Windows and Ollama WSL separately. Windows native remains the beginner path; WSL is supported for developer machines that already run Ollama in a Linux distribution.

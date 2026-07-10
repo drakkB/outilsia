@@ -221,6 +221,8 @@ def check_download_page(base_url: str) -> dict[str, object]:
         )
     )
     terrain_caveat_ok = "campagne terrain 5 machines reste en cours" in text
+    proof_engine_ok = "eval_count / eval_duration" in text and "load_duration" in text
+    objective_arena_ok = "Arena objective v1" in text and "six preuves" in text
     return {
         "status": result.get("status"),
         "title_signal_ok": "Scanner PC IA locale" in text,
@@ -228,11 +230,15 @@ def check_download_page(base_url: str) -> dict[str, object]:
         "screenshot_refs_ok": all(path in text for path in SCREENSHOT_PATHS),
         "static_links_ok": static_links_ok,
         "terrain_caveat_ok": terrain_caveat_ok,
+        "proof_engine_ok": proof_engine_ok,
+        "objective_arena_ok": objective_arena_ok,
         "ok": result.get("status") == 200
         and "Scanner PC IA locale" in text
         and all(path in text for path in SCREENSHOT_PATHS)
         and static_links_ok
-        and terrain_caveat_ok,
+        and terrain_caveat_ok
+        and proof_engine_ok
+        and objective_arena_ok,
     }
 
 
@@ -240,30 +246,42 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
     result = fetch(absolute(base_url, "/scanner-ia-local"))
     text = str(result.get("text") or "")
     canonical = canonical_href(text)
+    proof_engine_ok = "eval_count / eval_duration" in text and "prompt_eval_count" in text
+    objective_arena_ok = "Arena objective v1" in text and "six vérifications" in text
     return {
         "status": result.get("status"),
         "canonical_ok": canonical == absolute(base_url, "/scanner-ia-local"),
         "download_link_ok": "/telecharger-scanner-ia-local" in text,
         "terrain_caveat_ok": "validation terrain multi-machines reste en cours" in text,
+        "proof_engine_ok": proof_engine_ok,
+        "objective_arena_ok": objective_arena_ok,
         "ok": result.get("status") == 200
         and canonical == absolute(base_url, "/scanner-ia-local")
         and "/telecharger-scanner-ia-local" in text
-        and "validation terrain multi-machines reste en cours" in text,
+        and "validation terrain multi-machines reste en cours" in text
+        and proof_engine_ok
+        and objective_arena_ok,
     }
 
 
 def check_llms_txt(base_url: str) -> dict[str, object]:
     result = fetch(absolute(base_url, "/llms.txt"), read_limit=300_000)
     text = str(result.get("text") or "")
+    proof_engine_ok = "eval_count / eval_duration" in text
+    objective_arena_ok = "Objective Arena" in text and "six local proofs" in text
     return {
         "status": result.get("status"),
         "hub_ok": "https://outilsia.fr/scanner-ia-local" in text,
         "download_ok": "https://outilsia.fr/telecharger-scanner-ia-local" in text,
         "terrain_caveat_ok": "5-machine physical field-validation campaign is not complete yet" in text,
+        "proof_engine_ok": proof_engine_ok,
+        "objective_arena_ok": objective_arena_ok,
         "ok": result.get("status") == 200
         and "https://outilsia.fr/scanner-ia-local" in text
         and "https://outilsia.fr/telecharger-scanner-ia-local" in text
-        and "5-machine physical field-validation campaign is not complete yet" in text,
+        and "5-machine physical field-validation campaign is not complete yet" in text
+        and proof_engine_ok
+        and objective_arena_ok,
     }
 
 
@@ -361,15 +379,15 @@ def write_markdown(report: dict[str, object], path: Path) -> None:
     lines += ["", "## Téléchargement et screenshots", ""]
     hub = report["scanner_hub"]
     lines.append(
-        f"- `/scanner-ia-local` status={hub['status']} canonical={hub['canonical_ok']} download={hub['download_link_ok']} terrain_caveat={hub['terrain_caveat_ok']}"
+        f"- `/scanner-ia-local` status={hub['status']} canonical={hub['canonical_ok']} download={hub['download_link_ok']} proof_engine={hub['proof_engine_ok']} objective_arena={hub['objective_arena_ok']} terrain_caveat={hub['terrain_caveat_ok']}"
     )
     dp = report["download_page"]
     lines.append(
-        f"- `/telecharger-scanner-ia-local` status={dp['status']} title={dp['title_signal_ok']} screenshots={dp['screenshot_refs_ok']} static_links={dp['static_links_ok']} terrain_caveat={dp['terrain_caveat_ok']}"
+        f"- `/telecharger-scanner-ia-local` status={dp['status']} title={dp['title_signal_ok']} screenshots={dp['screenshot_refs_ok']} static_links={dp['static_links_ok']} proof_engine={dp['proof_engine_ok']} objective_arena={dp['objective_arena_ok']} terrain_caveat={dp['terrain_caveat_ok']}"
     )
     llms = report["llms_txt"]
     lines.append(
-        f"- `/llms.txt` status={llms['status']} hub={llms['hub_ok']} download={llms['download_ok']} terrain_caveat={llms['terrain_caveat_ok']}"
+        f"- `/llms.txt` status={llms['status']} hub={llms['hub_ok']} download={llms['download_ok']} proof_engine={llms['proof_engine_ok']} objective_arena={llms['objective_arena_ok']} terrain_caveat={llms['terrain_caveat_ok']}"
     )
     lines += ["", "## Promesses terrain", ""]
     for item in report["field_claims"]:
