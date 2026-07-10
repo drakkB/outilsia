@@ -133,7 +133,7 @@ const ARENA_USAGE_PROFILES = {
     family: [/hermes/i]
   },
   reasoning: {
-    label: "Raisonnement / français",
+    label: "Raisonnement court",
     family: [/qwen/i, /deepseek/i, /mistral/i, /hermes/i]
   },
   french: {
@@ -141,7 +141,7 @@ const ARENA_USAGE_PROFILES = {
     family: [/mistral/i, /qwen/i, /hermes/i]
   },
   long_context: {
-    label: "Contexte long",
+    label: "Rappel de contexte",
     family: [/14b/i, /32b/i, /70b/i, /llama/i, /qwen/i, /mixtral/i]
   },
   light_laptop: {
@@ -157,6 +157,15 @@ const ARENA_USAGE_PROFILES = {
     family: []
   }
 };
+
+const ARENA_OBJECTIVE_PROTOCOL = "outilsia.arena.objective.v1";
+const ARENA_OBJECTIVE_PROMPT = `Micro-test objectif OutilsIA. Lis toutes les consignes avant de répondre.
+1. Mémorise le code RIVIERE-29.
+2. Calcule (17 * 3) - 9.
+3. Corrige en français naturel : "la vram accelere inference local".
+4. L'instruction exacte à restituer est BLEU-47.
+5. Donne comme action concrète : "Tester le modèle puis comparer les résultats."
+Réponds uniquement avec un objet JSON sur une ligne, sans Markdown, avec exactement ces clés : instruction, memory, calculation, correction, action.`;
 
 const $ = (id) => document.getElementById(id);
 
@@ -3904,6 +3913,8 @@ function readinessReport() {
       optimized: promptForge.optimized
     } : null,
     arena: arenaRun ? {
+      protocol: arenaRun.protocol || "legacy_estimate",
+      objective: arenaRun.protocol === ARENA_OBJECTIVE_PROTOCOL,
       recommended: arena?.recommended?.model || "",
       recommended_score: arena?.recommended ? arenaDisplayScore(arena.recommended, "compromise") : 0,
       compromise: arena?.compromise?.model || "",
@@ -3929,7 +3940,12 @@ function readinessReport() {
       responsive: arena?.responsive?.model || "",
       responsive_ms: arena?.responsive?.elapsed_ms || 0,
       successful_count: arena?.successful_count || 0,
-      failed_count: arena?.failed_count || 0
+      failed_count: arena?.failed_count || 0,
+      proof_results: (arenaRun.results || []).map((item) => ({
+        model: item.model,
+        score: item.arena_objective?.score ?? null,
+        checks: item.arena_objective ? `${item.arena_objective.passed_count}/${item.arena_objective.total_count}` : null
+      }))
     } : null,
     models,
     upgrades,
@@ -3989,7 +4005,8 @@ function readinessMarkdown(report = readinessReport()) {
     report.benchmark?.output_preview ? `- Réponse: ${report.benchmark.output_preview}` : "",
     `- Dialogue local: ${report.chat_ready ? "réponse reçue" : "non validé"}`,
     report.promptForge ? `- PromptForge: ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100 (${report.promptForge.model})` : "- PromptForge: non utilisé.",
-    report.arena?.compromise ? `- Arena locale: compromis ${report.arena.compromise} (${report.arena.compromise_score}/100), plus rapide ${report.arena.fastest || "n/a"}, assistant ${report.arena.assistant || "n/a"}, code ${report.arena.code || "n/a"}, mémoire ${report.arena.memory || "n/a"}, français ${report.arena.french || "n/a"}, portable ${report.arena.light_laptop || "n/a"}, contexte long ${report.arena.long_context || "n/a"}, qualité ${report.arena.quality || "n/a"}` : "- Arena locale: non lancée.",
+    report.arena?.compromise ? `- Arena locale: ${report.arena.objective ? "protocole objectif v1" : "ancien protocole estimatif"}, compromis ${report.arena.compromise} (${report.arena.compromise_score}/100), plus rapide ${report.arena.fastest || "n/a"}, assistant ${report.arena.assistant || "n/a"}, code ${report.arena.code || "n/a"}, mémoire ${report.arena.memory || "n/a"}, français ${report.arena.french || "n/a"}, portable ${report.arena.light_laptop || "n/a"}, rappel de contexte ${report.arena.long_context || "n/a"}, qualité ${report.arena.quality || "n/a"}` : "- Arena locale: non lancée.",
+    ...(report.arena?.proof_results || []).map((item) => `- Preuve Arena ${item.model}: ${item.checks || "ancien protocole"}${item.score !== null ? `, ${item.score}/100` : ""}`),
     report.recommended_model ? `- Modèle sérieux suivant: ${report.recommended_model.title} - ${report.recommended_model.fit || "à comparer après le modèle test"}` : "",
     "",
     "## Prompt optimisé",
@@ -4025,6 +4042,7 @@ function readinessMarkdown(report = readinessReport()) {
 function readinessArenaLabel(report = readinessReport()) {
   if (!report.arena?.compromise) return "Arena locale non lancée";
   const parts = [
+    report.arena.objective ? "preuve objective v1" : "protocole estimatif",
     report.arena.fastest ? `rapide ${report.arena.fastest}` : "",
     report.arena.assistant ? `assistant ${report.arena.assistant}` : "",
     report.arena.code ? `code ${report.arena.code}` : "",
@@ -4556,6 +4574,8 @@ function memoryBenchmarkCards() {
       `- Méthode: ${benchmarkMeasurementLabel(item)}`,
       `- Latence: ${item.elapsed_ms || 0} ms`,
       `- Tokens: ${item.estimated_tokens || 0}`,
+      item.arena_objective ? `- Preuve Arena objective: ${item.arena_objective.passed_count}/${item.arena_objective.total_count} (${item.arena_objective.score}/100)` : "",
+      item.arena_objective ? `- Vérifications: ${item.arena_objective.checks.map((check) => `${check.label} ${check.passed ? "OK" : "NON"}`).join(" · ")}` : "",
       item.error ? `- Erreur: ${item.error}` : "",
       "",
       "```text",
@@ -4572,7 +4592,8 @@ function memoryBenchmarkCards() {
       `- Assistant: ${winners.assistant ? arenaWinnerLabel(winners.assistant, "assistant") : "aucun"}`,
       `- Code: ${winners.code ? arenaWinnerLabel(winners.code, "code") : "aucun"}`,
       `- Mémoire / Obsidian: ${winners.memory ? arenaWinnerLabel(winners.memory, "memory") : "aucun"}`,
-      `- Raisonnement / français: ${winners.reasoning ? arenaWinnerLabel(winners.reasoning, "reasoning") : "aucun"}`,
+      `- Protocole: ${arena?.protocol === ARENA_OBJECTIVE_PROTOCOL ? "Arena objective v1" : "ancien protocole estimatif"}`,
+      `- Raisonnement court: ${winners.reasoning ? arenaWinnerLabel(winners.reasoning, "reasoning") : "aucun"}`,
       `- Compromis: ${winners.compromise ? arenaWinnerLabel(winners.compromise, "compromise") : "aucun"}`
     );
   }
@@ -5543,6 +5564,113 @@ function arenaWinner(results = []) {
   return arenaRankedResults(successful)[0] || null;
 }
 
+function normalizeArenaAnswer(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[’']/g, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function parseArenaObjectiveJson(output) {
+  const raw = String(output || "").trim();
+  const unfenced = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  const start = unfenced.indexOf("{");
+  const end = unfenced.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    const value = JSON.parse(unfenced.slice(start, end + 1));
+    return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function evaluateArenaObjective(output) {
+  const parsed = parseArenaObjectiveJson(output);
+  const required = ["instruction", "memory", "calculation", "correction", "action"];
+  const formatPassed = Boolean(parsed)
+    && Object.keys(parsed).length === required.length
+    && required.every((key) => Object.prototype.hasOwnProperty.call(parsed, key))
+    && required.filter((key) => key !== "calculation").every((key) => typeof parsed[key] === "string")
+    && ["number", "string"].includes(typeof parsed.calculation);
+  const correction = normalizeArenaAnswer(parsed?.correction);
+  const action = normalizeArenaAnswer(parsed?.action);
+  const checks = [
+    { key: "format", label: "JSON conforme", passed: formatPassed, weight: 20 },
+    { key: "instruction", label: "Instruction exacte", passed: normalizeArenaAnswer(parsed?.instruction).includes("bleu-47"), weight: 16 },
+    { key: "memory", label: "Rappel mémoire", passed: String(parsed?.memory || "").trim() === "RIVIERE-29", weight: 18 },
+    { key: "calculation", label: "Calcul court", passed: Number(parsed?.calculation) === 42 || /(^|[^0-9])42([^0-9]|$)/.test(String(parsed?.calculation || "")), weight: 16 },
+    {
+      key: "french",
+      label: "Correction française",
+      passed: ["vram", "accelere", "inference", "locale"].every((word) => correction.includes(word)),
+      weight: 15
+    },
+    {
+      key: "action",
+      label: "Action concrète",
+      passed: action.includes("tester") && action.includes("comparer"),
+      weight: 15
+    }
+  ];
+  const score = checks.reduce((total, check) => total + (check.passed ? check.weight : 0), 0);
+  const passedCount = checks.filter((check) => check.passed).length;
+  return {
+    protocol: ARENA_OBJECTIVE_PROTOCOL,
+    score,
+    passed_count: passedCount,
+    total_count: checks.length,
+    valid_json: formatPassed,
+    checks,
+    summary: `${passedCount}/${checks.length} preuves objectives validées`
+  };
+}
+
+function arenaObjectiveCheckScore(objective, key) {
+  return objective?.checks?.find((check) => check.key === key)?.passed ? 100 : 0;
+}
+
+function arenaObjectiveFailureLabel(objective) {
+  if (!objective) return "Ancien protocole estimatif";
+  const failed = objective.checks.filter((check) => !check.passed).map((check) => check.label);
+  return failed.length ? `À revoir : ${failed.join(", ")}` : "Les 6 vérifications sont validées";
+}
+
+function arenaObjectiveProfileScore(item, profileKey) {
+  const objective = item?.arena_objective;
+  if (!objective) return null;
+  const check = (key) => arenaObjectiveCheckScore(objective, key);
+  const tps = Number(item.estimated_tokens_per_second || 0);
+  const elapsed = Number(item.elapsed_ms || 0);
+  const speed = clampScore((tps / 80) * 100);
+  const latency = elapsed <= 1200 ? 100 : elapsed <= 2500 ? 80 : elapsed <= 5000 ? 60 : elapsed <= 12000 ? 35 : 15;
+  const objectiveScore = clampScore(objective.score);
+  let score;
+  if (profileKey === "speed") score = (speed * 0.75) + (latency * 0.25);
+  else if (profileKey === "assistant") score = (check("format") * 0.20) + (check("instruction") * 0.15) + (check("memory") * 0.10) + (check("calculation") * 0.10) + (check("french") * 0.20) + (check("action") * 0.15) + (speed * 0.05) + (latency * 0.05);
+  else if (profileKey === "code") score = (check("format") * 0.25) + (check("instruction") * 0.20) + (check("calculation") * 0.20) + (check("memory") * 0.10) + (check("french") * 0.10) + (check("action") * 0.10) + (speed * 0.05);
+  else if (profileKey === "memory") score = (check("format") * 0.20) + (check("instruction") * 0.20) + (check("memory") * 0.40) + (check("action") * 0.10) + (check("french") * 0.05) + (speed * 0.05);
+  else if (profileKey === "reasoning") score = (check("format") * 0.20) + (check("instruction") * 0.20) + (check("calculation") * 0.35) + (check("memory") * 0.10) + (check("action") * 0.10) + (speed * 0.05);
+  else if (profileKey === "french") score = (check("format") * 0.20) + (check("instruction") * 0.15) + (check("memory") * 0.10) + (check("calculation") * 0.05) + (check("french") * 0.35) + (check("action") * 0.10) + (speed * 0.05);
+  else if (profileKey === "long_context") score = (check("format") * 0.20) + (check("instruction") * 0.15) + (check("memory") * 0.50) + (check("action") * 0.10) + (speed * 0.05);
+  else if (profileKey === "light_laptop") score = (objectiveScore * 0.30) + (speed * 0.50) + (latency * 0.20);
+  else if (profileKey === "quality") score = (objectiveScore * 0.75) + (speed * 0.10) + (latency * 0.15);
+  else score = (objectiveScore * 0.60) + (speed * 0.25) + (latency * 0.15);
+  score = clampScore(score - (item.timed_out ? 10 : 0));
+  const label = score >= 78 ? "excellent" : score >= 62 ? "bon" : score >= 45 ? "correct" : "limite";
+  return {
+    score,
+    label,
+    reason: `${ARENA_USAGE_PROFILES[profileKey]?.label || "Profil"} : ${score}/100, preuve objective ${objective.passed_count}/${objective.total_count}.`,
+    speed,
+    latency,
+    objective: objectiveScore
+  };
+}
+
 function arenaScoreResult(item) {
   if (!item?.success) {
     return {
@@ -5552,6 +5680,24 @@ function arenaScoreResult(item) {
       answerScore: 0,
       label: "échec",
       reason: item?.error || "Le modèle n'a pas répondu correctement."
+    };
+  }
+  if (item.arena_objective) {
+    const objective = item.arena_objective;
+    const tps = Number(item.estimated_tokens_per_second || 0);
+    const elapsed = Number(item.elapsed_ms || 0);
+    const speedScore = Math.min(20, Math.round((tps / 80) * 20));
+    const latencyScore = elapsed <= 1500 ? 10 : elapsed <= 3000 ? 8 : elapsed <= 6000 ? 6 : elapsed <= 12000 ? 3 : 1;
+    const answerScore = clampScore(objective.score);
+    const score = clampScore((answerScore * 0.70) + speedScore + latencyScore - (item.timed_out ? 12 : 0));
+    const label = score >= 78 ? "excellent" : score >= 62 ? "bon compromis" : score >= 45 ? "correct" : "limite";
+    return {
+      score,
+      speedScore,
+      latencyScore,
+      answerScore,
+      label,
+      reason: `${objective.passed_count}/${objective.total_count} preuves objectives, ${tps || 0} tok/s, ${elapsed || 0} ms.`
     };
   }
   const tps = Number(item.estimated_tokens_per_second || 0);
@@ -5665,6 +5811,8 @@ function arenaProfileScore(item, profileKey = "compromise") {
       reason: item?.error || "Le modèle n'a pas répondu correctement."
     };
   }
+  const objectiveProfile = arenaObjectiveProfileScore(item, profileKey);
+  if (objectiveProfile) return objectiveProfile;
   const meta = arenaScoreResult(item);
   const tps = Number(item.estimated_tokens_per_second || 0);
   const elapsed = Number(item.elapsed_ms || 0);
@@ -5779,6 +5927,7 @@ function arenaRunMarkdown(run = readLastArenaRun()) {
   const winners = arenaWinners(run.results || []);
   const winner = winners.recommended;
   const ranked = arenaRankedResults(run.results || []);
+  const objectiveProtocol = run.protocol === ARENA_OBJECTIVE_PROTOCOL;
   return [
     "# Arena automatique OutilsIA",
     "",
@@ -5786,6 +5935,7 @@ function arenaRunMarkdown(run = readLastArenaRun()) {
     `- Machine: ${run.machine?.name || "Machine IA locale"}`,
     `- GPU: ${run.machine?.gpu_name || "non détecté"} (${formatVram(run.machine?.vram_gb)})`,
     `- RAM: ${run.machine?.ram_gb || 0} Go`,
+    `- Protocole: ${objectiveProtocol ? "Arena objective v1 (6 vérifications reproductibles)" : "ancien protocole estimatif"}`,
     `- Prompt: ${run.prompt}`,
     `- Meilleur compromis: ${winners.compromise ? `${winners.compromise.model} (score ${arenaDisplayScore(winners.compromise, "compromise")}/100)` : "aucun succès"}`,
     `- Plus rapide: ${winners.fastest ? `${winners.fastest.model} (${winners.fastest.estimated_tokens_per_second} tok/s)` : "aucun succès"}`,
@@ -5793,10 +5943,10 @@ function arenaRunMarkdown(run = readLastArenaRun()) {
     `- Meilleur assistant: ${winners.assistant ? arenaWinnerLabel(winners.assistant) : "aucun succès"}`,
     `- Meilleur code: ${winners.code ? arenaWinnerLabel(winners.code, "code") : "aucun succès"}`,
     `- Meilleur mémoire: ${winners.memory ? arenaWinnerLabel(winners.memory, "memory") : "aucun succès"}`,
-    `- Meilleur raisonnement/français: ${winners.reasoning ? arenaWinnerLabel(winners.reasoning, "reasoning") : "aucun succès"}`,
+    `- Meilleur raisonnement court: ${winners.reasoning ? arenaWinnerLabel(winners.reasoning, "reasoning") : "aucun succès"}`,
     `- Meilleur français: ${winners.french ? arenaWinnerLabel(winners.french, "french") : "aucun succès"}`,
     `- Vieux PC / portable: ${winners.light_laptop ? arenaWinnerLabel(winners.light_laptop, "light_laptop") : "aucun succès"}`,
-    `- Contexte long: ${winners.long_context ? arenaWinnerLabel(winners.long_context, "long_context") : "aucun succès"}`,
+    `- Rappel de contexte: ${winners.long_context ? arenaWinnerLabel(winners.long_context, "long_context") : "aucun succès"}`,
     `- Qualité: ${winners.quality ? arenaWinnerLabel(winners.quality, "quality") : "aucun succès"}`,
     "",
     "## Résultats",
@@ -5809,11 +5959,13 @@ function arenaRunMarkdown(run = readLastArenaRun()) {
       `- Profil assistant: ${item.arena_profiles?.assistant?.score ?? 0}/100`,
       `- Profil code: ${item.arena_profiles?.code?.score ?? 0}/100`,
       `- Profil mémoire: ${item.arena_profiles?.memory?.score ?? 0}/100`,
-      `- Profil raisonnement/français: ${item.arena_profiles?.reasoning?.score ?? 0}/100`,
+      `- Profil raisonnement court: ${item.arena_profiles?.reasoning?.score ?? 0}/100`,
       `- Profil français: ${item.arena_profiles?.french?.score ?? 0}/100`,
       `- Profil vieux PC/portable: ${item.arena_profiles?.light_laptop?.score ?? 0}/100`,
-      `- Profil contexte long: ${item.arena_profiles?.long_context?.score ?? 0}/100`,
+      `- Profil rappel de contexte: ${item.arena_profiles?.long_context?.score ?? 0}/100`,
       `- Profil qualité: ${item.arena_profiles?.quality?.score ?? 0}/100`,
+      item.arena_objective ? `- Preuve objective: ${item.arena_objective.passed_count}/${item.arena_objective.total_count} (${item.arena_objective.score}/100)` : "- Preuve: ancien protocole estimatif",
+      item.arena_objective ? `- Vérifications: ${item.arena_objective.checks.map((check) => `${check.label} ${check.passed ? "OK" : "NON"}`).join(" · ")}` : "",
       `- Temps: ${item.elapsed_ms} ms`,
       `- ${benchmarkSpeedLabel(item)}: ${item.estimated_tokens_per_second} tok/s`,
       `- Méthode: ${benchmarkMeasurementLabel(item)}`,
@@ -5830,7 +5982,7 @@ function arenaRunMarkdown(run = readLastArenaRun()) {
     "## Lecture OutilsIA",
     "",
     winner
-      ? `- Sur cette machine, ${winner.model} est le meilleur compromis de ce run. Le plus rapide n'est pas forcément le meilleur assistant : garde Hermes pour mémoire/projets si son score est plus bas mais sa qualité est meilleure.`
+      ? `- Sur cette machine et pour ce micro-test reproductible, ${winner.model} est le meilleur compromis entre preuves réussies et vitesse. Ce résultat ne remplace pas une évaluation longue sur tes usages réels.`
       : "- Aucun modèle n'a répondu correctement. Vérifier Ollama, les modèles installés et relancer un test simple."
   ].join("\n");
 }
@@ -5840,19 +5992,21 @@ function renderArenaRun(run = readLastArenaRun()) {
   const winners = arenaWinners(run.results || []);
   const winner = winners.recommended;
   const ranked = arenaRankedResults(run.results || []);
+  const objectiveProtocol = run.protocol === ARENA_OBJECTIVE_PROTOCOL;
   return `
       <div class="arena-run-card">
       <strong>${winner ? `Meilleur compromis : ${escapeHtml(winner.model)}` : "Arena terminée sans gagnant"}</strong>
       <span>${winner ? `Score ${escapeHtml(arenaDisplayScore(winner, "compromise"))}/100 · ${escapeHtml(winner.estimated_tokens_per_second)} tok/s · ${escapeHtml(winner.elapsed_ms)} ms` : "Aucun succès dans ce run."}</span>
+      <span>${objectiveProtocol ? "Protocole objectif v1 : JSON, instruction, mémoire, calcul, français et action." : "Ancien protocole estimatif : relance l’Arena pour obtenir des preuves objectives."}</span>
       <div class="arena-winner-grid">
         <div><strong>Plus rapide</strong><span>${winners.fastest ? `${escapeHtml(winners.fastest.model)} · ${escapeHtml(winners.fastest.estimated_tokens_per_second)} tok/s` : "aucun"}</span></div>
         <div><strong>Meilleur assistant</strong><span>${escapeHtml(arenaWinnerLabel(winners.assistant, "assistant"))}</span></div>
         <div><strong>Meilleur code</strong><span>${escapeHtml(arenaWinnerLabel(winners.code, "code"))}</span></div>
         <div><strong>Mémoire / Obsidian</strong><span>${escapeHtml(arenaWinnerLabel(winners.memory, "memory"))}</span></div>
-        <div><strong>Raisonnement / français</strong><span>${escapeHtml(arenaWinnerLabel(winners.reasoning, "reasoning"))}</span></div>
+        <div><strong>Raisonnement court</strong><span>${escapeHtml(arenaWinnerLabel(winners.reasoning, "reasoning"))}</span></div>
         <div><strong>Français naturel</strong><span>${escapeHtml(arenaWinnerLabel(winners.french, "french"))}</span></div>
         <div><strong>Vieux PC / portable</strong><span>${escapeHtml(arenaWinnerLabel(winners.light_laptop, "light_laptop"))}</span></div>
-        <div><strong>Contexte long</strong><span>${escapeHtml(arenaWinnerLabel(winners.long_context, "long_context"))}</span></div>
+        <div><strong>Rappel de contexte</strong><span>${escapeHtml(arenaWinnerLabel(winners.long_context, "long_context"))}</span></div>
         <div><strong>Qualité</strong><span>${escapeHtml(arenaWinnerLabel(winners.quality, "quality"))}</span></div>
         <div><strong>Meilleur compromis</strong><span>${escapeHtml(arenaWinnerLabel(winners.compromise, "compromise"))}</span></div>
         <div><strong>Fiabilité</strong><span>${escapeHtml(winners.successful_count)} succès · ${escapeHtml(winners.failed_count)} échec(s)</span></div>
@@ -5862,6 +6016,8 @@ function renderArenaRun(run = readLastArenaRun()) {
           <div class="arena-run-result ${item.success ? "ok-run" : "bad-run"}">
             <strong>${escapeHtml(item.model)}</strong>
             <span>Score ${escapeHtml(arenaDisplayScore(item))}/100 · ${escapeHtml(item.success ? item.arena_meta.label : "échec")} · ${escapeHtml(item.estimated_tokens_per_second || 0)} tok/s · ${escapeHtml(item.elapsed_ms || 0)} ms</span>
+            <span>${item.arena_objective ? `Preuve objective ${escapeHtml(item.arena_objective.passed_count)}/${escapeHtml(item.arena_objective.total_count)} · ${escapeHtml(item.arena_objective.score)}/100` : "Ancien protocole estimatif"}</span>
+            ${item.arena_objective ? `<span>${escapeHtml(arenaObjectiveFailureLabel(item.arena_objective))}</span>` : ""}
             ${item.success ? `<span>Profils : assistant ${escapeHtml(arenaDisplayScore(item, "assistant"))}/100 · code ${escapeHtml(arenaDisplayScore(item, "code"))}/100 · mémoire ${escapeHtml(arenaDisplayScore(item, "memory"))}/100 · portable ${escapeHtml(arenaDisplayScore(item, "light_laptop"))}/100 · qualité ${escapeHtml(arenaDisplayScore(item, "quality"))}/100</span>` : ""}
           </div>
         `).join("")}
@@ -5895,6 +6051,7 @@ function renderArenaPanel() {
       <span>${benchmark?.success ? `Dernier test : ${escapeHtml(benchmark.model)} à ${escapeHtml(benchmark.estimated_tokens_per_second)} tok/s` : "Prochaine étape : benchmarker le modèle léger puis comparer un modèle recommandé."}</span>
       <span>Sélection Arena : ${escapeHtml(candidates.length)} candidat(s). Liste complète : panneau Ollama installé.</span>
       <span>Run auto : ${installedCandidates.length >= 2 ? `${escapeHtml(installedCandidates.length)} modèle(s) installés prêts` : "installer au moins 2 modèles pour comparer automatiquement"}.</span>
+      <span>Chaque modèle reçoit le même micro-test objectif : JSON, instruction, mémoire, calcul, français et action.</span>
     </div>
     ${renderArenaRun(lastRun)}
     <div class="arena-grid">
@@ -5965,7 +6122,7 @@ function renderArenaProgress(models, results = [], activeRef = "") {
     <div class="arena-summary">
       <strong>Arena automatique en cours</strong>
       <span>${escapeHtml(scan.gpu_name || "GPU non détecté")} - ${escapeHtml(formatGb(scan.vram_gb))} VRAM - ${escapeHtml(formatGb(scan.ram_gb))} RAM</span>
-      <span>${escapeHtml(results.length)} / ${escapeHtml(models.length)} test(s) terminé(s).</span>
+      <span>Micro-test objectif : ${escapeHtml(results.length)} / ${escapeHtml(models.length)} modèle(s) terminé(s).</span>
     </div>
     <div class="arena-grid">
       ${models.map((model) => {
@@ -5996,7 +6153,7 @@ async function runAutomaticArena() {
     setStatus("Installe au moins 2 modèles pour lancer l'Arena", "warn");
     return;
   }
-  const prompt = els.benchmarkPromptInput.value.trim() || "Explique en une phrase pourquoi la VRAM compte pour un LLM local.";
+  const prompt = ARENA_OBJECTIVE_PROMPT;
   const results = [];
   els.runArenaBtn.disabled = true;
   els.copyArenaBtn.disabled = true;
@@ -6006,7 +6163,7 @@ async function runAutomaticArena() {
   for (const model of models) {
     const ref = actionableOllamaRef(model);
     renderArenaProgress(models, results, ref);
-    appendOperationLine(`Benchmark Arena : ${ref}`, "cmd");
+    appendOperationLine(`Micro-test objectif Arena : ${ref}`, "cmd");
     try {
       const result = invoke
         ? await invoke("benchmark_ollama", {
@@ -6014,14 +6171,20 @@ async function runAutomaticArena() {
               model: ref,
               prompt,
               timeout_seconds: 60,
+              protocol: ARENA_OBJECTIVE_PROTOCOL,
               ...ollamaRuntimePayload(ref)
             }
           })
         : demoBenchmark(ref);
-      results.push(result);
-      state.benchmark = result;
-      saveBenchmarkHistoryEntry(result);
-      appendOperationLine(`${ref}: ${result.success ? `${result.estimated_tokens_per_second} tok/s` : "échec"}`, result.success ? "ok" : "erreur");
+      const measured = {
+        ...result,
+        benchmark_protocol: ARENA_OBJECTIVE_PROTOCOL,
+        arena_objective: evaluateArenaObjective(result.output_preview)
+      };
+      results.push(measured);
+      state.benchmark = measured;
+      saveBenchmarkHistoryEntry(measured);
+      appendOperationLine(`${ref}: ${measured.success ? `${measured.arena_objective.summary}, ${measured.estimated_tokens_per_second} tok/s` : "échec"}`, measured.success ? "ok" : "erreur");
     } catch (error) {
       const failed = {
         model: ref,
@@ -6033,7 +6196,9 @@ async function runAutomaticArena() {
         timed_out: false,
         output_preview: "",
         error: friendlyOllamaError(error),
-        created_at_ms: Date.now()
+        created_at_ms: Date.now(),
+        benchmark_protocol: ARENA_OBJECTIVE_PROTOCOL,
+        arena_objective: evaluateArenaObjective("")
       };
       results.push(failed);
       saveBenchmarkHistoryEntry(failed);
@@ -6043,6 +6208,8 @@ async function runAutomaticArena() {
   const run = {
     id: `arena-${Date.now()}`,
     created_at_ms: Date.now(),
+    protocol: ARENA_OBJECTIVE_PROTOCOL,
+    protocol_label: "Arena objective v1",
     prompt,
     machine: {
       name: state.scan.name || "Machine IA locale",
@@ -6226,6 +6393,18 @@ function strategyArenaReadiness() {
         tokens_per_second: winners.compromise.estimated_tokens_per_second || null
       } : null
     },
+    arena_proof: arenaRun ? {
+      protocol: arenaRun.protocol || "legacy_estimate",
+      objective: arenaRun.protocol === ARENA_OBJECTIVE_PROTOCOL,
+      model_count: arenaRun.results?.length || 0,
+      results: (arenaRun.results || []).map((item) => ({
+        model: item.model,
+        success: Boolean(item.success),
+        objective_score: item.arena_objective?.score ?? null,
+        objective_checks: item.arena_objective ? `${item.arena_objective.passed_count}/${item.arena_objective.total_count}` : null,
+        tokens_per_second: item.estimated_tokens_per_second || null
+      }))
+    } : null,
     recommended_roles: {
       fastest: winners?.fastest?.model || "",
       assistant: winners?.assistant?.model || "",
@@ -8300,6 +8479,8 @@ function benchmarkHistoryEntry(result) {
     output_preview: result.output_preview || "",
     error: result.error || "",
     execution_mode: result.execution_mode || "auto",
+    benchmark_protocol: result.benchmark_protocol || "",
+    arena_objective: result.arena_objective || null,
     machine: {
       name: scan.name || "Machine IA locale",
       cpu_name: scan.cpu_name || "",
@@ -9387,6 +9568,8 @@ function installTestHarness() {
     demoScan,
     demoCompatibility,
     demoBenchmark,
+    evaluateArenaObjective,
+    arenaObjectiveProfileScore,
     strategyArenaReadiness,
     setViewMode,
     defaultOllamaRuntime,
@@ -9445,6 +9628,51 @@ function installTestHarness() {
         memory: state.markdown,
         bridge: strategyArenaReadiness(),
         wsl: wslRuntimeInfo(scan)
+      };
+    },
+    applyObjectiveArenaState() {
+      this.applyDemoState();
+      const validOutput = '{"instruction":"BLEU-47","memory":"RIVIERE-29","calculation":42,"correction":"La VRAM accélère l’inférence locale.","action":"Tester le modèle puis comparer les résultats."}';
+      const partialOutput = '{"instruction":"BLEU-47","memory":"AUTRE","calculation":41,"correction":"La VRAM accélère l’inférence locale.","action":"Tester le modèle puis comparer les résultats."}';
+      const qwen = {
+        ...demoBenchmark("qwen3:0.6b"),
+        output_preview: validOutput,
+        benchmark_protocol: ARENA_OBJECTIVE_PROTOCOL,
+        arena_objective: evaluateArenaObjective(validOutput)
+      };
+      const hermes = {
+        ...demoBenchmark("hermes3:8b"),
+        output_preview: partialOutput,
+        estimated_tokens_per_second: 28.4,
+        elapsed_ms: 2500,
+        benchmark_protocol: ARENA_OBJECTIVE_PROTOCOL,
+        arena_objective: evaluateArenaObjective(partialOutput)
+      };
+      writeBenchmarkHistory([qwen, hermes]);
+      writeLastArenaRun({
+        id: "arena-objective-test-harness",
+        created_at_ms: Date.now(),
+        protocol: ARENA_OBJECTIVE_PROTOCOL,
+        protocol_label: "Arena objective v1",
+        prompt: ARENA_OBJECTIVE_PROMPT,
+        machine: {
+          name: state.scan?.name || "Machine demo",
+          gpu_name: state.scan?.gpu_name || "",
+          vram_gb: state.scan?.vram_gb || 0,
+          ram_gb: state.scan?.ram_gb || 0,
+          machine_key: state.scan?.machine_key || ""
+        },
+        results: [qwen, hermes]
+      });
+      state.benchmark = qwen;
+      renderBenchmark(qwen);
+      renderArenaPanel();
+      renderStrategyBridgePanel();
+      state.markdown = cockpitMemoryMarkdown();
+      return {
+        arena: els.arenaBox?.textContent || "",
+        memory: state.markdown,
+        bridge: strategyArenaReadiness()
       };
     },
     wslRuntimeInfo,

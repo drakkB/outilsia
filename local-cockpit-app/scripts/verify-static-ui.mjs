@@ -83,6 +83,11 @@ const requiredFeatureText = [
   ["js benchmark keep action", js, "data-keep-installed-model"],
   ["js benchmark delete action", js, "data-delete-model"],
   ["js benchmark compare action", js, "data-post-install-arena"],
+  ["js objective arena protocol", js, "outilsia.arena.objective.v1"],
+  ["js objective arena evaluator", js, "evaluateArenaObjective"],
+  ["js objective arena evidence", js, "preuves objectives validées"],
+  ["rust objective arena protocol", rust, "protocol: Option<String>"],
+  ["rust objective arena output budget", rust, "objective_arena.then_some(192)"],
 ];
 
 const missingFeature = requiredFeatureText.filter(([, text, needle]) => !text.includes(needle));

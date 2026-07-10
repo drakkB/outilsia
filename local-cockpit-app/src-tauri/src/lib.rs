@@ -169,6 +169,7 @@ pub struct BenchmarkRequest {
     timeout_seconds: Option<u64>,
     runtime: Option<String>,
     force_cpu: Option<bool>,
+    protocol: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1136,23 +1137,45 @@ fn open_obsidian_vault(app: AppHandle, path: String) -> Result<(), String> {
 #[tauri::command]
 async fn benchmark_ollama(request: BenchmarkRequest) -> Result<BenchmarkResult, String> {
     let model = validate_ollama_model_ref(&request.model)?;
-    let user_prompt = request
-        .prompt
+    let objective_arena = matches!(
+        request.protocol.as_deref(),
+        Some("arena_objective_v1") | Some("outilsia.arena.objective.v1")
+    );
+    let prompt = prepare_benchmark_prompt(request.prompt, objective_arena);
+    let timeout = Duration::from_secs(request.timeout_seconds.unwrap_or(45).clamp(5, 180));
+    let runtime = normalize_ollama_runtime(request.runtime.as_deref());
+    let num_predict_override = objective_arena.then_some(192);
+    if request.force_cpu.unwrap_or(false) {
+        return run_ollama_api_prompt(
+            model,
+            prompt,
+            timeout,
+            runtime,
+            true,
+            true,
+            num_predict_override,
+        )
+        .await;
+    }
+    run_ollama_api_with_cli_fallback(model, prompt, timeout, runtime, true, num_predict_override)
+        .await
+}
+
+fn prepare_benchmark_prompt(request_prompt: Option<String>, objective_arena: bool) -> String {
+    let prompt_limit = if objective_arena { 3000 } else { 500 };
+    let user_prompt = request_prompt
         .unwrap_or_else(|| {
             "Réponds en français, en une seule phrase courte, sans raisonnement: pourquoi la VRAM est importante pour un LLM local ?".to_string()
         })
         .trim()
         .chars()
-        .take(500)
+        .take(prompt_limit)
         .collect::<String>();
-    let prompt =
-        format!("{user_prompt}\nRéponse finale uniquement, une phrase courte en français.");
-    let timeout = Duration::from_secs(request.timeout_seconds.unwrap_or(45).clamp(5, 180));
-    let runtime = normalize_ollama_runtime(request.runtime.as_deref());
-    if request.force_cpu.unwrap_or(false) {
-        return run_ollama_api_prompt(model, prompt, timeout, runtime, true, true).await;
+    if objective_arena {
+        user_prompt
+    } else {
+        format!("{user_prompt}\nRéponse finale uniquement, une phrase courte en français.")
     }
-    run_ollama_api_with_cli_fallback(model, prompt, timeout, runtime, true).await
 }
 
 #[tauri::command]
@@ -1172,9 +1195,9 @@ async fn chat_ollama(request: BenchmarkRequest) -> Result<BenchmarkResult, Strin
     let timeout = Duration::from_secs(request.timeout_seconds.unwrap_or(90).clamp(5, 300));
     let runtime = normalize_ollama_runtime(request.runtime.as_deref());
     if request.force_cpu.unwrap_or(false) {
-        return run_ollama_api_prompt(model, prompt, timeout, runtime, true, false).await;
+        return run_ollama_api_prompt(model, prompt, timeout, runtime, true, false, None).await;
     }
-    run_ollama_api_with_cli_fallback(model, prompt, timeout, runtime, false).await
+    run_ollama_api_with_cli_fallback(model, prompt, timeout, runtime, false, None).await
 }
 
 async fn run_ollama_api_with_cli_fallback(
@@ -1183,6 +1206,7 @@ async fn run_ollama_api_with_cli_fallback(
     timeout: Duration,
     runtime: OllamaRuntime,
     benchmark_profile: bool,
+    num_predict_override: Option<u32>,
 ) -> Result<BenchmarkResult, String> {
     match run_ollama_api_prompt(
         model.clone(),
@@ -1191,6 +1215,7 @@ async fn run_ollama_api_with_cli_fallback(
         runtime,
         false,
         benchmark_profile,
+        num_predict_override,
     )
     .await
     {
@@ -1222,6 +1247,7 @@ fn ollama_chat_payload(
     prompt: &str,
     force_cpu: bool,
     benchmark_profile: bool,
+    num_predict_override: Option<u32>,
 ) -> Value {
     let mut options = serde_json::Map::new();
     options.insert(
@@ -1229,7 +1255,10 @@ fn ollama_chat_payload(
         json!(if benchmark_profile { 2048 } else { 4096 }),
     );
     if benchmark_profile {
-        options.insert("num_predict".to_string(), json!(96));
+        options.insert(
+            "num_predict".to_string(),
+            json!(num_predict_override.unwrap_or(96)),
+        );
         options.insert("seed".to_string(), json!(42));
         options.insert("temperature".to_string(), json!(0));
     }
@@ -1346,8 +1375,15 @@ async fn run_ollama_api_prompt(
     runtime: OllamaRuntime,
     force_cpu: bool,
     benchmark_profile: bool,
+    num_predict_override: Option<u32>,
 ) -> Result<BenchmarkResult, String> {
-    let payload = ollama_chat_payload(&model, &prompt, force_cpu, benchmark_profile);
+    let payload = ollama_chat_payload(
+        &model,
+        &prompt,
+        force_cpu,
+        benchmark_profile,
+        num_predict_override,
+    );
     let execution_mode = if force_cpu { "cpu" } else { "auto" };
     if runtime == OllamaRuntime::Wsl && cfg!(target_os = "windows") {
         let execution_mode = execution_mode.to_string();
@@ -4603,7 +4639,7 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
 
     #[test]
     fn benchmark_chat_payload_is_deterministic_and_can_force_cpu() {
-        let payload = ollama_chat_payload("qwen3:0.6b", "bonjour", true, true);
+        let payload = ollama_chat_payload("qwen3:0.6b", "bonjour", true, true, None);
         assert_eq!(
             payload.get("model").and_then(Value::as_str),
             Some("qwen3:0.6b")
@@ -4637,8 +4673,26 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
     }
 
     #[test]
+    fn objective_arena_keeps_the_reproducible_prompt_unchanged() {
+        let prompt = "Réponds uniquement en JSON avec instruction, memory et calculation.";
+        assert_eq!(
+            prepare_benchmark_prompt(Some(prompt.to_string()), true),
+            prompt
+        );
+        assert!(prepare_benchmark_prompt(Some(prompt.to_string()), false)
+            .ends_with("Réponse finale uniquement, une phrase courte en français."));
+        let payload = ollama_chat_payload("qwen3:0.6b", prompt, false, true, Some(192));
+        assert_eq!(
+            payload
+                .pointer("/options/num_predict")
+                .and_then(Value::as_i64),
+            Some(192)
+        );
+    }
+
+    #[test]
     fn automatic_chat_payload_does_not_force_cpu_or_benchmark_sampling() {
-        let payload = ollama_chat_payload("hermes3:8b", "bonjour", false, false);
+        let payload = ollama_chat_payload("hermes3:8b", "bonjour", false, false, None);
         assert!(payload.pointer("/options/num_gpu").is_none());
         assert!(payload.pointer("/options/num_predict").is_none());
         assert!(payload.pointer("/options/seed").is_none());
