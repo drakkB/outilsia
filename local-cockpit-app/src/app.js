@@ -6707,6 +6707,10 @@ function fieldTestMachineEntry() {
   const promptForge = currentPromptForgeResult();
   const arena = readLastArenaRun();
   const successfulArena = (arena?.results || []).some((item) => item?.success);
+  const objectiveArenaResults = (arena?.results || [])
+    .filter((item) => item?.success && item?.arena_objective)
+    .sort((a, b) => Number(b.arena_objective?.score || 0) - Number(a.arena_objective?.score || 0));
+  const bestObjectiveArena = objectiveArenaResults[0] || null;
   const upgrade = report.upgrades[0];
   const doctor = report.hardware_doctor || hardwareDoctorSnapshot(scan);
   const os = [scan.os_name, scan.os_version].filter(Boolean).join(" ").trim();
@@ -6765,6 +6769,11 @@ function fieldTestMachineEntry() {
     promptforge_ok: Boolean(promptForge?.optimized),
     dialogue_ok: Boolean(state.chatResult?.success && state.chatResult?.output_preview),
     arena_ok: Boolean(successfulArena),
+    arena_protocol: arena?.protocol || "legacy_estimate",
+    arena_objective: arena?.protocol === ARENA_OBJECTIVE_PROTOCOL,
+    arena_objective_best_model: bestObjectiveArena?.model || "",
+    arena_objective_best_score: Number(bestObjectiveArena?.arena_objective?.score || 0),
+    arena_objective_best_checks: bestObjectiveArena ? `${bestObjectiveArena.arena_objective.passed_count}/${bestObjectiveArena.arena_objective.total_count}` : "",
     report_ok: Boolean(state.scan && benchmark?.success && lastShareReportUrl),
     first_30s: fieldTestFirst30sProof({ scan, report, action, profile, benchmark, upgrade }),
     share_url: lastShareReportUrl || "",

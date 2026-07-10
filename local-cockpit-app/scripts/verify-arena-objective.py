@@ -39,6 +39,7 @@ def main():
             [valid, partial, fenced, extra_key],
         )
         rendered = page.evaluate("() => window.__OUTILSIA_TEST__.applyObjectiveArenaState()")
+        field_entry = page.evaluate("() => window.__OUTILSIA_TEST__.fieldTestEntry()")
         browser.close()
 
     assert result["valid"]["score"] == 100, result
@@ -56,6 +57,9 @@ def main():
     assert "Arena objective v1" in rendered["memory"], rendered
     assert rendered["bridge"]["arena_proof"]["objective"] is True, rendered
     assert rendered["bridge"]["arena_proof"]["results"][0]["objective_checks"] == "6/6", rendered
+    assert field_entry["arena_objective"] is True, field_entry
+    assert field_entry["arena_protocol"] == "outilsia.arena.objective.v1", field_entry
+    assert field_entry["arena_objective_best_checks"] == "6/6", field_entry
     print("arena_objective_ok protocol=outilsia.arena.objective.v1 checks=6")
 
 
