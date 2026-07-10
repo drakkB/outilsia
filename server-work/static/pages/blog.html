@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blog IA 2026 - guides IA locale, Ollama, GPU et outils gratuits | OutilsIA</title>
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:description" content="Tous les guides OutilsIA : IA locale, Ollama, DeepSeek, mini PC, GPU, Raspberry Pi, RAG, outils gratuits et comparatifs IA mis à jour pour 2026.">
+<meta property="og:title" content="Blog IA 2026 - guides IA locale, Ollama, GPU et outils gratuits | OutilsIA">
+<link rel="canonical" href="https://outilsia.fr/blog">
+<meta name="description" content="Tous les guides OutilsIA : IA locale, Ollama, DeepSeek, mini PC, GPU, Raspberry Pi, RAG, outils gratuits et comparatifs IA mis à jour pour 2026.">
+<link rel="stylesheet" href="/static/css/tailwind.min.css">
+<script defer src="/static/js/alpine.min.js"></script>
+<style>
+body { font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.glass { background: rgba(15,15,26,0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.06); }
+.card-hover { transition: all 0.3s; }
+.card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,240,255,0.08); }
+.gradient-text { background: linear-gradient(135deg, #00f0ff, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+</style>
+<meta property="og:image" content="https://outilsia.fr/static/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://outilsia.fr/blog">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:site_name" content="OutilsIA.fr">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://outilsia.fr/static/og-cover.png">
+<meta name="twitter:title" content="Blog OutilsIA : guides, comparatifs et actualit&eacute;s IA 2026">
+<meta name="twitter:description" content="Tous nos guides, comparatifs et tutoriels IA. 114 articles sur l IA en ligne, locale, hardware et par usage.">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"CollectionPage","name":"Blog OutilsIA - guides IA locale et outils IA","url":"https://outilsia.fr/blog","description":"Tous les guides OutilsIA : IA locale, Ollama, DeepSeek, mini PC, GPU, Raspberry Pi, RAG, outils gratuits et comparatifs IA mis à jour pour 2026.","mainEntity":{"@type":"ItemList","itemListElement":[{"@type":"ListItem","position":1,"name":"IA locale","url":"https://outilsia.fr/ia-locale"},{"@type":"ListItem","position":2,"name":"Ollama Docker","url":"https://outilsia.fr/blog/ollama-docker-guide"},{"@type":"ListItem","position":3,"name":"DeepSeek R1 local","url":"https://outilsia.fr/blog/deepseek-r1-local"},{"@type":"ListItem","position":4,"name":"Mini PC IA","url":"https://outilsia.fr/blog/meilleur-mini-pc-ia"},{"@type":"ListItem","position":5,"name":"Matériel IA","url":"https://outilsia.fr/materiel"},{"@type":"ListItem","position":6,"name":"Raspberry Pi IA","url":"https://outilsia.fr/blog/ia-raspberry-pi-guide-complet-2026"},{"@type":"ListItem","position":7,"name":"Meilleur OS IA locale","url":"https://outilsia.fr/blog/meilleur-os-ia-locale"},{"@type":"ListItem","position":8,"name":"Claude.md","url":"https://outilsia.fr/memoryforge/claude-md"}]}}</script>
+<style>[x-cloak]{display:none!important}</style>
+</head>
+<body class="bg-dark-900 text-white antialiased">
+
+<nav class="fixed top-0 w-full z-50 glass" x-data="{ open: false }">
+    <div class="max-w-7xl mx-auto px-4 flex items-center justify-between h-16">
+        <a href="/" class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-violet-400 flex items-center justify-center text-sm font-black">IA</div>
+            <span class="text-xl font-bold">Outils<span class="gradient-text">IA</span></span>
+        </a>
+        <div class="hidden md:flex items-center gap-6 text-sm">
+            <a href="/" class="text-gray-400 hover:text-cyan-400">Accueil</a>
+            <a href="/comparateur" class="text-gray-400 hover:text-cyan-400">Comparateur</a>
+            <a href="/ia-locale" class="text-gray-400 hover:text-cyan-400">IA Locale</a>
+            <a href="/materiel" class="text-gray-400 hover:text-cyan-400">Mat&eacute;riel</a>
+            <a href="/blog" class="text-cyan-400 font-semibold">Blog</a>
+            <a href="/mon-pc-peut-il" class="text-gray-400 hover:text-cyan-400">Mon PC</a>
+            <a href="/upgrade-ia" class="text-gray-400 hover:text-cyan-400">Upgrade</a>
+        </div>
+        <button aria-label="Ouvrir le menu" @click="open = !open" class="md:hidden text-gray-400 hover:text-cyan-400 p-2">
+            <svg x-show="!open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            <svg x-show="open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+    </div>
+    <div x-show="open" x-transition class="md:hidden glass border-t border-white/5">
+        <div class="px-4 py-4 space-y-3">
+            <a href="/" class="block text-gray-400 hover:text-cyan-400 text-sm">Accueil</a>
+            <a href="/comparateur" class="block text-gray-400 hover:text-cyan-400 text-sm">Comparateur</a>
+            <a href="/ia-locale" class="block text-gray-400 hover:text-cyan-400 text-sm">IA Locale</a>
+            <a href="/materiel" class="block text-gray-400 hover:text-cyan-400 text-sm">Mat&eacute;riel</a>
+            <a href="/blog" class="block text-cyan-400 font-semibold text-sm">Blog</a>
+            <a href="/mon-pc-peut-il" class="block text-gray-400 hover:text-cyan-400 text-sm">Mon PC peut-il faire tourner une IA ?</a>
+            <a href="/upgrade-ia" class="block text-gray-400 hover:text-cyan-400 text-sm">Upgrade Advisor IA</a>
+        </div>
+    </div>
+</nav>
+
+<section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-2">
+  <div class="glass rounded-2xl p-5 border-cyan-400/20">
+    <div class="grid md:grid-cols-[1.35fr_.65fr] gap-5 items-center">
+      <div>
+        <p class="text-xs font-black uppercase tracking-wider text-cyan-400 mb-2">Bêta OutilsIA Local Cockpit</p>
+        <h2 class="text-2xl md:text-3xl font-black leading-tight">Le scanner desktop arrive : votre PC, vos modèles IA locaux, vos vrais tokens/s.</h2>
+        <p class="text-gray-300 mt-3 leading-relaxed">L'app Windows scanne CPU, RAM, GPU, VRAM, détecte Ollama, installe un modèle compatible, lance un benchmark Qwen/Hermes et génère un rapport MemoryForge/Obsidian. Le simulateur web estime ; le cockpit mesure votre vraie machine.</p>
+      </div>
+      <div class="grid gap-2 text-sm">
+        <a class="inline-flex justify-center rounded-xl bg-cyan-400 px-4 py-3 font-black text-dark-900 hover:opacity-90 transition" href="/telecharger-scanner-ia-local">Télécharger la bêta</a>
+        <a class="inline-flex justify-center rounded-xl bg-white px-4 py-3 font-black text-dark-900 hover:opacity-90 transition" href="/mon-pc-peut-il">Estimer mon PC</a>
+        <a class="inline-flex justify-center rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 font-bold text-cyan-100 hover:bg-cyan-400/15 transition" href="/blog/ollama-windows-vs-wsl-ia-locale-2026">Ollama Windows ou WSL ?</a>
+        <a class="inline-flex justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-bold text-white hover:bg-white/10 transition" href="/securite-confidentialite-scanner">Sécurité et confidentialité</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- KG fix: category navigation + orphan articles (added 2026-05-05) -->
+<section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-2">
+  <div class="glass rounded-2xl p-5">
+    <h2 class="text-sm font-bold text-cyan-400 uppercase tracking-wider mb-3">Cat&eacute;gories du blog</h2>
+    <div class="flex flex-wrap gap-2 text-sm">
+      <a href="/categorie/comparatifs" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-cyan-500/10 hover:text-cyan-400 transition border border-white/10">Comparatifs</a>
+      <a href="/categorie/ia-locale" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-cyan-500/10 hover:text-cyan-400 transition border border-white/10">IA Locale</a>
+      <a href="/categorie/hardware" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-cyan-500/10 hover:text-cyan-400 transition border border-white/10">Hardware</a>
+      <a href="/categorie/gratuit" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-cyan-500/10 hover:text-cyan-400 transition border border-white/10">Gratuit</a>
+      <a href="/categorie/par-metier" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-cyan-500/10 hover:text-cyan-400 transition border border-white/10">Par m&eacute;tier</a>
+      <a href="/categorie/creatif" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-cyan-500/10 hover:text-cyan-400 transition border border-white/10">Cr&eacute;atif</a>
+      <a href="/categorie/karpathy" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-violet-500/10 hover:text-violet-400 transition border border-white/10">Karpathy</a>
+      <a href="/categorie/rag" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-violet-500/10 hover:text-violet-400 transition border border-white/10">RAG</a>
+    </div>
+    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mt-5 mb-2">Articles &agrave; d&eacute;couvrir</h3>
+    <ul class="space-y-1.5 text-sm">
+      <li><a href="/blog/test-hallucination-ia-locale-15-minutes" class="text-gray-300 hover:text-amber-300 transition">&rarr; Test anti-hallucination IA locale : la m&eacute;thode en 15 minutes</a></li>
+      <li><a href="/blog/pentesting-llm-local-open-source-2026" class="text-gray-300 hover:text-amber-300 transition">&rarr; Pentesting avec LLM local open-source : audit defensif en 2026</a></li>
+      <li><a href="/blog/pack-ia-locale-pme-sans-cloud-2026" class="text-gray-300 hover:text-amber-300 transition">&rarr; Pack IA locale PME sans cloud : documents, mails et factures en priv&eacute;</a></li>
+      <li><a href="/blog/modele-ia-local-par-metier-2026" class="text-gray-300 hover:text-amber-300 transition">&rarr; Quel mod&egrave;le IA local choisir par m&eacute;tier en 2026 ?</a></li>
+      <li><a href="/blog/hermes-vs-claude-mytho-ia-locale" class="text-gray-300 hover:text-amber-300 transition">&rarr; Hermes vs Claude mytho : faire mieux avec l'IA locale</a></li>
+      <li><a href="/acheter-pc-ia-ou-attendre" class="text-gray-300 hover:text-cyan-400 transition">&rarr; Acheter un PC IA maintenant ou attendre RTX Spark ?</a></li>
+      <li><a href="/blog/claude-46-vs-gpt-55-claude-mythos-gpt-56" class="text-gray-300 hover:text-cyan-400 transition">&rarr; Claude 4.6 vs GPT-5.5 : le duel qui chauffe avant GPT-5.6</a></li>
+      <li><a href="/blog/active-wiki-rag-pomdp-2026" class="text-gray-300 hover:text-cyan-400 transition">&rarr; Active Wiki, RAG et POMDP : la nouvelle g&eacute;n&eacute;ration d'IA contextuelle</a></li>
+      <li><a href="/blog/agents-code-claude-code-cursor-openclaw-comparatif-2026" class="text-gray-300 hover:text-cyan-400 transition">&rarr; Agents code 2026 : Claude Code vs Cursor vs OpenClaw &mdash; comparatif</a></li>
+    </ul>
+  </div>
+</section>
+<section class="cash-route-hub" data-codex-cash-route="1">
+  <style>
+    .cash-route-hub{max-width:1120px;margin:28px auto;padding:0 18px}
+    .cash-route-box{border:1px solid rgba(148,163,184,.18);border-radius:18px;background:rgba(15,23,42,.62);padding:18px}
+    .cash-route-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:14px}
+    .cash-route-head h2{margin:0;color:#f8fafc;font-size:clamp(1.15rem,2vw,1.55rem);line-height:1.15}
+    .cash-route-head p{margin:5px 0 0;color:#94a3b8;font-size:.92rem;line-height:1.5}
+    .cash-route-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .cash-route-card{display:block;text-decoration:none;color:#e5e7eb;border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.035);padding:13px;min-width:0}
+    .cash-route-card:hover{border-color:rgba(103,232,249,.32);background:rgba(255,255,255,.055)}
+    .cash-route-card b{display:block;color:#f8fafc;font-size:.94rem;margin-bottom:5px}
+    .cash-route-card span{display:block;color:#94a3b8;font-size:.82rem;line-height:1.42}
+    .cash-route-pill{color:#67e8f9;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px}
+    @media(max-width:860px){.cash-route-head{display:block}.cash-route-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:520px){.cash-route-grid{grid-template-columns:1fr}.cash-route-hub{padding:0 12px}}
+  </style>
+  <div class="cash-route-box">
+    <div class="cash-route-head">
+      <div>
+        <h2>Choisir le bon matériel avant d’acheter</h2>
+        <p>Les guides qui transforment une curiosité IA locale en décision d’achat claire : GPU, mini-PC, build complet ou Raspberry Pi.</p>
+      </div>
+    </div>
+    <div class="cash-route-grid">
+      <a class="cash-route-card" href="/blog/meilleur-gpu-ia-locale-2026"><div class="cash-route-pill">Le plus décisif</div><b>Meilleur GPU IA locale</b><span>RTX 3060, 3090, 4090 : le choix selon VRAM, budget et modèles.</span></a>
+      <a class="cash-route-card" href="/blog/ia-raspberry-pi-guide-complet-2026"><div class="cash-route-pill">Petit budget</div><b>IA sur Raspberry Pi</b><span>La porte d’entrée la moins chère, avec accessoires vraiment utiles.</span></a>
+      <a class="cash-route-card" href="/blog/meilleur-mini-pc-ia"><div class="cash-route-pill">Simple et compact</div><b>Meilleur mini PC IA</b><span>Mac mini, NUC, Ryzen : une machine propre sans monter un PC.</span></a>
+      <a class="cash-route-card" href="/blog/build-ia-locale-1500e-liste-complete-amazon-2026"><div class="cash-route-pill">Liste complète</div><b>Build IA locale 1500€</b><span>Composants cohérents : GPU, RAM, SSD, alim et boîtier.</span></a>
+    </div>
+  </div>
+</section>
+
+
+
+
+<section class="pt-24 pb-12 px-4 text-center">
+    <h1 class="text-3xl sm:text-4xl font-black mb-4">Blog <span class="gradient-text">OutilsIA</span></h1>
+    <p class="text-gray-400">114 articles &mdash; guides, comparatifs, tutoriels IA</p>
+</section>
+
+<section class="px-4 pb-20">
+    <div class="max-w-5xl mx-auto grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <a href="/blog/rtx-3090-qwen-3-6-hermes-ia-locale-2026" class="glass rounded-xl p-5 card-hover block group" style="border:1px solid rgba(251,191,36,0.62); background:linear-gradient(135deg, rgba(251,191,36,0.15), rgba(103,232,249,0.08));">
+                <div style="display:inline-block;background:rgba(251,191,36,0.18);color:#fde68a;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">NOUVEAU &middot; RTX 3090 &middot; QWEN/HERMES</div>
+                <h3 class="font-semibold text-sm group-hover:text-amber-300 transition mb-2">RTX 3090 + Qwen 3.6 + Hermes : le combo IA locale 24 Go VRAM</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Quels modèles faire tourner sur une RTX 3090 : Qwen 32B, Qwen 3.6 35B-A3B, Hermes, VRAM, commandes et panier Amazon.</p>
+            </a>
+            <a href="/blog/glm-5-2-753b-open-weights-2026" class="glass rounded-xl p-5 card-hover block group" style="border:1px solid rgba(103,232,249,0.60); background:linear-gradient(135deg, rgba(103,232,249,0.14), rgba(251,191,36,0.08));">
+                <div style="display:inline-block;background:rgba(103,232,249,0.16);color:#a5f3fc;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">NOUVEAU &middot; GLM-5.2 &middot; OPEN WEIGHTS</div>
+                <h3 class="font-semibold text-sm group-hover:text-cyan-300 transition mb-2">Faire tourner GLM-5.2 en local : configurations, Ollama et ZCode</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">217 à 467 Go en GGUF, ZCode, commandes locales et station 512 Go : le matériel réellement nécessaire.</p>
+            </a>
+            <a href="/blog/plaud-note-obsidian-memoire-ia-2026" class="glass rounded-xl p-5 card-hover block group" style="border:1px solid rgba(125,211,252,0.60); background:linear-gradient(135deg, rgba(125,211,252,0.14), rgba(168,85,247,0.08));">
+                <div style="display:inline-block;background:rgba(125,211,252,0.16);color:#bae6fd;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">NOUVEAU &middot; VOIX &rarr; MEMOIRE IA</div>
+                <h3 class="font-semibold text-sm group-hover:text-sky-300 transition mb-2">PLAUD Note + Obsidian : transformer la voix en memoire IA</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Le workflow PLAUD, transcription, Obsidian, MemoryForge et RAG local, avec verdict achat Amazon.</p>
+            </a>
+            <a href="/blog/config-pc-llm-local-24go-2026" class="glass rounded-xl p-5 card-hover block group" style="border:1px solid rgba(248,216,137,0.60); background:linear-gradient(135deg, rgba(248,216,137,0.16), rgba(103,232,249,0.06));">
+                <div style="display:inline-block;background:rgba(248,216,137,0.18);color:#fde68a;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">NOUVEAU &middot; PC LLM LOCAL</div>
+                <h3 class="font-semibold text-sm group-hover:text-amber-300 transition mb-2">Monter un PC pour LLM local en 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">La config 24 Go VRAM a acheter : RTX 3090/4090, G.Skill 64 Go DDR5, Lian Li LANCOOL 216, perfs Ollama et panier clair.</p>
+            </a>
+            <a href="/blog/pentesting-llm-local-open-source-2026" class="glass rounded-xl p-5 card-hover block group" style="border:1px solid rgba(94,234,212,0.55); background:linear-gradient(135deg, rgba(94,234,212,0.16), rgba(244,184,96,0.06));">
+                <div style="display:inline-block;background:rgba(94,234,212,0.16);color:#99f6e4;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">NOUVEAU &middot; SECURITE LOCALE</div>
+                <h3 class="font-semibold text-sm group-hover:text-teal-300 transition mb-2">Pentesting avec LLM local open-source : audit defensif en 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Un workflow prudent pour auditer vos propres sites avec Ollama : OWASP, preuves, tests locaux, rapport et materiel utile.</p>
+            </a>
+            <a href="/blog/test-hallucination-ia-locale-15-minutes" class="glass rounded-xl p-5 card-hover block group" style="border:1px solid rgba(242,184,75,0.55); background:linear-gradient(135deg, rgba(242,184,75,0.16), rgba(255,255,255,0.025));">
+                <div style="display:inline-block;background:rgba(242,184,75,0.16);color:#f8d889;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">TEST &middot; ANTI-HALLUCINATION</div>
+                <h3 class="font-semibold text-sm group-hover:text-amber-300 transition mb-2">Test anti-hallucination IA locale : la m&eacute;thode en 15 minutes</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Sources, citations, hypoth&egrave;ses et tests : une m&eacute;thode simple pour rep&eacute;rer une IA qui invente avant qu&rsquo;elle vous co&ucirc;te du temps.</p>
+            </a>
+            <a href="/blog/pack-ia-locale-pme-sans-cloud-2026" class="glass rounded-xl p-5 card-hover block group" style="border:1px solid rgba(183,217,106,0.52); background:linear-gradient(135deg, rgba(183,217,106,0.15), rgba(255,255,255,0.025));">
+                <div style="display:inline-block;background:rgba(183,217,106,0.15);color:#d8f99b;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">PME &middot; CONFIDENTIALIT&Eacute;</div>
+                <h3 class="font-semibold text-sm group-hover:text-amber-300 transition mb-2">Pack IA locale PME sans cloud : documents, mails et factures en priv&eacute;</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Un setup concret pour garder les documents sensibles en local : mini serveur, RAG, Open WebUI, sauvegardes et permissions.</p>
+            </a>
+            <a href="/blog/modele-ia-local-par-metier-2026" class="glass rounded-xl p-5 card-hover block group" style="border:1px solid rgba(233,177,91,0.52); background:linear-gradient(135deg, rgba(233,177,91,0.15), rgba(255,255,255,0.025));">
+                <div style="display:inline-block;background:rgba(233,177,91,0.15);color:#ffd08a;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">GUIDE &middot; MOD&Egrave;LES LOCAUX</div>
+                <h3 class="font-semibold text-sm group-hover:text-amber-300 transition mb-2">Quel mod&egrave;le IA local choisir par m&eacute;tier en 2026 ?</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Hermes, Qwen, DeepSeek, Mistral ou Llama : choisir selon le vrai usage, puis acheter le mat&eacute;riel avec marge.</p>
+            </a>
+            <a href="/blog/hermes-vs-claude-mytho-ia-locale" class="glass rounded-xl p-5 card-hover block group" style="border:1px solid rgba(242,184,75,0.55); background:linear-gradient(135deg, rgba(242,184,75,0.10), rgba(125,213,111,0.05));">
+                <div style="display:inline-block;background:rgba(242,184,75,0.18);color:#f8d889;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">NOUVEAU ? IA LOCALE</div>
+                <h3 class="font-semibold text-sm group-hover:text-amber-300 transition mb-2">Hermes vs Claude mytho : faire mieux avec l'IA locale</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Quand Claude invente, reprenez le contr&ocirc;le : Hermes, sources locales, RAG, citations et tests pour des r&eacute;ponses v&eacute;rifiables.</p>
+            </a>
+            <a href="/acheter-pc-ia-ou-attendre" class="glass rounded-xl p-5 card-hover block group" style="border:1px solid rgba(34,211,238,0.55);">
+                <div style="display:inline-block;background:rgba(34,211,238,0.16);color:#67e8f9;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">OUTIL Â· ACTU MATOS</div>
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Acheter un PC IA maintenant ou attendre RTX Spark ?</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Simulateur de timing achat : RTX 3090, RTX 5090, Arc Pro B70, Strix Halo, Mac M4, DGX Spark et AI PCs.</p>
+            </a>
+            <a href="/blog/claude-46-vs-gpt-55-claude-mythos-gpt-56" class="glass rounded-xl p-5 card-hover block group" style="border:1px solid rgba(34,211,238,0.55);">
+                <div style="display:inline-block;background:rgba(34,211,238,0.16);color:#67e8f9;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">ðŸ”¥ ACTU Â· 3 JUIN</div>
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Claude 4.6 vs GPT-5.5 : le duel qui chauffe avant Claude Mythos vs GPT-5.6</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Ce qui est confirmé, ce que les utilisateurs reprochent à Claude, et pourquoi GPT-5.6 devient déjà le prochain front IA.</p>
+            </a>
+            <a href="/blog/chine-memoire-ia-locale-cxmt-hbm3-ddr5-2026" class="glass rounded-xl p-5 card-hover block group" style="border:1px solid rgba(168,85,247,0.45);">
+                <div style="display:inline-block;background:rgba(168,85,247,0.18);color:#c4b5fd;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">ðŸ”¥ NOUVEAU Â· 24 MAI</div>
+                <h3 class="font-semibold text-sm group-hover:text-violet-300 transition mb-2">Chine, CXMT, HBM3 : la mémoire peut changer l'IA locale</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">DDR5 chinoise, HBM3, LPDDR5X : pourquoi le futur de l'IA locale se joue autant sur la mémoire que sur les GPU.</p>
+            </a>
+            <a href="/blog/intel-arc-pro-b70-32go-ia-locale-2026" class="glass rounded-xl p-5 card-hover block group" style="border:1px solid rgba(34,211,238,0.45);">
+                <div style="display:inline-block;background:rgba(34,211,238,0.16);color:#67e8f9;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">ðŸ”¥ NOUVEAU Â· 24 MAI</div>
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Intel Arc Pro B70 32 Go : le GPU IA locale que certains appellent “Arc Pro 870”</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Specs officielles, intérêt pour l'IA locale, limites logiciel Intel et verdict honnête face à NVIDIA/AMD.</p>
+            </a>
+            <a href="/blog/qwen-3-6-review-2026" class="glass rounded-xl p-5 card-hover block group" style="border:1px solid rgba(251,191,36,0.4);">
+                <div style="display:inline-block;background:rgba(251,191,36,0.2);color:#fbbf24;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">ðŸ”¥ NOUVEAU Â· 22 AVRIL</div>
+                <h3 class="font-semibold text-sm group-hover:text-amber-400 transition mb-2">Qwen 3.6 en avril 2026 : Plus, 35B-A3B, Max-Preview — test complet et benchmarks</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Alibaba sort 3 versions Qwen en 4 semaines et prend la t&ecirc;te du code open-weight. Max-Preview #1 SWE-bench Pro. Test &amp; install Ollama.</p>
+            </a>
+            <a href="/blog/agentic-rag-guide-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Agentic RAG : le guide complet du RAG intelligent en 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet Agentic RAG 2026 : d&eacute;couvrez comment les agents IA transforment le RAG classique avec raisonnement,</p>
+            </a>
+            <a href="/blog/agents-ia-autonomes-local-ollama-guide-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Agents IA autonomes en local : cr&eacute;er vos propres agents avec Ollama (guide complet 2026)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet pour cr&eacute;er des agents IA autonomes en local avec Ollama, CrewAI, AutoGen et LangGraph. 10 agents co</p>
+            </a>
+            <a href="/blog/agi-futur-intelligence-artificielle-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">AGI : quand l'IA deviendra aussi intelligente que l'humain (le point en 2026)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">AGI (Intelligence Artificielle G&eacute;n&eacute;rale) : o&ugrave; en est-on en 2026 ? Quand l'IA &eacute;galera l'humai</p>
+            </a>
+            <a href="/blog/alternative-copilot-gratuit" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Alternative GitHub Copilot gratuite 2026 : les meilleures options pour coder</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleures alternatives gratuites à GitHub Copilot en 2026 : Codeium, Tabby, Continue.dev, CodeWhisperer,</p>
+            </a>
+            <a href="/blog/alternative-midjourney-gratuite" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Alternative Midjourney gratuite 2026 : générer des images sans payer</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Les meilleures alternatives gratuites a Midjourney en 2026 : Stable Diffusion, Flux, DALL-E via Bing, Leonardo, Ideogram</p>
+            </a>
+            <a href="/blog/autoagent-optimiser-agents-ia-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">AutoAgent : l'outil open-source qui optimise vos agents IA automatiquement</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">AutoAgent est un m&eacute;ta-agent qui lit les logs, identifie les erreurs et optimise automatiquement vos agents IA. Gu</p>
+            </a>
+            <a href="/blog/autoresearch-gpu-benchmark-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">AutoResearch GPU : benchmarker automatiquement vos configs d'inf&eacute;rence IA</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Appliquez la boucle AutoResearch de Karpathy au benchmarking GPU : trouvez automatiquement la configuration optimale (qu</p>
+            </a>
+            <a href="/blog/autoresearch-ollama-config-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">AutoResearch Ollama : optimiser automatiquement les param&egrave;tres de vos mod&egrave;les</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Utilisez la boucle AutoResearch pour trouver automatiquement les meilleurs param&egrave;tres Ollama (temperature, top_p,</p>
+            </a>
+            <a href="/blog/autoresearch-prompts-optimisation-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">AutoResearch Prompts : trouver le meilleur prompt par mutation automatique</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Appliquez la boucle AutoResearch au prompt engineering : un script Python qui mute, teste et s&eacute;lectionne automati</p>
+            </a>
+            <a href="/blog/autoresearch-shopify-cas-concret-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Shopify utilise AutoResearch : +19% de performance en une nuit (cas concret)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Le CEO de Shopify (200 milliards $) a adapt&eacute; AutoResearch de Karpathy pour optimiser un mod&egrave;le interne. R&</p>
+            </a>
+            <a href="/blog/calcul-distribue-modeles-locaux-avenir-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">L'avenir du calcul distribu&eacute; passe-t-il par les mod&egrave;les locaux ? (analyse 2026)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Calcul distribu&eacute; et IA locale : et si des millions de GPU grand public rempla&ccedil;aient les datacenters ? Anal</p>
+            </a>
+            <a href="/blog/carte-graphique-externe-egpu-ia-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Carte graphique externe (eGPU) pour l'IA : le meilleur des deux mondes ?</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">eGPU pour l'IA locale : boitier externe + RTX 4070/4090 via Thunderbolt. Guide complet 2026. Compatibilite, performances</p>
+            </a>
+            <a href="/blog/carte-graphique-externe-ia" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Carte graphique externe (eGPU) pour l'IA : le meilleur des deux mondes ?</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">eGPU pour l'IA locale : boitier externe + RTX 4070/4090 via Thunderbolt. Guide complet 2026. Compatibilite, performances</p>
+            </a>
+            <a href="/blog/chatgpt-gratuit-francais-guide-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">ChatGPT gratuit en fran&ccedil;ais : guide complet pour l'utiliser sans payer en 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet pour utiliser ChatGPT gratuitement en fran&ccedil;ais en 2026. Cr&eacute;er un compte, limites GPT-4o, app</p>
+            </a>
+            <a href="/blog/chatgpt-vs-claude-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">ChatGPT vs Claude 2026 : comparatif honnete (lequel choisir ?)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">ChatGPT vs Claude en 2026 : comparatif detaille prix, qualite du code, ecriture, raisonnement, recherche, vie privee. Le</p>
+            </a>
+            <a href="/blog/chatgpt-vs-gemini-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">ChatGPT vs Gemini 2026 : quel chatbot IA choisir ?</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif complet ChatGPT vs Gemini en 2026 : prix, qualite, recherche, multimodal, fenetre de contexte. Tableau et ver</p>
+            </a>
+            <a href="/blog/chatgpt-vs-mistral" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">ChatGPT vs Mistral 2026 : le duel France vs USA</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif ChatGPT vs Mistral 2026. OpenAI vs Mistral AI. Performance, prix, vie privee, open source. Le duel France vs </p>
+            </a>
+            <a href="/blog/chatgpt-vs-perplexity-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">ChatGPT vs Perplexity 2026 : recherche ou conversation ?</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif ChatGPT vs Perplexity en 2026 : lequel choisir pour la recherche, la conversation, la creation ? Tableau comp</p>
+            </a>
+            <a href="/blog/claude-gratuit-guide-complet-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Claude gratuit : guide complet pour utiliser l'IA d'Anthropic sans payer (2026)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet pour utiliser Claude gratuitement en 2026. Cr&eacute;er un compte, astuces pour maximiser les 30 messages/</p>
+            </a>
+            <a href="/blog/combien-consomme-chatgpt" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Combien consomme ChatGPT ? Électricité, eau et coût réel par question</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Combien consomme ChatGPT en électricité et en eau ? Coût réel par question, comparaison avec Google, Claude, Gemini et l</p>
+            </a>
+            <a href="/blog/comment-fonctionnent-llm" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Comment fonctionnent les LLM ? Transformer, attention, tokens expliqués simplement</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Explication simple du fonctionnement des LLM : tokens, Transformer, attention, paramètres, quantification, MoE, températ</p>
+            </a>
+            <a href="/blog/consommation-electrique-ia" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Consommation électrique de l'IA : combien coûte votre GPU par mois ?</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Tableau complet de la consommation électrique de chaque GPU pour l'IA locale : RTX 3060, 4090, Mac M4. Coût mensuel, bre</p>
+            </a>
+            <a href="/blog/deepseek-r1-local" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Installer DeepSeek R1 en local : guide complet avec Ollama</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide étape par étape pour installer DeepSeek R1 en local avec Ollama. Configuration VRAM, benchmarks, comparaison avec </p>
+            </a>
+            <a href="/blog/deepseek-vs-chatgpt" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">DeepSeek vs ChatGPT 2026 : l'IA chinoise qui rivalise (et c'est gratuit)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif DeepSeek vs ChatGPT en 2026. DeepSeek R1 et V3 sont gratuits et rivalisent avec GPT-4. Benchmarks, vie privee</p>
+            </a>
+            <a href="/blog/dual-3090-ia-locale" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">2x RTX 3090 (48 Go VRAM) : quels modèles IA faire tourner en local ?</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet dual RTX 3090 pour IA locale. 48 Go de VRAM, quels modeles faire tourner ? Llama 70B, Mixtral, DeepSeek. C</p>
+            </a>
+            <a href="/blog/ecoflow-vs-zendure" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">EcoFlow vs Zendure 2026 : comparatif batteries solaires (avis honnête)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif honnête EcoFlow vs Zendure en 2026 : batteries solaires, stations portables, fiabilité, prix. Notre EcoFlow a</p>
+            </a>
+            <a href="/blog/egpu-nvidia-mac-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">eGPU NVIDIA sur Mac Mini M4 2026 : Apple ouvre les portes (guide complet)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Apple supporte enfin les GPU NVIDIA sur macOS en 2026. Guide complet : Mac Mini M4 + boitier eGPU + RTX 4090. Boitiers, </p>
+            </a>
+            <a href="/blog/extensions-ia-chrome-gratuites-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Les 10 meilleures extensions IA gratuites pour Chrome en 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">S&eacute;lection des 10 meilleures extensions Chrome avec IA en 2026. Sider, Monica, Merlin, Perplexity, Grammarly... To</p>
+            </a>
+            <a href="/blog/fine-tuning-ia-donnees-personnelles-guide-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Fine-tuning : entra&icirc;ner une IA avec vos propres donn&eacute;es (guide local 2026)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet fine-tuning IA en local : LoRA, QLoRA, Unsloth, Axolotl. Entra&icirc;nez un mod&egrave;le avec vos donn&ea</p>
+            </a>
+            <a href="/blog/gemini-gratuit-guide-complet-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Gemini gratuit : guide complet de l'IA Google en 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet pour utiliser Google Gemini gratuitement en 2026. Comparaison ChatGPT vs Claude vs Gemini, 10 cas d'usage </p>
+            </a>
+            <a href="/blog/google-mort-ia-remplace-recherche-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Google est-il mort ? Comment l'IA remplace la recherche web en 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Google perd du terrain face &agrave; Perplexity, ChatGPT et Claude. Analyse compl&egrave;te : chiffres, comparaisons, et</p>
+            </a>
+            <a href="/blog/hermes-agent-architecture-complete-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Hermes Agent : l'architecture compl&egrave;te qui transforme un LLM en agent autonome</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">D&eacute;couvrez l'architecture 6 couches de Hermes Agent par Nous Research : interface, cerveau, infrastructure, 40+ ou</p>
+            </a>
+            <a href="/blog/hermes-applications-concretes-ia-locale-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">25 applications concr&egrave;tes de Hermes et l'IA locale (arr&ecirc;tez de juste "tester")</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">25 projets concrets &agrave; faire AUJOURD'HUI avec Hermes et Ollama : argent, travail, maison, business, cerveau. Fini </p>
+            </a>
+            <a href="/blog/hermes-vs-claude-code-openclaw-guide-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Hermes vs Claude Code vs OpenClaw : peut-on remplacer un abo &agrave; 200$/mois ? (guide 2026)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Hermes, OpenClaw, Claude Code : 3 outils que tout le monde confond. Guide clair pour comprendre les diff&eacute;rences, </p>
+            </a>
+            <a href="/blog/ia-au-bureau-par-metier" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Quelle IA pour le bureau ? Guide par metier 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet des meilleurs outils IA par metier en 2026 : comptable, avocat, RH, marketing, commercial, medecin, manage</p>
+            </a>
+            <a href="/blog/ia-cv-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleure IA pour CV et lettre de motivation 2026 (gratuit)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleures IA gratuites pour creer un CV et une lettre de motivation en 2026 : ChatGPT, Claude, Enhancv, </p>
+            </a>
+            <a href="/blog/ia-expliquee-grands-parents-guide-simple-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">L'IA expliqu&eacute;e aux grands-parents : comprendre ChatGPT simplement</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">L'intelligence artificielle expliqu&eacute;e simplement, sans jargon. Comprendre ChatGPT, savoir l'utiliser, conna&icirc</p>
+            </a>
+            <a href="/blog/ia-gratuite-française" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">IA gratuite française 2026 : Mistral, Hugging Face et les alternatives</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Decouvrez les meilleures IA gratuites françaises en 2026. Mistral AI, Hugging Face, LightOn, Kyutai. Comment les utilise</p>
+            </a>
+            <a href="/blog/ia-gratuite-sans-inscription" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">IA gratuite sans inscription 2026 : les meilleurs outils accessibles immédiatement</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Liste des meilleures IA gratuites sans inscription en 2026 : Perplexity, Copilot, HuggingChat, DuckDuckGo AI Chat, Mistr</p>
+            </a>
+            <a href="/blog/ia-interdites-france-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Les IA interdites en France en 2026 (et comment les utiliser l&eacute;galement)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Quelles IA sont interdites en France en 2026 ? EU AI Act, deepfakes, reconnaissance faciale, scoring social... Tout ce q</p>
+            </a>
+            <a href="/blog/ia-locale-sans-internet" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">IA locale sans internet : faire tourner une IA sur son PC en 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet pour utiliser une IA sans internet en 2026. Ollama, LM Studio, modeles hors ligne, materiel requis. Vie pr</p>
+            </a>
+            <a href="/blog/ia-locale-vs-claude-code" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">IA locale vs Claude Code / Codex : peut-on coder sans abonnement ?</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif IA locale (Ollama, Qwen Coder, DeepSeek) vs cloud (Claude Code, Copilot, Cursor). Qualite, cout, vie privee, </p>
+            </a>
+            <a href="/blog/ia-mode-fashion-outils-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">IA et mode : les meilleurs outils pour s'habiller avec l'intelligence artificielle en 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">D&eacute;couvrez les 8 meilleurs outils IA mode en 2026 : essayage virtuel, styliste IA, garde-robe capsule. Comparatif </p>
+            </a>
+            <a href="/blog/ia-pour-avocat" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">IA pour avocat 2026 : les outils pour le juridique</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet des outils IA pour avocats et juristes en 2026. Claude, ChatGPT, Harvey AI, Doctrine.fr, Ollama. Confident</p>
+            </a>
+            <a href="/blog/ia-pour-etudiant" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">IA pour etudiant 2026 : les outils gratuits indispensables</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Decouvrez les meilleurs outils IA gratuits pour etudiants en 2026 : ChatGPT, Claude, Perplexity, NotebookLM, Quillbot. G</p>
+            </a>
+            <a href="/blog/ia-pour-les-profs" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">IA pour les profs : les meilleurs outils gratuits pour enseignants 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Decouvrez les meilleurs outils IA gratuits pour enseignants en 2026 : ChatGPT, Claude, Gemini, MagicSchool AI, Diffit, T</p>
+            </a>
+            <a href="/blog/ia-pour-linkedin" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">IA pour LinkedIn 2026 : écrire des posts qui performent</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleurs outils IA pour écrire des posts LinkedIn en 2026 : ChatGPT, Claude, Taplio, AuthoredUp, Jasper,</p>
+            </a>
+            <a href="/blog/ia-powerpoint-gratuit" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">IA PowerPoint gratuit 2026 : créer des présentations en 1 clic</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleurs outils IA pour créer des présentations gratuitement en 2026 : Gamma, Beautiful.ai, Tome, Slides</p>
+            </a>
+            <a href="/blog/ia-raspberry-pi-guide-complet-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">IA sur Raspberry Pi : le guide complet pour faire tourner une IA &agrave; 80&euro; (2026)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet pour faire tourner une IA locale sur Raspberry Pi 5 &agrave; partir de 80&euro;. Ollama, mod&egrave;les co</p>
+            </a>
+            <a href="/blog/ia-resume-texte-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">IA résumé de texte gratuit 2026 : les meilleurs outils pour résumer</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleurs outils IA pour résumer du texte gratuitement en 2026 : Claude, ChatGPT, Perplexity, QuillBot, T</p>
+            </a>
+            <a href="/blog/ia-resume-videos-youtube-gratuit-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">IA qui r&eacute;sume les vid&eacute;os YouTube gratuitement : les 5 meilleurs outils 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparez les 5 meilleurs outils IA pour r&eacute;sumer des vid&eacute;os YouTube gratuitement en 2026 : ChatGPT, Claude,</p>
+            </a>
+            <a href="/blog/ia-solaire-offgrid" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Faire tourner une IA avec le solaire : le guide offgrid complet 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet pour alimenter une IA locale avec l'energie solaire en 2026. Mac Mini M4 + EcoFlow + panneau solaire = ass</p>
+            </a>
+            <a href="/blog/ia-traduction-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleure IA pour traduire en 2026 : comparatif gratuit</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleures IA de traduction en 2026 : DeepL, ChatGPT, Claude, Google Translate, Reverso. Tableau par pair</p>
+            </a>
+            <a href="/blog/ia-voix-gratuite-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">IA voix gratuite 2026 : les meilleurs outils text-to-speech et voice cloning</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleurs outils IA voix gratuits en 2026 : ElevenLabs, PlayHT, Coqui TTS, Bark, Azure TTS, Google TTS. T</p>
+            </a>
+            <a href="/blog/idea-file-karpathy-partager-idees-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Idea File de Karpathy : pourquoi on ne partagera plus de code en 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Karpathy propose l'Idea File : partager des id&eacute;es au lieu du code. Votre agent IA construit l'impl&eacute;mentati</p>
+            </a>
+            <a href="/blog/installer-hermes-nous-research-guide-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Installer Hermes (Nous Research) en local : guide complet config + mod&egrave;les 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide pratique pour installer Hermes de Nous Research en local avec Ollama. Configs minimum, choix du mod&egrave;le (8B </p>
+            </a>
+            <a href="/blog/installer-ollama-guide" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Installer Ollama : guide complet (Windows, Mac, Linux) en 5 minutes</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet pour installer Ollama sur Windows, Mac et Linux en 5 minutes. Telecharger, configurer et lancer votre prem</p>
+            </a>
+            <a href="/blog/investir-materiel-ia-rembourser-roi-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Investir dans du mat&eacute;riel IA haut de gamme et le rembourser en 1-2 ans (guide ROI 2026)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Le business case complet pour investir dans du mat&eacute;riel IA local : 4 configs de 2 500&euro; &agrave; 13 000&euro;</p>
+            </a>
+            <a href="/blog/karpathy-autoresearch-guide-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Karpathy AutoResearch : l'IA qui s'am&eacute;liore toute seule (guide complet)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet AutoResearch de Karpathy : un script Python de 630 lignes qui cr&eacute;e une boucle autonome d'am&eacute;</p>
+            </a>
+            <a href="/blog/karpathy-rag-depasse-llm-wiki-alternative-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Karpathy dit que le RAG est d&eacute;pass&eacute; : le LLM Wiki est l'alternative (avril 2026)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Karpathy affirme que le RAG est fondamentalement d&eacute;faillant. Son alternative : le LLM Wiki, une base de connaissa</p>
+            </a>
+            <a href="/blog/llm-wiki-knowledge-engineering-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">LLM Wiki : quand l'IA construit et maintient sa propre base de connaissances</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet du pattern LLM Wiki (Karpathy/Yuchen Jin) : l'&eacute;volution au-del&agrave; du RAG o&ugrave; le LLM devi</p>
+            </a>
+            <a href="/blog/lm-studio-guide" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">LM Studio : guide complet (installation, modèles, utilisation)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet LM Studio 2026 : installation, telechargement de modeles IA (Llama 3, Mistral), interface de chat, serveur</p>
+            </a>
+            <a href="/blog/mac-mini-m4-ia-locale" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Mac Mini M4 pour IA locale 2026 : quel modèle choisir ?</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet Mac Mini M4 pour IA locale en 2026. M4, M4 Pro 24 Go, M4 Pro 48 Go. Benchmarks, modeles compatibles, prix.</p>
+            </a>
+            <a href="/blog/machine-de-reve-ia-locale-config-ultime-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Machine de r&ecirc;ve pour l'IA locale : les configs ultimes sans limite de budget</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Les configs PC ultimes pour l'IA locale en 2026 : de 5 000 &agrave; 500 000 euros. GPU, CPU, RAM, refroidissement, ROI v</p>
+            </a>
+            <a href="/blog/materiel-remplacer-claude-code" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Quel materiel pour egaler Claude Code en local ? Guide hardware 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide materiel complet pour faire tourner une IA de code en local : GPU, Mac, RAM. 4 tiers de budget (300 a 6000 euros) </p>
+            </a>
+            <a href="/blog/meilleur-gpu-ia-locale-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleure carte graphique pour l'IA en 2026 : comparatif et guide d'achat</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleures cartes graphiques pour l'IA en 2026. RTX 3060, 4060, 4070, 4090, 5070 Ti, 5090, RX 7900 XTX. P</p>
+            </a>
+            <a href="/blog/meilleur-gpu-ia-locale-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleur GPU pour IA locale 2026 : quel carte graphique choisir ?</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet pour choisir le meilleur GPU pour IA locale en 2026. RTX 3060, 4060, 4070, 4090. Comparatif VRAM, prix, pe</p>
+            </a>
+            <a href="/blog/meilleur-ia-ecriture-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleure IA pour ecrire en 2026 : comparatif livres, articles, memoires</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleures IA pour ecrire en 2026 : Claude, ChatGPT, Jasper, Copy.ai, Notion AI, Gemini. Tableau par usag</p>
+            </a>
+            <a href="/blog/meilleur-ia-excel-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleure IA pour Excel 2026 : formules, tableaux et automatisation</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleures IA pour Excel en 2026. ChatGPT, Claude, Copilot, SheetAI, Rows AI, Julius. Formules, VBA, tabl</p>
+            </a>
+            <a href="/blog/meilleur-ia-gratuite-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleure IA gratuite 2026 : top 10 comparatif complet</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des 10 meilleures IA gratuites en 2026 : ChatGPT, Claude, Gemini, Mistral Le Chat, Perplexity, Copilot, Grok,</p>
+            </a>
+            <a href="/blog/meilleur-ia-image-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleure IA pour générer des images en 2026 : gratuit et payant</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleures IA de generation d'images en 2026 : Midjourney, DALL-E 3, Stable Diffusion, Flux, Adobe Firefl</p>
+            </a>
+            <a href="/blog/meilleur-ia-musique-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleure IA pour la musique 2026 : creer des chansons gratuitement</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleures IA pour creer de la musique en 2026. Suno, Udio, MusicGen, AIVA, Stable Audio. Gratuit, payant</p>
+            </a>
+            <a href="/blog/meilleur-ia-photo-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleure IA retouche photo 2026 : supprimer fond, agrandir, restaurer</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleures IA de retouche photo en 2026 : Remove.bg, Upscayl, Remini, Photoshop AI, Luminar Neo, Topaz Ph</p>
+            </a>
+            <a href="/blog/meilleur-ia-pour-coder" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleure IA pour coder en 2026 : comparatif gratuit et payant</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleures IA pour coder en 2026 : GitHub Copilot, Cursor, Claude Code, ChatGPT, Gemini, Codeium, Tabnine</p>
+            </a>
+            <a href="/blog/meilleur-ia-traduction-pdf" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Traduire un PDF avec l'IA : les meilleurs outils gratuits 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleurs outils IA pour traduire un PDF en 2026 : Claude, ChatGPT, DeepL, Google Translate, Doc Translat</p>
+            </a>
+            <a href="/blog/meilleur-ia-video-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleure IA pour la video 2026 : générateur et montage</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleures IA video en 2026 : Sora, Runway, Pika, Kling, HeyGen, Synthesia, CapCut AI. Tableau avec prix </p>
+            </a>
+            <a href="/blog/meilleur-mini-pc-ia" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleur mini PC pour l'IA en 2026 : Mac Mini, NUC, Beelink comparatif</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif des meilleurs mini PC pour faire tourner l'IA en local en 2026 : Mac Mini M4, Intel NUC, ASUS NUC, Beelink SE</p>
+            </a>
+            <a href="/blog/meilleur-modele-rag-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleur mod&egrave;le pour le RAG en 2026 : comparatif embeddings + LLM</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif complet des meilleurs mod&egrave;les pour le RAG en 2026 : embeddings (nomic, bge-m3, e5-mistral), LLM (Llama</p>
+            </a>
+            <a href="/blog/meilleur-os-ia-locale" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleur OS pour IA locale 2026 : Linux vs Windows vs macOS</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Quel systeme d'exploitation choisir pour l'IA locale en 2026 ? Comparatif Linux, Windows et macOS. Performance, GPU, Doc</p>
+            </a>
+            <a href="/blog/meilleure-ia-coder-python-gratuit-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meilleure IA pour coder en Python : comparatif gratuit 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif complet des meilleures IA pour coder en Python gratuitement en 2026 : Claude, ChatGPT, Copilot, Cursor, Aider</p>
+            </a>
+            <a href="/blog/memoire-unifiée-ia-locale-mac-vs-pc" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Mémoire unifiée et IA locale : pourquoi c'est une révolution (Mac vs PC)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Memoire unifiée Apple Silicon vs VRAM PC : pourquoi le Mac est une révolution pour l'IA locale. Comparatif Mac Mini M4 P</p>
+            </a>
+            <a href="/blog/memoire-unifiée-ia-locale" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Mémoire unifiée et IA locale : pourquoi c'est une révolution (Mac vs PC)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Memoire unifiée Apple Silicon vs VRAM PC : pourquoi le Mac est une révolution pour l'IA locale. Comparatif Mac Mini M4 P</p>
+            </a>
+            <a href="/blog/mempalace-milla-jovovich-memoire-ia-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">MemPalace : Milla Jovovich cr&eacute;e le meilleur syst&egrave;me de m&eacute;moire IA au monde (et c'est gratuit)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">MemPalace par Milla Jovovich : 4 600 stars GitHub en quelques heures, 96.6% sur LongMemEval, compression AAAK 30x. Le sy</p>
+            </a>
+            <a href="/blog/meta-harness-stanford-performance-ia-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Meta-Harness de Stanford : pourquoi le m&ecirc;me mod&egrave;le IA peut &ecirc;tre 6x plus performant</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Stanford d&eacute;montre que le m&ecirc;me mod&egrave;le IA peut &ecirc;tre 6x plus performant gr&acirc;ce au harness (c</p>
+            </a>
+            <a href="/blog/metiers-disparus-2030-ia" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">10 m&eacute;tiers qui n'existeront plus en 2030 (et ceux qui les remplaceront)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Quels m&eacute;tiers vont dispara&icirc;tre &agrave; cause de l'IA d'ici 2030 ? Traducteur, comptable, d&eacute;veloppeu</p>
+            </a>
+            <a href="/blog/mistral-ai-gratuit-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Mistral AI gratuit 2026 : Le Chat, modèles, IA locale française</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Mistral AI en 2026 : Le Chat gratuit, modeles Mistral 7B, Mixtral, Mistral Large, Pixtral. Comment utiliser l'IA francai</p>
+            </a>
+            <a href="/blog/naissance-ia-comment-nait-intelligence-artificielle-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">La naissance d'une IA : comment na&icirc;t, s'entra&icirc;ne et m&ucirc;rit une intelligence artificielle</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Le guide d&eacute;finitif : comment une IA est cr&eacute;&eacute;e, de l'architecture Transformer au d&eacute;ploiement </p>
+            </a>
+            <a href="/blog/nouveautes-ia-avril-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Nouveautés IA avril 2026 : les sorties et annonces du mois</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Toutes les nouveautés IA d'avril 2026 : nouveaux modèles, outils lancés, matériel, actualités Mistral et Hugging Face. L</p>
+            </a>
+            <a href="/blog/nvidia-dgx-spark-comparatif" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">NVIDIA DGX Spark 2026 : le mini PC IA ultime ? Comparatif complet</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">NVIDIA DGX Spark 2026 : 128 Go de memoire unifiée, CUDA natif, 1 PFLOP dans un mini PC. Comparatif complet avec Mac Stud</p>
+            </a>
+            <a href="/blog/ollama-docker-guide" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Ollama + Docker : déployer une IA locale proprement en 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide avancé pour déployer Ollama avec Docker en 2026. Docker Compose, GPU passthrough NVIDIA, multi-modèle, API REST, r</p>
+            </a>
+            <a href="/blog/ollama-vs-lm-studio" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Ollama vs LM Studio 2026 : lequel choisir pour l'IA locale ?</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif Ollama vs LM Studio 2026 : CLI vs GUI, performance, facilite, modeles, API, personnalisation. Tableau et verd</p>
+            </a>
+            <a href="/blog/open-webui-ollama-chatgpt-prive-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Open WebUI + Ollama : votre ChatGPT priv&eacute; gratuit en 5 minutes</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Installez Open WebUI + Ollama en 5 minutes pour avoir votre propre ChatGPT priv&eacute;, gratuit et 100% local. RAG int&</p>
+            </a>
+            <a href="/blog/openclaw-vs-hermes-comparatif-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">OpenClaw vs Hermes : quel mod&egrave;le open-source choisir en 2026 ?</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Comparatif d&eacute;taill&eacute; OpenClaw vs Hermes : code, cr&eacute;ativit&eacute;, raisonnement, function calling, f</p>
+            </a>
+            <a href="/blog/quel-modele-sur-quel-hardware" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Quel modèle IA sur quel hardware ? Le tableau complet 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Le tableau de reference : quel modele IA tourne sur quel hardware en 2026. Llama, Mistral, Qwen, Gemma sur RTX 3060, 409</p>
+            </a>
+            <a href="/blog/rag-local-ollama-guide-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">RAG en local avec Ollama : guide complet 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet pour construire un systeme RAG local avec Ollama, LangChain et ChromaDB en 2026. Chatez avec vos documents</p>
+            </a>
+
+            <a href="/blog/rag-local-paperless-nextcloud-emails-ollama-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">RAG local Paperless, Nextcloud et emails : guide Ollama 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Construire une recherche IA locale pour Paperless, Nextcloud et emails avec Ollama, Qdrant et hybrid search. Architectur</p>
+            </a>            <a href="/blog/rag-local-n8n-automatiser-assistant-ia-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">RAG local avec n8n : automatiser votre assistant IA sans code</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet pour cr&eacute;er un syst&egrave;me RAG local avec n8n et Ollama. Automatisez votre assistant IA sans &eac</p>
+            </a>
+            <a href="/blog/rag-local-ollama-guide-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">RAG local avec Ollama : donnez une m&eacute;moire &agrave; votre IA (guide complet 2026)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet pour construire un syst&egrave;me RAG local avec Ollama, LangChain et ChromaDB. Interrogez vos documents P</p>
+            </a>
+            <a href="/blog/rag-sans-internet-assistant-prive-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">RAG sans internet : cr&eacute;er un assistant priv&eacute; avec vos documents personnels</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Construisez un assistant IA 100% offline qui lit vos documents personnels (contrats, notes, code, emails). Z&eacute;ro d</p>
+            </a>
+            <a href="/blog/remplace-chatgpt-hermes-30-jours-experience" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">J'ai remplac&eacute; ChatGPT par Hermes pendant 30 jours : voici ce qui s'est pass&eacute;</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Exp&eacute;rience : 30 jours sans ChatGPT, uniquement avec Hermes en local. R&eacute;sultat : 200&#8364;/mois &eacute;co</p>
+            </a>
+            <a href="/blog/rtx-pro-6000-blackwell-96go-ia-locale-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">NVIDIA RTX PRO 6000 Blackwell 96 Go : le GPU ultime pour l'IA locale (&agrave; 10 000&euro;)</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Test complet du NVIDIA RTX PRO 6000 Blackwell 96 Go GDDR7 : le GPU professionnel ultime pour l'IA locale. Llama 70B en F</p>
+            </a>
+            <a href="/blog/stable-diffusion-local" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Installer Stable Diffusion en local : guide complet 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet pour installer Stable Diffusion en local en 2026. A1111 vs ComfyUI vs Forge. Configuration requise, instal</p>
+            </a>
+            <a href="/blog/toutes-ia-mistral" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Toutes les IA de Mistral : modèles, Le Chat, API et guide complet 2026</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet de tous les modèles Mistral AI : Le Chat, Mistral 7B, Mixtral, Mistral Large, Pixtral, Codestral. Comment </p>
+            </a>
+            <a href="/blog/whisper-transcrire-audio-texte-local-gratuit-2026" class="glass rounded-xl p-5 card-hover block group">
+                <h3 class="font-semibold text-sm group-hover:text-cyan-400 transition mb-2">Whisper : transcrire l'audio en texte gratuitement avec l'IA locale</h3>
+                <p class="text-xs text-gray-500 line-clamp-2">Guide complet Whisper d'OpenAI : transcrivez audio et vid&eacute;o en texte gratuitement, en local, sans envoyer vos don</p>
+            </a>
+    </div>
+</section>
+
+<footer class="border-t border-white/5 py-12 px-4">
+    <div class="max-w-5xl mx-auto">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-8">
+            <div>
+                <h4 class="font-semibold text-sm mb-3">Comparateur</h4>
+                <div class="space-y-2 text-xs text-gray-500">
+                    <a href="/blog/chatgpt-vs-claude-2026" class="block hover:text-cyan-400">ChatGPT vs Claude</a>
+                    <a href="/blog/chatgpt-vs-gemini-2026" class="block hover:text-cyan-400">ChatGPT vs Gemini</a>
+                    <a href="/blog/meilleur-ia-gratuite-2026" class="block hover:text-cyan-400">Meilleure IA gratuite</a>
+                </div>
+            </div>
+            <div>
+                <h4 class="font-semibold text-sm mb-3">IA Locale</h4>
+                <div class="space-y-2 text-xs text-gray-500">
+                    <a href="/blog/installer-ollama-guide" class="block hover:text-cyan-400">Installer Ollama</a>
+                    <a href="/blog/rag-local-ollama-guide-2026" class="block hover:text-cyan-400">RAG local</a>
+                    <a href="/blog/open-webui-ollama-chatgpt-prive-2026" class="block hover:text-cyan-400">Open WebUI</a>
+                </div>
+            </div>
+            <div>
+                <h4 class="font-semibold text-sm mb-3">Mat&eacute;riel</h4>
+                <div class="space-y-2 text-xs text-gray-500">
+                    <a href="/blog/meilleur-gpu-ia-locale-2026" class="block hover:text-cyan-400">Meilleur GPU</a>
+                    <a href="/blog/machine-de-reve-ia-locale-config-ultime-2026" class="block hover:text-cyan-400">Machine de r&ecirc;ve</a>
+                    <a href="/mon-pc-peut-il" class="block hover:text-cyan-400">Mon PC peut-il ?</a>
+                </div>
+            </div>
+            <div>
+                <h4 class="font-semibold text-sm mb-3">Guides</h4>
+                <div class="space-y-2 text-xs text-gray-500">
+                    <a href="/blog/naissance-ia-comment-nait-intelligence-artificielle-2026" class="block hover:text-cyan-400">Naissance d'une IA</a>
+                    <a href="/blog/ia-expliquee-grands-parents-guide-simple-2026" class="block hover:text-cyan-400">IA pour les grands-parents</a>
+                    <a href="/blog/karpathy-autoresearch-guide-2026" class="block hover:text-cyan-400">Karpathy AutoResearch</a>
+                </div>
+            </div>
+        </div>
+        <div class="border-t border-white/5 pt-6 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded bg-gradient-to-br from-cyan-400 to-violet-400 flex items-center justify-center text-[10px] font-black">IA</div>
+                <span class="text-sm font-semibold">OutilsIA.fr</span>
+            </div>
+            <p class="text-xs text-gray-600">&copy; 2026 OutilsIA.fr &mdash; Comparateur ind&eacute;pendant d'outils IA</p>
+        </div>
+    </div>
+</footer>
+
+<script src="/static/js/affiliate-tracker.js?v=inp20260620" defer></script>
+
+<section class="seo-growth-hub" data-codex-seo="blog-intro">
+  <style>
+    .seo-growth-hub{margin:32px auto;padding:28px;border:1px solid rgba(34,211,238,.24);border-radius:22px;background:linear-gradient(135deg,rgba(15,23,42,.92),rgba(8,47,73,.55));max-width:1120px}
+    .seo-growth-hub h2{margin:0 0 10px;font-size:clamp(1.35rem,2vw,2rem);color:#e0f2fe}
+    .seo-growth-hub p{margin:0 0 20px;color:#cbd5e1;line-height:1.65}
+    .seo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+    .seo-card{display:block;text-decoration:none;color:#e5f7ff;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:14px;background:rgba(255,255,255,.045)}
+    .seo-card strong{display:block;color:#67e8f9;margin-bottom:6px}
+    .seo-card span{display:block;color:#b6c7d8;font-size:.92rem;line-height:1.45}
+  </style>
+  <h2>Guides IA à lire en priorité</h2>
+  <p>Le blog OutilsIA est organisé pour répondre aux recherches qui montent déjà dans Google : IA locale, Ollama, DeepSeek, mini PC, GPU, Raspberry Pi et mémoire projet.</p>
+  <div class="seo-grid"><a class="seo-card" href="/ia-locale"><strong>IA locale</strong><span>Le pilier pour choisir modèles, outils et architecture privée.</span></a>
+<a class="seo-card" href="/blog/ollama-docker-guide"><strong>Ollama Docker</strong><span>Déployer proprement un serveur IA local.</span></a>
+<a class="seo-card" href="/blog/deepseek-r1-local"><strong>DeepSeek R1 local</strong><span>Configurer DeepSeek avec Ollama et éviter les erreurs fréquentes.</span></a>
+<a class="seo-card" href="/blog/meilleur-mini-pc-ia"><strong>Mini PC IA</strong><span>Comparer Mac mini, NUC, Beelink et machines compactes.</span></a>
+<a class="seo-card" href="/materiel"><strong>Matériel IA</strong><span>Choisir GPU, RAM, VRAM et configurations adaptées.</span></a>
+<a class="seo-card" href="/blog/ia-raspberry-pi-guide-complet-2026"><strong>Raspberry Pi IA</strong><span>Tester l'IA à petit budget, avec limites réalistes.</span></a>
+<a class="seo-card" href="/blog/meilleur-os-ia-locale"><strong>Meilleur OS IA locale</strong><span>Linux, Windows, macOS : le bon système selon l'usage.</span></a>
+<a class="seo-card" href="/memoryforge/claude-md"><strong>Claude.md</strong><span>Structurer la mémoire projet pour Claude Code.</span></a></div>
+</section>
+
+</body>
+</html>
