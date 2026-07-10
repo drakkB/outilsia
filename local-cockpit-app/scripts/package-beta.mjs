@@ -188,6 +188,8 @@ const release = {
   published_at: publishedAt,
   build_provenance: buildProvenance,
   release_notes: [
+    "Proof Engine Ollama exact : chargement, préremplissage et génération tokens/s utilisent les métriques natives de l'API, avec repli CLI signalé comme estimation.",
+    "Arena objective v1 : chaque modèle reçoit le même micro-test et conserve six preuves vérifiables — JSON, instruction, mémoire, calcul, français et action.",
     "Retest CPU après erreur CUDA : OutilsIA force num_gpu=0 via l'API Ollama pour distinguer un modèle fonctionnel d'un pilote GPU bloqué.",
     "Potentiel matériel et état du runtime sont séparés : un score GPU élevé ne masque plus un échec CUDA/Ollama réel.",
     "DriverDoctor : détection des pilotes NVIDIA/AMD/Intel, conseils CUDA/ROCm/Vulkan, RAM dual-channel, fréquence mémoire et mémoire unifiée.",
@@ -195,7 +197,7 @@ const release = {
     "Bibliothèque Mes prompts : sauvegarder les prompts optimisés, les réutiliser dans Benchmark ou Dialogue, copier/exporter la bibliothèque.",
     "Parcours guidé étendu : scan, diagnostic, Ollama, modèle test, benchmark, PromptForge, dialogue local, Arena et rapport final MemoryForge.",
     "PromptForge local intégré : optimiser un prompt de benchmark/dialogue, l'envoyer vers Ollama et le sauvegarder dans MemoryForge.",
-    "Arena locale enrichie : comparaison automatique des modèles installés avec score OutilsIA, plus rapide, plus réactif et meilleur compromis.",
+    "Arena locale : scores par usage calculés depuis les preuves objectives et les performances mesurées sur la machine, sans bonus lié au nom du modèle.",
     "Teasing tenu : les cartes modèles affichent maintenant force, usage, limite et prochaine action sans cacher l'information derrière un bouton.",
     "Suivi direct renforcé : installer Ollama, télécharger un modèle ou lancer un benchmark met immédiatement le bandeau haut à jour.",
     "Benchmark moins désorientant : l'app garde le suivi visible en haut au lieu de forcer l'utilisateur à chercher la console en bas.",
