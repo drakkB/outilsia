@@ -1633,6 +1633,7 @@ h2 {
 .prompt-library-panel { grid-column: span 3; order: 34; }
 .installed-panel { grid-column: span 3; order: 35; }
 .benchmark-history-panel { grid-column: span 3; order: 36; }
+.model-autopilot-panel { grid-column: span 6; order: 37; }
 .action-panel { grid-column: span 4; order: 40; }
 .upgrade-impact-panel { grid-column: span 4; order: 41; }
 .next-panel { grid-column: span 4; order: 42; }
@@ -2237,6 +2238,82 @@ dd {
   margin-bottom: 4px;
   color: var(--muted);
   font-size: 0.78rem;
+}
+
+.autopilot-budget,
+.autopilot-results {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.autopilot-budget {
+  margin-bottom: 10px;
+}
+
+.autopilot-budget div,
+.autopilot-profile,
+.autopilot-active {
+  background: rgba(4, 9, 12, 0.54);
+  border: 1px solid rgba(139, 163, 174, 0.18);
+  border-radius: 7px;
+  min-width: 0;
+  padding: 9px;
+}
+
+.autopilot-budget span,
+.autopilot-budget strong,
+.autopilot-profile span,
+.autopilot-profile strong,
+.autopilot-active span,
+.autopilot-active strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.autopilot-budget span,
+.autopilot-profile span,
+.autopilot-active span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  margin-top: 3px;
+}
+
+.autopilot-budget strong {
+  font-size: 14px;
+  margin-top: 3px;
+}
+
+.model-autopilot-box {
+  background:
+    radial-gradient(circle at 4% 0%, rgba(120, 220, 232, 0.12), transparent 30%),
+    linear-gradient(135deg, rgba(9, 24, 32, 0.96), rgba(10, 17, 22, 0.92));
+  border: 1px solid rgba(120, 220, 232, 0.22);
+  border-radius: 8px;
+  display: grid;
+  gap: 9px;
+  line-height: 1.4;
+  min-height: 118px;
+  padding: 10px;
+}
+
+.model-autopilot-box.empty {
+  align-items: center;
+  color: var(--muted);
+}
+
+.autopilot-profile.recommended {
+  border-color: rgba(134, 239, 172, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.08);
+}
+
+.autopilot-profile.failed {
+  border-color: rgba(255, 145, 136, 0.34);
+}
+
+.autopilot-active {
+  border-color: rgba(241, 201, 107, 0.32);
 }
 
 .bridge-summary,
@@ -3706,6 +3783,7 @@ dd {
   }
 
   .benchmark-panel,
+  .model-autopilot-panel,
   .chat-panel,
   .promptforge-panel,
   .prompt-library-panel,
@@ -3837,6 +3915,7 @@ dd {
   .readiness-panel,
   .account-panel,
   .benchmark-panel,
+  .model-autopilot-panel,
   .chat-panel,
   .promptforge-panel,
   .prompt-library-panel,
@@ -3919,6 +3998,11 @@ dd {
   }
 
   .passport-proof-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .autopilot-budget,
+  .autopilot-results {
     grid-template-columns: 1fr;
   }
 

@@ -445,6 +445,24 @@
           </div>
         </article>
 
+        <article class="panel model-autopilot-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Model Autopilot</h2>
+            <span id="modelAutopilotState">modèle installé requis</span>
+          </div>
+          <div class="autopilot-budget" aria-label="Budget Model Autopilot">
+            <div><span>Profils</span><strong>3</strong></div>
+            <div><span>Durée max</span><strong>3 min</strong></div>
+            <div><span>Téléchargement</span><strong>0</strong></div>
+          </div>
+          <div id="modelAutopilotBox" class="model-autopilot-box empty">Choisissez un modèle Ollama déjà installé dans le benchmark.</div>
+          <div class="row-actions">
+            <button id="runModelAutopilotBtn" type="button" disabled>Tester 3 profils</button>
+            <button id="applyModelAutopilotBtn" type="button" disabled>Appliquer le profil</button>
+            <button id="rollbackModelAutopilotBtn" type="button" disabled>Restaurer</button>
+          </div>
+        </article>
+
         <article class="panel promptforge-panel">
           <div class="panel-title">
             <h2>PromptForge local</h2>

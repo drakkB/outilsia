@@ -23,6 +23,7 @@ OutilsIA is a French-first toolbox for running AI on your own machine: free in-b
 The open desktop client scans CPU, RAM, GPU, VRAM, storage and Ollama runtimes, installs models only after explicit confirmation, benchmarks them with native Ollama metrics and recommends which tested model to keep.
 
 - **Hardware Doctor 2.0** separates detected drivers from observed runtime allocation. After a benchmark it uses Ollama `/api/ps` (`size_vram / size`) to report CPU, hybrid CPU/GPU or GPU execution; missing evidence stays unknown.
+- **Model Autopilot v1** compares three bounded Ollama execution profiles on one already-installed model, requires explicit consent before testing or applying, and can restore the previous profile or Ollama defaults.
 - **AI Capability Passport v1** exports a versioned JSON document containing hardware evidence, runtimes, installed models, benchmarks, recommendation and the read-only Strategy Arena handoff boundary.
 - The passport SHA-256 detects document modification. It is not an identity signature for the PC or its owner.
 - Prompts, model outputs, personal files and account tokens are excluded from the passport.

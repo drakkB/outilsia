@@ -189,6 +189,7 @@ const release = {
   build_provenance: buildProvenance,
   release_notes: [
     "Hardware Doctor 2.0 : signaux RAM/GPU/driver/PCIe/ReBAR/thermiques clairement sourcés, mesures instantanées étiquetées et inconnues conservées comme inconnues.",
+    "Model Autopilot v1 : trois profils bornés sur un modèle déjà installé, métriques API Ollama obligatoires, application explicite et restauration du profil précédent ou des réglages par défaut.",
     "Preuve d'offload Ollama : après benchmark, /api/ps distingue CPU, hybride et GPU depuis size_vram / size au lieu de déduire l'accélération depuis le pilote.",
     "AI Capability Passport v1 : export JSON optionnel lié à la machine et au build avec capacités, modèles, preuves, recommandation, limites et SHA-256 d'intégrité — pas une signature d'identité.",
     "Recommendation Engine v2 : choisir Chat, Code, Mémoire, Français, Portable ou Polyvalent, comparer deux candidats avec sept preuves et obtenir une décision « Garder ce modèle » avec vitesse, latence, ressources et limites exportées.",

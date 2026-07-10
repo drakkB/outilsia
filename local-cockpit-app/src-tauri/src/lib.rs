@@ -182,6 +182,15 @@ pub struct BenchmarkRequest {
     runtime: Option<String>,
     force_cpu: Option<bool>,
     protocol: Option<String>,
+    tuning: Option<OllamaTuningRequest>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct OllamaTuningRequest {
+    num_ctx: Option<u32>,
+    num_batch: Option<u32>,
+    num_thread: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1164,6 +1173,7 @@ async fn benchmark_ollama(request: BenchmarkRequest) -> Result<BenchmarkResult, 
         Some("arena_objective_v1")
             | Some("outilsia.arena.objective.v1")
             | Some("outilsia.recommendation.v2")
+            | Some("outilsia.autopilot.v1")
     );
     let prompt = prepare_benchmark_prompt(request.prompt, structured_benchmark);
     let timeout = Duration::from_secs(request.timeout_seconds.unwrap_or(45).clamp(5, 180));
@@ -1173,15 +1183,18 @@ async fn benchmark_ollama(request: BenchmarkRequest) -> Result<BenchmarkResult, 
         _ if structured_benchmark => Some(192),
         _ => None,
     };
-    if request.force_cpu.unwrap_or(false) {
+    let force_cpu = request.force_cpu.unwrap_or(false);
+    let tuning = request.tuning;
+    if force_cpu || tuning.is_some() {
         return run_ollama_api_prompt(
             model,
             prompt,
             timeout,
             runtime,
-            true,
+            force_cpu,
             true,
             num_predict_override,
+            tuning,
         )
         .await;
     }
@@ -1222,8 +1235,13 @@ async fn chat_ollama(request: BenchmarkRequest) -> Result<BenchmarkResult, Strin
     let prompt = format!("Réponds en français, clairement et directement.\n\n{user_prompt}");
     let timeout = Duration::from_secs(request.timeout_seconds.unwrap_or(90).clamp(5, 300));
     let runtime = normalize_ollama_runtime(request.runtime.as_deref());
-    if request.force_cpu.unwrap_or(false) {
-        return run_ollama_api_prompt(model, prompt, timeout, runtime, true, false, None).await;
+    let force_cpu = request.force_cpu.unwrap_or(false);
+    let tuning = request.tuning;
+    if force_cpu || tuning.is_some() {
+        return run_ollama_api_prompt(
+            model, prompt, timeout, runtime, force_cpu, false, None, tuning,
+        )
+        .await;
     }
     run_ollama_api_with_cli_fallback(model, prompt, timeout, runtime, false, None).await
 }
@@ -1244,6 +1262,7 @@ async fn run_ollama_api_with_cli_fallback(
         false,
         benchmark_profile,
         num_predict_override,
+        None,
     )
     .await
     {
@@ -1276,12 +1295,23 @@ fn ollama_chat_payload(
     force_cpu: bool,
     benchmark_profile: bool,
     num_predict_override: Option<u32>,
+    tuning: Option<&OllamaTuningRequest>,
 ) -> Value {
     let mut options = serde_json::Map::new();
-    options.insert(
-        "num_ctx".to_string(),
-        json!(if benchmark_profile { 2048 } else { 4096 }),
-    );
+    let num_ctx = tuning
+        .and_then(|profile| profile.num_ctx)
+        .map(|value| value.clamp(512, 32_768))
+        .unwrap_or(if benchmark_profile { 2048 } else { 4096 });
+    options.insert("num_ctx".to_string(), json!(num_ctx));
+    if let Some(value) = tuning.and_then(|profile| profile.num_batch) {
+        options.insert(
+            "num_batch".to_string(),
+            json!(value.clamp(32, 1024).min(num_ctx)),
+        );
+    }
+    if let Some(value) = tuning.and_then(|profile| profile.num_thread) {
+        options.insert("num_thread".to_string(), json!(value.clamp(1, 64)));
+    }
     if benchmark_profile {
         options.insert(
             "num_predict".to_string(),
@@ -1494,6 +1524,7 @@ async fn run_ollama_api_prompt(
     force_cpu: bool,
     benchmark_profile: bool,
     num_predict_override: Option<u32>,
+    tuning: Option<OllamaTuningRequest>,
 ) -> Result<BenchmarkResult, String> {
     let payload = ollama_chat_payload(
         &model,
@@ -1501,6 +1532,7 @@ async fn run_ollama_api_prompt(
         force_cpu,
         benchmark_profile,
         num_predict_override,
+        tuning.as_ref(),
     );
     let execution_mode = if force_cpu { "cpu" } else { "auto" };
     if runtime == OllamaRuntime::Wsl && cfg!(target_os = "windows") {
@@ -4917,7 +4949,7 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
 
     #[test]
     fn benchmark_chat_payload_is_deterministic_and_can_force_cpu() {
-        let payload = ollama_chat_payload("qwen3:0.6b", "bonjour", true, true, None);
+        let payload = ollama_chat_payload("qwen3:0.6b", "bonjour", true, true, None, None);
         assert_eq!(
             payload.get("model").and_then(Value::as_str),
             Some("qwen3:0.6b")
@@ -4959,7 +4991,7 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
         );
         assert!(prepare_benchmark_prompt(Some(prompt.to_string()), false)
             .ends_with("Réponse finale uniquement, une phrase courte en français."));
-        let payload = ollama_chat_payload("qwen3:0.6b", prompt, false, true, Some(192));
+        let payload = ollama_chat_payload("qwen3:0.6b", prompt, false, true, Some(192), None);
         assert_eq!(
             payload
                 .pointer("/options/num_predict")
@@ -4967,7 +4999,7 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
             Some(192)
         );
         let recommendation_payload =
-            ollama_chat_payload("qwen3:0.6b", prompt, false, true, Some(224));
+            ollama_chat_payload("qwen3:0.6b", prompt, false, true, Some(224), None);
         assert_eq!(
             recommendation_payload
                 .pointer("/options/num_predict")
@@ -4978,7 +5010,7 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
 
     #[test]
     fn automatic_chat_payload_does_not_force_cpu_or_benchmark_sampling() {
-        let payload = ollama_chat_payload("hermes3:8b", "bonjour", false, false, None);
+        let payload = ollama_chat_payload("hermes3:8b", "bonjour", false, false, None, None);
         assert!(payload.pointer("/options/num_gpu").is_none());
         assert!(payload.pointer("/options/num_predict").is_none());
         assert!(payload.pointer("/options/seed").is_none());
@@ -4986,6 +5018,40 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
             payload.pointer("/options/num_ctx").and_then(Value::as_i64),
             Some(4096)
         );
+    }
+
+    #[test]
+    fn autopilot_tuning_is_bounded_and_explicit_in_payload() {
+        let tuning = OllamaTuningRequest {
+            num_ctx: Some(90_000),
+            num_batch: Some(4),
+            num_thread: Some(128),
+        };
+        let payload = ollama_chat_payload(
+            "qwen3:0.6b",
+            "profil autopilot",
+            false,
+            true,
+            Some(192),
+            Some(&tuning),
+        );
+        assert_eq!(
+            payload.pointer("/options/num_ctx").and_then(Value::as_i64),
+            Some(32_768)
+        );
+        assert_eq!(
+            payload
+                .pointer("/options/num_batch")
+                .and_then(Value::as_i64),
+            Some(32)
+        );
+        assert_eq!(
+            payload
+                .pointer("/options/num_thread")
+                .and_then(Value::as_i64),
+            Some(64)
+        );
+        assert!(payload.pointer("/options/num_gpu").is_none());
     }
 
     #[test]

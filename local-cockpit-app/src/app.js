@@ -12,6 +12,7 @@ const state = {
   release: null,
   appBuildInfo: null,
   recommendationRun: null,
+  modelAutopilotRun: null,
   capabilityPassport: null,
   localSnapshots: [],
   installingModels: {},
@@ -29,6 +30,7 @@ const HERMES_AGENT_WATCH = {
 const BENCHMARK_HISTORY_KEY = "outilsia.localCockpit.benchmarkHistory.v1";
 const ARENA_RUN_KEY = "outilsia.localCockpit.lastArenaRun.v1";
 const RECOMMENDATION_RUN_KEY = "outilsia.localCockpit.recommendationRun.v2";
+const MODEL_AUTOPILOT_PROFILES_KEY = "outilsia.localCockpit.modelAutopilotProfiles.v1";
 const PROMPT_LIBRARY_KEY = "outilsia.localCockpit.promptLibrary.v1";
 const CHAT_HISTORY_KEY = "outilsia.localCockpit.chatHistory.v1";
 const FIELD_TEST_PROFILE_KEY = "outilsia.localCockpit.fieldTestProfile.v1";
@@ -37,6 +39,7 @@ const UPGRADE_SIM_TARGET_KEY = "outilsia.localCockpit.upgradeSimTarget.v1";
 const MAX_BENCHMARK_HISTORY = 80;
 const MAX_PROMPT_LIBRARY = 40;
 const MAX_CHAT_HISTORY = 60;
+const MODEL_AUTOPILOT_PROTOCOL = "outilsia.autopilot.v1";
 
 const UPGRADE_SIM_TARGETS = [
   { key: "auto", label: "Auto", reason: "Upgrade prioritaire proposé par OutilsIA." },
@@ -352,6 +355,11 @@ const els = {
   benchmarkModelInput: $("benchmarkModelInput"),
   benchmarkPromptInput: $("benchmarkPromptInput"),
   benchmarkResult: $("benchmarkResult"),
+  modelAutopilotState: $("modelAutopilotState"),
+  modelAutopilotBox: $("modelAutopilotBox"),
+  runModelAutopilotBtn: $("runModelAutopilotBtn"),
+  applyModelAutopilotBtn: $("applyModelAutopilotBtn"),
+  rollbackModelAutopilotBtn: $("rollbackModelAutopilotBtn"),
   benchmarkHistoryState: $("benchmarkHistoryState"),
   benchmarkHistoryBox: $("benchmarkHistoryBox"),
   copyBenchmarkHistoryBtn: $("copyBenchmarkHistoryBtn"),
@@ -2858,6 +2866,7 @@ function applyUsageProfile(profileKey) {
   renderPreparePanel();
   renderReadinessPanel();
   renderChatPresets();
+  renderModelAutopilot();
   setStatus(`Profil ${profile.label} prêt`, "ok");
 }
 
@@ -2881,6 +2890,7 @@ function applyOldPortablePreset() {
   }
   renderPreparePanel();
   renderFieldTestPanel();
+  renderModelAutopilot();
   setStatus("Mode vieux PC / portable prêt : petit modèle, contexte court, preuve locale d'abord", "ok");
 }
 
@@ -2897,11 +2907,13 @@ function useUsageProfilePack(target = "benchmark") {
   if (pack.model && els.benchmarkModelInput) els.benchmarkModelInput.value = pack.model;
   if (els.benchmarkPromptInput) els.benchmarkPromptInput.value = pack.test.prompt;
   els.benchmarkPromptInput?.focus?.();
+  renderModelAutopilot();
   setStatus(`Pack ${pack.profile.label} prêt pour benchmark`, "ok");
 }
 
 function renderScan(scan) {
   state.capabilityPassport = null;
+  state.modelAutopilotRun = null;
   state.scan = scan;
   els.sourceText.textContent = scan.source || "local";
   els.machineKey.textContent = scan.machine_key || "machine locale";
@@ -2919,6 +2931,7 @@ function renderScan(scan) {
   if (els.topOsText) els.topOsText.textContent = `${scan.os_name || "OS"} ${scan.os_version || ""}`.trim();
   if (els.topOllamaText) els.topOllamaText.textContent = topRuntimeOllama(scan);
   renderHardwareDoctor(scan);
+  renderModelAutopilot();
   renderCapabilityPassportPanel();
   renderWslRuntime(scan);
   els.checkBtn.disabled = false;
@@ -4337,6 +4350,7 @@ function readinessReport() {
     },
     hardware_doctor: hardwareDoctor,
     capability_passport: capabilityPassportSummary(),
+    model_autopilot: modelAutopilotSnapshot(),
     usage_profile: {
       key: usage.key,
       label: usage.label,
@@ -4456,6 +4470,11 @@ function readinessMarkdown(report = readinessReport()) {
     report.benchmark
       ? `- Benchmark: ${report.benchmark.model} - ${report.benchmark.estimated_tokens_per_second} tok/s - ${report.benchmark.elapsed_ms} ms - ${benchmarkMeasurementLabel(report.benchmark)} - ${benchmarkExecutionLabel(report.benchmark)} - succès ${report.benchmark.success ? "oui" : "non"}`
       : "- Aucun benchmark lancé.",
+    report.model_autopilot?.active
+      ? `- Model Autopilot: profil ${report.model_autopilot.active.label} actif - ${modelAutopilotTuningLabel(report.model_autopilot.active.tuning)}`
+      : report.model_autopilot?.recommended
+        ? `- Model Autopilot: ${report.model_autopilot.recommended.label} recommandé, non appliqué`
+        : "- Model Autopilot: non mesuré.",
     report.benchmark?.output_preview ? `- Réponse: ${report.benchmark.output_preview}` : "",
     `- Dialogue local: ${report.chat_ready ? "réponse reçue" : "non validé"}`,
     report.promptForge ? `- PromptForge: ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100 (${report.promptForge.model})` : "- PromptForge: non utilisé.",
@@ -5302,6 +5321,7 @@ function renderReadinessPanel() {
       <span>${report.recommended_model ? `2e modèle : ${escapeHtml(report.recommended_model.ref)} · ${report.recommended_model.installed ? "installé" : "à installer"}` : "Deuxième modèle recommandé non déterminé."}</span>
       <span>${report.arena?.compromise ? `Arena : rapide ${escapeHtml(report.arena.fastest || "n/a")} · assistant ${escapeHtml(report.arena.assistant || "n/a")} · compromis ${escapeHtml(report.arena.compromise)} (${escapeHtml(report.arena.compromise_score)}/100)` : "Arena locale non encore lancée."}</span>
       <span>${report.recommendation_engine?.winner ? `Recommandation mesurée : ${escapeHtml(report.recommendation_engine.verdict)} · ${escapeHtml(report.recommendation_engine.winner.score)}/100 · confiance ${escapeHtml(report.recommendation_engine.confidence)}` : "Recommendation Engine v2 non encore lancé."}</span>
+      <span>${report.model_autopilot?.active ? `Profil Ollama : ${escapeHtml(report.model_autopilot.active.label)} · ${escapeHtml(modelAutopilotTuningLabel(report.model_autopilot.active.tuning))}` : report.model_autopilot?.recommended ? `Autopilot : ${escapeHtml(report.model_autopilot.recommended.label)} recommandé, à appliquer dans Détails.` : "Model Autopilot non encore mesuré."}</span>
       <span>${report.capability_passport ? `Passport : SHA-256 ${escapeHtml(`${report.capability_passport.digest.slice(0, 16)}…`)}` : "AI Capability Passport disponible dans Détails après génération."}</span>
       <span>${report.upgrades[0] ? `Upgrade utile : ${escapeHtml(report.upgrades[0].title)}` : "Aucun achat prioritaire pour l'instant."}</span>
       <span>${report.account_ready ? "Compte prêt : rapport partageable disponible après synchronisation." : "Connecte le compte pour sauvegarder et partager ce rapport."}</span>
@@ -7058,6 +7078,7 @@ function strategyArenaReadiness() {
         expose_recommended_roles: true,
         expose_benchmark_proof: Boolean(benchmark?.success),
         expose_usage_recommendation: Boolean(recommendation?.winner),
+        expose_model_autopilot_profile: Boolean(modelAutopilotSnapshot()?.active),
         expose_runtime_command_prefix: true,
         install_or_delete_models_inside_strategy_arena: false,
         run_backtests_inside_outilsia: false
@@ -7146,6 +7167,7 @@ function strategyArenaReadiness() {
       candidate_refs: recommendation.candidate_refs,
       results: recommendation.results
     } : null,
+    model_autopilot: modelAutopilotSnapshot(),
     capability_passport: capabilityPassportSummary(),
     recommended_roles: {
       fastest: winners?.fastest?.model || "",
@@ -7187,6 +7209,7 @@ function renderStrategyBridgePanel() {
       <span>${escapeHtml(profile.installed_models.length)} modèle(s) installé(s), ${escapeHtml(profile.candidate_models.length)} candidat(s) OutilsIA.</span>
       <span>${escapeHtml(profile.next_action)}</span>
       <span>Commande modèle : ${escapeHtml(profile.runtime_command_prefix)} run &lt;modele&gt;</span>
+      ${profile.model_autopilot?.active ? `<span>Profil Ollama : ${escapeHtml(profile.model_autopilot.active.label)} · ${escapeHtml(modelAutopilotTuningLabel(profile.model_autopilot.active.tuning))}</span>` : ""}
     </div>
     <div class="bridge-rules">
       <span>OutilsIA prépare les modèles locaux.</span>
@@ -7217,6 +7240,7 @@ function strategyBridgeMarkdown() {
     `- Fichier attendu: ${profile.handoff_manifest?.file_name || profile.import_file}`,
     `- Résumé: ${profile.bridge_summary}`,
     `- AI Capability Passport: ${profile.capability_passport ? `${profile.capability_passport.schema} · SHA-256 ${profile.capability_passport.digest}` : "non généré"}`,
+    `- Model Autopilot: ${profile.model_autopilot?.active ? `${profile.model_autopilot.active.label} · ${modelAutopilotTuningLabel(profile.model_autopilot.active.tuning)}` : "profil Ollama par défaut"}`,
     "",
     "## Modèles installés",
     "",
@@ -7260,6 +7284,7 @@ function strategyBridgeMarkdown() {
     `- Modèles candidats: ${profile.handoff_manifest?.capabilities?.list_candidate_models ? "oui" : "non"}`,
     `- Rôles recommandés: ${profile.handoff_manifest?.capabilities?.expose_recommended_roles ? "oui" : "non"}`,
     `- Preuve benchmark: ${profile.handoff_manifest?.capabilities?.expose_benchmark_proof ? "oui" : "non"}`,
+    `- Profil Model Autopilot: ${profile.handoff_manifest?.capabilities?.expose_model_autopilot_profile ? "oui" : "non"}`,
     `- Gestion modèles dans Strategy Arena: ${profile.handoff_manifest?.capabilities?.install_or_delete_models_inside_strategy_arena ? "oui" : "non"}`,
     `- Backtests dans OutilsIA: ${profile.handoff_manifest?.capabilities?.run_backtests_inside_outilsia ? "oui" : "non"}`,
     "",
@@ -7302,6 +7327,7 @@ function capabilityPassportSourceRevision() {
     proof.build_id || "",
     benchmark.created_at_ms || 0,
     benchmark.model || "",
+    canonicalJson(modelAutopilotSnapshot() || {}),
     recommendation.created_at_ms || recommendation.id || "",
     arena.created_at_ms || arena.id || "",
     (state.scan?.installed_models || []).map(modelLabel).sort().join(","),
@@ -7394,6 +7420,7 @@ function capabilityPassportDocument() {
       gpu_allocation_proven: runtimeEvidence.status === "gpu-proven" || runtimeEvidence.status === "hybrid-proven",
       hardware_doctor_v2: doctor?.schema === "outilsia.hardware_doctor.v2",
       recommendation_engine_v2: Boolean(report.recommendation_engine?.winner),
+      model_autopilot_v1: Boolean(report.model_autopilot?.active || report.model_autopilot?.recommended),
       local_arena: Boolean(report.arena),
       strategy_arena_profile_export: true
     },
@@ -7411,7 +7438,9 @@ function capabilityPassportDocument() {
       elapsed_ms: Number(item.elapsed_ms || 0),
       runtime_processor: item.runtime_processor || "unknown",
       gpu_offload_percent: Number(item.runtime_gpu_offload_percent || 0),
-      runtime_evidence_source: item.runtime_evidence_source || ""
+      runtime_evidence_source: item.runtime_evidence_source || "",
+      autopilot_profile: item.autopilot_active_profile || item.autopilot_profile || "",
+      tuning: item.tuning || null
     })),
     recommendation: {
       usage_profile: report.usage_profile,
@@ -7419,6 +7448,7 @@ function capabilityPassportDocument() {
       engine: report.recommendation_engine,
       upgrade: report.upgrades?.[0] || null
     },
+    model_autopilot: report.model_autopilot,
     arena: report.arena,
     strategy_arena_handoff: {
       schema: bridge.schema,
@@ -7438,6 +7468,7 @@ function capabilityPassportDocument() {
       "Le diagnostic décrit les signaux exposés au moment du scan et du benchmark ; il ne certifie pas la stabilité sous charge longue.",
       "La fréquence et le canal mémoire peuvent être estimés selon les informations fournies par le système.",
       "La preuve d'offload GPU dépend de la disponibilité de l'API Ollama /api/ps après le benchmark.",
+      "Model Autopilot compare des réglages d'exécution sur le même modèle ; il ne mesure pas une nouvelle quantification et n'améliore pas les poids du modèle.",
       "L'empreinte SHA-256 détecte une modification du document ; elle ne prouve ni l'identité du PC ni celle du propriétaire.",
       "Ce passeport ne constitue pas une validation de stratégie financière ni un résultat de backtest."
     ]
@@ -7754,6 +7785,7 @@ function fieldTestMachineEntry() {
   const upgrade = report.upgrades[0];
   const doctor = report.hardware_doctor || hardwareDoctorSnapshot(scan);
   const passport = capabilityPassportSummary();
+  const autopilot = report.model_autopilot || null;
   const runtimeEvidence = report.runtime_readiness?.evidence || doctorRuntimeEvidence(scan, benchmark?.model || report.test_model || "qwen3:0.6b");
   const os = [scan.os_name, scan.os_version].filter(Boolean).join(" ").trim();
   return {
@@ -7796,6 +7828,11 @@ function fieldTestMachineEntry() {
     capability_passport_ok: Boolean(passport),
     capability_passport_schema: passport?.schema || "",
     capability_passport_digest: passport?.digest || "",
+    model_autopilot_ok: Boolean(autopilot?.active),
+    model_autopilot_profile: autopilot?.active?.key || "",
+    model_autopilot_num_ctx: Number(autopilot?.active?.tuning?.num_ctx || 0),
+    model_autopilot_num_batch: Number(autopilot?.active?.tuning?.num_batch || 0),
+    model_autopilot_num_thread: Number(autopilot?.active?.tuning?.num_thread || 0),
     scan_ok: Boolean(state.scan),
     score: report.score === null ? 0 : Number(report.score),
     score_label: scoreLabel(report.score),
@@ -8364,6 +8401,412 @@ async function generateMemory() {
   }
 }
 
+function readModelAutopilotStore() {
+  try {
+    const raw = window.localStorage?.getItem(MODEL_AUTOPILOT_PROFILES_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed?.schema === "outilsia.model_autopilot.profiles.v1" && parsed.profiles && typeof parsed.profiles === "object") {
+      return parsed;
+    }
+  } catch (_) {
+    // A corrupt optional profile must never block a benchmark.
+  }
+  return { schema: "outilsia.model_autopilot.profiles.v1", profiles: {} };
+}
+
+function writeModelAutopilotStore(store) {
+  try {
+    window.localStorage?.setItem(MODEL_AUTOPILOT_PROFILES_KEY, JSON.stringify(store));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function modelAutopilotBindingKey(model) {
+  const machine = state.scan?.machine_key || "unscanned";
+  const runtime = defaultOllamaRuntime(model);
+  return `${machine}|${runtime}|${normalizeOllamaRef(model)}`;
+}
+
+function modelAutopilotBinding(model) {
+  const clean = normalizeOllamaRef(model);
+  if (!clean) return null;
+  return readModelAutopilotStore().profiles[modelAutopilotBindingKey(clean)] || null;
+}
+
+function activeModelAutopilotProfile(model) {
+  const active = modelAutopilotBinding(model)?.active;
+  if (!active?.tuning) return null;
+  return active;
+}
+
+function modelAutopilotTuningPayload(model) {
+  const active = activeModelAutopilotProfile(model);
+  return active?.tuning ? { tuning: { ...active.tuning } } : {};
+}
+
+function modelAutopilotInstalledModel(model) {
+  return (state.scan?.installed_models || []).find((item) => sameOllamaModel(modelLabel(item), model)) || null;
+}
+
+function modelAutopilotCandidates(model) {
+  const cores = Math.max(1, Math.min(64, Number(state.scan?.cpu_cores || 4)));
+  const ram = Number(state.scan?.ram_gb || 0);
+  const vram = Number(state.scan?.vram_gb || 0);
+  const installed = modelAutopilotInstalledModel(model);
+  const modelSize = Number(installed?.size_gb || 0);
+  const constrained = (ram > 0 && ram <= 12) || (modelSize > 0 && ram > 0 && modelSize >= ram * 0.65);
+  const qualityContext = constrained ? 4096 : (ram >= 32 || vram >= 12 ? 8192 : 6144);
+  const balancedContext = qualityContext <= 4096 ? 3072 : 4096;
+  const balancedBatch = vram >= 8 || state.scan?.unified_memory ? 256 : 128;
+  return [
+    {
+      key: "fast",
+      label: "Rapide",
+      detail: "Contexte court et charge mémoire contenue.",
+      tuning: { num_ctx: 2048, num_batch: 128, num_thread: Math.min(cores, 8) }
+    },
+    {
+      key: "balanced",
+      label: "Équilibré",
+      detail: "Réglage quotidien entre débit et contexte.",
+      tuning: { num_ctx: balancedContext, num_batch: balancedBatch, num_thread: Math.min(cores, 12) }
+    },
+    {
+      key: "quality",
+      label: "Qualité / contexte",
+      detail: "Plus de contexte ; la quantification du modèle reste inchangée.",
+      tuning: { num_ctx: qualityContext, num_batch: 128, num_thread: Math.min(cores, 16) }
+    }
+  ];
+}
+
+function modelAutopilotTuningLabel(tuning = {}) {
+  return `ctx ${Number(tuning.num_ctx || 0)} · batch ${Number(tuning.num_batch || 0)} · threads ${Number(tuning.num_thread || 0)}`;
+}
+
+function scoreModelAutopilotResults(results = []) {
+  const successful = results.filter((item) => item.success);
+  if (!successful.length) return { results, recommended: null };
+  const maxSpeed = Math.max(...successful.map((item) => Number(item.estimated_tokens_per_second || 0)), 1);
+  const maxPrompt = Math.max(...successful.map((item) => Number(item.prompt_tokens_per_second || 0)), 1);
+  const maxContext = Math.max(...successful.map((item) => Number(item.tuning?.num_ctx || 0)), 1);
+  const minContext = Math.min(...successful.map((item) => Number(item.tuning?.num_ctx || maxContext)), maxContext);
+  const balancedContext = Number(successful.find((item) => item.autopilot_profile === "balanced")?.tuning?.num_ctx || maxContext);
+  const usage = readUsageProfileKey();
+  const weights = usage === "portable"
+    ? { speed: 0.55, prompt: 0.20, context: 0.15, proof: 0.10 }
+    : usage === "memory"
+      ? { speed: 0.28, prompt: 0.12, context: 0.50, proof: 0.10 }
+      : { speed: 0.42, prompt: 0.18, context: 0.30, proof: 0.10 };
+  const targetContext = usage === "portable" ? minContext : usage === "memory" ? maxContext : balancedContext;
+  const scored = results.map((item) => {
+    if (!item.success) return { ...item, autopilot_score: 0 };
+    const speed = Number(item.estimated_tokens_per_second || 0) / maxSpeed;
+    const prompt = Number(item.prompt_tokens_per_second || 0) > 0
+      ? Number(item.prompt_tokens_per_second || 0) / maxPrompt
+      : speed;
+    const itemContext = Number(item.tuning?.num_ctx || 0);
+    const context = Math.max(0, 1 - (Math.abs(itemContext - targetContext) / Math.max(targetContext, 1)));
+    const proof = item.autopilot_proof_ok ? 1 : 0.4;
+    const score = Math.round(100 * (
+      (speed * weights.speed)
+      + (prompt * weights.prompt)
+      + (context * weights.context)
+      + (proof * weights.proof)
+    ));
+    return { ...item, autopilot_score: Math.max(0, Math.min(100, score)) };
+  });
+  const recommended = scored
+    .filter((item) => item.success)
+    .sort((left, right) => right.autopilot_score - left.autopilot_score)[0] || null;
+  return { results: scored, recommended };
+}
+
+function modelAutopilotSnapshot() {
+  const run = state.modelAutopilotRun;
+  const model = normalizeOllamaRef(run?.model || els.benchmarkModelInput?.value || "");
+  const active = model ? activeModelAutopilotProfile(model) : null;
+  if (!run && !active) return null;
+  return {
+    schema: MODEL_AUTOPILOT_PROTOCOL,
+    model,
+    runtime: run?.runtime || defaultOllamaRuntime(model),
+    measured_at: run?.measured_at || null,
+    budget: run?.budget || { profiles: 3, timeout_seconds_each: 55, downloads: 0 },
+    recommended: run?.recommended ? {
+      key: run.recommended.autopilot_profile,
+      label: run.recommended.autopilot_label,
+      score: run.recommended.autopilot_score,
+      tuning: run.recommended.tuning,
+      tokens_per_second: Number(run.recommended.estimated_tokens_per_second || 0),
+      prompt_tokens_per_second: Number(run.recommended.prompt_tokens_per_second || 0)
+    } : null,
+    active: active ? {
+      key: active.key,
+      label: active.label,
+      tuning: active.tuning,
+      applied_at: active.applied_at,
+      measured_tokens_per_second: Number(active.measured_tokens_per_second || 0)
+    } : null,
+    results: (run?.results || []).map((item) => ({
+      key: item.autopilot_profile,
+      label: item.autopilot_label,
+      success: Boolean(item.success),
+      score: Number(item.autopilot_score || 0),
+      tuning: item.tuning,
+      tokens_per_second: Number(item.estimated_tokens_per_second || 0),
+      prompt_tokens_per_second: Number(item.prompt_tokens_per_second || 0),
+      elapsed_ms: Number(item.elapsed_ms || 0),
+      measurement_source: item.measurement_source || "",
+      runtime_processor: item.runtime_processor || "unknown",
+      gpu_offload_percent: Number(item.runtime_gpu_offload_percent || 0)
+    }))
+  };
+}
+
+function renderModelAutopilot() {
+  if (!els.modelAutopilotBox) return;
+  const model = ollamaActionRef(els.benchmarkModelInput?.value || "");
+  const installed = Boolean(model && isOllamaModelInstalled(model));
+  const running = Boolean(state.modelAutopilotRun?.running);
+  const run = state.modelAutopilotRun?.model === model ? state.modelAutopilotRun : null;
+  const binding = model ? modelAutopilotBinding(model) : null;
+  const active = binding?.active || null;
+  const recommendationApplied = Boolean(
+    active
+    && run?.recommended
+    && active.key === run.recommended.autopilot_profile
+    && canonicalJson(active.tuning) === canonicalJson(run.recommended.tuning)
+  );
+  els.runModelAutopilotBtn.disabled = !state.scan || !installed || running;
+  els.applyModelAutopilotBtn.disabled = running || !run?.recommended?.success || recommendationApplied;
+  els.applyModelAutopilotBtn.textContent = recommendationApplied ? "Profil appliqué" : "Appliquer le profil";
+  els.rollbackModelAutopilotBtn.disabled = running || !binding?.rollback_available;
+
+  if (!state.scan) {
+    els.modelAutopilotState.textContent = "scan requis";
+    els.modelAutopilotBox.className = "model-autopilot-box empty";
+    els.modelAutopilotBox.textContent = "Scannez la machine avant de mesurer les réglages Ollama.";
+    return;
+  }
+  if (!model || !installed) {
+    els.modelAutopilotState.textContent = "modèle installé requis";
+    els.modelAutopilotBox.className = "model-autopilot-box empty";
+    els.modelAutopilotBox.textContent = model
+      ? `${model} doit déjà être installé. Model Autopilot ne télécharge aucun modèle.`
+      : "Choisissez un modèle Ollama déjà installé dans le benchmark.";
+    return;
+  }
+
+  const activeHtml = active ? `
+    <div class="autopilot-active">
+      <strong>Actif dans OutilsIA · ${escapeHtml(active.label)}</strong>
+      <span>${escapeHtml(modelAutopilotTuningLabel(active.tuning))}</span>
+    </div>
+  ` : "";
+  const resultsHtml = run?.results?.length ? `
+    <div class="autopilot-results">
+      ${run.results.map((item) => `
+        <div class="autopilot-profile ${item.autopilot_profile === run.recommended?.autopilot_profile ? "recommended" : ""} ${item.success ? "" : "failed"}">
+          <strong>${escapeHtml(item.autopilot_label)}${item.autopilot_profile === run.recommended?.autopilot_profile ? " · recommandé" : ""}</strong>
+          <span>${escapeHtml(modelAutopilotTuningLabel(item.tuning))}</span>
+          <span>${item.success ? `${escapeHtml(item.estimated_tokens_per_second || 0)} tok/s · score ${escapeHtml(item.autopilot_score || 0)}/100` : escapeHtml(friendlyOllamaError(item.error || "test en erreur"))}</span>
+        </div>
+      `).join("")}
+    </div>
+  ` : "";
+  const headline = running
+    ? `Campagne en cours · ${escapeHtml(model)}`
+    : run?.recommended
+      ? `${escapeHtml(run.recommended.autopilot_label)} recommandé pour le profil ${escapeHtml(currentUsageProfile().label)}`
+      : `${escapeHtml(model)} prêt · trois réglages bornés`;
+  const detail = run?.recommended
+    ? `${modelAutopilotTuningLabel(run.recommended.tuning)} · mesure API Ollama · aucune application automatique.`
+    : "Rapide, Équilibré et Qualité / contexte. Le modèle et sa quantification ne changent pas.";
+  els.modelAutopilotState.textContent = running ? "mesure en cours" : active ? "profil actif" : run?.recommended ? "comparaison prête" : "prêt";
+  els.modelAutopilotBox.className = "model-autopilot-box";
+  els.modelAutopilotBox.innerHTML = `
+    <div class="arena-summary">
+      <strong>${headline}</strong>
+      <span>${escapeHtml(detail)}</span>
+    </div>
+    ${activeHtml}
+    ${resultsHtml}
+  `;
+}
+
+async function runModelAutopilot() {
+  const model = ollamaActionRef(els.benchmarkModelInput?.value || "");
+  if (!state.scan || !model || !isOllamaModelInstalled(model)) {
+    setStatus("Model Autopilot exige un modèle déjà installé", "warn");
+    renderModelAutopilot();
+    return;
+  }
+  const approved = window.confirm(
+    `Tester 3 profils Ollama sur ${model} ?\n\nBudget maximum : 3 minutes. Aucun modèle ne sera téléchargé et aucun réglage ne sera appliqué sans votre confirmation.`
+  );
+  if (!approved) {
+    setStatus("Campagne Model Autopilot annulée", "warn");
+    return;
+  }
+  const candidates = modelAutopilotCandidates(model);
+  const runtime = defaultOllamaRuntime(model);
+  state.capabilityPassport = null;
+  state.modelAutopilotRun = {
+    schema: MODEL_AUTOPILOT_PROTOCOL,
+    model,
+    runtime,
+    running: true,
+    measured_at: null,
+    budget: { profiles: candidates.length, timeout_seconds_each: 55, downloads: 0 },
+    results: [],
+    recommended: null
+  };
+  renderCapabilityPassportPanel();
+  renderModelAutopilot();
+  resetOperationConsole(`Model Autopilot · ${model}`);
+  setOperationFocus(`Model Autopilot : ${model}`, [
+    "Trois profils bornés, un seul modèle déjà installé.",
+    "Aucun téléchargement et aucune modification silencieuse.",
+    "Chaque test exige les métriques de l'API Ollama."
+  ]);
+  try {
+    for (const profile of candidates) {
+      appendOperationLine(`${profile.label} · ${modelAutopilotTuningLabel(profile.tuning)}`, "cmd");
+      setStatus(`Model Autopilot ${profile.label} : ${model}...`);
+      try {
+        const result = invoke
+          ? await invoke("benchmark_ollama", {
+              request: {
+                model,
+                prompt: "Réponds uniquement sur une ligne : AUTO-42 | VRAM | benchmark local.",
+                timeout_seconds: 55,
+                protocol: MODEL_AUTOPILOT_PROTOCOL,
+                tuning: profile.tuning,
+                ...ollamaRuntimePayload(model)
+              }
+            })
+          : {
+              ...demoBenchmark(model),
+              measurement_source: "ollama_api",
+              output_preview: "AUTO-42 | VRAM | benchmark local.",
+              estimated_tokens_per_second: Number((demoBenchmark(model).estimated_tokens_per_second * ({ fast: 1.08, balanced: 1, quality: 0.88 }[profile.key] || 1)).toFixed(1))
+            };
+        const measured = {
+          ...result,
+          protocol: MODEL_AUTOPILOT_PROTOCOL,
+          autopilot_profile: profile.key,
+          autopilot_label: profile.label,
+          tuning: profile.tuning,
+          autopilot_proof_ok: /AUTO-42/i.test(result.output_preview || "") && /VRAM/i.test(result.output_preview || "")
+        };
+        state.modelAutopilotRun.results.push(measured);
+        appendOperationLine(`${profile.label}: ${measured.success ? `${measured.estimated_tokens_per_second} tok/s` : friendlyOllamaError(measured.error)}`, measured.success ? "bench" : "erreur");
+      } catch (error) {
+        state.modelAutopilotRun.results.push({
+          model,
+          success: false,
+          error: friendlyOllamaError(error),
+          autopilot_profile: profile.key,
+          autopilot_label: profile.label,
+          tuning: profile.tuning,
+          autopilot_score: 0
+        });
+        appendOperationLine(`${profile.label}: ${friendlyOllamaError(error)}`, "erreur");
+      }
+      renderModelAutopilot();
+    }
+    const scored = scoreModelAutopilotResults(state.modelAutopilotRun.results);
+    state.modelAutopilotRun = {
+      ...state.modelAutopilotRun,
+      running: false,
+      measured_at: new Date().toISOString(),
+      results: scored.results,
+      recommended: scored.recommended
+    };
+    finishOperationMonitor(scored.recommended ? "Model Autopilot terminé" : "Model Autopilot sans profil valide");
+    setStatus(
+      scored.recommended ? `${scored.recommended.autopilot_label} recommandé, application manuelle requise` : "Aucun profil Autopilot validé",
+      scored.recommended ? "ok" : "warn"
+    );
+  } finally {
+    if (state.modelAutopilotRun) state.modelAutopilotRun.running = false;
+    renderModelAutopilot();
+    renderReadinessPanel();
+  }
+}
+
+function applyModelAutopilotRecommendation() {
+  const run = state.modelAutopilotRun;
+  const recommended = run?.recommended;
+  if (!run || !recommended?.success) {
+    setStatus("Aucun profil Model Autopilot valide à appliquer", "warn");
+    return;
+  }
+  const store = readModelAutopilotStore();
+  const key = modelAutopilotBindingKey(run.model);
+  const existing = store.profiles[key] || null;
+  const active = {
+    key: recommended.autopilot_profile,
+    label: recommended.autopilot_label,
+    tuning: { ...recommended.tuning },
+    applied_at: new Date().toISOString(),
+    measured_tokens_per_second: Number(recommended.estimated_tokens_per_second || 0),
+    measurement_source: recommended.measurement_source || "ollama_api"
+  };
+  store.profiles[key] = {
+    machine_key: state.scan?.machine_key || "",
+    model: run.model,
+    runtime: run.runtime,
+    active,
+    previous: existing?.active || null,
+    rollback_available: true
+  };
+  if (!writeModelAutopilotStore(store)) {
+    setStatus("Impossible d'enregistrer le profil Model Autopilot", "bad");
+    return;
+  }
+  const appliedResult = { ...recommended, autopilot_applied: true };
+  state.benchmark = appliedResult;
+  state.capabilityPassport = null;
+  saveBenchmarkHistoryEntry(appliedResult);
+  renderBenchmark(appliedResult);
+  renderModelAutopilot();
+  renderCapabilityPassportPanel();
+  renderReadinessPanel();
+  setStatus(`Profil ${active.label} appliqué à ${run.model} dans OutilsIA`, "ok");
+}
+
+function rollbackModelAutopilotProfile() {
+  const model = ollamaActionRef(els.benchmarkModelInput?.value || "");
+  const store = readModelAutopilotStore();
+  const key = modelAutopilotBindingKey(model);
+  const binding = store.profiles[key];
+  if (!binding?.rollback_available) {
+    setStatus("Aucun profil précédent à restaurer", "warn");
+    return;
+  }
+  if (binding.previous) {
+    store.profiles[key] = {
+      ...binding,
+      active: binding.previous,
+      previous: null,
+      rollback_available: false
+    };
+  } else {
+    delete store.profiles[key];
+  }
+  writeModelAutopilotStore(store);
+  state.capabilityPassport = null;
+  renderModelAutopilot();
+  renderCapabilityPassportPanel();
+  renderReadinessPanel();
+  const restored = activeModelAutopilotProfile(model);
+  setStatus(restored ? `Profil ${restored.label} restauré` : "Réglages Ollama par défaut restaurés", "ok");
+}
+
 async function runBenchmark(options = {}) {
   const forceCpu = Boolean(options.forceCpu);
   const rawModel = els.benchmarkModelInput.value.trim();
@@ -8395,9 +8838,11 @@ async function runBenchmark(options = {}) {
     }
   }
   els.benchmarkBtn.disabled = true;
+  const activeTuning = forceCpu ? null : activeModelAutopilotProfile(model);
   resetOperationConsole(`${forceCpu ? "Retest CPU" : "Benchmark Ollama"} lancé : ${model}`);
   setOperationFocus(`${forceCpu ? "Retest CPU sans GPU" : "Benchmark en cours"} : ${model}`, [
     forceCpu ? "Ollama force num_gpu=0 pour isoler le pilote GPU." : "Ollama reçoit un prompt court.",
+    activeTuning ? `Profil actif : ${activeTuning.label} · ${modelAutopilotTuningLabel(activeTuning.tuning)}.` : "Réglages Ollama par défaut.",
     "Le résultat séparera chargement, préremplissage et débit de génération quand l'API Ollama les expose.",
     "Reste sur cet écran : le suivi direct apparaît ici."
   ]);
@@ -8412,13 +8857,16 @@ async function runBenchmark(options = {}) {
             prompt: els.benchmarkPromptInput.value.trim(),
             timeout_seconds: 45,
             force_cpu: forceCpu,
+            ...(forceCpu ? {} : modelAutopilotTuningPayload(model)),
             ...ollamaRuntimePayload(model)
           }
         })
       : { ...demoBenchmark(model), execution_mode: forceCpu ? "cpu" : "auto" };
     const normalizedResult = {
       ...result,
-      execution_mode: result.execution_mode || (forceCpu ? "cpu" : "auto")
+      execution_mode: result.execution_mode || (forceCpu ? "cpu" : "auto"),
+      autopilot_active_profile: activeTuning?.key || "",
+      tuning: activeTuning?.tuning || null
     };
     state.benchmark = normalizedResult;
     renderBenchmark(normalizedResult);
@@ -8431,6 +8879,7 @@ async function runBenchmark(options = {}) {
     renderArenaPanel();
     renderStrategyBridgePanel();
     renderFieldTestPanel();
+    renderModelAutopilot();
     await refreshAuthState();
     finishOperationMonitor(normalizedResult.success ? "Benchmark terminé" : "Benchmark terminé avec erreur");
     setStatus(normalizedResult.success ? "Benchmark terminé" : "Benchmark terminé avec erreur", normalizedResult.success ? "ok" : "warn");
@@ -8442,6 +8891,7 @@ async function runBenchmark(options = {}) {
     setStatus(message, "bad");
   } finally {
     els.benchmarkBtn.disabled = false;
+    renderModelAutopilot();
   }
 }
 
@@ -8696,6 +9146,7 @@ function applyChatPreset(key) {
 
 async function runLocalChat() {
   const model = preferredChatModel();
+  const activeTuning = activeModelAutopilotProfile(model);
   const userPrompt = els.chatPromptInput.value.trim();
   if (!userPrompt) {
     setStatus("Question requise pour le dialogue local", "bad");
@@ -8719,6 +9170,7 @@ async function runLocalChat() {
             model,
             prompt,
             timeout_seconds: 90,
+            ...modelAutopilotTuningPayload(model),
             ...ollamaRuntimePayload(model)
           }
         })
@@ -8726,6 +9178,8 @@ async function runLocalChat() {
     result.prompt = userPrompt;
     result.system_prompt = systemPrompt;
     result.sent_prompt = prompt;
+    result.autopilot_active_profile = activeTuning?.key || "";
+    result.tuning = activeTuning?.tuning || null;
     result.created_at_ms = result.created_at_ms || Date.now();
     state.chatResult = result;
     saveChatHistoryEntry(result, userPrompt, systemPrompt);
@@ -10683,6 +11137,56 @@ function installTestHarness() {
     ollamaRuntimePayload,
     ollamaRuntimeCommandLabel,
     installedOllamaRuntimeFor,
+    modelAutopilotCandidates,
+    scoreModelAutopilotResults,
+    modelAutopilotSnapshot,
+    applyModelAutopilotRecommendation,
+    rollbackModelAutopilotProfile,
+    async applyModelAutopilotState() {
+      window.localStorage?.removeItem(MODEL_AUTOPILOT_PROFILES_KEY);
+      this.applyDemoState();
+      const model = "qwen3:0.6b";
+      els.benchmarkModelInput.value = model;
+      const factors = { fast: 1.08, balanced: 1, quality: 0.88 };
+      const candidates = modelAutopilotCandidates(model);
+      const measured = candidates.map((profile, index) => ({
+        ...demoBenchmark(model),
+        created_at_ms: Date.now() + index,
+        measurement_source: "ollama_api",
+        prompt_tokens_per_second: 180 - (index * 15),
+        estimated_tokens_per_second: Number((120 * factors[profile.key]).toFixed(1)),
+        output_preview: "AUTO-42 | VRAM | benchmark local.",
+        protocol: MODEL_AUTOPILOT_PROTOCOL,
+        autopilot_profile: profile.key,
+        autopilot_label: profile.label,
+        tuning: profile.tuning,
+        autopilot_proof_ok: true
+      }));
+      const scored = scoreModelAutopilotResults(measured);
+      state.modelAutopilotRun = {
+        schema: MODEL_AUTOPILOT_PROTOCOL,
+        model,
+        runtime: "native",
+        running: false,
+        measured_at: new Date().toISOString(),
+        budget: { profiles: 3, timeout_seconds_each: 55, downloads: 0 },
+        results: scored.results,
+        recommended: scored.recommended
+      };
+      renderModelAutopilot();
+      const measuredSnapshot = modelAutopilotSnapshot();
+      applyModelAutopilotRecommendation();
+      const appliedSnapshot = modelAutopilotSnapshot();
+      const field = fieldTestMachineEntry();
+      const bridge = strategyArenaReadiness();
+      const report = readinessReport();
+      const passport = await buildCapabilityPassport();
+      const passportVerified = await verifyCapabilityPassportIntegrity(passport);
+      const panel = els.modelAutopilotBox?.textContent || "";
+      rollbackModelAutopilotProfile();
+      const rolledBackSnapshot = modelAutopilotSnapshot();
+      return { measuredSnapshot, appliedSnapshot, rolledBackSnapshot, field, bridge, report, passport, passportVerified, panel };
+    },
     async applyCapabilityPassportState() {
       this.applyDemoState();
       const passport = await generateCapabilityPassport();
@@ -10745,6 +11249,7 @@ function installTestHarness() {
       renderArenaPanel();
       renderStrategyBridgePanel();
       renderFieldTestPanel();
+      renderModelAutopilot();
       renderPrimaryAction();
       state.markdown = cockpitMemoryMarkdown();
       els.memoryText.value = state.markdown;
@@ -11227,6 +11732,10 @@ els.refreshUpdatesBtn.addEventListener("click", refreshDesktopUpdates);
 els.disconnectBtn.addEventListener("click", disconnectDesktop);
 els.benchmarkBtn.addEventListener("click", runBenchmark);
 els.syncBenchmarkBtn.addEventListener("click", syncBenchmark);
+els.runModelAutopilotBtn?.addEventListener("click", runModelAutopilot);
+els.applyModelAutopilotBtn?.addEventListener("click", applyModelAutopilotRecommendation);
+els.rollbackModelAutopilotBtn?.addEventListener("click", rollbackModelAutopilotProfile);
+els.benchmarkModelInput?.addEventListener("input", renderModelAutopilot);
 els.chatSendBtn.addEventListener("click", runLocalChat);
 els.chatCopyBtn.addEventListener("click", copyLocalChatAnswer);
 els.chatMemoryBtn.addEventListener("click", saveLocalChatToMemory);
@@ -11576,6 +12085,7 @@ if (!invoke) {
 restoreViewMode();
 loadHistory();
 renderBenchmarkHistory();
+renderModelAutopilot();
 renderPromptLibrary();
 renderChatHistory();
 renderPreparePanel();

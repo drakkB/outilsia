@@ -62,6 +62,7 @@ SCREENSHOT_PATHS = [
     "/static/images/local-cockpit/local-cockpit-scanned-desktop-20260703.png?v=202607032140",
     "/static/images/local-cockpit/local-cockpit-scanned-mobile-20260703.png?v=202607032140",
     "/static/images/local-cockpit/local-cockpit-capability-passport-v1.png?v=20260710",
+    "/static/images/local-cockpit/local-cockpit-model-autopilot-v1.png?v=20260710",
 ]
 
 FALSE_JS_LINK_RE = re.compile(r'(?:href|src)="(?:get[A-Z][^"]*|item\.[^"]*|\$\{[^"]*)')
@@ -229,6 +230,13 @@ def check_download_page(base_url: str) -> dict[str, object]:
         and "sept preuves" in text
         and "garder ce modèle" in text.lower()
     )
+    model_autopilot_ok = (
+        "Model Autopilot v1" in text
+        and "Rapide" in text
+        and "Équilibré" in text
+        and "retour" in text.lower()
+        and "num_ctx" in text
+    )
     doctor_passport_ok = (
         "Hardware Doctor 2.0" in text
         and "AI Capability Passport" in text
@@ -245,6 +253,7 @@ def check_download_page(base_url: str) -> dict[str, object]:
         "proof_engine_ok": proof_engine_ok,
         "objective_arena_ok": objective_arena_ok,
         "recommendation_engine_ok": recommendation_engine_ok,
+        "model_autopilot_ok": model_autopilot_ok,
         "doctor_passport_ok": doctor_passport_ok,
         "ok": result.get("status") == 200
         and "Scanner PC IA locale" in text
@@ -254,6 +263,7 @@ def check_download_page(base_url: str) -> dict[str, object]:
         and proof_engine_ok
         and objective_arena_ok
         and recommendation_engine_ok
+        and model_autopilot_ok
         and doctor_passport_ok,
     }
 
@@ -269,6 +279,13 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         and "7 preuves locales" in text
         and "Garder ce modèle" in text
     )
+    model_autopilot_ok = (
+        "Model Autopilot v1" in text
+        and "Rapide" in text
+        and "Équilibré" in text
+        and "num_ctx" in text
+        and "retour arrière" in text.lower()
+    )
     doctor_passport_ok = (
         "Hardware Doctor 2.0" in text
         and "AI Capability Passport" in text
@@ -283,6 +300,7 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         "proof_engine_ok": proof_engine_ok,
         "objective_arena_ok": objective_arena_ok,
         "recommendation_engine_ok": recommendation_engine_ok,
+        "model_autopilot_ok": model_autopilot_ok,
         "doctor_passport_ok": doctor_passport_ok,
         "ok": result.get("status") == 200
         and canonical == absolute(base_url, "/scanner-ia-local")
@@ -291,6 +309,7 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         and proof_engine_ok
         and objective_arena_ok
         and recommendation_engine_ok
+        and model_autopilot_ok
         and doctor_passport_ok,
     }
 
@@ -304,6 +323,12 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
         "Recommendation Engine v2" in text
         and "usage-specific proof" in text
         and "which tested model to keep" in text
+    )
+    model_autopilot_ok = (
+        "Model Autopilot v1" in text
+        and "already-installed model" in text
+        and "downloads nothing" in text
+        and "restore" in text
     )
     doctor_passport_ok = (
         "Hardware Doctor 2.0" in text
@@ -319,6 +344,7 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
         "proof_engine_ok": proof_engine_ok,
         "objective_arena_ok": objective_arena_ok,
         "recommendation_engine_ok": recommendation_engine_ok,
+        "model_autopilot_ok": model_autopilot_ok,
         "doctor_passport_ok": doctor_passport_ok,
         "ok": result.get("status") == 200
         and "https://outilsia.fr/scanner-ia-local" in text
@@ -327,6 +353,7 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
         and proof_engine_ok
         and objective_arena_ok
         and recommendation_engine_ok
+        and model_autopilot_ok
         and doctor_passport_ok,
     }
 
