@@ -188,8 +188,31 @@ jobs:
           console.log("cross_platform_release_ok", release.version, release.files.length);
           NODE
 
+      - name: Upload merged web release
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-cockpit-cross-platform-web-release
+          path: server-work/static/downloads/local-cockpit/*
+          if-no-files-found: error
+
+      - name: Check deploy configuration
+        id: deploy_config
+        env:
+          DEPLOY_REQUESTED: ${{ github.event.inputs.deploy_to_vps }}
+          OUTILSIA_DEPLOY_SSH_KEY: ${{ secrets.OUTILSIA_DEPLOY_SSH_KEY }}
+          OUTILSIA_DEPLOY_HOST: ${{ secrets.OUTILSIA_DEPLOY_HOST }}
+        run: |
+          if [ "$DEPLOY_REQUESTED" != "true" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          elif [ -z "$OUTILSIA_DEPLOY_SSH_KEY" ] || [ -z "$OUTILSIA_DEPLOY_HOST" ]; then
+            echo "::warning::Déploiement VPS demandé mais secrets OUTILSIA_DEPLOY_SSH_KEY/OUTILSIA_DEPLOY_HOST absents. L'artefact fusionné reste disponible."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Configure deploy SSH
-        if: ${{ github.event.inputs.deploy_to_vps == 'true' }}
+        if: ${{ steps.deploy_config.outputs.enabled == 'true' }}
         env:
           OUTILSIA_DEPLOY_SSH_KEY: ${{ secrets.OUTILSIA_DEPLOY_SSH_KEY }}
           OUTILSIA_DEPLOY_HOST: ${{ secrets.OUTILSIA_DEPLOY_HOST }}
@@ -210,19 +233,12 @@ jobs:
           EOF
 
       - name: Deploy merged release to outilsia.fr
-        if: ${{ github.event.inputs.deploy_to_vps == 'true' }}
+        if: ${{ steps.deploy_config.outputs.enabled == 'true' }}
         env:
           OUTILSIA_DEPLOY_REMOTE_DIR: ${{ secrets.OUTILSIA_DEPLOY_REMOTE_DIR }}
         run: |
           npm run publish:cross-platform -- --input ../server-work/static/downloads/local-cockpit --release-dir .artifacts/deploy-gated-release --remote outilsia-deploy --remote-dir "${OUTILSIA_DEPLOY_REMOTE_DIR:-/var/www/outilsia/static/downloads/local-cockpit}" --deploy
 
       - name: Verify deployed public release
-        if: ${{ github.event.inputs.deploy_to_vps == 'true' }}
+        if: ${{ steps.deploy_config.outputs.enabled == 'true' }}
         run: npm run verify:release:prod
-
-      - name: Upload merged web release
-        uses: actions/upload-artifact@v4
-        with:
-          name: local-cockpit-cross-platform-web-release
-          path: server-work/static/downloads/local-cockpit/*
-          if-no-files-found: error
