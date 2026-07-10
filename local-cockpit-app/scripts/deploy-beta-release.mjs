@@ -10,6 +10,7 @@ const repoRoot = resolve(appRoot, "..");
 const defaultReleaseDir = join(repoRoot, "server-work", "static", "downloads", "local-cockpit");
 const defaultPagePath = join(repoRoot, "server-work", "static", "pages", "telecharger-scanner-ia-local.html");
 const defaultRemote = process.env.OUTILSIA_DEPLOY_REMOTE || "";
+const defaultIdentity = process.env.OUTILSIA_SSH_IDENTITY || "";
 const defaultRemoteDir = "/var/www/outilsia/static/downloads/local-cockpit";
 const defaultRemotePagePath = "/var/www/outilsia/static/pages/telecharger-scanner-ia-local.html";
 
@@ -22,6 +23,7 @@ Default:
   --remote ${defaultRemote || "<set OUTILSIA_DEPLOY_REMOTE or pass --remote>"}
   --remote-dir ${defaultRemoteDir}
   --remote-page ${defaultRemotePagePath}
+  --identity ${defaultIdentity || "<optional SSH private key>"}
 
 Without --deploy, the script validates only and prints the planned deployment.`);
 }
@@ -30,6 +32,7 @@ function parseArgs(argv) {
   const opts = {
     releaseDir: defaultReleaseDir,
     remote: defaultRemote,
+    identity: defaultIdentity,
     remoteDir: defaultRemoteDir,
     remotePagePath: defaultRemotePagePath,
     deploy: false,
@@ -55,6 +58,10 @@ function parseArgs(argv) {
     }
     if (arg === "--remote") {
       opts.remote = argv[++i] || "";
+      continue;
+    }
+    if (arg === "--identity") {
+      opts.identity = resolve(argv[++i] || "");
       continue;
     }
     if (arg === "--remote-dir") {
@@ -156,6 +163,10 @@ function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
 
+function sshOptions(opts) {
+  return opts.identity ? ["-i", opts.identity, "-o", "BatchMode=yes"] : [];
+}
+
 function deploy({ releasePath, files, pagePath }, opts) {
   const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
   const backupDir = `/var/backups/outilsia-local-cockpit/release_${stamp}`;
@@ -175,14 +186,14 @@ function deploy({ releasePath, files, pagePath }, opts) {
     `mkdir -p ${shellQuote(stagingDir)}`,
     `echo backup:${backupDir}`,
   ].join("; ");
-  run("ssh", [opts.remote, prepareCommand]);
+  run("ssh", [...sshOptions(opts), opts.remote, prepareCommand]);
 
   for (const file of files) {
-    run("scp", [file.path, `${opts.remote}:${stagingDir}/${basename(file.path)}`]);
+    run("scp", [...sshOptions(opts), file.path, `${opts.remote}:${stagingDir}/${basename(file.path)}`]);
   }
-  run("scp", [releasePath, `${opts.remote}:${stagingDir}/release.json`]);
+  run("scp", [...sshOptions(opts), releasePath, `${opts.remote}:${stagingDir}/release.json`]);
   if (pagePath && remotePagePath) {
-    run("scp", [pagePath, `${opts.remote}:${stagingDir}/${basename(remotePagePath)}`]);
+    run("scp", [...sshOptions(opts), pagePath, `${opts.remote}:${stagingDir}/${basename(remotePagePath)}`]);
   }
 
   const verifyScript = [
@@ -207,7 +218,7 @@ function deploy({ releasePath, files, pagePath }, opts) {
     "echo release_activated",
     "echo previous_release_files_retained_for_cache_transition",
   ].join("; ");
-  run("ssh", [opts.remote, verifyAndActivateCommand]);
+  run("ssh", [...sshOptions(opts), opts.remote, verifyAndActivateCommand]);
 }
 
 try {

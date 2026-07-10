@@ -17,7 +17,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - Ajouter une empreinte SHA-256 couvrant le document hors bloc d'intégrité. Cette empreinte détecte une modification ; elle ne constitue pas une signature d'identité.
 - Garder le passeport dans le mode Détails pour ne pas encombrer le parcours Essentiel.
 
-État au 10 juillet 2026 : source, gates, build et publication Windows/Linux terminés sur le build `291016659721` issu du commit `c3dbbc2`. La recette terrain physique reste à finaliser sans fixture ni preuve fabriquée.
+État au 10 juillet 2026 : source, gates, build et publication Windows/Linux terminés sur le build `291051072031` issu du commit `7f1549f`. La recette terrain physique reste à finaliser sans fixture ni preuve fabriquée.
 
 - [x] Sondes NVIDIA : VRAM utilisée, P-state, PCIe et ReBAR seulement quand explicitement exposé.
 - [x] Preuve d'offload Ollama `/api/ps` : CPU, hybride ou GPU, avec état « non prouvé » en absence de mesure.
@@ -44,7 +44,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - Borner chaque campagne par un budget de temps, de disque et de téléchargements accepté par l'utilisateur.
 - Ne jamais remplacer une configuration qui fonctionne sans comparaison mesurée et possibilité de restaurer le profil précédent.
 
-Premier jalon source au 10 juillet 2026 : campagne bornée sur un modèle déjà installé. La quantification, les couches GPU et la comparaison multi-runtime restent des phases ultérieures après validation terrain.
+Premier jalon publié au 10 juillet 2026 dans le build `291051072031` : campagne bornée sur un modèle déjà installé. La quantification, les couches GPU et la comparaison multi-runtime restent des phases ultérieures après validation terrain.
 
 - [x] Comparer trois profils Rapide, Équilibré et Qualité / contexte sur le même modèle.
 - [x] Borner côté Rust `num_ctx`, `num_batch` et `num_thread`.
