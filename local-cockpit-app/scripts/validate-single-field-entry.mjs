@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { REQUIRED_PROFILES, assertFieldProfileHardware } from "./import-field-tests.mjs";
+import { validateFieldEnrichment } from "./validate-field-enrichment.mjs";
 
 const FIELD_KIT = existsSync("/mnt/c/Users/chris/Desktop")
   ? "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Field-Test-Kit"
@@ -233,6 +234,7 @@ export function validateSingleFieldEntry(entry, expectedProfile = "") {
   assertFieldProfileHardware(entry, entry.profile);
   assertBenchmarkPlausible(entry);
   const first30s = validateFirst30sProof(entry);
+  const evidence = validateFieldEnrichment(entry);
   return {
     ok: true,
     profile: entry.profile,
@@ -246,6 +248,7 @@ export function validateSingleFieldEntry(entry, expectedProfile = "") {
     app_version: appVersion,
     tested_at: String(entry.tested_at || "").trim(),
     report: entry.share_url,
+    ...evidence,
   };
 }
 

@@ -30,6 +30,11 @@ REQUIRED_FIELDS = {
     "benchmark_model",
     "benchmark_tokens_per_second",
     "benchmark_elapsed_ms",
+    "benchmark_execution_mode",
+    "benchmark_measurement_source",
+    "benchmark_runtime_processor",
+    "benchmark_gpu_offload_percent",
+    "benchmark_runtime_evidence_source",
     "promptforge_ok",
     "dialogue_ok",
     "arena_ok",
@@ -83,6 +88,12 @@ def main():
         raise AssertionError("demo field entry should have scan_ok=true")
     if entry.get("hardware_doctor", {}).get("schema") != "outilsia.hardware_doctor.v2":
         raise AssertionError(f"Hardware Doctor v2 missing from field entry: {entry.get('hardware_doctor')}")
+    if entry.get("benchmark_runtime_processor") != "gpu":
+        raise AssertionError(f"runtime processor proof missing: {entry.get('benchmark_runtime_processor')}")
+    if float(entry.get("benchmark_gpu_offload_percent") or 0) < 95:
+        raise AssertionError(f"GPU offload proof missing: {entry.get('benchmark_gpu_offload_percent')}")
+    if entry.get("benchmark_runtime_evidence_source") != "ollama_api_ps":
+        raise AssertionError(f"runtime source proof missing: {entry.get('benchmark_runtime_evidence_source')}")
     if entry.get("promptforge_ok") is not True or entry.get("dialogue_ok") is not True or entry.get("arena_ok") is not True:
         raise AssertionError(f"demo field entry should prove prompt/dialogue/arena: {entry}")
     if not entry.get("benchmark_model") or float(entry.get("benchmark_tokens_per_second") or 0) <= 0:

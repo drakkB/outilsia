@@ -7754,6 +7754,7 @@ function fieldTestMachineEntry() {
   const upgrade = report.upgrades[0];
   const doctor = report.hardware_doctor || hardwareDoctorSnapshot(scan);
   const passport = capabilityPassportSummary();
+  const runtimeEvidence = report.runtime_readiness?.evidence || doctorRuntimeEvidence(scan, benchmark?.model || report.test_model || "qwen3:0.6b");
   const os = [scan.os_name, scan.os_version].filter(Boolean).join(" ").trim();
   return {
     profile: fieldProfile.profile,
@@ -7808,6 +7809,11 @@ function fieldTestMachineEntry() {
     benchmark_elapsed_ms: Number(benchmark?.elapsed_ms || 0),
     benchmark_execution_mode: benchmark?.execution_mode || "auto",
     benchmark_measurement_source: benchmark?.measurement_source || "legacy_history",
+    benchmark_runtime_processor: benchmark?.runtime_processor || runtimeEvidence?.processor || "unknown",
+    benchmark_gpu_offload_percent: Number(benchmark?.runtime_gpu_offload_percent || runtimeEvidence?.gpu_offload_percent || 0),
+    benchmark_runtime_evidence_source: benchmark?.runtime_evidence_source || runtimeEvidence?.source || "",
+    benchmark_runtime_model_size_bytes: Number(benchmark?.runtime_model_size_bytes || runtimeEvidence?.model_size_bytes || 0),
+    benchmark_runtime_vram_bytes: Number(benchmark?.runtime_vram_bytes || runtimeEvidence?.vram_bytes || 0),
     benchmark_load_duration_ms: Number(benchmark?.load_duration_ms || 0),
     benchmark_prompt_tokens_per_second: Number(benchmark?.prompt_tokens_per_second || 0),
     benchmark_eval_duration_ms: Number(benchmark?.eval_duration_ms || 0),

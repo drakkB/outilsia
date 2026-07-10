@@ -3,6 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { validateFieldEnrichment } from "./validate-field-enrichment.mjs";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const outputPath = join(appRoot, ".artifacts", "field-tests.json");
@@ -255,6 +256,11 @@ export function validateFieldTests(payload, options = {}) {
 
   const shareUrls = new Set();
   const tpsByRoundedValue = new Map();
+  const enrichedEvidence = {
+    hardware_doctor_v2_profiles: [],
+    ollama_runtime_proof_profiles: [],
+    capability_passport_profiles: [],
+  };
   for (const profile of REQUIRED_PROFILES) {
     const machine = byProfile.get(profile);
     assertString(machine.machine_label, `${profile}.machine_label`);
@@ -286,6 +292,10 @@ export function validateFieldTests(payload, options = {}) {
     shareUrls.add(shareUrl);
     assertFieldProfileHardware(machine, profile);
     assertBenchmarkPlausible(machine, profile);
+    const evidence = validateFieldEnrichment(machine);
+    if (evidence.hardware_doctor.available) enrichedEvidence.hardware_doctor_v2_profiles.push(profile);
+    if (evidence.runtime_evidence.proven) enrichedEvidence.ollama_runtime_proof_profiles.push(profile);
+    if (evidence.capability_passport.available) enrichedEvidence.capability_passport_profiles.push(profile);
     const tpsKey = Number(machine.benchmark_tokens_per_second || 0).toFixed(1);
     if (tpsByRoundedValue.has(tpsKey)) {
       fail(`Duplicate benchmark_tokens_per_second across field machines: ${tpsKey} tok/s for ${tpsByRoundedValue.get(tpsKey)} and ${profile}`);
@@ -297,6 +307,10 @@ export function validateFieldTests(payload, options = {}) {
     ok: true,
     profile_count: REQUIRED_PROFILES.length,
     tested_profiles: REQUIRED_PROFILES,
+    enriched_evidence: {
+      blocking: false,
+      ...enrichedEvidence,
+    },
   };
 }
 
@@ -310,6 +324,9 @@ export function fieldTestsMarkdown(payload, validation) {
     `- Testeur: ${payload.tester || "non renseigné"}`,
     `- Build: ${payload.build_id || "non renseigné"}`,
     `- Machines requises: ${validation.profile_count}`,
+    `- Doctor 2.0 (facultatif): ${validation.enriched_evidence?.hardware_doctor_v2_profiles?.length || 0}/${validation.profile_count}`,
+    `- Allocation Ollama prouvée (facultatif): ${validation.enriched_evidence?.ollama_runtime_proof_profiles?.length || 0}/${validation.profile_count}`,
+    `- Passport généré (facultatif): ${validation.enriched_evidence?.capability_passport_profiles?.length || 0}/${validation.profile_count}`,
     "",
     "| Profil | Machine | Score | Modèle conseillé | Benchmark | Rapport | Upgrade |",
     "| --- | --- | ---: | --- | --- | --- | --- |",

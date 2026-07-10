@@ -191,6 +191,9 @@ function buildStatus(opts) {
       build_id: validation?.build_id || machine.build_id || "",
       app_version: validation?.app_version || machine.app_version || "",
       share_url: machine.share_url || "",
+      hardware_doctor: validation?.hardware_doctor || null,
+      runtime_evidence: validation?.runtime_evidence || null,
+      capability_passport: validation?.capability_passport || null,
       missing_fields: missing,
     };
   });
@@ -200,6 +203,9 @@ function buildStatus(opts) {
   const buildIds = [...new Set(profiles.filter((item) => item.status === "ready").map((item) => item.build_id).filter(Boolean))];
   const appVersions = [...new Set(profiles.filter((item) => item.status === "ready").map((item) => item.app_version).filter(Boolean))];
   const metadataMixed = buildIds.length > 1 || appVersions.length > 1;
+  const doctorProfiles = profiles.filter((item) => item.status === "ready" && item.hardware_doctor?.available).map((item) => item.profile);
+  const runtimeProofProfiles = profiles.filter((item) => item.status === "ready" && item.runtime_evidence?.proven).map((item) => item.profile);
+  const passportProfiles = profiles.filter((item) => item.status === "ready" && item.capability_passport?.available).map((item) => item.profile);
   const nextProfile = missingProfiles[0] || incompleteProfiles[0] || (metadataMixed ? readyProfiles[0] || "" : "");
   return {
     schema: "outilsia.local_cockpit_field_status.v1",
@@ -218,6 +224,12 @@ function buildStatus(opts) {
     build_ids: buildIds,
     app_versions: appVersions,
     metadata_mixed: metadataMixed,
+    enriched_evidence: {
+      blocking: false,
+      hardware_doctor_v2_profiles: doctorProfiles,
+      ollama_runtime_proof_profiles: runtimeProofProfiles,
+      capability_passport_profiles: passportProfiles,
+    },
     next_profile_to_test: nextProfile,
     duplicates: [...new Set(duplicates)],
     unreadable,
@@ -276,6 +288,12 @@ async function buildStatusWithReports(opts) {
   status.profiles_incomplete = incompleteProfiles;
   status.profiles_network_unverified = networkUnverified;
   status.profiles_report_incomplete = reportIncomplete;
+  status.enriched_evidence = {
+    blocking: false,
+    hardware_doctor_v2_profiles: status.profiles.filter((item) => item.status === "ready" && item.hardware_doctor?.available).map((item) => item.profile),
+    ollama_runtime_proof_profiles: status.profiles.filter((item) => item.status === "ready" && item.runtime_evidence?.proven).map((item) => item.profile),
+    capability_passport_profiles: status.profiles.filter((item) => item.status === "ready" && item.capability_passport?.available).map((item) => item.profile),
+  };
   status.report_network_verified = !opts.offline && readyProfiles.length === status.profiles_required.length && networkUnverified.length === 0 && reportIncomplete.length === 0;
   status.status = missingProfiles.length || incompleteProfiles.length || networkUnverified.length || status.unreadable.length || status.metadata_mixed
     ? "FIELD_TESTS_INCOMPLETE"
@@ -298,10 +316,13 @@ function markdown(status) {
     `- Builds prêts: ${status.build_ids?.length ? status.build_ids.join(", ") : "aucun"}`,
     `- Versions app prêtes: ${status.app_versions?.length ? status.app_versions.join(", ") : "aucune"}`,
     `- Métadonnées mélangées: ${status.metadata_mixed ? "oui" : "non"}`,
+    `- Doctor 2.0 (facultatif): ${status.enriched_evidence?.hardware_doctor_v2_profiles?.length || 0}/${status.profiles_required.length}`,
+    `- Preuve d'allocation Ollama (facultatif): ${status.enriched_evidence?.ollama_runtime_proof_profiles?.length || 0}/${status.profiles_required.length}`,
+    `- Passport généré (facultatif): ${status.enriched_evidence?.capability_passport_profiles?.length || 0}/${status.profiles_required.length}`,
     `- Prochain profil à tester: ${status.next_profile_to_test || "aucun"}`,
     "",
-    "| Profil | Statut | Build | App | Machine | Modèle | Benchmark | Rapport | Manques |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| Profil | Statut | Build | App | Machine | Modèle | Benchmark | Doctor | Runtime | Passport | Rapport | Manques |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
   ];
   for (const profile of status.profiles) {
     lines.push([
@@ -312,6 +333,11 @@ function markdown(status) {
       profile.machine_label || "-",
       profile.recommended_model || "-",
       profile.benchmark || "-",
+      profile.hardware_doctor?.label || "-",
+      profile.runtime_evidence?.proven
+        ? `${profile.runtime_evidence.processor} · ${profile.runtime_evidence.gpu_offload_percent}%`
+        : profile.runtime_evidence?.label || "-",
+      profile.capability_passport?.label || "-",
       profile.share_url || "-",
       (profile.missing_fields || []).join(", ") || "-",
     ].map((cell) => String(cell).replaceAll("|", "\\|")).join(" | ").replace(/^/, "| ").replace(/$/, " |"));
@@ -354,6 +380,9 @@ function missionHtml(status) {
           <td>${escapeHtml(profile.machine_label || "-")}</td>
           <td>${escapeHtml(profile.recommended_model || "-")}</td>
           <td>${escapeHtml(profile.benchmark || "-")}</td>
+          <td>${escapeHtml(profile.hardware_doctor?.label || "-")}</td>
+          <td>${escapeHtml(profile.runtime_evidence?.proven ? `${profile.runtime_evidence.processor} · ${profile.runtime_evidence.gpu_offload_percent}%` : profile.runtime_evidence?.label || "-")}</td>
+          <td>${escapeHtml(profile.capability_passport?.available ? `${profile.capability_passport.digest.slice(0, 12)}…` : "facultatif")}</td>
           <td>${profile.share_url ? `<a href="${escapeHtml(profile.share_url)}">${escapeHtml(profile.share_url)}</a>` : "-"}</td>
           <td>${escapeHtml((profile.missing_fields || []).join(", ") || "-")}</td>
         </tr>`).join("");
@@ -425,7 +454,8 @@ function missionHtml(status) {
       <li>Prendre le profil indiqué : <strong>${escapeHtml(nextText)}</strong>.</li>
       <li>Ouvrir OutilsIA Local Cockpit sur cette machine et cliquer <strong>Analyser ce PC</strong>.</li>
       <li>Obtenir au minimum : matériel reconnu, score, modèle conseillé, benchmark, PromptForge, dialogue local, Arena, rapport.</li>
-      <li>Passer en <strong>Détails</strong>, ouvrir <strong>Test terrain</strong>, choisir le <strong>Profil terrain</strong> attendu, puis cliquer <strong>Télécharger fiche</strong>.</li>
+      <li>Optionnel mais utile : dans <strong>Détails</strong>, générer l’<strong>AI Capability Passport</strong> avant l’export.</li>
+      <li>Ouvrir <strong>Test terrain</strong>, choisir le <strong>Profil terrain</strong> attendu, puis cliquer <strong>Télécharger fiche</strong>.</li>
       <li>Revenir sur ce kit et lancer <strong>COLLECTER.cmd</strong>, puis <strong>STATUT.cmd</strong>.</li>
     </ol>
     <p class="muted">Manque actuel du profil suivant : ${escapeHtml(nextMissing)}.</p>
@@ -434,7 +464,7 @@ function missionHtml(status) {
     <h2>Statut des profils</h2>
     <table>
       <thead>
-        <tr><th>Profil</th><th>Statut</th><th>Build</th><th>Machine</th><th>Modèle</th><th>Benchmark</th><th>Rapport</th><th>Manques</th></tr>
+        <tr><th>Profil</th><th>Statut</th><th>Build</th><th>Machine</th><th>Modèle</th><th>Benchmark</th><th>Doctor</th><th>Runtime</th><th>Passport</th><th>Rapport</th><th>Manques</th></tr>
       </thead>
       <tbody>${rows}
       </tbody>
@@ -501,6 +531,7 @@ function nextProfileHtml(status) {
       <div class="card"><strong>2. Benchmark</strong><span>Un modèle testé avec tokens/s et durée.</span></div>
       <div class="card"><strong>3. Flux IA</strong><span>PromptForge, dialogue local et Arena locale validés.</span></div>
       <div class="card"><strong>4. Rapport</strong><span>Rapport généré ou lien partagé copié dans la fiche.</span></div>
+      <div class="card"><strong>Preuve enrichie</strong><span>Doctor 2.0 et allocation Ollama sont capturés automatiquement. Le Passport est facultatif.</span></div>
     </div>
   </section>
   <section>

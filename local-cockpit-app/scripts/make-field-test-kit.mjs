@@ -97,6 +97,85 @@ const PROFILE_GUIDES = {
   },
 };
 
+const FIELD_ENRICHMENT_POWERSHELL = String.raw`
+function Test-EnrichedEvidence($entry) {
+  $result = @{
+    error = ""
+    doctor = "non exporte"
+    doctor_available = $false
+    runtime = if ($entry.runtime_readiness_label) { [string]$entry.runtime_readiness_label } else { "a mesurer" }
+    runtime_proven = $false
+    passport = "non genere"
+    passport_available = $false
+  }
+  $doctorProperty = $entry.PSObject.Properties["hardware_doctor"]
+  if ($doctorProperty -and $doctorProperty.Value) {
+    $doctor = $doctorProperty.Value
+    if ([string]$doctor.schema -ne "outilsia.hardware_doctor.v2") {
+      $result.error = "hardware_doctor.schema invalide"
+      return $result
+    }
+    $doctorScore = 0.0
+    if (![double]::TryParse([string]$doctor.score, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$doctorScore) -or $doctorScore -lt 0 -or $doctorScore -gt 100) {
+      $result.error = "hardware_doctor.score invalide"
+      return $result
+    }
+    $result.doctor = "$doctorScore/100"
+    $result.doctor_available = $true
+  }
+
+  $passportOk = $entry.capability_passport_ok -eq $true
+  $passportSchema = [string]$entry.capability_passport_schema
+  $passportDigest = ([string]$entry.capability_passport_digest).Trim().ToLowerInvariant()
+  if ($passportOk) {
+    if ($passportSchema -ne "outilsia.ai_capability_passport.v1") {
+      $result.error = "capability_passport_schema invalide"
+      return $result
+    }
+    if ($passportDigest -notmatch "^[a-f0-9]{64}$") {
+      $result.error = "capability_passport_digest invalide"
+      return $result
+    }
+    $result.passport = "SHA-256 $($passportDigest.Substring(0, 12))..."
+    $result.passport_available = $true
+  } elseif (![string]::IsNullOrWhiteSpace($passportSchema) -or ![string]::IsNullOrWhiteSpace($passportDigest)) {
+    $result.error = "metadonnees Passport presentes sans capability_passport_ok"
+    return $result
+  }
+
+  $executionMode = if ($entry.benchmark_execution_mode) { ([string]$entry.benchmark_execution_mode).ToLowerInvariant() } else { "auto" }
+  if (@("auto", "cpu") -notcontains $executionMode) {
+    $result.error = "benchmark_execution_mode invalide"
+    return $result
+  }
+  $processor = if ($entry.benchmark_runtime_processor) { ([string]$entry.benchmark_runtime_processor).ToLowerInvariant() } else { "unknown" }
+  if (@("unknown", "cpu", "gpu", "hybrid") -notcontains $processor) {
+    $result.error = "benchmark_runtime_processor invalide"
+    return $result
+  }
+  $source = [string]$entry.benchmark_runtime_evidence_source
+  $offload = 0.0
+  if ($entry.PSObject.Properties["benchmark_gpu_offload_percent"]) {
+    if (![double]::TryParse([string]$entry.benchmark_gpu_offload_percent, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$offload) -or $offload -lt 0 -or $offload -gt 100) {
+      $result.error = "benchmark_gpu_offload_percent invalide"
+      return $result
+    }
+  }
+  if ($processor -ne "unknown") {
+    if ($source -ne "ollama_api_ps") {
+      $result.error = "preuve runtime sans source ollama_api_ps"
+      return $result
+    }
+    if ($processor -eq "cpu" -and $offload -ne 0) { $result.error = "offload CPU doit etre 0"; return $result }
+    if ($processor -eq "gpu" -and $offload -lt 95) { $result.error = "offload GPU doit etre au moins 95"; return $result }
+    if ($processor -eq "hybrid" -and ($offload -le 0 -or $offload -ge 95)) { $result.error = "offload hybride doit etre entre 0 et 95"; return $result }
+    $result.runtime = "$processor - $offload%"
+    $result.runtime_proven = $true
+  }
+  return $result
+}
+`;
+
 const STRICT_PROFILE_RECIPES = {
   old_laptop: {
     title: "Recette stricte vieux laptop",
@@ -348,6 +427,13 @@ function toWindowsPath(path) {
   if (path.startsWith("/mnt/") && path.length > 6) {
     const drive = path.slice(5, 6).toUpperCase();
     return `${drive}:\\${path.slice(7).replaceAll("/", "\\")}`;
+  }
+  if (path.startsWith("/")) {
+    try {
+      return execFileSync("wslpath", ["-w", path], { encoding: "utf8" }).trim();
+    } catch {
+      // Keep the legacy fallback for non-WSL hosts.
+    }
   }
   return path.replaceAll("/", "\\");
 }
@@ -656,6 +742,12 @@ function writeOperatorChecklist(kitDir, release) {
     "",
     ...checklist.proof_items.map((item) => `- ${item}`),
     "",
+    "## Preuves enrichies facultatives",
+    "",
+    "- Hardware Doctor 2.0 : score et diagnostic matériel détaillé.",
+    "- Allocation Ollama : CPU, GPU ou hybride, pourcentage d'offload et source `/api/ps` si disponible.",
+    "- AI Capability Passport : schéma v1 et digest SHA-256. Son absence ne bloque pas la fiche.",
+    "",
     "## Commandes utiles",
     "",
     ...checklist.commands.map((command) => `- \`${command}\``),
@@ -725,6 +817,10 @@ function writeOperatorChecklist(kitDir, release) {
   <section>
     <h2>8 preuves à obtenir sur chaque PC</h2>
     <ol class="proofs">${checklist.proof_items.map((item) => `<li>${item}</li>`).join("")}</ol>
+  </section>
+  <section>
+    <h2>Preuves enrichies facultatives</h2>
+    <p>Doctor 2.0 et l'allocation Ollama sont capturés automatiquement quand le runtime les fournit. Générer le Passport ajoute son digest SHA-256. Ces éléments enrichissent le diagnostic mais ne remplacent ni ne bloquent les 8 preuves physiques.</p>
   </section>
   <section>
     <h2>Ordre court</h2>
@@ -945,6 +1041,7 @@ ${cards}
       <li>Lancer un benchmark réel si aucune preuve locale n'est affichée.</li>
       <li>Tester PromptForge, dialogue local, Arena et rapport.</li>
       <li>Aller dans <strong>Details</strong> &gt; <strong>Test terrain</strong>.</li>
+      <li>Optionnel : générer l'<strong>AI Capability Passport</strong> pour joindre son digest à la fiche.</li>
       <li>Sélectionner manuellement <strong>${profile}</strong>.</li>
       <li>Cliquer <strong>Telecharger fiche</strong>.</li>
       <li>Lancer <code>VALIDER-DERNIERE-FICHE.cmd</code> avant de quitter la machine.</li>
@@ -991,6 +1088,8 @@ ${cards}
       "- Arena locale visible ou statut explicite.",
       "- Rapport généré ou lien de partage.",
       "- Profil terrain manuel correct dans la fiche exportée.",
+      "- Preuve enrichie facultative : Doctor 2.0, allocation CPU/GPU Ollama et digest du Passport.",
+      "- L'absence de Passport ne bloque jamais une fiche terrain ; un Passport annoncé doit toutefois être valide.",
       "",
       "## À ne pas faire",
       "",
@@ -1049,6 +1148,7 @@ ${cards}
       <li>Benchmark réel avec tokens/s supérieur à 0.</li>
       <li>PromptForge, dialogue local, Arena locale et rapport avec statut explicite.</li>
       <li>Fiche exportée : <code>outilsia-field-test-${profile}.json</code>.</li>
+      <li>Facultatif : Doctor 2.0, allocation Ollama et digest du Passport enrichissent la preuve sans la rendre obligatoire.</li>
     </ul>
   </section>
   <section>
@@ -1057,6 +1157,7 @@ ${cards}
       <li>Lancer <code>${profileCommandName(profile)}</code>.</li>
       <li>Ouvrir OutilsIA Local Cockpit et cliquer <strong>Analyser ce PC</strong>.</li>
       <li>Compléter benchmark, PromptForge, dialogue, Arena et rapport.</li>
+      <li>Facultatif : générer l'AI Capability Passport avant l'export.</li>
       <li>Exporter la fiche terrain avec le profil manuel <code>${profile}</code>.</li>
       <li>Lancer <code>VALIDER-DERNIERE-FICHE.cmd</code>.</li>
     </ol>
@@ -1659,6 +1760,8 @@ function main() {
     "- Benchmark : modèle, tokens/s, durée.",
     "- Flux complet : PromptForge, dialogue local, Arena, rapport.",
     "- Upgrade utile ou raison de ne pas upgrader.",
+    "- Facultatif : Doctor 2.0, preuve CPU/GPU/hybride Ollama et digest AI Capability Passport.",
+    "- Le Passport n'est pas une preuve d'identité et son absence ne bloque pas le terrain.",
     "",
     "## Flux recommande avec l'app",
     "",
@@ -1677,19 +1780,20 @@ function main() {
     "13. Double-cliquer `OUVRIR-MISSION.cmd` si tu veux le tableau complet des 5 profils.",
     "14. Sur chaque machine, ouvrir OutilsIA Local Cockpit.",
     "15. Passer en `Details`.",
-    "16. Ouvrir `Test terrain`.",
-    "17. Choisir le `Profil terrain` attendu par `CENTRE-TERRAIN.html`, `PROCHAIN-PC.html`, `FIELD-PROGRESS.html`, `FIELD-DISPATCH.html`, `FIELD-PROFILE-CARDS.html`, `FIELD-PROFILE-EXPECTATIONS.html`, `FIELD-OPERATOR-CHECKLIST.html` ou `BRIEF-*.html`. Laisser `Auto selon le scan` seulement si l'inférence correspond au profil demandé.",
-    "18. Cliquer `Telecharger fiche`.",
-    "19. Double-cliquer `VALIDER-DERNIERE-FICHE.cmd` pour vérifier immédiatement que la fiche contient scan, benchmark, PromptForge, dialogue, Arena et rapport.",
-    "20. Revenir sur la machine principale et double-cliquer `COLLECTER.cmd` pour récupérer automatiquement les fiches `outilsia-field-test-*.json` depuis Téléchargements vers `entries/`.",
-    "21. Double-cliquer `VALIDER-FICHES.cmd` pour valider toutes les fiches présentes et voir immédiatement les profils manquants/incomplets.",
-    "22. Double-cliquer `EXPORTER-FICHES.cmd` si cette machine terrain doit renvoyer ses fiches par USB, réseau ou messagerie. Le zip peut ensuite être décompressé dans `entries/` sur la machine principale.",
-    "23. Sur la machine principale, placer le zip transféré dans ce dossier ou dans Téléchargements, puis double-cliquer `IMPORTER-PACK-FICHES.cmd`.",
-    "24. Double-cliquer `PREPARER-KIT-USB.cmd` pour copier le kit complet vers une clé USB ou un dossier de transfert avant d'aller sur les autres PC.",
-    "25. Double-cliquer `OUVRIR-CENTRE-TERRAIN.cmd`, `OUVRIR-PROGRESSION-TERRAIN.cmd` ou `PROCHAIN-PC.cmd` pour voir le profil suivant.",
-    "26. Double-cliquer `STATUT.cmd` pour voir les profils prets, manquants ou incomplets.",
-    "27. Double-cliquer `VERIFIER-KIT.cmd` avant de partir sur un PC distant : le script confirme le SHA de l'installeur et les fichiers indispensables.",
-    "28. Double-cliquer `AUDIT-TERRAIN.cmd` pour obtenir un verdict unique : pret / pas pret, prochain PC, manques et fichiers à ouvrir.",
+    "16. Optionnel : générer l'`AI Capability Passport` pour joindre son digest à la fiche.",
+    "17. Ouvrir `Test terrain`.",
+    "18. Choisir le `Profil terrain` attendu par `CENTRE-TERRAIN.html`, `PROCHAIN-PC.html`, `FIELD-PROGRESS.html`, `FIELD-DISPATCH.html`, `FIELD-PROFILE-CARDS.html`, `FIELD-PROFILE-EXPECTATIONS.html`, `FIELD-OPERATOR-CHECKLIST.html` ou `BRIEF-*.html`. Laisser `Auto selon le scan` seulement si l'inférence correspond au profil demandé.",
+    "19. Cliquer `Telecharger fiche`.",
+    "20. Double-cliquer `VALIDER-DERNIERE-FICHE.cmd` pour vérifier immédiatement que la fiche contient scan, benchmark, PromptForge, dialogue, Arena et rapport.",
+    "21. Revenir sur la machine principale et double-cliquer `COLLECTER.cmd` pour récupérer automatiquement les fiches `outilsia-field-test-*.json` depuis Téléchargements vers `entries/`.",
+    "22. Double-cliquer `VALIDER-FICHES.cmd` pour valider toutes les fiches présentes et voir immédiatement les profils manquants/incomplets.",
+    "23. Double-cliquer `EXPORTER-FICHES.cmd` si cette machine terrain doit renvoyer ses fiches par USB, réseau ou messagerie. Le zip peut ensuite être décompressé dans `entries/` sur la machine principale.",
+    "24. Sur la machine principale, placer le zip transféré dans ce dossier ou dans Téléchargements, puis double-cliquer `IMPORTER-PACK-FICHES.cmd`.",
+    "25. Double-cliquer `PREPARER-KIT-USB.cmd` pour copier le kit complet vers une clé USB ou un dossier de transfert avant d'aller sur les autres PC.",
+    "26. Double-cliquer `OUVRIR-CENTRE-TERRAIN.cmd`, `OUVRIR-PROGRESSION-TERRAIN.cmd` ou `PROCHAIN-PC.cmd` pour voir le profil suivant.",
+    "27. Double-cliquer `STATUT.cmd` pour voir les profils prets, manquants ou incomplets.",
+    "28. Double-cliquer `VERIFIER-KIT.cmd` avant de partir sur un PC distant : le script confirme le SHA de l'installeur et les fichiers indispensables.",
+    "29. Double-cliquer `AUDIT-TERRAIN.cmd` pour obtenir un verdict unique : pret / pas pret, prochain PC, manques et fichiers à ouvrir.",
     "29. Quand les 5 profils sont présents, double-cliquer `ASSEMBLER.cmd`.",
     "30. Double-cliquer `IMPORTER.cmd` pour valider et importer le `FIELD-TESTS.json` final.",
     "31. Double-cliquer `VALIDER-GOAL.cmd` pour enchainer collecte, statut, assemblage, import et audit global.",
@@ -3495,6 +3599,8 @@ function Test-BenchmarkPlausible($entry) {
   return ""
 }
 
+${FIELD_ENRICHMENT_POWERSHELL}
+${FIELD_ENRICHMENT_POWERSHELL}
 function Test-First30sProof($entry) {
   $required = @("hardware_visible", "score_visible", "recommended_model_visible", "benchmark_cta_or_proof_visible", "upgrade_visible")
   $proofProperty = $entry.PSObject.Properties["first_30s"]
@@ -3680,9 +3786,13 @@ $benchmarkPlausibilityError = Test-BenchmarkPlausible $entry
 if (![string]::IsNullOrWhiteSpace($benchmarkPlausibilityError)) {
   Fail "profil=$($entry.profile) $benchmarkPlausibilityError"
 }
+$enriched = Test-EnrichedEvidence $entry
+if (![string]::IsNullOrWhiteSpace([string]$enriched.error)) {
+  Fail "profil=$($entry.profile) preuve enrichie invalide: $($enriched.error)"
+}
 
 $report = $entry.share_url
-Write-Host "field_entry_ok profile=$($entry.profile) model=$($entry.recommended_model) benchmark=$($entry.benchmark_model) tps=$($entry.benchmark_tokens_per_second) first_30s=$($first30s.source) build_id=$($entry.build_id) app_version=$($entry.app_version) report=$report" -ForegroundColor Green
+Write-Host "field_entry_ok profile=$($entry.profile) model=$($entry.recommended_model) benchmark=$($entry.benchmark_model) tps=$($entry.benchmark_tokens_per_second) first_30s=$($first30s.source) doctor=$($enriched.doctor) runtime=$($enriched.runtime) passport=$($enriched.passport) build_id=$($entry.build_id) app_version=$($entry.app_version) report=$report" -ForegroundColor Green
 exit 0
 `, "utf8");
 
@@ -3946,7 +4056,23 @@ function Validate-Entry($entry) {
   if (![string]::IsNullOrWhiteSpace($benchmarkPlausibilityError)) {
     return @{ status = "incomplete"; error = $benchmarkPlausibilityError }
   }
-  return @{ status = "ready"; error = ""; first_30s_complete = $true; first_30s_source = $first30s.source; first_30s_summary = $first30s.summary }
+  $enriched = Test-EnrichedEvidence $entry
+  if (![string]::IsNullOrWhiteSpace([string]$enriched.error)) {
+    return @{ status = "incomplete"; error = "preuve enrichie invalide: $($enriched.error)" }
+  }
+  return @{
+    status = "ready"
+    error = ""
+    first_30s_complete = $true
+    first_30s_source = $first30s.source
+    first_30s_summary = $first30s.summary
+    doctor = $enriched.doctor
+    doctor_available = $enriched.doctor_available
+    runtime = $enriched.runtime
+    runtime_proven = $enriched.runtime_proven
+    passport = $enriched.passport
+    passport_available = $enriched.passport_available
+  }
 }
 
 if ([string]::IsNullOrWhiteSpace($EntriesDir)) {
@@ -4009,6 +4135,12 @@ foreach ($profile in $requiredProfiles) {
       first_30s_complete = $false
       first_30s_source = ""
       first_30s_summary = ""
+      doctor = "-"
+      doctor_available = $false
+      runtime = "-"
+      runtime_proven = $false
+      passport = "-"
+      passport_available = $false
       report = ""
       error = "fiche absente"
     }
@@ -4028,6 +4160,12 @@ foreach ($profile in $requiredProfiles) {
     first_30s_complete = [bool]$validation.first_30s_complete
     first_30s_source = [string]$validation.first_30s_source
     first_30s_summary = [string]$validation.first_30s_summary
+    doctor = [string]$validation.doctor
+    doctor_available = [bool]$validation.doctor_available
+    runtime = [string]$validation.runtime
+    runtime_proven = [bool]$validation.runtime_proven
+    passport = [string]$validation.passport
+    passport_available = [bool]$validation.passport_available
     build_id = [string]$entry.build_id
     app_version = [string]$entry.app_version
     report = $report
@@ -4051,6 +4189,9 @@ $tpsGroups = @($profiles |
   Group-Object { ([math]::Round([double]$_.benchmark_tokens_per_second, 1)).ToString([System.Globalization.CultureInfo]::InvariantCulture) } |
   Where-Object { $_.Count -gt 1 })
 $duplicateTps = @($tpsGroups | ForEach-Object { [string]$_.Name })
+$doctorProfiles = @($profiles | Where-Object { $_.status -eq "ready" -and $_.doctor_available } | ForEach-Object { $_.profile })
+$runtimeProofProfiles = @($profiles | Where-Object { $_.status -eq "ready" -and $_.runtime_proven } | ForEach-Object { $_.profile })
+$passportProfiles = @($profiles | Where-Object { $_.status -eq "ready" -and $_.passport_available } | ForEach-Object { $_.profile })
 $valid = $ready.Count -eq $requiredProfiles.Count -and $unreadable.Count -eq 0 -and $unexpected.Count -eq 0 -and !$metadataMixed -and $duplicateShareUrls.Count -eq 0 -and $duplicateTps.Count -eq 0
 $next = ""
 if ($missing.Count -gt 0) { $next = $missing[0] }
@@ -4076,6 +4217,12 @@ $reportObj = [pscustomobject]@{
   metadata_mixed = $metadataMixed
   duplicate_share_urls = $duplicateShareUrls
   duplicate_benchmark_tokens_per_second = $duplicateTps
+  enriched_evidence = [pscustomobject]@{
+    blocking = $false
+    hardware_doctor_v2_profiles = $doctorProfiles
+    ollama_runtime_proof_profiles = $runtimeProofProfiles
+    capability_passport_profiles = $passportProfiles
+  }
   next_profile_to_fix = $next
   duplicates = @($duplicates | Select-Object -Unique)
   unreadable = $unreadable
@@ -4102,10 +4249,13 @@ $lines = @(
   "- Metadonnees melangees: $(if ($metadataMixed) { 'oui' } else { 'non' })",
   "- Rapports dupliques: $(if ($duplicateShareUrls.Count -gt 0) { $duplicateShareUrls -join ', ' } else { 'aucun' })",
   "- Tok/s dupliques: $(if ($duplicateTps.Count -gt 0) { $duplicateTps -join ', ' } else { 'aucun' })",
+  "- Doctor 2.0 (facultatif): $($doctorProfiles.Count)/$($requiredProfiles.Count)",
+  "- Preuve d'allocation Ollama (facultatif): $($runtimeProofProfiles.Count)/$($requiredProfiles.Count)",
+  "- Passport genere (facultatif): $($passportProfiles.Count)/$($requiredProfiles.Count)",
   "- Prochain profil à corriger: $(if ($next) { $next } else { 'aucun' })",
   "",
-  "| Profil | Statut | UX 30s | Build | App | Fichier | Modele | Benchmark | Rapport | Erreur |",
-  "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
+  "| Profil | Statut | UX 30s | Build | App | Fichier | Modele | Benchmark | Doctor | Runtime | Passport | Rapport | Erreur |",
+  "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
 )
 foreach ($row in $profiles) {
   $fileName = if ($row.source_file) { Split-Path $row.source_file -Leaf } else { "-" }
@@ -4116,7 +4266,7 @@ foreach ($row in $profiles) {
   $app = if ($row.app_version) { $row.app_version } else { "-" }
   $rep = if ($row.report) { $row.report } else { "-" }
   $err = if ($row.error) { $row.error } else { "-" }
-  $lines += "| $($row.profile) | $($row.status) | $ux | $build | $app | $fileName | $model | $bench | $rep | $err |"
+  $lines += "| $($row.profile) | $($row.status) | $ux | $build | $app | $fileName | $model | $bench | $($row.doctor) | $($row.runtime) | $($row.passport) | $rep | $err |"
 }
 $lines += ""
 $lines | Set-Content -LiteralPath $OutMd -Encoding UTF8
@@ -4132,7 +4282,7 @@ foreach ($row in $profiles) {
   $rep = if ($row.report) { "<a href='$(Html $row.report)'>$(Html $row.report)</a>" } else { "-" }
   $err = if ($row.error) { $row.error } else { "-" }
   $proof = if ($row.status -eq "ready") { "preuve complete" } elseif ($row.status -eq "missing") { "fiche absente" } else { "a corriger" }
-  $htmlRows += "<tr class='$(Html $row.status)'><td><strong>$(Html $row.profile)</strong><span>$(Html $proof)</span></td><td>$(Html $row.status)</td><td>$ux</td><td>$(Html $build)</td><td>$(Html $app)</td><td>$(Html $fileName)</td><td>$(Html $model)</td><td>$(Html $bench)</td><td>$rep</td><td>$(Html $err)</td></tr>"
+  $htmlRows += "<tr class='$(Html $row.status)'><td><strong>$(Html $row.profile)</strong><span>$(Html $proof)</span></td><td>$(Html $row.status)</td><td>$ux</td><td>$(Html $build)</td><td>$(Html $app)</td><td>$(Html $fileName)</td><td>$(Html $model)</td><td>$(Html $bench)</td><td>$(Html $row.doctor)</td><td>$(Html $row.runtime)</td><td>$(Html $row.passport)</td><td>$rep</td><td>$(Html $err)</td></tr>"
 }
 $unreadableHtml = @()
 if ($unreadable.Count -gt 0) {
@@ -4190,7 +4340,7 @@ $html = @"
   <section>
     <h2>Fiches par profil</h2>
     <table>
-      <thead><tr><th>Profil</th><th>Statut</th><th>UX 30s</th><th>Build</th><th>App</th><th>Fichier</th><th>Modele</th><th>Benchmark</th><th>Rapport</th><th>Erreur</th></tr></thead>
+      <thead><tr><th>Profil</th><th>Statut</th><th>UX 30s</th><th>Build</th><th>App</th><th>Fichier</th><th>Modele</th><th>Benchmark</th><th>Doctor</th><th>Runtime</th><th>Passport</th><th>Rapport</th><th>Erreur</th></tr></thead>
       <tbody>$htmlRowsText</tbody>
     </table>
   </section>
@@ -4203,6 +4353,7 @@ $html = @"
       <li>PromptForge, dialogue local, Arena locale et rapport avec statut OK.</li>
       <li>URL partagee OutilsIA au format <code>https://outilsia.fr/r/...</code>.</li>
       <li>Meme <code>build_id</code> et meme <code>app_version</code> sur les 5 profils.</li>
+      <li>Enrichissement facultatif : Doctor 2.0, allocation Ollama et digest du Passport. Leur absence ne bloque pas une fiche.</li>
     </ul>
   </section>
   <section>
@@ -4273,6 +4424,12 @@ foreach ($profile in $requiredProfiles) {
       benchmark = ""
       build_id = ""
       app_version = ""
+      doctor = "-"
+      doctor_available = $false
+      runtime = "-"
+      runtime_proven = $false
+      passport = "-"
+      passport_available = $false
       share_url = ""
       missing_fields = @("fiche absente")
     }
@@ -4296,6 +4453,12 @@ foreach ($profile in $requiredProfiles) {
     benchmark = $bench
     build_id = [string]$row.build_id
     app_version = [string]$row.app_version
+    doctor = [string]$row.doctor
+    doctor_available = [bool]$row.doctor_available
+    runtime = [string]$row.runtime
+    runtime_proven = [bool]$row.runtime_proven
+    passport = [string]$row.passport
+    passport_available = [bool]$row.passport_available
     share_url = $(if ($row.report -and $row.report -ne "local") { [string]$row.report } else { "" })
     missing_fields = $missingFields
   }
@@ -4307,6 +4470,9 @@ $incomplete = @($profiles | Where-Object { $_.status -eq "incomplete" } | ForEac
 $buildIds = @($validation.build_ids)
 $appVersions = @($validation.app_versions)
 $metadataMixed = [bool]$validation.metadata_mixed
+$doctorProfiles = @($profiles | Where-Object { $_.status -eq "ready" -and $_.doctor_available } | ForEach-Object { $_.profile })
+$runtimeProofProfiles = @($profiles | Where-Object { $_.status -eq "ready" -and $_.runtime_proven } | ForEach-Object { $_.profile })
+$passportProfiles = @($profiles | Where-Object { $_.status -eq "ready" -and $_.passport_available } | ForEach-Object { $_.profile })
 $next = ""
 if ($missing.Count -gt 0) { $next = $missing[0] }
 elseif ($incomplete.Count -gt 0) { $next = $incomplete[0] }
@@ -4325,6 +4491,12 @@ $status = [pscustomobject]@{
   build_ids = $buildIds
   app_versions = $appVersions
   metadata_mixed = $metadataMixed
+  enriched_evidence = [pscustomobject]@{
+    blocking = $false
+    hardware_doctor_v2_profiles = $doctorProfiles
+    ollama_runtime_proof_profiles = $runtimeProofProfiles
+    capability_passport_profiles = $passportProfiles
+  }
   next_profile_to_test = $next
   duplicates = @($validation.duplicates)
   unreadable = @($validation.unreadable)
@@ -4343,10 +4515,13 @@ $md = @(
   "- Builds prets: $(if ($buildIds.Count -gt 0) { $buildIds -join ', ' } else { 'aucun' })",
   "- Versions app pretes: $(if ($appVersions.Count -gt 0) { $appVersions -join ', ' } else { 'aucune' })",
   "- Metadonnees melangees: $(if ($metadataMixed) { 'oui' } else { 'non' })",
+  "- Doctor 2.0 (facultatif): $($doctorProfiles.Count)/$($requiredProfiles.Count)",
+  "- Preuve d'allocation Ollama (facultatif): $($runtimeProofProfiles.Count)/$($requiredProfiles.Count)",
+  "- Passport genere (facultatif): $($passportProfiles.Count)/$($requiredProfiles.Count)",
   "- Prochain profil a tester: $(if ($next) { $next } else { 'aucun' })",
   "",
-  "| Profil | Statut | Build | App | Modele | Benchmark | Rapport | Manques |",
-  "| --- | --- | --- | --- | --- | --- | --- | --- |"
+  "| Profil | Statut | Build | App | Modele | Benchmark | Doctor | Runtime | Passport | Rapport | Manques |",
+  "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
 )
 foreach ($row in $profiles) {
   $model = if ($row.recommended_model) { $row.recommended_model } else { "-" }
@@ -4355,7 +4530,7 @@ foreach ($row in $profiles) {
   $app = if ($row.app_version) { $row.app_version } else { "-" }
   $report = if ($row.share_url) { $row.share_url } else { "-" }
   $miss = if ($row.missing_fields.Count) { ($row.missing_fields -join ", ") } else { "-" }
-  $md += "| $($row.profile) | $($row.status) | $build | $app | $model | $bench | $report | $miss |"
+  $md += "| $($row.profile) | $($row.status) | $build | $app | $model | $bench | $($row.doctor) | $($row.runtime) | $($row.passport) | $report | $miss |"
 }
 $md += ""
 $md | Set-Content -LiteralPath $outMd -Encoding UTF8
@@ -4415,7 +4590,7 @@ $progressMd | Set-Content -LiteralPath (Join-Path $PSScriptRoot "FIELD-PROGRESS.
 $nextTitle = if ($next) { $labels[$next] } else { "Les 5 profils sont prets" }
 $centerRows = ($profiles | ForEach-Object {
   $miss = if ($_.missing_fields.Count) { $_.missing_fields -join ", " } else { "-" }
-  "<tr class=""$($_.status)""><td><code>$(Html $_.profile)</code><span>$(Html $labels[$_.profile])</span></td><td><strong>$(Html $_.status)</strong></td><td><code>$(Html $_.build_id)</code><span>$(Html $_.app_version)</span></td><td>$(Html $_.recommended_model)</td><td>$(Html $_.benchmark)</td><td>$(Html $miss)</td></tr>"
+  "<tr class=""$($_.status)""><td><code>$(Html $_.profile)</code><span>$(Html $labels[$_.profile])</span></td><td><strong>$(Html $_.status)</strong></td><td><code>$(Html $_.build_id)</code><span>$(Html $_.app_version)</span></td><td>$(Html $_.recommended_model)</td><td>$(Html $_.benchmark)</td><td>$(Html $_.doctor)</td><td>$(Html $_.runtime)</td><td>$(Html $_.passport)</td><td>$(Html $miss)</td></tr>"
 }) -join ([Environment]::NewLine)
 
 $centerHtml = @"
@@ -4466,6 +4641,7 @@ $centerHtml = @"
       <li>Tester le profil indique : <strong>$(Html $nextTitle)</strong>.</li>
       <li>Dans l'app, cliquer <strong>Analyser ce PC</strong>.</li>
       <li>Obtenir scan, benchmark, PromptForge, dialogue, Arena et rapport.</li>
+      <li>Optionnel : generer l'AI Capability Passport avant l'export.</li>
       <li>Exporter la fiche dans <strong>Details &gt; Test terrain</strong> avec le bon profil manuel.</li>
       <li>Lancer <code>VALIDER-DERNIERE-FICHE.cmd</code>, puis <code>STATUT.cmd</code>.</li>
     </ol>
@@ -4482,7 +4658,7 @@ $centerHtml = @"
   </section>
   <section>
     <h2>Profils</h2>
-    <table><thead><tr><th>Profil</th><th>Statut</th><th>Build</th><th>Modele</th><th>Benchmark</th><th>Manques</th></tr></thead><tbody>
+    <table><thead><tr><th>Profil</th><th>Statut</th><th>Build</th><th>Modele</th><th>Benchmark</th><th>Doctor</th><th>Runtime</th><th>Passport</th><th>Manques</th></tr></thead><tbody>
 $centerRows
     </tbody></table>
   </section>

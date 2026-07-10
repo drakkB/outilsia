@@ -45,7 +45,19 @@ function entry(profile, index) {
       arena_ok: true,
       report_ok: true,
       share_url: `https://outilsia.fr/r/fixture-${profile}`,
-      notes: "Fixture assembler only."
+      notes: "Fixture assembler only.",
+      ...(profile === "rtx_3060_12gb" ? {
+        hardware_doctor: { schema: "outilsia.hardware_doctor.v2", score: 78 },
+        capability_passport_ok: true,
+        capability_passport_schema: "outilsia.ai_capability_passport.v1",
+        capability_passport_digest: "b".repeat(64),
+        runtime_readiness: "ready",
+        runtime_readiness_label: "Exécution hybride observée",
+        benchmark_execution_mode: "auto",
+        benchmark_runtime_processor: "hybrid",
+        benchmark_gpu_offload_percent: 72.5,
+        benchmark_runtime_evidence_source: "ollama_api_ps",
+      } : {}),
     }],
     notes: "single-machine fixture"
   };
@@ -68,6 +80,15 @@ if (payload.machines.map((item) => item.profile).join(",") !== REQUIRED_PROFILES
 }
 if (payload.build_id !== "fixture-build" || payload.app_version !== "0.1.1") {
   throw new Error(`Assembled payload did not keep uniform build metadata: ${payload.build_id}/${payload.app_version}`);
+}
+const enrichedMachine = payload.machines.find((item) => item.profile === "rtx_3060_12gb");
+if (enrichedMachine?.hardware_doctor?.schema !== "outilsia.hardware_doctor.v2" || enrichedMachine.capability_passport_digest !== "b".repeat(64)) {
+  throw new Error("Assembler did not preserve enriched Doctor/Passport evidence");
+}
+if (validation.enriched_evidence.hardware_doctor_v2_profiles.length !== 1
+  || validation.enriched_evidence.ollama_runtime_proof_profiles.length !== 1
+  || validation.enriched_evidence.capability_passport_profiles.length !== 1) {
+  throw new Error(`Unexpected enriched evidence summary: ${JSON.stringify(validation.enriched_evidence)}`);
 }
 
 const missingBuildDir = mkdtempSync(join(tmpdir(), "outilsia-field-entries-missing-build-"));
@@ -113,6 +134,9 @@ if (status.status !== "FIELD_TESTS_READY" || status.profiles_ready.length !== RE
 const html = missionHtml(status);
 if (!html.includes("Mission terrain OutilsIA") || !html.includes("5</strong>")) {
   throw new Error("Mission terrain HTML does not expose ready status");
+}
+if (!html.includes("Doctor") || !html.includes("Passport") || !html.includes("hybrid · 72.5%")) {
+  throw new Error("Mission terrain HTML does not expose optional enriched evidence");
 }
 
 console.log(`field_tests_assembler_ok profiles=${validation.profile_count} status=${status.status} out=${out}`);

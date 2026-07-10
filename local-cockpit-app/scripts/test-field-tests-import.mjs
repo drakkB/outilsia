@@ -32,7 +32,19 @@ const machines = REQUIRED_PROFILES.map((profile, index) => ({
   arena_ok: true,
   report_ok: true,
   share_url: `https://outilsia.fr/r/fixture-${profile}`,
-  notes: "Fixture validator only."
+  notes: "Fixture validator only.",
+  ...(profile === "rtx_4080_4090" ? {
+    hardware_doctor: { schema: "outilsia.hardware_doctor.v2", score: 92 },
+    capability_passport_ok: true,
+    capability_passport_schema: "outilsia.ai_capability_passport.v1",
+    capability_passport_digest: "c".repeat(64),
+    runtime_readiness: "ready",
+    runtime_readiness_label: "Accélération GPU observée",
+    benchmark_execution_mode: "auto",
+    benchmark_runtime_processor: "gpu",
+    benchmark_gpu_offload_percent: 100,
+    benchmark_runtime_evidence_source: "ollama_api_ps",
+  } : {}),
 }));
 
 const payload = {
@@ -49,8 +61,26 @@ const result = validateFieldTests(payload, { verifyShareUrls: false });
 if (result.ok !== true || result.profile_count !== REQUIRED_PROFILES.length) {
   throw new Error(`Unexpected validation result: ${JSON.stringify(result)}`);
 }
+if (result.enriched_evidence.hardware_doctor_v2_profiles.join(",") !== "rtx_4080_4090"
+  || result.enriched_evidence.ollama_runtime_proof_profiles.join(",") !== "rtx_4080_4090"
+  || result.enriched_evidence.capability_passport_profiles.join(",") !== "rtx_4080_4090") {
+  throw new Error(`Unexpected enriched evidence: ${JSON.stringify(result.enriched_evidence)}`);
+}
 
 let failed = false;
+try {
+  validateFieldTests({
+    ...payload,
+    machines: payload.machines.map((machine) => machine.profile === "rtx_4080_4090"
+      ? { ...machine, capability_passport_digest: "invalid" }
+      : machine),
+  }, { verifyShareUrls: false });
+} catch (error) {
+  failed = String(error.message || error).includes("capability_passport_digest");
+}
+if (!failed) throw new Error("field tests payload should reject malformed optional Passport evidence");
+
+failed = false;
 try {
   validateFieldTests({ ...payload, build_id: "" }, { verifyShareUrls: false });
 } catch (error) {

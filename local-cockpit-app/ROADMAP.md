@@ -27,6 +27,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Résumé Passport dans le rapport, MemoryForge, le pont Strategy Arena et le terrain, sans rendre le terrain artificiellement dépendant du passeport.
 - [x] Pages SEO/GEO, FAQ structurées, `llms.txt`, README et monitoring mis à jour.
 - [x] Construire et publier le nouveau build Windows/Linux, puis vérifier les cinq artefacts publics et leurs SHA-256.
+- [x] Enrichir le kit terrain avec Doctor 2.0, preuve d'allocation Ollama et Passport facultatif, sans modifier les huit preuves bloquantes.
 - [ ] Confirmer l'offload réel sur les machines physiques de la campagne terrain.
 
 ## Phase 1 - Preuve terrain fiable
@@ -40,6 +41,8 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - Tester quantification, contexte, couches GPU, threads, batch et runtime.
 - Conserver des profils Rapide, Équilibré et Qualité avec retour arrière.
 - Recommander une configuration reproductible, pas seulement un nom de modèle.
+- Borner chaque campagne par un budget de temps, de disque et de téléchargements accepté par l'utilisateur.
+- Ne jamais remplacer une configuration qui fonctionne sans comparaison mesurée et possibilité de restaurer le profil précédent.
 
 ## Phase 3 - Tests personnels privés
 

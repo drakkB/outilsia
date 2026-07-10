@@ -51,6 +51,8 @@ function assertFile(path, minBytes = 1) {
 
 function toWslPath(path) {
   const value = String(path || "");
+  const wslUnc = value.match(/^\\\\wsl(?:\.localhost|\$)\\[^\\]+\\(.*)$/i);
+  if (wslUnc) return `/${wslUnc[1].replaceAll("\\", "/")}`;
   const match = value.match(/^([a-zA-Z]):[\\/](.*)$/);
   if (!match) return value;
   return `/mnt/${match[1].toLowerCase()}/${match[2].replaceAll("\\", "/")}`;
@@ -183,6 +185,13 @@ const status = readJson(statusPath);
 if (status.schema !== "outilsia.local_cockpit_field_status.v1") fail("unexpected field status schema");
 if (!Array.isArray(status.profiles_required) || status.profiles_required.length !== 5) fail("field status should require 5 profiles");
 if (!readFileSync(statusMarkdownPath, "utf8").includes("| Rapport |")) fail("field status markdown must expose report/share column");
+for (const needle of ["Doctor 2.0 (facultatif)", "Preuve d'allocation Ollama (facultatif)"]) {
+  if (!readFileSync(statusMarkdownPath, "utf8").includes(needle)) fail(`field status markdown missing ${needle}`);
+}
+const statusMarkdown = readFileSync(statusMarkdownPath, "utf8");
+if (!statusMarkdown.includes("Passport généré (facultatif)") && !statusMarkdown.includes("Passport genere (facultatif)")) {
+  fail("field status markdown missing optional Passport summary");
+}
 const fieldTestsReadme = readFileSync(join(kitDir, "FIELD-TESTS-README.md"), "utf8");
 for (const needle of ["FIELD-TESTS.json", "gabarit vide", "preuve reelle", "entries/", "assemble:field-tests", "mélangés", "même build public"]) {
   if (!fieldTestsReadme.includes(needle)) fail(`FIELD-TESTS README missing ${needle}`);
@@ -250,6 +259,9 @@ for (const needle of [
 const strategyBridgeCmd = readFileSync(join(kitDir, "OUVRIR-PONT-STRATEGY-ARENA.cmd"), "utf8");
 if (!strategyBridgeCmd.includes("PONT-STRATEGY-ARENA.html")) fail("Strategy Arena bridge cmd must open PONT-STRATEGY-ARENA.html");
 if (!readFileSync(missionPath, "utf8").includes("<th>Rapport</th>")) fail("mission html must expose report/share column");
+for (const needle of ["<th>Doctor</th>", "<th>Runtime</th>", "<th>Passport</th>"]) {
+  if (!readFileSync(missionPath, "utf8").includes(needle)) fail(`mission html missing enriched evidence column ${needle}`);
+}
 const commandCenter = readFileSync(commandCenterPath, "utf8");
 if (!commandCenter.includes("Centre terrain OutilsIA")) fail("command center html missing title");
 if (!commandCenter.includes("prochain PC physique") && !commandCenter.includes("OUVRIR-CENTRE-TERRAIN.cmd")) fail("command center html must expose next physical PC or command entrypoint");
@@ -285,6 +297,8 @@ for (const needle of [
   "Règle bloquante",
   "VALIDER-DERNIERE-FICHE.cmd",
   "outilsia-field-test-",
+  "Preuves enrichies facultatives",
+  "AI Capability Passport",
 ]) {
   if (!operatorChecklistMd.includes(needle) && !operatorChecklistHtml.includes(needle)) {
     fail(`operator checklist missing ${needle}`);
