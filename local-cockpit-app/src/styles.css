@@ -3166,6 +3166,124 @@ dd {
   gap: 7px;
 }
 
+.recommendation-engine-card {
+  background: rgba(4, 9, 12, 0.48);
+  border: 1px solid rgba(252, 211, 77, 0.24);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.recommendation-engine-card.has-decision {
+  border-color: rgba(134, 239, 172, 0.34);
+}
+
+.recommendation-engine-head {
+  align-items: start;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.recommendation-engine-head strong,
+.recommendation-engine-head p,
+.recommendation-decision strong,
+.recommendation-decision p {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.recommendation-engine-head strong {
+  font-size: 13px;
+}
+
+.recommendation-engine-head p,
+.recommendation-decision p,
+.recommendation-stale {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  margin: 4px 0 0;
+}
+
+.recommendation-engine-head em {
+  background: rgba(252, 211, 77, 0.10);
+  border: 1px solid rgba(252, 211, 77, 0.22);
+  border-radius: 999px;
+  color: var(--warn);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  padding: 4px 7px;
+  white-space: nowrap;
+}
+
+.recommendation-candidates {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.recommendation-candidates > div {
+  background: rgba(255,255,255,.035);
+  border: 1px solid rgba(139, 163, 174, 0.14);
+  border-radius: 7px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.recommendation-candidates strong,
+.recommendation-candidates span,
+.recommendation-candidates small,
+.recommendation-ranking span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.recommendation-candidates strong {
+  font-size: 11px;
+}
+
+.recommendation-candidates span,
+.recommendation-candidates small,
+.recommendation-ranking span {
+  color: var(--muted);
+  display: block;
+  font-size: 10px;
+  line-height: 1.35;
+  margin-top: 3px;
+}
+
+.recommendation-decision {
+  background: rgba(134, 239, 172, 0.07);
+  border: 1px solid rgba(134, 239, 172, 0.22);
+  border-radius: 7px;
+  display: grid;
+  gap: 5px;
+  padding: 9px;
+}
+
+.recommendation-decision > span {
+  color: var(--good);
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.recommendation-decision strong {
+  font-size: 14px;
+}
+
+.recommendation-ranking {
+  display: grid;
+  gap: 3px;
+}
+
+.recommendation-engine-actions {
+  gap: 7px;
+}
+
 .readiness-box {
   display: grid;
   gap: 10px;
@@ -3623,6 +3741,7 @@ dd {
   .release-strip,
   .view-mode-strip,
   .quick-decision-strip,
+  .recommendation-candidates,
   .machine-summary-grid,
   .sticky-action-strip,
   .pdf-field-summary,

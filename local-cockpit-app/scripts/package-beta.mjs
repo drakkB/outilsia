@@ -188,6 +188,7 @@ const release = {
   published_at: publishedAt,
   build_provenance: buildProvenance,
   release_notes: [
+    "Recommendation Engine v2 : choisir Chat, Code, Mémoire, Français, Portable ou Polyvalent, comparer deux candidats avec sept preuves et obtenir une décision « Garder ce modèle » avec vitesse, latence, ressources et limites exportées.",
     "Proof Engine Ollama exact : chargement, préremplissage et génération tokens/s utilisent les métriques natives de l'API, avec repli CLI signalé comme estimation.",
     "Arena objective v1 : chaque modèle reçoit le même micro-test et conserve six preuves vérifiables — JSON, instruction, mémoire, calcul, français et action.",
     "Retest CPU après erreur CUDA : OutilsIA force num_gpu=0 via l'API Ollama pour distinguer un modèle fonctionnel d'un pilote GPU bloqué.",

@@ -11,6 +11,7 @@ const state = {
   contentSignals: null,
   release: null,
   appBuildInfo: null,
+  recommendationRun: null,
   localSnapshots: [],
   installingModels: {},
   optimisticInstalledModels: []
@@ -26,6 +27,7 @@ const HERMES_AGENT_WATCH = {
 
 const BENCHMARK_HISTORY_KEY = "outilsia.localCockpit.benchmarkHistory.v1";
 const ARENA_RUN_KEY = "outilsia.localCockpit.lastArenaRun.v1";
+const RECOMMENDATION_RUN_KEY = "outilsia.localCockpit.recommendationRun.v2";
 const PROMPT_LIBRARY_KEY = "outilsia.localCockpit.promptLibrary.v1";
 const CHAT_HISTORY_KEY = "outilsia.localCockpit.chatHistory.v1";
 const FIELD_TEST_PROFILE_KEY = "outilsia.localCockpit.fieldTestProfile.v1";
@@ -159,6 +161,7 @@ const ARENA_USAGE_PROFILES = {
 };
 
 const ARENA_OBJECTIVE_PROTOCOL = "outilsia.arena.objective.v1";
+const RECOMMENDATION_ENGINE_PROTOCOL = "outilsia.recommendation.v2";
 const ARENA_OBJECTIVE_PROMPT = `Micro-test objectif OutilsIA. Lis toutes les consignes avant de répondre.
 1. Mémorise le code RIVIERE-29.
 2. Calcule (17 * 3) - 9.
@@ -166,6 +169,33 @@ const ARENA_OBJECTIVE_PROMPT = `Micro-test objectif OutilsIA. Lis toutes les con
 4. L'instruction exacte à restituer est BLEU-47.
 5. Donne comme action concrète : "Tester le modèle puis comparer les résultats."
 Réponds uniquement avec un objet JSON sur une ligne, sans Markdown, avec exactement ces clés : instruction, memory, calculation, correction, action.`;
+
+const RECOMMENDATION_USAGE_TASKS = {
+  polyvalent: {
+    label: "Décision polyvalente",
+    prompt: "écris une phrase contenant les verbes tester, comparer et garder"
+  },
+  chat: {
+    label: "Assistant quotidien",
+    prompt: "réponds en une phrase contenant assistant quotidien, modèle léger et benchmark"
+  },
+  code: {
+    label: "Correction de code",
+    prompt: "corrige function add(a,b){return a-b;} avec return a + b, puis indique que add(4,5) vaut 9"
+  },
+  memory: {
+    label: "Mémoire projet",
+    prompt: "rappelle exactement OBSIDIEN-84 et ajoute les mots prochaine action"
+  },
+  french: {
+    label: "Français naturel",
+    prompt: "corrige naturellement : mon ia local repond bien en francais"
+  },
+  portable: {
+    label: "Réponse légère",
+    prompt: "réponds en 14 mots maximum avec les expressions modèle léger et benchmark"
+  }
+};
 
 const $ = (id) => document.getElementById(id);
 
@@ -379,6 +409,7 @@ let operationConsoleLines = [];
 let activeInstallModel = "";
 let operationLive = false;
 let primaryAnalysisBusy = false;
+let recommendationEngineBusy = false;
 let recipeAutoSaveTimer = null;
 const UI_MODE_STORAGE_KEY = "outilsia-local-cockpit-ui-mode";
 const readinessProof = {
@@ -2357,8 +2388,292 @@ function currentUsageProfile() {
   return { key, ...USAGE_PROFILES[key] };
 }
 
+function readRecommendationRun() {
+  if (state.recommendationRun) return state.recommendationRun;
+  try {
+    const raw = localStorage.getItem(RECOMMENDATION_RUN_KEY);
+    state.recommendationRun = raw ? JSON.parse(raw) : null;
+    return state.recommendationRun;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeRecommendationRun(run) {
+  state.recommendationRun = run || null;
+  try {
+    if (run) localStorage.setItem(RECOMMENDATION_RUN_KEY, JSON.stringify(run));
+    else localStorage.removeItem(RECOMMENDATION_RUN_KEY);
+  } catch (_) {
+    // The current result still remains visible for this render cycle.
+  }
+}
+
+function recommendationRunMatchesCurrentMachine(run) {
+  if (!run?.machine || !state.scan) return false;
+  const runKey = String(run.machine.machine_key || "").trim();
+  const scanKey = String(state.scan.machine_key || "").trim();
+  if (runKey && scanKey) return runKey === scanKey;
+  return String(run.machine.gpu_name || "") === String(state.scan.gpu_name || "")
+    && Number(run.machine.vram_gb || 0) === Number(state.scan.vram_gb || 0)
+    && Number(run.machine.ram_gb || 0) === Number(state.scan.ram_gb || 0);
+}
+
+function recommendationCandidateResources(candidate) {
+  const model = candidate?.model || candidate || {};
+  const ref = candidate?.ref || actionableOllamaRef(model) || model?.model || "";
+  const vramRequired = modelRequiredVram(model);
+  const machineVram = Number(state.scan?.vram_gb || 0);
+  const machineRam = Number(state.scan?.ram_gb || 0);
+  const storageFree = Number(state.scan?.storage_free_gb || state.scan?.free_storage_gb || 0);
+  const storageLabel = estimatedModelSizeLabel(ref);
+  let fit = "à confirmer";
+  if (vramRequired && machineVram >= vramRequired) fit = "GPU compatible en Q4 estimé";
+  else if (machineRam >= Math.max(16, vramRequired || 0)) fit = "RAM/offload possible, vitesse à mesurer";
+  else if (isStarterModelRef(ref)) fit = "modèle léger adapté au test";
+  return {
+    storage_label: storageLabel,
+    storage_free_gb: storageFree || null,
+    vram_required_q4_gb: vramRequired || null,
+    machine_vram_gb: machineVram || null,
+    machine_ram_gb: machineRam || null,
+    fit
+  };
+}
+
+function recommendationProfileBonus(model, profileKey) {
+  const text = `${modelTitle(model)} ${actionableOllamaRef(model)} ${model?.use_case || ""}`.toLowerCase();
+  if (profileKey === "chat") return /hermes|mistral|llama/.test(text) ? 36 : 0;
+  if (profileKey === "code") return /coder|code|deepseek|qwen/.test(text) ? 40 : 0;
+  if (profileKey === "memory") return /hermes|mistral/.test(text) ? 42 : 0;
+  if (profileKey === "french") return /mistral|hermes|qwen/.test(text) ? 34 : 0;
+  if (profileKey === "portable") {
+    if (/0\.6b|1b|1\.5b|3b|mini|phi/.test(text)) return 70;
+    if (/7b|8b/.test(text)) return 12;
+    return -20;
+  }
+  return /qwen|gemma|mistral|hermes/.test(text) ? 18 : 0;
+}
+
+function recommendationEngineCandidates(profileKey = readUsageProfileKey(), limit = 2) {
+  if (!state.scan) return [];
+  const compatibility = state.compatibility?.compatibility || state.compatibility || {};
+  const catalog = extractModels(compatibility).filter((model) => actionableOllamaRef(model));
+  const installed = (state.scan.installed_models || []).map((model) => {
+    const ref = modelLabel(model);
+    return {
+      name: ref,
+      ollama: ref,
+      size_gb: model.size_gb || null,
+      reason: "Déjà installé sur cette machine."
+    };
+  });
+  const starter = {
+    name: "Qwen3 test léger",
+    params: "0.6B",
+    ollama: "qwen3:0.6b",
+    reason: "Preuve légère pour vérifier le runtime et la réactivité."
+  };
+  const byRef = new Map();
+  for (const model of [...catalog, ...installed, starter]) {
+    const ref = normalizeOllamaRef(actionableOllamaRef(model));
+    if (!ref) continue;
+    const current = byRef.get(ref);
+    if (!current || (!current.vram_q4 && model.vram_q4)) byRef.set(ref, model);
+  }
+  const availableMemory = effectiveModelMemoryGb(state.scan);
+  const constrained = isConstrainedLegacyMachine();
+  const candidates = [...byRef.values()].filter((model) => {
+    const ref = actionableOllamaRef(model);
+    const text = `${modelTitle(model)} ${ref}`.toLowerCase();
+    const need = modelRequiredVram(model);
+    if (need && availableMemory && need > availableMemory) return false;
+    if (availableMemory < 24 && /\b(32b|70b|72b|109b|123b|235b)\b/.test(text)) return false;
+    if (constrained && isAmbitiousForLegacyModel(model)) return false;
+    return true;
+  });
+  const scored = candidates.map((model) => {
+    const ref = actionableOllamaRef(model);
+    let score = modelRecommendationScore(model) + recommendationProfileBonus(model, profileKey);
+    if (isStarterModelRef(ref)) {
+      score += profileKey === "portable" || constrained ? 55 : -25;
+    }
+    if (hasSuccessfulBenchmarkFor(ref)) score += 20;
+    return { model, ref, score };
+  }).sort((left, right) => right.score - left.score);
+  const selected = [];
+  const add = (item) => {
+    if (!item?.ref || selected.some((entry) => sameOllamaModel(entry.ref, item.ref))) return;
+    selected.push(item);
+  };
+  scored.filter((item) => isOllamaModelInstalled(item.ref)).forEach(add);
+  scored.forEach(add);
+  return selected.slice(0, limit);
+}
+
+function recommendationResourceScore(item) {
+  const resources = item.resource_estimates || {};
+  const vramNeed = Number(resources.vram_required_q4_gb || 0);
+  const machineVram = Number(resources.machine_vram_gb || 0);
+  if (!vramNeed || !machineVram) return 55;
+  if (vramNeed <= machineVram * 0.5) return 100;
+  if (vramNeed <= machineVram * 0.8) return 82;
+  if (vramNeed <= machineVram) return 68;
+  return 38;
+}
+
+function recommendationResultScore(item, profileKey) {
+  if (!item?.success || !item.recommendation_proof) return 0;
+  const profile = USAGE_PROFILES[profileKey] || USAGE_PROFILES.polyvalent;
+  const profileScore = arenaProfileScore(item, profile.arena).score;
+  const proofScore = Number(item.recommendation_proof.score || 0);
+  const usagePassed = item.recommendation_proof.checks?.find((check) => check.key === "usage")?.passed ? 100 : 0;
+  const resourceScore = recommendationResourceScore(item);
+  return clampScore((profileScore * 0.50) + (proofScore * 0.20) + (usagePassed * 0.20) + (resourceScore * 0.10));
+}
+
+function recommendationDecision(run = readRecommendationRun()) {
+  if (!run?.results?.length) return null;
+  const ranked = run.results
+    .filter((item) => item.success)
+    .map((item) => ({ ...item, recommendation_score: recommendationResultScore(item, run.profile) }))
+    .sort((left, right) => right.recommendation_score - left.recommendation_score);
+  const winner = ranked[0] || null;
+  if (!winner) {
+    return {
+      winner: null,
+      ranked,
+      verdict: "Aucun modèle validé",
+      detail: "Vérifie Ollama, le runtime choisi et les modèles installés avant de relancer.",
+      confidence: "insuffisante"
+    };
+  }
+  const proof = winner.recommendation_proof;
+  const failed = proof.checks.filter((check) => !check.passed).map((check) => check.label);
+  const confidence = winner.recommendation_score >= 75 && proof.passed_count >= 6
+    ? "solide"
+    : winner.recommendation_score >= 55
+      ? "à confirmer"
+      : "limitée";
+  const verdict = confidence === "solide"
+    ? `Garder ${winner.model} pour ${proof.profile_label}`
+    : `Meilleur candidat mesuré : ${winner.model}`;
+  const limits = [];
+  if (failed.length) limits.push(`À revoir : ${failed.join(", ")}.`);
+  if (Number(winner.estimated_tokens_per_second || 0) < 5) limits.push("Débit inférieur à 5 tok/s : usage interactif potentiellement lent.");
+  if (!limits.length) limits.push("Décision valable pour ce protocole court et cette machine ; confirmer sur vos tâches longues.");
+  return {
+    winner,
+    ranked,
+    verdict,
+    confidence,
+    detail: `${proof.summary} · ${winner.estimated_tokens_per_second || 0} tok/s · score usage ${winner.recommendation_score}/100.`,
+    limits
+  };
+}
+
+function recommendationReportSnapshot(run = readRecommendationRun()) {
+  if (!recommendationRunMatchesCurrentMachine(run)) return null;
+  const decision = recommendationDecision(run);
+  if (!run || !decision) return null;
+  return {
+    schema: run.schema || "outilsia.recommendation_run.v2",
+    protocol: run.protocol || RECOMMENDATION_ENGINE_PROTOCOL,
+    created_at_ms: Number(run.created_at_ms || 0),
+    profile: run.profile || "polyvalent",
+    profile_label: run.profile_label || USAGE_PROFILES[run.profile]?.label || "Polyvalent",
+    candidate_refs: run.candidate_refs || [],
+    verdict: decision.verdict,
+    confidence: decision.confidence,
+    detail: decision.detail,
+    limits: decision.limits || [],
+    winner: decision.winner ? {
+      model: decision.winner.model,
+      score: decision.winner.recommendation_score,
+      proof_score: Number(decision.winner.recommendation_proof?.score || 0),
+      checks: `${decision.winner.recommendation_proof?.passed_count || 0}/${decision.winner.recommendation_proof?.total_count || 0}`,
+      tokens_per_second: Number(decision.winner.estimated_tokens_per_second || 0),
+      elapsed_ms: Number(decision.winner.elapsed_ms || 0),
+      resources: decision.winner.resource_estimates || null
+    } : null,
+    results: (run.results || []).map((item) => ({
+      model: item.model,
+      success: Boolean(item.success),
+      recommendation_score: recommendationResultScore(item, run.profile),
+      resource_efficiency_score: recommendationResourceScore(item),
+      proof_score: Number(item.recommendation_proof?.score || 0),
+      checks: item.recommendation_proof ? `${item.recommendation_proof.passed_count}/${item.recommendation_proof.total_count}` : null,
+      usage_passed: Boolean(item.recommendation_proof?.checks?.find((check) => check.key === "usage")?.passed),
+      tokens_per_second: Number(item.estimated_tokens_per_second || 0),
+      elapsed_ms: Number(item.elapsed_ms || 0),
+      resources: item.resource_estimates || null,
+      error: item.error || null
+    }))
+  };
+}
+
+function renderRecommendationEngine(profileKey = readUsageProfileKey()) {
+  const profile = USAGE_PROFILES[profileKey] || USAGE_PROFILES.polyvalent;
+  const candidates = recommendationEngineCandidates(profileKey, 2);
+  const run = readRecommendationRun();
+  const currentRun = run?.profile === profileKey && recommendationRunMatchesCurrentMachine(run) ? run : null;
+  const decision = currentRun ? recommendationDecision(currentRun) : null;
+  const missing = candidates.filter((item) => !isOllamaModelInstalled(item.ref));
+  const actionLabel = recommendationEngineBusy
+    ? "Comparaison en cours..."
+    : missing.length
+      ? `Installer ${missing.length} modèle(s) et comparer`
+      : `Comparer ${candidates.length} modèle(s)`;
+  return `
+    <div class="recommendation-engine-card ${decision?.winner ? "has-decision" : ""}">
+      <div class="recommendation-engine-head">
+        <div>
+          <span class="label">Recommendation Engine v2</span>
+          <strong>Meilleur modèle pour ${escapeHtml(profile.label)}</strong>
+          <p>Mêmes preuves communes, plus un test ${escapeHtml(recommendationUsageTask(profileKey).label.toLowerCase())}.</p>
+        </div>
+        <em>${decision ? `confiance ${escapeHtml(decision.confidence)}` : "à mesurer"}</em>
+      </div>
+      <div class="recommendation-candidates">
+        ${candidates.length ? candidates.map((item) => {
+          const resources = recommendationCandidateResources(item);
+          return `
+          <div>
+            <strong>${escapeHtml(item.ref)}</strong>
+            <span>${escapeHtml(isOllamaModelInstalled(item.ref) ? "installé" : `à télécharger · ${estimatedModelSizeLabel(item.ref)}`)}</span>
+            <small>${escapeHtml(resources.vram_required_q4_gb ? `${resources.vram_required_q4_gb} Go VRAM Q4 estimés` : "VRAM à mesurer")} · ${escapeHtml(resources.fit)}</small>
+          </div>
+        `; }).join("") : "<p>Le scan et le catalogue doivent fournir au moins deux modèles actionnables.</p>"}
+      </div>
+      ${decision ? `
+        <div class="recommendation-decision">
+          <span>Décision mesurée</span>
+          <strong>${escapeHtml(decision.verdict)}</strong>
+          <p>${escapeHtml(decision.detail)}</p>
+          <p>${escapeHtml(decision.limits.join(" "))}</p>
+          <div class="recommendation-ranking">
+            ${decision.ranked.map((item, index) => `<span>${index + 1}. ${escapeHtml(item.model)} · ${escapeHtml(item.recommendation_score)}/100 · ${escapeHtml(item.recommendation_proof.passed_count)}/${escapeHtml(item.recommendation_proof.total_count)} preuves · ${escapeHtml(item.estimated_tokens_per_second || 0)} tok/s · ${escapeHtml(item.elapsed_ms || 0)} ms · ${escapeHtml(item.resource_estimates?.storage_label || "stockage à confirmer")}</span>`).join("")}
+          </div>
+        </div>
+      ` : run ? `<p class="recommendation-stale">Dernière décision obtenue pour ${escapeHtml(USAGE_PROFILES[run.profile]?.label || run.profile)} ou une autre machine. Relance pour ce profil matériel.</p>` : ""}
+      <div class="row-actions compact-actions recommendation-engine-actions">
+        <button type="button" data-run-recommendation="${escapeHtml(profileKey)}" ${recommendationEngineBusy || candidates.length < 2 ? "disabled" : ""}>${escapeHtml(actionLabel)}</button>
+        ${decision?.winner ? `<button type="button" data-post-install-chat="${escapeHtml(decision.winner.model)}">Utiliser le gagnant</button>` : ""}
+      </div>
+      <p class="fine-note">Aucun modèle n'est supprimé automatiquement. La décision compare uniquement les candidats testés sur cette machine.</p>
+    </div>
+  `;
+}
+
 function usageProfileModelRef(profileKey = readUsageProfileKey()) {
   const profile = USAGE_PROFILES[profileKey] || USAGE_PROFILES.polyvalent;
+  const recommendationRun = readRecommendationRun();
+  const recommendation = recommendationRun?.profile === profileKey && recommendationRunMatchesCurrentMachine(recommendationRun)
+    ? recommendationDecision(recommendationRun)
+    : null;
+  if (recommendation?.winner?.model && isOllamaModelInstalled(recommendation.winner.model)) {
+    return normalizeOllamaRef(recommendation.winner.model);
+  }
   const arena = arenaWinners(readLastArenaRun()?.results || []);
   const arenaModel = arena?.[profile.arena]?.model;
   if (arenaModel && isOllamaModelInstalled(arenaModel)) return normalizeOllamaRef(arenaModel);
@@ -3761,6 +4076,7 @@ function renderPreparePanel() {
             : ""}
         </div>
       </div>
+      ${renderRecommendationEngine(usage.key)}
     </div>
     <div class="cockpit-focus">
       <div class="cockpit-focus-card ${flow.benchmarkReady ? "ok-step" : ""}">
@@ -3831,6 +4147,7 @@ function readinessReport() {
   const promptForge = currentPromptForgeResult();
   const arenaRun = readLastArenaRun();
   const arena = arenaRun ? arenaWinners(arenaRun.results || []) : null;
+  const recommendationEngine = recommendationReportSnapshot();
   const hardwareDoctor = hardwareDoctorSnapshot(scan);
   const models = extractModels(compatibility).slice(0, 5).map((model) => ({
     title: modelTitle(model),
@@ -3947,6 +4264,7 @@ function readinessReport() {
         checks: item.arena_objective ? `${item.arena_objective.passed_count}/${item.arena_objective.total_count}` : null
       }))
     } : null,
+    recommendation_engine: recommendationEngine,
     models,
     upgrades,
     buying_links: buyingLinks,
@@ -4007,6 +4325,11 @@ function readinessMarkdown(report = readinessReport()) {
     report.promptForge ? `- PromptForge: ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100 (${report.promptForge.model})` : "- PromptForge: non utilisé.",
     report.arena?.compromise ? `- Arena locale: ${report.arena.objective ? "protocole objectif v1" : "ancien protocole estimatif"}, compromis ${report.arena.compromise} (${report.arena.compromise_score}/100), plus rapide ${report.arena.fastest || "n/a"}, assistant ${report.arena.assistant || "n/a"}, code ${report.arena.code || "n/a"}, mémoire ${report.arena.memory || "n/a"}, français ${report.arena.french || "n/a"}, portable ${report.arena.light_laptop || "n/a"}, rappel de contexte ${report.arena.long_context || "n/a"}, qualité ${report.arena.quality || "n/a"}` : "- Arena locale: non lancée.",
     ...(report.arena?.proof_results || []).map((item) => `- Preuve Arena ${item.model}: ${item.checks || "ancien protocole"}${item.score !== null ? `, ${item.score}/100` : ""}`),
+    report.recommendation_engine
+      ? `- Recommendation Engine v2 (${report.recommendation_engine.profile_label}): ${report.recommendation_engine.verdict} · confiance ${report.recommendation_engine.confidence}`
+      : "- Recommendation Engine v2: non lancé.",
+    ...(report.recommendation_engine?.results || []).map((item) => `- Candidat ${item.model}: score ${item.recommendation_score}/100 · preuves ${item.checks || "0/7"} · ${item.tokens_per_second} tok/s · ${item.elapsed_ms} ms · ${item.resources?.vram_required_q4_gb ? `${item.resources.vram_required_q4_gb} Go VRAM Q4 estimés` : "VRAM à confirmer"} · ${item.resources?.storage_label || "stockage à confirmer"}`),
+    ...(report.recommendation_engine?.limits || []).map((item) => `- Limite Recommendation Engine: ${item}`),
     report.recommended_model ? `- Modèle sérieux suivant: ${report.recommended_model.title} - ${report.recommended_model.fit || "à comparer après le modèle test"}` : "",
     "",
     "## Prompt optimisé",
@@ -4076,6 +4399,7 @@ function readinessSummaryText(report = readinessReport()) {
     `Deuxième modèle: ${recommended}`,
     `Prompt: ${prompt}`,
     `Arena: ${readinessArenaLabel(report)}`,
+    `Recommandation mesurée: ${report.recommendation_engine?.winner ? `${report.recommendation_engine.verdict} (${report.recommendation_engine.winner.score}/100, confiance ${report.recommendation_engine.confidence})` : "non lancée"}`,
     `Upgrade utile: ${upgrade}`,
     `Prochaine action: ${report.next[0] || "sauvegarder le rapport"}`
   ];
@@ -4107,6 +4431,7 @@ function premiumReportHtml(report = readinessReport()) {
   const upgrade = report.upgrades[0] || {};
   const upgradeImpact = currentUpgradeImpact();
   const benchmark = report.benchmark || null;
+  const recommendation = report.recommendation_engine || null;
   const models = (report.models || []).slice(0, 5);
   const links = (report.buying_links || []).slice(0, 4);
   const arenaRoles = [
@@ -4148,6 +4473,7 @@ function premiumReportHtml(report = readinessReport()) {
     benchmark ? `Benchmark réel : ${benchmark.model} à ${benchmark.estimated_tokens_per_second ?? "--"} tok/s` : "Benchmark court à lancer",
     report.promptForge ? `PromptForge : ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100` : "PromptForge non utilisé",
     report.arena?.compromise ? `Arena : ${readinessArenaLabel(report)}` : "Arena locale à comparer",
+    recommendation?.winner ? `Recommendation Engine : ${recommendation.verdict} (${recommendation.winner.score}/100)` : "Recommendation Engine v2 à lancer",
     model.ref ? `Modèle suivant : ${model.ref}` : "Modèle suivant à déterminer"
   ];
   const installNow = model.ref || report.test_model || "qwen3:0.6b";
@@ -4212,7 +4538,7 @@ function premiumReportHtml(report = readinessReport()) {
         </div>
         <div>
           <span>Modèle à privilégier</span>
-          <strong>${escapeHtml(model.ref || report.test_model || "à déterminer")}</strong>
+          <strong>${escapeHtml(recommendation?.winner?.model || model.ref || report.test_model || "à déterminer")}</strong>
         </div>
         <div>
           <span>Preuve locale</span>
@@ -4350,6 +4676,13 @@ function premiumReportHtml(report = readinessReport()) {
           <span>Arena locale</span>
           <strong>${escapeHtml(report.arena?.compromise || "À lancer")}</strong>
           <p>${escapeHtml(pdfExcerpt(report.arena?.compromise ? readinessArenaLabel(report) : "Compare les modèles installés pour séparer vitesse, assistant, code, mémoire et compromis.", 300))}</p>
+        </div>
+        <div class="pdf-card pdf-card-wide">
+          <span>Recommendation Engine v2</span>
+          <strong>${escapeHtml(recommendation?.verdict || "Comparaison par usage à lancer")}</strong>
+          <p>${escapeHtml(recommendation?.winner ? `${recommendation.profile_label} · score ${recommendation.winner.score}/100 · confiance ${recommendation.confidence} · ${recommendation.winner.tokens_per_second} tok/s · ${recommendation.winner.elapsed_ms} ms` : "Deux modèles compatibles sont soumis aux mêmes preuves objectives et à un test propre à l'usage choisi.")}</p>
+          <p>${escapeHtml(recommendation?.winner?.resources ? `Ressources estimées : ${recommendation.winner.resources.vram_required_q4_gb || "?"} Go VRAM Q4 · ${recommendation.winner.resources.machine_ram_gb || "?"} Go RAM disponibles · ${recommendation.winner.resources.storage_label || "stockage à confirmer"}.` : "Les besoins VRAM, la RAM disponible et le stockage sont affichés sans inventer une mesure système absente.")}</p>
+          <p>${escapeHtml(recommendation?.limits?.join(" ") || "La décision reste limitée au protocole court et doit être confirmée sur les tâches longues de l'utilisateur.")}</p>
         </div>
         <div class="pdf-card pdf-card-wide">
           <span>Upgrade utile</span>
@@ -4576,6 +4909,8 @@ function memoryBenchmarkCards() {
       `- Tokens: ${item.estimated_tokens || 0}`,
       item.arena_objective ? `- Preuve Arena objective: ${item.arena_objective.passed_count}/${item.arena_objective.total_count} (${item.arena_objective.score}/100)` : "",
       item.arena_objective ? `- Vérifications: ${item.arena_objective.checks.map((check) => `${check.label} ${check.passed ? "OK" : "NON"}`).join(" · ")}` : "",
+      item.recommendation_proof ? `- Recommendation Engine ${item.recommendation_proof.profile_label}: ${item.recommendation_proof.passed_count}/${item.recommendation_proof.total_count} (${item.recommendation_proof.score}/100)` : "",
+      item.resource_estimates ? `- Ressources: ${item.resource_estimates.vram_required_q4_gb || "?"} Go VRAM Q4 estimés · ${item.resource_estimates.machine_ram_gb || "?"} Go RAM disponibles · ${item.resource_estimates.storage_label || "stockage à confirmer"}` : "",
       item.error ? `- Erreur: ${item.error}` : "",
       "",
       "```text",
@@ -4597,6 +4932,20 @@ function memoryBenchmarkCards() {
       `- Compromis: ${winners.compromise ? arenaWinnerLabel(winners.compromise, "compromise") : "aucun"}`
     );
   }
+  const recommendation = recommendationReportSnapshot();
+  if (recommendation) {
+    lines.push(
+      "",
+      "## Décision Recommendation Engine v2",
+      "",
+      `- Profil: ${recommendation.profile_label}`,
+      `- Verdict: ${recommendation.verdict}`,
+      `- Confiance: ${recommendation.confidence}`,
+      recommendation.winner ? `- Modèle à garder: ${recommendation.winner.model} (${recommendation.winner.score}/100, ${recommendation.winner.checks} preuves)` : "- Aucun modèle validé.",
+      ...recommendation.results.map((item) => `- ${item.model}: ${item.recommendation_score}/100 · ${item.checks || "0/7"} · ${item.tokens_per_second} tok/s · ${item.elapsed_ms} ms`),
+      ...recommendation.limits.map((item) => `- Limite: ${item}`)
+    );
+  }
   return lines.join("\n");
 }
 
@@ -4609,6 +4958,8 @@ function memoryDecisionCard(report = readinessReport()) {
     "",
     `- Modèle test: ${report.test_model || "qwen3:0.6b"}`,
     `- Deuxième modèle: ${report.recommended_model?.ref || "non déterminé"}`,
+    `- Recommandation mesurée: ${report.recommendation_engine?.verdict || "non lancée"}`,
+    report.recommendation_engine?.winner ? `- Modèle à garder: ${report.recommendation_engine.winner.model} (${report.recommendation_engine.winner.score}/100, confiance ${report.recommendation_engine.confidence})` : "",
     `- PromptForge: ${report.promptForge ? `${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100` : "non lancé"}`,
     `- Rapport partagé: ${lastShareReportUrl || "non partagé"}`,
     "",
@@ -4811,6 +5162,7 @@ function renderReadinessPanel() {
       <span>${report.promptForge ? `PromptForge : ${escapeHtml(report.promptForge.before_score)} -> ${escapeHtml(report.promptForge.after_score)}/100` : "PromptForge non encore utilisé."}</span>
       <span>${report.recommended_model ? `2e modèle : ${escapeHtml(report.recommended_model.ref)} · ${report.recommended_model.installed ? "installé" : "à installer"}` : "Deuxième modèle recommandé non déterminé."}</span>
       <span>${report.arena?.compromise ? `Arena : rapide ${escapeHtml(report.arena.fastest || "n/a")} · assistant ${escapeHtml(report.arena.assistant || "n/a")} · compromis ${escapeHtml(report.arena.compromise)} (${escapeHtml(report.arena.compromise_score)}/100)` : "Arena locale non encore lancée."}</span>
+      <span>${report.recommendation_engine?.winner ? `Recommandation mesurée : ${escapeHtml(report.recommendation_engine.verdict)} · ${escapeHtml(report.recommendation_engine.winner.score)}/100 · confiance ${escapeHtml(report.recommendation_engine.confidence)}` : "Recommendation Engine v2 non encore lancé."}</span>
       <span>${report.upgrades[0] ? `Upgrade utile : ${escapeHtml(report.upgrades[0].title)}` : "Aucun achat prioritaire pour l'instant."}</span>
       <span>${report.account_ready ? "Compte prêt : rapport partageable disponible après synchronisation." : "Connecte le compte pour sauvegarder et partager ce rapport."}</span>
     </div>
@@ -5629,6 +5981,106 @@ function evaluateArenaObjective(output) {
   };
 }
 
+function recommendationUsageTask(profileKey = readUsageProfileKey()) {
+  return RECOMMENDATION_USAGE_TASKS[profileKey] || RECOMMENDATION_USAGE_TASKS.polyvalent;
+}
+
+function recommendationEnginePrompt(profileKey = readUsageProfileKey()) {
+  const task = recommendationUsageTask(profileKey);
+  return `Micro-test Recommendation Engine v2 OutilsIA. Lis toutes les consignes avant de répondre.
+1. Mémorise le code RIVIERE-29.
+2. Calcule (17 * 3) - 9.
+3. Corrige en français naturel : "la vram accelere inference local".
+4. L'instruction à restituer contient BLEU-47.
+5. Donne comme action concrète : "Tester le modèle puis comparer les résultats."
+6. Pour le champ usage (${task.label}) : ${task.prompt}.
+Réponds uniquement avec un objet JSON sur une ligne, sans Markdown, avec exactement ces clés : instruction, memory, calculation, correction, action, usage.`;
+}
+
+function recommendationUsagePassed(value, profileKey) {
+  const raw = String(value || "");
+  const text = normalizeArenaAnswer(raw);
+  if (profileKey === "chat") {
+    return ["assistant quotidien", "modele leger", "benchmark"].every((needle) => text.includes(needle));
+  }
+  if (profileKey === "code") {
+    return /return\s+a\s*\+\s*b/i.test(raw) && /(^|[^0-9])9([^0-9]|$)/.test(raw);
+  }
+  if (profileKey === "memory") {
+    return text.includes("obsidien-84") && text.includes("prochaine action");
+  }
+  if (profileKey === "french") {
+    return ["ia locale", "repond", "francais"].every((needle) => text.includes(needle));
+  }
+  if (profileKey === "portable") {
+    const words = text.split(/\s+/).filter(Boolean);
+    return words.length <= 14 && text.includes("modele leger") && text.includes("benchmark");
+  }
+  return ["tester", "comparer", "garder"].every((needle) => text.includes(needle));
+}
+
+function evaluateRecommendationProof(output, profileKey = readUsageProfileKey()) {
+  const parsed = parseArenaObjectiveJson(output);
+  const required = ["instruction", "memory", "calculation", "correction", "action", "usage"];
+  const formatPassed = Boolean(parsed)
+    && Object.keys(parsed).length === required.length
+    && required.every((key) => Object.prototype.hasOwnProperty.call(parsed, key))
+    && required.filter((key) => key !== "calculation").every((key) => typeof parsed[key] === "string")
+    && ["number", "string"].includes(typeof parsed.calculation);
+  const basePayload = parsed ? {
+    instruction: parsed.instruction,
+    memory: parsed.memory,
+    calculation: parsed.calculation,
+    correction: parsed.correction,
+    action: parsed.action
+  } : {};
+  const base = evaluateArenaObjective(JSON.stringify(basePayload));
+  const weights = { format: 16, instruction: 13, memory: 14, calculation: 13, french: 12, action: 12 };
+  const checks = base.checks.map((check) => ({
+    ...check,
+    passed: check.key === "format" ? formatPassed : check.passed,
+    weight: weights[check.key]
+  }));
+  checks.push({
+    key: "usage",
+    label: recommendationUsageTask(profileKey).label,
+    passed: Boolean(parsed) && recommendationUsagePassed(parsed.usage, profileKey),
+    weight: 20
+  });
+  const score = checks.reduce((total, check) => total + (check.passed ? check.weight : 0), 0);
+  const passedCount = checks.filter((check) => check.passed).length;
+  return {
+    protocol: RECOMMENDATION_ENGINE_PROTOCOL,
+    profile: profileKey,
+    profile_label: USAGE_PROFILES[profileKey]?.label || USAGE_PROFILES.polyvalent.label,
+    score,
+    passed_count: passedCount,
+    total_count: checks.length,
+    valid_json: formatPassed,
+    checks,
+    summary: `${passedCount}/${checks.length} preuves validées pour ${USAGE_PROFILES[profileKey]?.label || "Polyvalent"}`
+  };
+}
+
+function demoRecommendationOutput(profileKey = "polyvalent") {
+  const usage = {
+    polyvalent: "Tester, comparer et garder le modèle le plus adapté.",
+    chat: "Un assistant quotidien commence par un modèle léger puis un benchmark.",
+    code: "function add(a,b){return a + b;} puis add(4,5) vaut 9",
+    memory: "OBSIDIEN-84 · prochaine action",
+    french: "Mon IA locale répond bien en français.",
+    portable: "Choisir un modèle léger puis lancer un benchmark."
+  }[profileKey] || "Tester, comparer et garder le modèle le plus adapté.";
+  return JSON.stringify({
+    instruction: "BLEU-47",
+    memory: "RIVIERE-29",
+    calculation: 42,
+    correction: "La VRAM accélère l'inférence locale.",
+    action: "Tester le modèle puis comparer les résultats.",
+    usage
+  });
+}
+
 function arenaObjectiveCheckScore(objective, key) {
   return objective?.checks?.find((check) => check.key === key)?.passed ? 100 : 0;
 }
@@ -6234,6 +6686,142 @@ async function runAutomaticArena() {
   setStatus(winner ? `Arena terminée: ${winner.model} gagne` : "Arena terminée sans gagnant", winner ? "ok" : "warn");
 }
 
+async function runRecommendationEngine(profileKey = readUsageProfileKey()) {
+  const profile = USAGE_PROFILES[profileKey] || USAGE_PROFILES.polyvalent;
+  if (!state.scan) {
+    setStatus("Scan requis avant la recommandation mesurée", "warn");
+    return null;
+  }
+  if (!hasUsableOllamaRuntime(state.scan)) {
+    setStatus("Ollama requis avant de comparer les modèles", "warn");
+    return null;
+  }
+  if (recommendationEngineBusy) {
+    setStatus("Recommendation Engine déjà en cours", "warn");
+    return null;
+  }
+  const candidates = recommendationEngineCandidates(profileKey, 2);
+  if (candidates.length < 2) {
+    setStatus("Deux modèles compatibles et actionnables sont requis", "warn");
+    return null;
+  }
+
+  recommendationEngineBusy = true;
+  renderPreparePanel();
+  setStatus(`Recommendation Engine ${profile.label} : préparation...`);
+  resetOperationConsole(`Recommendation Engine v2 · ${profile.label}`);
+  appendOperationLine(`Candidats : ${candidates.map((item) => item.ref).join(", ")}`, "info");
+
+  const results = [];
+  try {
+    for (const candidate of candidates) {
+      if (isOllamaModelInstalled(candidate.ref)) continue;
+      appendOperationLine(`Installation consentie par le bouton : ${candidate.ref}`, "cmd");
+      await installRecommendedModel(candidate.ref);
+      if (!isOllamaModelInstalled(candidate.ref)) {
+        results.push({
+          model: candidate.ref,
+          prompt: recommendationEnginePrompt(profileKey),
+          elapsed_ms: 0,
+          estimated_tokens: 0,
+          estimated_tokens_per_second: 0,
+          success: false,
+          timed_out: false,
+          output_preview: "",
+          error: "Modèle non confirmé après installation.",
+          benchmark_protocol: RECOMMENDATION_ENGINE_PROTOCOL,
+          recommendation_proof: evaluateRecommendationProof("", profileKey),
+          resource_estimates: recommendationCandidateResources(candidate),
+          created_at_ms: Date.now()
+        });
+      }
+    }
+
+    resetOperationConsole(`Comparaison mesurée · ${profile.label}`);
+    const prompt = recommendationEnginePrompt(profileKey);
+    for (const candidate of candidates) {
+      if (results.some((item) => sameOllamaModel(item.model, candidate.ref) && !item.success)) continue;
+      appendOperationLine(`Test ${profile.label} : ${candidate.ref}`, "cmd");
+      try {
+        const result = invoke
+          ? await invoke("benchmark_ollama", {
+              request: {
+                model: candidate.ref,
+                prompt,
+                timeout_seconds: 75,
+                protocol: RECOMMENDATION_ENGINE_PROTOCOL,
+                ...ollamaRuntimePayload(candidate.ref)
+              }
+            })
+          : { ...demoBenchmark(candidate.ref), output_preview: demoRecommendationOutput(profileKey) };
+        const proof = evaluateRecommendationProof(result.output_preview, profileKey);
+        const measured = {
+          ...result,
+          benchmark_protocol: RECOMMENDATION_ENGINE_PROTOCOL,
+          recommendation_proof: proof,
+          arena_objective: proof,
+          resource_estimates: recommendationCandidateResources(candidate)
+        };
+        results.push(measured);
+        saveBenchmarkHistoryEntry(measured);
+        appendOperationLine(`${candidate.ref}: ${proof.summary}, ${measured.estimated_tokens_per_second || 0} tok/s`, measured.success ? "ok" : "erreur");
+      } catch (error) {
+        const failed = {
+          model: candidate.ref,
+          prompt,
+          elapsed_ms: 0,
+          estimated_tokens: 0,
+          estimated_tokens_per_second: 0,
+          success: false,
+          timed_out: false,
+          output_preview: "",
+          error: friendlyOllamaError(error),
+          benchmark_protocol: RECOMMENDATION_ENGINE_PROTOCOL,
+          recommendation_proof: evaluateRecommendationProof("", profileKey),
+          resource_estimates: recommendationCandidateResources(candidate),
+          created_at_ms: Date.now()
+        };
+        results.push(failed);
+        saveBenchmarkHistoryEntry(failed);
+        appendOperationLine(`${candidate.ref}: ${failed.error}`, "erreur");
+      }
+    }
+
+    const run = {
+      id: `recommendation-${Date.now()}`,
+      schema: "outilsia.recommendation_run.v2",
+      protocol: RECOMMENDATION_ENGINE_PROTOCOL,
+      created_at_ms: Date.now(),
+      profile: profileKey,
+      profile_label: profile.label,
+      prompt,
+      candidate_refs: candidates.map((item) => item.ref),
+      machine: {
+        name: state.scan.name || "Machine IA locale",
+        gpu_name: state.scan.gpu_name || "",
+        vram_gb: state.scan.vram_gb || 0,
+        ram_gb: state.scan.ram_gb || 0,
+        machine_key: state.scan.machine_key || ""
+      },
+      results
+    };
+    writeRecommendationRun(run);
+    const decision = recommendationDecision(run);
+    if (decision?.winner) state.benchmark = decision.winner;
+    renderPreparePanel();
+    renderReadinessPanel();
+    renderFieldTestPanel();
+    renderStrategyBridgePanel();
+    finishOperationMonitor(decision?.winner ? "Recommandation mesurée" : "Comparaison sans gagnant");
+    setStatus(decision?.verdict || "Aucun modèle validé", decision?.winner ? "ok" : "warn");
+    return run;
+  } finally {
+    recommendationEngineBusy = false;
+    renderPreparePanel();
+    renderPrimaryAction();
+  }
+}
+
 function clearArenaRun() {
   const ok = window.confirm("Vider le dernier run Arena automatique ?");
   if (!ok) return;
@@ -6246,6 +6834,7 @@ function strategyArenaReadiness() {
   const scan = state.scan || {};
   const arenaRun = readLastArenaRun();
   const winners = arenaRun?.results?.length ? arenaWinners(arenaRun.results) : null;
+  const recommendation = recommendationReportSnapshot();
   const installed = (scan.installed_models || []).map((model) => ({
     name: modelLabel(model),
     size_gb: model.size_gb || null,
@@ -6313,7 +6902,7 @@ function strategyArenaReadiness() {
     runtime_recommended: defaultOllamaRuntime(),
     runtime_label: ollamaRuntimeLabel(scan),
     runtime_command_prefix: ollamaRuntimeCommandLabel(),
-    recommended_model: preferred?.ref || winners?.compromise?.model || winners?.assistant?.model || winners?.fastest?.model || "",
+    recommended_model: recommendation?.winner?.model || preferred?.ref || winners?.compromise?.model || winners?.assistant?.model || winners?.fastest?.model || "",
     local_models_available_via_outilsia: installed.length > 0,
     bridge_summary: "Modèles locaux disponibles via OutilsIA; Strategy Arena consomme le profil et valide par compilation/backtest.",
     handoff_manifest: {
@@ -6327,6 +6916,7 @@ function strategyArenaReadiness() {
         list_candidate_models: true,
         expose_recommended_roles: true,
         expose_benchmark_proof: Boolean(benchmark?.success),
+        expose_usage_recommendation: Boolean(recommendation?.winner),
         expose_runtime_command_prefix: true,
         install_or_delete_models_inside_strategy_arena: false,
         run_backtests_inside_outilsia: false
@@ -6404,6 +6994,16 @@ function strategyArenaReadiness() {
         objective_checks: item.arena_objective ? `${item.arena_objective.passed_count}/${item.arena_objective.total_count}` : null,
         tokens_per_second: item.estimated_tokens_per_second || null
       }))
+    } : null,
+    recommendation_engine: recommendation ? {
+      protocol: recommendation.protocol,
+      profile: recommendation.profile,
+      profile_label: recommendation.profile_label,
+      verdict: recommendation.verdict,
+      confidence: recommendation.confidence,
+      winner: recommendation.winner,
+      candidate_refs: recommendation.candidate_refs,
+      results: recommendation.results
     } : null,
     recommended_roles: {
       fastest: winners?.fastest?.model || "",
@@ -6711,6 +7311,7 @@ function fieldTestMachineEntry() {
     .filter((item) => item?.success && item?.arena_objective)
     .sort((a, b) => Number(b.arena_objective?.score || 0) - Number(a.arena_objective?.score || 0));
   const bestObjectiveArena = objectiveArenaResults[0] || null;
+  const recommendation = report.recommendation_engine || null;
   const upgrade = report.upgrades[0];
   const doctor = report.hardware_doctor || hardwareDoctorSnapshot(scan);
   const os = [scan.os_name, scan.os_version].filter(Boolean).join(" ").trim();
@@ -6774,6 +7375,13 @@ function fieldTestMachineEntry() {
     arena_objective_best_model: bestObjectiveArena?.model || "",
     arena_objective_best_score: Number(bestObjectiveArena?.arena_objective?.score || 0),
     arena_objective_best_checks: bestObjectiveArena ? `${bestObjectiveArena.arena_objective.passed_count}/${bestObjectiveArena.arena_objective.total_count}` : "",
+    recommendation_engine_ok: Boolean(recommendation?.winner),
+    recommendation_engine_protocol: recommendation?.protocol || "",
+    recommendation_engine_profile: recommendation?.profile || "",
+    recommendation_engine_winner: recommendation?.winner?.model || "",
+    recommendation_engine_score: Number(recommendation?.winner?.score || 0),
+    recommendation_engine_confidence: recommendation?.confidence || "",
+    recommendation_engine_checks: recommendation?.winner?.checks || "",
     report_ok: Boolean(state.scan && benchmark?.success && lastShareReportUrl),
     first_30s: fieldTestFirst30sProof({ scan, report, action, profile, benchmark, upgrade }),
     share_url: lastShareReportUrl || "",
@@ -8490,6 +9098,8 @@ function benchmarkHistoryEntry(result) {
     execution_mode: result.execution_mode || "auto",
     benchmark_protocol: result.benchmark_protocol || "",
     arena_objective: result.arena_objective || null,
+    recommendation_proof: result.recommendation_proof || null,
+    resource_estimates: result.resource_estimates || null,
     machine: {
       name: scan.name || "Machine IA locale",
       cpu_name: scan.cpu_name || "",
@@ -9578,6 +10188,11 @@ function installTestHarness() {
     demoCompatibility,
     demoBenchmark,
     evaluateArenaObjective,
+    evaluateRecommendationProof,
+    recommendationEnginePrompt,
+    recommendationDecision,
+    recommendationEngineCandidates,
+    demoRecommendationOutput,
     arenaObjectiveProfileScore,
     strategyArenaReadiness,
     setViewMode,
@@ -9586,6 +10201,7 @@ function installTestHarness() {
     ollamaRuntimeCommandLabel,
     installedOllamaRuntimeFor,
     applyDemoState() {
+      writeRecommendationRun(null);
       const scan = demoScan();
       renderScan(scan);
       renderCompatibility(demoCompatibility());
@@ -9682,6 +10298,89 @@ function installTestHarness() {
         arena: els.arenaBox?.textContent || "",
         memory: state.markdown,
         bridge: strategyArenaReadiness()
+      };
+    },
+    applyRecommendationEngineState(profileKey = "code") {
+      this.applyDemoState();
+      localStorage.setItem(USAGE_PROFILE_KEY, profileKey);
+      const qwenOutput = demoRecommendationOutput(profileKey);
+      const hermesOutput = JSON.stringify({
+        instruction: "BLEU-47",
+        memory: "RIVIERE-29",
+        calculation: 42,
+        correction: "La VRAM accélère l'inférence locale.",
+        action: "Tester le modèle puis comparer les résultats.",
+        usage: profileKey === "code" ? "function add(a,b){return a - b;} puis add(4,5) vaut 8" : "réponse partielle"
+      });
+      const candidateResources = {
+        storage_label: "4-6 Go",
+        storage_free_gb: 420,
+        vram_required_q4_gb: 5,
+        machine_vram_gb: Number(state.scan?.vram_gb || 0),
+        machine_ram_gb: Number(state.scan?.ram_gb || 0),
+        fit: "GPU compatible en Q4 estimé"
+      };
+      const qwen = {
+        ...demoBenchmark("qwen3:latest"),
+        output_preview: qwenOutput,
+        estimated_tokens_per_second: 37.5,
+        elapsed_ms: 1880,
+        benchmark_protocol: RECOMMENDATION_ENGINE_PROTOCOL,
+        recommendation_proof: evaluateRecommendationProof(qwenOutput, profileKey),
+        resource_estimates: candidateResources
+      };
+      qwen.arena_objective = qwen.recommendation_proof;
+      const hermes = {
+        ...demoBenchmark("hermes3:8b"),
+        output_preview: hermesOutput,
+        estimated_tokens_per_second: 28.4,
+        elapsed_ms: 2500,
+        benchmark_protocol: RECOMMENDATION_ENGINE_PROTOCOL,
+        recommendation_proof: evaluateRecommendationProof(hermesOutput, profileKey),
+        resource_estimates: candidateResources
+      };
+      hermes.arena_objective = hermes.recommendation_proof;
+      const run = {
+        id: "recommendation-test-harness",
+        schema: "outilsia.recommendation_run.v2",
+        protocol: RECOMMENDATION_ENGINE_PROTOCOL,
+        created_at_ms: Date.now(),
+        profile: profileKey,
+        profile_label: USAGE_PROFILES[profileKey]?.label || "Polyvalent",
+        prompt: recommendationEnginePrompt(profileKey),
+        candidate_refs: [qwen.model, hermes.model],
+        machine: {
+          name: state.scan?.name || "Machine demo",
+          gpu_name: state.scan?.gpu_name || "",
+          vram_gb: state.scan?.vram_gb || 0,
+          ram_gb: state.scan?.ram_gb || 0,
+          machine_key: state.scan?.machine_key || ""
+        },
+        results: [qwen, hermes]
+      };
+      writeBenchmarkHistory([qwen, hermes]);
+      writeRecommendationRun(run);
+      state.benchmark = qwen;
+      renderPreparePanel();
+      renderReadinessPanel();
+      renderStrategyBridgePanel();
+      renderFieldTestPanel();
+      state.markdown = cockpitMemoryMarkdown();
+      const report = readinessReport();
+      const currentScan = state.scan;
+      state.scan = { ...currentScan, machine_key: "different-machine" };
+      const staleRecommendation = recommendationReportSnapshot();
+      state.scan = currentScan;
+      return {
+        prepare: els.prepareBox?.textContent || "",
+        readiness: els.readinessBox?.textContent || "",
+        report,
+        markdown: state.markdown,
+        pdf: premiumReportHtml(report),
+        bridge: strategyArenaReadiness(),
+        field: fieldTestMachineEntry(),
+        decision: recommendationDecision(run),
+        staleRecommendation
       };
     },
     wslRuntimeInfo,
@@ -10191,6 +10890,12 @@ document.addEventListener("click", async (event) => {
   const usagePackTarget = usagePackButton?.getAttribute?.("data-usage-pack");
   if (usagePackTarget) {
     useUsageProfilePack(usagePackTarget);
+    return;
+  }
+  const recommendationButton = event.target?.closest?.("[data-run-recommendation]");
+  const recommendationProfile = recommendationButton?.getAttribute?.("data-run-recommendation");
+  if (recommendationProfile && USAGE_PROFILES[recommendationProfile]) {
+    await runRecommendationEngine(recommendationProfile);
     return;
   }
   const oldPortablePresetButton = event.target?.closest?.("[data-old-portable-preset]");

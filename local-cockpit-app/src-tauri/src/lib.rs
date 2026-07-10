@@ -1137,14 +1137,20 @@ fn open_obsidian_vault(app: AppHandle, path: String) -> Result<(), String> {
 #[tauri::command]
 async fn benchmark_ollama(request: BenchmarkRequest) -> Result<BenchmarkResult, String> {
     let model = validate_ollama_model_ref(&request.model)?;
-    let objective_arena = matches!(
+    let structured_benchmark = matches!(
         request.protocol.as_deref(),
-        Some("arena_objective_v1") | Some("outilsia.arena.objective.v1")
+        Some("arena_objective_v1")
+            | Some("outilsia.arena.objective.v1")
+            | Some("outilsia.recommendation.v2")
     );
-    let prompt = prepare_benchmark_prompt(request.prompt, objective_arena);
+    let prompt = prepare_benchmark_prompt(request.prompt, structured_benchmark);
     let timeout = Duration::from_secs(request.timeout_seconds.unwrap_or(45).clamp(5, 180));
     let runtime = normalize_ollama_runtime(request.runtime.as_deref());
-    let num_predict_override = objective_arena.then_some(192);
+    let num_predict_override = match request.protocol.as_deref() {
+        Some("outilsia.recommendation.v2") => Some(224),
+        _ if structured_benchmark => Some(192),
+        _ => None,
+    };
     if request.force_cpu.unwrap_or(false) {
         return run_ollama_api_prompt(
             model,
@@ -4687,6 +4693,14 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
                 .pointer("/options/num_predict")
                 .and_then(Value::as_i64),
             Some(192)
+        );
+        let recommendation_payload =
+            ollama_chat_payload("qwen3:0.6b", prompt, false, true, Some(224));
+        assert_eq!(
+            recommendation_payload
+                .pointer("/options/num_predict")
+                .and_then(Value::as_i64),
+            Some(224)
         );
     }
 

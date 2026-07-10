@@ -87,7 +87,12 @@ const requiredFeatureText = [
   ["js objective arena evaluator", js, "evaluateArenaObjective"],
   ["js objective arena evidence", js, "preuves objectives validées"],
   ["rust objective arena protocol", rust, "protocol: Option<String>"],
-  ["rust objective arena output budget", rust, "objective_arena.then_some(192)"],
+  ["rust objective arena output budget", rust, "Some(\"outilsia.recommendation.v2\") => Some(224)"],
+  ["js recommendation protocol", js, "outilsia.recommendation.v2"],
+  ["js recommendation evaluator", js, "evaluateRecommendationProof"],
+  ["js recommendation decision", js, "Garder ${winner.model}"],
+  ["js recommendation report", js, "recommendation_engine"],
+  ["css recommendation engine", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".recommendation-engine-card"],
 ];
 
 const missingFeature = requiredFeatureText.filter(([, text, needle]) => !text.includes(needle));
