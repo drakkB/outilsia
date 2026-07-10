@@ -10,6 +10,7 @@ const state = {
   desktopManifest: null,
   contentSignals: null,
   release: null,
+  appBuildInfo: null,
   localSnapshots: [],
   installingModels: {},
   optimisticInstalledModels: []
@@ -607,6 +608,16 @@ async function loadDesktopManifest() {
   }
 }
 
+async function loadAppBuildInfo() {
+  try {
+    state.appBuildInfo = invoke
+      ? await invoke("get_app_build_info")
+      : { app_version: "0.1.1", build_id: "browser-demo", source_commit: "" };
+  } catch (_) {
+    state.appBuildInfo = { app_version: "0.1.1", build_id: "unknown-build", source_commit: "" };
+  }
+}
+
 function topSignalLabels(items = [], limit = 4) {
   if (!Array.isArray(items)) return [];
   return items.slice(0, limit).map((item) => {
@@ -648,13 +659,17 @@ function shortHash(hash) {
 function releaseProof() {
   const manifest = state.desktopManifest || {};
   const release = state.release || {};
+  const launched = state.appBuildInfo || {};
   const file = release.primary_download || {};
   const freshness = release.freshness || null;
   return {
-    app_version: manifest.current_version || release.version || "0.1.1",
+    app_version: launched.app_version || manifest.current_version || release.version || "0.1.1",
     channel: manifest.channel || release.channel || "beta",
     release_label: release.label || release.version || "",
-    build_id: release.build_id || "",
+    build_id: launched.build_id || "unknown-build",
+    source_commit: launched.source_commit || "",
+    public_build_id: release.build_id || "",
+    build_matches_public: Boolean(launched.build_id && release.build_id && launched.build_id === release.build_id),
     published_at: release.published_at || "",
     file_name: file.name || "",
     original_name: file.original_name || "",
@@ -681,8 +696,11 @@ function betaReportMarkdown() {
     "",
     `- Date locale: ${new Date().toISOString()}`,
     `- App lancée: ${proof.app_version} (${proof.channel})`,
+    `- Build lancé: ${proof.build_id || "non chargé"}`,
+    `- Commit source: ${proof.source_commit || "non embarqué"}`,
     `- Release publique: ${proof.release_label || "non chargée"}`,
-    `- Build ID public: ${proof.build_id || "non chargé"}`,
+    `- Build ID public: ${proof.public_build_id || "non chargé"}`,
+    `- Build lancé = public: ${proof.build_matches_public ? "oui" : "non"}`,
     `- Date release: ${proof.published_at || "non chargée"}`,
     `- Installateur public: ${proof.file_name || "non chargé"}`,
     `- Original Tauri: ${proof.original_name || "non chargé"}`,
@@ -767,6 +785,7 @@ function renderReleaseFallback(manifest = state.desktopManifest || demoDesktopMa
 
 function renderReleaseMetadata(release) {
   const manifest = state.desktopManifest || demoDesktopManifest();
+  const launchedBuild = String(state.appBuildInfo?.build_id || "");
   const file = release?.primary_download;
   if (!release?.ok || !file?.url) {
     renderReleaseFallback(manifest);
@@ -777,9 +796,16 @@ function renderReleaseMetadata(release) {
   }
   const url = absoluteOutisiaUrl(file.url);
   const size = formatBytes(file.size_bytes);
+  const buildMismatch = Boolean(
+    launchedBuild
+    && !["local-dev", "browser-demo", "unknown-build"].includes(launchedBuild)
+    && release.build_id
+    && launchedBuild !== release.build_id
+  );
   els.releaseTitle.textContent = `${release.product || "OutilsIA Local Cockpit"} ${release.label || release.version || "beta"}`;
   els.releaseText.textContent = [
-    "Bêta prête",
+    buildMismatch ? "Mise à jour disponible" : "Bêta prête",
+    launchedBuild ? `lancée ${launchedBuild}` : null,
     release.build_id ? `build ${release.build_id}` : null,
     file.platform || "desktop",
     size || null,
@@ -3946,8 +3972,11 @@ function readinessMarkdown(report = readinessReport()) {
     "## Build et release",
     "",
     `- App: ${report.release.app_version} (${report.release.channel})`,
+    `- Build réellement lancé: ${report.release.build_id || "non chargé"}`,
+    `- Commit source: ${report.release.source_commit || "non embarqué"}`,
     `- Release publique: ${report.release.release_label || "non chargée"}`,
-    `- Build ID: ${report.release.build_id || "non chargé"}`,
+    `- Build public: ${report.release.public_build_id || "non chargé"}`,
+    `- Build lancé = public: ${report.release.build_matches_public ? "oui" : "non"}`,
     `- Installateur: ${report.release.file_name || "non chargé"}`,
     `- SHA256: ${report.release.sha256 || "non chargé"}`,
     `- Date release: ${report.release.published_at || "non chargée"}`,
@@ -3955,7 +3984,7 @@ function readinessMarkdown(report = readinessReport()) {
     "## Preuve locale",
     "",
     report.benchmark
-      ? `- Benchmark: ${report.benchmark.model} - ${report.benchmark.estimated_tokens_per_second} tok/s - ${report.benchmark.elapsed_ms} ms - ${benchmarkExecutionLabel(report.benchmark)} - succès ${report.benchmark.success ? "oui" : "non"}`
+      ? `- Benchmark: ${report.benchmark.model} - ${report.benchmark.estimated_tokens_per_second} tok/s - ${report.benchmark.elapsed_ms} ms - ${benchmarkMeasurementLabel(report.benchmark)} - ${benchmarkExecutionLabel(report.benchmark)} - succès ${report.benchmark.success ? "oui" : "non"}`
       : "- Aucun benchmark lancé.",
     report.benchmark?.output_preview ? `- Réponse: ${report.benchmark.output_preview}` : "",
     `- Dialogue local: ${report.chat_ready ? "réponse reçue" : "non validé"}`,
@@ -4523,9 +4552,10 @@ function memoryBenchmarkCards() {
       "",
       `- Date: ${new Date(Number(item.created_at_ms || Date.now())).toISOString()}`,
       `- Succès: ${item.success ? "oui" : "non"}`,
-      `- Vitesse: ${item.estimated_tokens_per_second || 0} tok/s`,
+      `- ${benchmarkSpeedLabel(item)}: ${item.estimated_tokens_per_second || 0} tok/s`,
+      `- Méthode: ${benchmarkMeasurementLabel(item)}`,
       `- Latence: ${item.elapsed_ms || 0} ms`,
-      `- Tokens estimés: ${item.estimated_tokens || 0}`,
+      `- Tokens: ${item.estimated_tokens || 0}`,
       item.error ? `- Erreur: ${item.error}` : "",
       "",
       "```text",
@@ -5090,7 +5120,7 @@ function renderFirstTestPanel() {
       <div class="benchmark-card">
         <strong>Test réussi - ${escapeHtml(benchmark.model)}</strong>
         <span>Temps de réponse : ${escapeHtml(benchmark.elapsed_ms ?? "--")} ms</span>
-        <span>Vitesse estimée : ${escapeHtml(benchmark.estimated_tokens_per_second ?? "--")} tok/s</span>
+        <span>${escapeHtml(benchmarkSpeedLabel(benchmark))} : ${escapeHtml(benchmark.estimated_tokens_per_second ?? "--")} tok/s · ${escapeHtml(benchmarkMeasurementLabel(benchmark))}</span>
         <span>${escapeHtml(benchmark.output_preview || "Réponse vide")}</span>
       </div>
     ` : `
@@ -5785,8 +5815,10 @@ function arenaRunMarkdown(run = readLastArenaRun()) {
       `- Profil contexte long: ${item.arena_profiles?.long_context?.score ?? 0}/100`,
       `- Profil qualité: ${item.arena_profiles?.quality?.score ?? 0}/100`,
       `- Temps: ${item.elapsed_ms} ms`,
-      `- Débit estimé: ${item.estimated_tokens_per_second} tok/s`,
-      `- Tokens estimés: ${item.estimated_tokens}`,
+      `- ${benchmarkSpeedLabel(item)}: ${item.estimated_tokens_per_second} tok/s`,
+      `- Méthode: ${benchmarkMeasurementLabel(item)}`,
+      `- Tokens: ${item.estimated_tokens}`,
+      benchmarkMetricDetails(item) ? `- Détails: ${benchmarkMetricDetails(item)}` : "",
       `- Lecture: ${item.arena_meta.reason}`,
       item.error ? `- Erreur: ${item.error}` : "",
       "",
@@ -6547,6 +6579,10 @@ function fieldTestMachineEntry() {
     benchmark_tokens_per_second: Number(benchmark?.estimated_tokens_per_second || 0),
     benchmark_elapsed_ms: Number(benchmark?.elapsed_ms || 0),
     benchmark_execution_mode: benchmark?.execution_mode || "auto",
+    benchmark_measurement_source: benchmark?.measurement_source || "legacy_history",
+    benchmark_load_duration_ms: Number(benchmark?.load_duration_ms || 0),
+    benchmark_prompt_tokens_per_second: Number(benchmark?.prompt_tokens_per_second || 0),
+    benchmark_eval_duration_ms: Number(benchmark?.eval_duration_ms || 0),
     promptforge_ok: Boolean(promptForge?.optimized),
     dialogue_ok: Boolean(state.chatResult?.success && state.chatResult?.output_preview),
     arena_ok: Boolean(successfulArena),
@@ -6870,7 +6906,8 @@ function decisionPackMarkdown(pack = currentDecisionPack()) {
       "## Benchmark session",
       "",
       `- Modele: ${pack.benchmark.model}`,
-      `- Debit estime: ${pack.benchmark.estimated_tokens_per_second} tok/s`,
+      `- ${benchmarkSpeedLabel(pack.benchmark)}: ${pack.benchmark.estimated_tokens_per_second} tok/s`,
+      `- Methode: ${benchmarkMeasurementLabel(pack.benchmark)}`,
       `- Succes: ${pack.benchmark.success ? "oui" : "non"}`
     );
   }
@@ -7115,7 +7152,7 @@ async function runBenchmark(options = {}) {
   resetOperationConsole(`${forceCpu ? "Retest CPU" : "Benchmark Ollama"} lancé : ${model}`);
   setOperationFocus(`${forceCpu ? "Retest CPU sans GPU" : "Benchmark en cours"} : ${model}`, [
     forceCpu ? "Ollama force num_gpu=0 pour isoler le pilote GPU." : "Ollama reçoit un prompt court.",
-    "Le résultat affichera temps de réponse, vitesse estimée et aperçu.",
+    "Le résultat séparera chargement, préremplissage et débit de génération quand l'API Ollama les expose.",
     "Reste sur cet écran : le suivi direct apparaît ici."
   ]);
   appendOperationLine(`Prompt : ${els.benchmarkPromptInput.value.trim() || "prompt court par défaut"}`, "info");
@@ -7164,7 +7201,9 @@ async function runBenchmark(options = {}) {
 
 function appendBenchmarkToConsole(result) {
   appendOperationLine(`${result.success ? "Test réussi" : "Test terminé avec erreur"} : ${result.model}`, result.success ? "ok" : "erreur");
-  appendOperationLine(`Temps: ${result.elapsed_ms ?? 0} ms · Vitesse: ${result.estimated_tokens_per_second ?? 0} tok/s · Mode: ${String(result.execution_mode || "auto") === "cpu" ? "CPU seul" : "automatique"}`, "bench");
+  appendOperationLine(`Temps: ${result.elapsed_ms ?? 0} ms · ${benchmarkSpeedLabel(result)}: ${result.estimated_tokens_per_second ?? 0} tok/s · ${benchmarkMeasurementLabel(result)} · Mode: ${String(result.execution_mode || "auto") === "cpu" ? "CPU seul" : "automatique"}`, "bench");
+  const metricDetails = benchmarkMetricDetails(result);
+  if (metricDetails) appendOperationLine(metricDetails, "bench");
   const output = result.success
     ? result.output_preview || "Sortie vide"
     : friendlyOllamaError(result.error || result.output_preview || "Sortie vide");
@@ -7654,7 +7693,7 @@ function renderLocalChat(result) {
     <div class="benchmark-card chat-card">
       <strong>${escapeHtml(result.success ? "Réponse locale" : "Réponse avec erreur")} - ${escapeHtml(result.model)}</strong>
       <span>Temps : ${escapeHtml(result.elapsed_ms ?? 0)} ms${result.timed_out ? " - interrompu" : ""}</span>
-      <span>Vitesse estimée : ${escapeHtml(result.estimated_tokens_per_second ?? 0)} tok/s</span>
+      <span>${escapeHtml(benchmarkSpeedLabel(result))} : ${escapeHtml(result.estimated_tokens_per_second ?? 0)} tok/s · ${escapeHtml(benchmarkMeasurementLabel(result))}</span>
       <span>${escapeHtml(result.error || result.output_preview || "Réponse vide")}</span>
       ${memoryHint ? `<span class="memory-candidate">${escapeHtml(memoryHint)}</span>` : ""}
     </div>
@@ -7669,7 +7708,8 @@ async function copyLocalChatAnswer() {
   const text = [
     `Modele: ${state.chatResult.model}`,
     `Temps: ${state.chatResult.elapsed_ms} ms`,
-    `Vitesse estimee: ${state.chatResult.estimated_tokens_per_second} tok/s`,
+    `${benchmarkSpeedLabel(state.chatResult)}: ${state.chatResult.estimated_tokens_per_second} tok/s`,
+    `Methode: ${benchmarkMeasurementLabel(state.chatResult)}`,
     "",
     state.chatResult.output_preview
   ].join("\n");
@@ -7718,7 +7758,8 @@ function localChatMemoryMarkdown(result = state.chatResult) {
     `- Usage conseillé: ${info.fit}`,
     `- Limite: ${info.limit}`,
     `- Temps: ${result.elapsed_ms} ms`,
-    `- Débit estimé: ${result.estimated_tokens_per_second} tok/s`,
+    `- ${benchmarkSpeedLabel(result)}: ${result.estimated_tokens_per_second} tok/s`,
+    `- Méthode: ${benchmarkMeasurementLabel(result)}`,
     benchmark?.estimated_tokens_per_second ? `- Meilleur benchmark local connu: ${benchmark.estimated_tokens_per_second} tok/s` : "",
     "",
     result.system_prompt ? "## Prompt système OutilsIA" : "",
@@ -8161,10 +8202,36 @@ function benchmarkExecutionLabel(result) {
   return String(result?.execution_mode || "auto") === "cpu" ? "CPU seulement" : "Automatique GPU/CPU";
 }
 
+function benchmarkMeasurementIsExact(result) {
+  return String(result?.measurement_source || "") === "ollama_api";
+}
+
+function benchmarkMeasurementLabel(result) {
+  const source = String(result?.measurement_source || "legacy_history");
+  if (source === "ollama_api") return "Mesuré par Ollama API";
+  if (source === "ollama_api_estimate") return "API Ollama · débit partiellement estimé";
+  if (source === "ollama_cli_estimate") return "Estimation de secours via Ollama CLI";
+  return "Ancienne mesure locale · méthode non enregistrée";
+}
+
+function benchmarkSpeedLabel(result) {
+  return benchmarkMeasurementIsExact(result) ? "Débit mesuré" : "Débit estimé";
+}
+
+function benchmarkMetricDetails(result) {
+  const details = [];
+  if (Number(result?.load_duration_ms || 0) > 0) details.push(`chargement ${Number(result.load_duration_ms)} ms`);
+  if (Number(result?.prompt_tokens_per_second || 0) > 0) details.push(`préremplissage ${Number(result.prompt_tokens_per_second)} tok/s`);
+  if (Number(result?.eval_duration_ms || 0) > 0) details.push(`génération ${Number(result.eval_duration_ms)} ms`);
+  return details.join(" · ");
+}
+
 function renderBenchmark(result) {
   const model = ollamaActionRef(result.model || "");
   const quality = benchmarkQualityVerdict(result);
   const executionMode = benchmarkExecutionLabel(result);
+  const measurement = benchmarkMeasurementLabel(result);
+  const metricDetails = benchmarkMetricDetails(result);
   const cpuRetry = model && isCudaBenchmarkFailure(result)
     ? `<button type="button" class="cpu-retry-btn" data-retry-benchmark-cpu="${escapeHtml(model)}">Retester sans GPU</button>`
     : "";
@@ -8175,7 +8242,9 @@ function renderBenchmark(result) {
     <div class="benchmark-card">
       <strong>${escapeHtml(result.success ? "Test réussi" : "Test terminé avec erreur")} - ${escapeHtml(result.model)}</strong>
       <span>Temps de réponse : ${escapeHtml(result.elapsed_ms ?? 0)} ms${result.timed_out ? " - test interrompu" : ""}</span>
-      <span>Vitesse estimée : ${escapeHtml(result.estimated_tokens_per_second ?? 0)} tok/s</span>
+      <span>${escapeHtml(benchmarkSpeedLabel(result))} : ${escapeHtml(result.estimated_tokens_per_second ?? 0)} tok/s</span>
+      <span>Méthode : ${escapeHtml(measurement)}</span>
+      ${metricDetails ? `<span>Détails : ${escapeHtml(metricDetails)}</span>` : ""}
       <span>Exécution : ${escapeHtml(executionMode)}</span>
       <span>${escapeHtml(quality)}</span>
       <span>${escapeHtml(output)}</span>
@@ -8217,6 +8286,15 @@ function benchmarkHistoryEntry(result) {
     elapsed_ms: Number(result.elapsed_ms || 0),
     estimated_tokens: Number(result.estimated_tokens || 0),
     estimated_tokens_per_second: Number(result.estimated_tokens_per_second || 0),
+    measurement_source: result.measurement_source || "legacy_history",
+    measurement_note: result.measurement_note || "",
+    total_duration_ms: Number(result.total_duration_ms || 0),
+    load_duration_ms: Number(result.load_duration_ms || 0),
+    prompt_eval_count: Number(result.prompt_eval_count || 0),
+    prompt_eval_duration_ms: Number(result.prompt_eval_duration_ms || 0),
+    prompt_tokens_per_second: Number(result.prompt_tokens_per_second || 0),
+    eval_count: Number(result.eval_count || result.estimated_tokens || 0),
+    eval_duration_ms: Number(result.eval_duration_ms || 0),
     success: Boolean(result.success),
     timed_out: Boolean(result.timed_out),
     output_preview: result.output_preview || "",
@@ -8322,8 +8400,9 @@ function benchmarkHistoryMarkdown(items = readBenchmarkHistory()) {
       `- GPU: ${item.machine?.gpu_name || "non détecté"} (${formatVram(item.machine?.vram_gb)})`,
       `- RAM: ${item.machine?.ram_gb || 0} Go`,
       `- Temps: ${item.elapsed_ms} ms`,
-      `- Débit estimé: ${item.estimated_tokens_per_second} tok/s`,
-      `- Tokens estimés: ${item.estimated_tokens}`,
+      `- ${benchmarkSpeedLabel(item)}: ${item.estimated_tokens_per_second} tok/s`,
+      `- Méthode: ${benchmarkMeasurementLabel(item)}`,
+      `- Tokens: ${item.estimated_tokens}`,
       item.error ? `- Erreur: ${item.error}` : "",
       "",
       "```text",
@@ -8361,8 +8440,10 @@ function appendBenchmarkMarkdown(markdown) {
 - Modele: ${b.model}
 - Prompt: ${b.prompt}
 - Temps: ${b.elapsed_ms} ms
-- Tokens estimes: ${b.estimated_tokens}
-- Debit estime: ${b.estimated_tokens_per_second} tok/s
+- Tokens: ${b.estimated_tokens}
+- ${benchmarkSpeedLabel(b)}: ${b.estimated_tokens_per_second} tok/s
+- Methode: ${benchmarkMeasurementLabel(b)}
+${benchmarkMetricDetails(b) ? `- Details: ${benchmarkMetricDetails(b)}` : ""}
 - Succes: ${b.success ? "oui" : "non"}
 ${b.error ? `- Erreur: ${b.error}` : ""}
 
@@ -9242,6 +9323,14 @@ function demoBenchmark(model) {
     output_chars: 180,
     estimated_tokens: 45,
     estimated_tokens_per_second: 37.5,
+    measurement_source: "ollama_api",
+    total_duration_ms: 1200,
+    load_duration_ms: 120,
+    prompt_eval_count: 30,
+    prompt_eval_duration_ms: 150,
+    prompt_tokens_per_second: 200,
+    eval_count: 45,
+    eval_duration_ms: 1200,
     success: true,
     timed_out: false,
     output_preview: "La VRAM stocke les poids du modèle et le contexte, ce qui évite les allers-retours lents avec la RAM.",
@@ -9258,6 +9347,14 @@ function demoChat(model, prompt) {
     output_chars: 220,
     estimated_tokens: 55,
     estimated_tokens_per_second: 56.1,
+    measurement_source: "ollama_api",
+    total_duration_ms: 980,
+    load_duration_ms: 40,
+    prompt_eval_count: 42,
+    prompt_eval_duration_ms: 120,
+    prompt_tokens_per_second: 350,
+    eval_count: 55,
+    eval_duration_ms: 980,
     success: true,
     timed_out: false,
     output_preview: "Ton PC peut faire tourner des modèles légers à moyens avec Ollama ; commence par qwen3:0.6b pour valider l'installation, puis monte vers un modèle plus lourd selon la RAM et la VRAM détectées.",
@@ -10033,4 +10130,10 @@ renderReadinessPanel();
 renderPrimaryAction();
 installTestHarness();
 refreshAuthState();
-loadDesktopManifest();
+
+async function initializeAppMetadata() {
+  await loadAppBuildInfo();
+  await loadDesktopManifest();
+}
+
+initializeAppMetadata();

@@ -35,6 +35,17 @@ $appRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $appRoot
 $npm = Require-Npm
 
+if ([string]::IsNullOrWhiteSpace($env:OUTILSIA_BUILD_ID)) {
+  $env:OUTILSIA_BUILD_ID = (Get-Date).ToUniversalTime().ToString("yyyyMMddHHmmss")
+}
+if ([string]::IsNullOrWhiteSpace($env:GITHUB_SHA)) {
+  $git = Get-Command "git" -ErrorAction SilentlyContinue
+  if ($git) {
+    $env:GITHUB_SHA = (& $git.Source rev-parse HEAD).Trim()
+  }
+}
+Write-Host "Embedded build id: $env:OUTILSIA_BUILD_ID"
+
 Write-Step "Preflight statique"
 if (-not $SkipInstall) {
   Invoke-Checked $npm @("install")

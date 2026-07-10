@@ -879,7 +879,7 @@ h2 {
 .mode-essential .promptforge-panel.essential-active-panel,
 .mode-essential .readiness-panel.essential-active-panel {
   display: block;
-  grid-column: span 5;
+  grid-column: 1 / -1;
   order: 14;
 }
 
@@ -896,7 +896,7 @@ h2 {
 
 .mode-essential .operation-panel.operation-active {
   display: block;
-  grid-column: span 5;
+  grid-column: 1 / -1;
   order: 15;
 }
 
