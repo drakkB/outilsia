@@ -93,6 +93,13 @@ const requiredFeatureText = [
   ["js recommendation decision", js, "Garder ${winner.model}"],
   ["js recommendation report", js, "recommendation_engine"],
   ["css recommendation engine", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".recommendation-engine-card"],
+  ["html capability passport panel", html, "capabilityPassportBox"],
+  ["html capability passport generate", html, "generateCapabilityPassportBtn"],
+  ["js capability passport schema", js, "outilsia.ai_capability_passport.v1"],
+  ["js capability passport digest", js, "verifyCapabilityPassportIntegrity"],
+  ["js hardware doctor v2", js, "outilsia.hardware_doctor.v2"],
+  ["rust ollama runtime evidence", rust, "runtime_gpu_offload_percent"],
+  ["css capability passport", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".capability-passport-box"],
 ];
 
 const missingFeature = requiredFeatureText.filter(([, text, needle]) => !text.includes(needle));

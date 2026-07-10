@@ -228,6 +228,12 @@ def check_download_page(base_url: str) -> dict[str, object]:
         and "sept preuves" in text
         and "garder ce modèle" in text.lower()
     )
+    doctor_passport_ok = (
+        "Hardware Doctor 2.0" in text
+        and "AI Capability Passport" in text
+        and "ollama_api_ps" in text
+        and "pas une signature d'identité" in text
+    )
     return {
         "status": result.get("status"),
         "title_signal_ok": "Scanner PC IA locale" in text,
@@ -238,6 +244,7 @@ def check_download_page(base_url: str) -> dict[str, object]:
         "proof_engine_ok": proof_engine_ok,
         "objective_arena_ok": objective_arena_ok,
         "recommendation_engine_ok": recommendation_engine_ok,
+        "doctor_passport_ok": doctor_passport_ok,
         "ok": result.get("status") == 200
         and "Scanner PC IA locale" in text
         and all(path in text for path in SCREENSHOT_PATHS)
@@ -245,7 +252,8 @@ def check_download_page(base_url: str) -> dict[str, object]:
         and terrain_caveat_ok
         and proof_engine_ok
         and objective_arena_ok
-        and recommendation_engine_ok,
+        and recommendation_engine_ok
+        and doctor_passport_ok,
     }
 
 
@@ -260,6 +268,12 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         and "7 preuves locales" in text
         and "Garder ce modèle" in text
     )
+    doctor_passport_ok = (
+        "Hardware Doctor 2.0" in text
+        and "AI Capability Passport" in text
+        and "size_vram / size" in text
+        and "pas une signature d'identité" in text
+    )
     return {
         "status": result.get("status"),
         "canonical_ok": canonical == absolute(base_url, "/scanner-ia-local"),
@@ -268,13 +282,15 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         "proof_engine_ok": proof_engine_ok,
         "objective_arena_ok": objective_arena_ok,
         "recommendation_engine_ok": recommendation_engine_ok,
+        "doctor_passport_ok": doctor_passport_ok,
         "ok": result.get("status") == 200
         and canonical == absolute(base_url, "/scanner-ia-local")
         and "/telecharger-scanner-ia-local" in text
         and "validation terrain multi-machines reste en cours" in text
         and proof_engine_ok
         and objective_arena_ok
-        and recommendation_engine_ok,
+        and recommendation_engine_ok
+        and doctor_passport_ok,
     }
 
 
@@ -288,6 +304,12 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
         and "usage-specific proof" in text
         and "which tested model to keep" in text
     )
+    doctor_passport_ok = (
+        "Hardware Doctor 2.0" in text
+        and "AI Capability Passport v1" in text
+        and "size_vram / size" in text
+        and "not an identity signature" in text
+    )
     return {
         "status": result.get("status"),
         "hub_ok": "https://outilsia.fr/scanner-ia-local" in text,
@@ -296,13 +318,15 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
         "proof_engine_ok": proof_engine_ok,
         "objective_arena_ok": objective_arena_ok,
         "recommendation_engine_ok": recommendation_engine_ok,
+        "doctor_passport_ok": doctor_passport_ok,
         "ok": result.get("status") == 200
         and "https://outilsia.fr/scanner-ia-local" in text
         and "https://outilsia.fr/telecharger-scanner-ia-local" in text
         and "5-machine physical field-validation campaign is not complete yet" in text
         and proof_engine_ok
         and objective_arena_ok
-        and recommendation_engine_ok,
+        and recommendation_engine_ok
+        and doctor_passport_ok,
     }
 
 
@@ -400,15 +424,15 @@ def write_markdown(report: dict[str, object], path: Path) -> None:
     lines += ["", "## Téléchargement et screenshots", ""]
     hub = report["scanner_hub"]
     lines.append(
-        f"- `/scanner-ia-local` status={hub['status']} canonical={hub['canonical_ok']} download={hub['download_link_ok']} proof_engine={hub['proof_engine_ok']} objective_arena={hub['objective_arena_ok']} recommendation_engine={hub['recommendation_engine_ok']} terrain_caveat={hub['terrain_caveat_ok']}"
+        f"- `/scanner-ia-local` status={hub['status']} canonical={hub['canonical_ok']} download={hub['download_link_ok']} proof_engine={hub['proof_engine_ok']} objective_arena={hub['objective_arena_ok']} recommendation_engine={hub['recommendation_engine_ok']} doctor_passport={hub['doctor_passport_ok']} terrain_caveat={hub['terrain_caveat_ok']}"
     )
     dp = report["download_page"]
     lines.append(
-        f"- `/telecharger-scanner-ia-local` status={dp['status']} title={dp['title_signal_ok']} screenshots={dp['screenshot_refs_ok']} static_links={dp['static_links_ok']} proof_engine={dp['proof_engine_ok']} objective_arena={dp['objective_arena_ok']} recommendation_engine={dp['recommendation_engine_ok']} terrain_caveat={dp['terrain_caveat_ok']}"
+        f"- `/telecharger-scanner-ia-local` status={dp['status']} title={dp['title_signal_ok']} screenshots={dp['screenshot_refs_ok']} static_links={dp['static_links_ok']} proof_engine={dp['proof_engine_ok']} objective_arena={dp['objective_arena_ok']} recommendation_engine={dp['recommendation_engine_ok']} doctor_passport={dp['doctor_passport_ok']} terrain_caveat={dp['terrain_caveat_ok']}"
     )
     llms = report["llms_txt"]
     lines.append(
-        f"- `/llms.txt` status={llms['status']} hub={llms['hub_ok']} download={llms['download_ok']} proof_engine={llms['proof_engine_ok']} objective_arena={llms['objective_arena_ok']} recommendation_engine={llms['recommendation_engine_ok']} terrain_caveat={llms['terrain_caveat_ok']}"
+        f"- `/llms.txt` status={llms['status']} hub={llms['hub_ok']} download={llms['download_ok']} proof_engine={llms['proof_engine_ok']} objective_arena={llms['objective_arena_ok']} recommendation_engine={llms['recommendation_engine_ok']} doctor_passport={llms['doctor_passport_ok']} terrain_caveat={llms['terrain_caveat_ok']}"
     )
     lines += ["", "## Promesses terrain", ""]
     for item in report["field_claims"]:

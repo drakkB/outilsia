@@ -65,6 +65,9 @@ struct GpuProbe {
     driver_version: Option<String>,
     cuda_version: Option<String>,
     rocm_version: Option<String>,
+    memory_used_mb: Option<u32>,
+    performance_state: Option<String>,
+    rebar_status: Option<String>,
     temperature_c: Option<f64>,
     utilization_percent: Option<f64>,
     power_draw_w: Option<f64>,
@@ -117,6 +120,15 @@ struct OllamaProbe {
     installed: bool,
     version: Option<String>,
     models: Vec<InstalledModel>,
+    source: String,
+}
+
+#[derive(Debug, Clone, Default)]
+struct OllamaRuntimeEvidence {
+    model_size_bytes: u64,
+    vram_bytes: u64,
+    gpu_offload_percent: f64,
+    processor: String,
     source: String,
 }
 
@@ -224,6 +236,16 @@ pub struct BenchmarkResult {
     error: Option<String>,
     #[serde(default)]
     execution_mode: String,
+    #[serde(default)]
+    runtime_model_size_bytes: u64,
+    #[serde(default)]
+    runtime_vram_bytes: u64,
+    #[serde(default)]
+    runtime_gpu_offload_percent: f64,
+    #[serde(default)]
+    runtime_processor: String,
+    #[serde(default)]
+    runtime_evidence_source: String,
     created_at_ms: u128,
 }
 
@@ -1370,8 +1392,98 @@ fn benchmark_result_from_ollama_api(
         output_preview: output.chars().take(700).collect(),
         error: None,
         execution_mode: execution_mode.to_string(),
+        runtime_model_size_bytes: 0,
+        runtime_vram_bytes: 0,
+        runtime_gpu_offload_percent: 0.0,
+        runtime_processor: "unknown".to_string(),
+        runtime_evidence_source: String::new(),
         created_at_ms: now_ms(),
     })
+}
+
+fn parse_ollama_runtime_evidence(
+    payload: &Value,
+    target_model: &str,
+) -> Option<OllamaRuntimeEvidence> {
+    let models = payload.get("models")?.as_array()?;
+    let target = target_model.trim().to_lowercase();
+    let target_base = target.split(':').next().unwrap_or(&target);
+    let selected = models
+        .iter()
+        .find(|item| {
+            let candidate = item
+                .get("name")
+                .or_else(|| item.get("model"))
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim()
+                .to_lowercase();
+            candidate == target
+                || (!target.contains(':')
+                    && candidate.split(':').next().unwrap_or(&candidate) == target_base)
+        })
+        .or_else(|| (models.len() == 1).then(|| &models[0]))?;
+    let model_size_bytes = selected.get("size").and_then(Value::as_u64).unwrap_or(0);
+    let vram_bytes = selected
+        .get("size_vram")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    if model_size_bytes == 0 {
+        return None;
+    }
+    let gpu_offload_percent =
+        (((vram_bytes as f64 / model_size_bytes as f64) * 1000.0).round() / 10.0).clamp(0.0, 100.0);
+    let processor = if vram_bytes == 0 {
+        "cpu"
+    } else if gpu_offload_percent >= 95.0 {
+        "gpu"
+    } else {
+        "hybrid"
+    };
+    Some(OllamaRuntimeEvidence {
+        model_size_bytes,
+        vram_bytes,
+        gpu_offload_percent,
+        processor: processor.to_string(),
+        source: "ollama_api_ps".to_string(),
+    })
+}
+
+fn apply_ollama_runtime_evidence(result: &mut BenchmarkResult, evidence: OllamaRuntimeEvidence) {
+    result.runtime_model_size_bytes = evidence.model_size_bytes;
+    result.runtime_vram_bytes = evidence.vram_bytes;
+    result.runtime_gpu_offload_percent = evidence.gpu_offload_percent;
+    result.runtime_processor = evidence.processor;
+    result.runtime_evidence_source = evidence.source;
+}
+
+async fn fetch_native_ollama_runtime_evidence(
+    client: &reqwest::Client,
+    model: &str,
+) -> Option<OllamaRuntimeEvidence> {
+    let response = client
+        .get("http://127.0.0.1:11434/api/ps")
+        .send()
+        .await
+        .ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    let payload = response.json::<Value>().await.ok()?;
+    parse_ollama_runtime_evidence(&payload, model)
+}
+
+fn fetch_wsl_ollama_runtime_evidence(model: &str) -> Option<OllamaRuntimeEvidence> {
+    let output = run_command(
+        "wsl.exe",
+        &[
+            "sh",
+            "-lc",
+            "curl -fsS --max-time 10 http://127.0.0.1:11434/api/ps",
+        ],
+    )?;
+    let payload = serde_json::from_str::<Value>(&output).ok()?;
+    parse_ollama_runtime_evidence(&payload, model)
 }
 
 async fn run_ollama_api_prompt(
@@ -1419,13 +1531,17 @@ async fn run_ollama_api_prompt(
     if !status.is_success() {
         return Err(format!("API Ollama a répondu {status}: {response_payload}"));
     }
-    benchmark_result_from_ollama_api(
+    let mut result = benchmark_result_from_ollama_api(
         model,
         prompt,
         response_payload,
         started.elapsed(),
         execution_mode,
-    )
+    )?;
+    if let Some(evidence) = fetch_native_ollama_runtime_evidence(&client, &result.model).await {
+        apply_ollama_runtime_evidence(&mut result, evidence);
+    }
+    Ok(result)
 }
 
 fn run_wsl_ollama_api_prompt(
@@ -1460,13 +1576,17 @@ fn run_wsl_ollama_api_prompt(
     }
     let response_payload = serde_json::from_str::<Value>(&stdout)
         .map_err(|err| format!("Réponse API Ollama WSL illisible: {err}"))?;
-    benchmark_result_from_ollama_api(
+    let mut result = benchmark_result_from_ollama_api(
         model,
         prompt,
         response_payload,
         started.elapsed(),
         &execution_mode,
-    )
+    )?;
+    if let Some(evidence) = fetch_wsl_ollama_runtime_evidence(&result.model) {
+        apply_ollama_runtime_evidence(&mut result, evidence);
+    }
+    Ok(result)
 }
 
 fn run_ollama_prompt(
@@ -1572,6 +1692,11 @@ fn run_ollama_prompt(
             Some(stderr.chars().take(500).collect())
         },
         execution_mode: "auto".to_string(),
+        runtime_model_size_bytes: 0,
+        runtime_vram_bytes: 0,
+        runtime_gpu_offload_percent: 0.0,
+        runtime_processor: "unknown".to_string(),
+        runtime_evidence_source: String::new(),
         created_at_ms: now_ms(),
     })
 }
@@ -2377,6 +2502,9 @@ fn detect_gpu() -> GpuProbe {
         driver_version: None,
         cuda_version: None,
         rocm_version: None,
+        memory_used_mb: None,
+        performance_state: None,
+        rebar_status: None,
         temperature_c: None,
         utilization_percent: None,
         power_draw_w: None,
@@ -2392,15 +2520,29 @@ fn detect_nvidia_smi() -> Option<GpuProbe> {
     let output = run_command(
         "nvidia-smi",
         &[
-            "--query-gpu=name,memory.total,driver_version,temperature.gpu,utilization.gpu,power.draw,power.limit,pcie.link.width.current,pcie.link.width.max,pcie.link.gen.current,pcie.link.gen.max",
+            "--query-gpu=name,memory.total,memory.used,driver_version,pstate,temperature.gpu,utilization.gpu,power.draw,power.limit,pcie.link.width.current,pcie.link.width.max,pcie.link.gen.current,pcie.link.gen.max",
             "--format=csv,noheader,nounits",
         ],
     )?;
+    parse_nvidia_smi_csv(
+        &output,
+        detect_nvidia_cuda_version(),
+        detect_nvidia_rebar_status(),
+    )
+}
+
+fn parse_nvidia_smi_csv(
+    output: &str,
+    cuda_version: Option<String>,
+    rebar_status: Option<String>,
+) -> Option<GpuProbe> {
     let line = output.lines().find(|line| !line.trim().is_empty())?;
     let mut parts = line.split(',').map(str::trim);
     let name = parts.next()?.to_string();
     let memory_mb = parts.next().and_then(|value| value.parse::<u32>().ok());
+    let memory_used_mb = parts.next().and_then(parse_optional_u32);
     let driver_version = parts.next().and_then(clean_optional_string);
+    let performance_state = parts.next().and_then(clean_optional_string);
     let temperature_c = parts.next().and_then(parse_optional_f64);
     let utilization_percent = parts.next().and_then(parse_optional_f64);
     let power_draw_w = parts.next().and_then(parse_optional_f64);
@@ -2417,8 +2559,11 @@ fn detect_nvidia_smi() -> Option<GpuProbe> {
         vram_gb: memory_mb.map(|mb| ((mb as f64) / 1024.0).round() as u32),
         source: "nvidia-smi".to_string(),
         driver_version,
-        cuda_version: detect_nvidia_cuda_version(),
+        cuda_version,
         rocm_version: None,
+        memory_used_mb,
+        performance_state,
+        rebar_status,
         temperature_c,
         utilization_percent,
         power_draw_w,
@@ -2460,6 +2605,41 @@ fn detect_nvidia_cuda_version() -> Option<String> {
             .next()
             .and_then(clean_optional_string)
     })
+}
+
+fn detect_nvidia_rebar_status() -> Option<String> {
+    let output = run_command("nvidia-smi", &["-q"])?;
+    parse_nvidia_rebar_status(&output)
+}
+
+fn parse_nvidia_rebar_status(output: &str) -> Option<String> {
+    let lines: Vec<&str> = output.lines().collect();
+    for (index, line) in lines.iter().enumerate() {
+        let lower = line.trim().to_lowercase();
+        if !lower.contains("resizable bar") && !lower.contains("resizeable bar") {
+            continue;
+        }
+        if let Some((_, value)) = line.split_once(':') {
+            let normalized = value.trim().to_lowercase();
+            if normalized.contains("enabled") || normalized == "yes" {
+                return Some("enabled".to_string());
+            }
+            if normalized.contains("disabled") || normalized == "no" {
+                return Some("disabled".to_string());
+            }
+        }
+        for candidate in lines.iter().skip(index + 1).take(6) {
+            let normalized = candidate.trim().to_lowercase();
+            if normalized.contains("enabled") || normalized.ends_with(": yes") {
+                return Some("enabled".to_string());
+            }
+            if normalized.contains("disabled") || normalized.ends_with(": no") {
+                return Some("disabled".to_string());
+            }
+        }
+        return Some("reported_unconfirmed".to_string());
+    }
+    None
 }
 
 fn detect_rocm_version() -> Option<String> {
@@ -2767,15 +2947,24 @@ fn detect_windows_gpu() -> Option<GpuProbe> {
     )?;
     let (name, vram_gb, driver_version) = preferred_windows_gpu_from_output(&output)?;
 
+    let vendor = detect_vendor(&name);
+    let rocm_version = if vendor == "AMD" {
+        detect_rocm_version()
+    } else {
+        None
+    };
     Some(GpuProbe {
-        vendor: Some(detect_vendor(&name)),
+        vendor: Some(vendor),
         category: Some(gpu_category(&name)),
         name: Some(name),
         vram_gb,
         source: "powershell-win32-videocontroller".to_string(),
         driver_version,
         cuda_version: None,
-        rocm_version: None,
+        rocm_version,
+        memory_used_mb: None,
+        performance_state: None,
+        rebar_status: None,
         temperature_c: None,
         utilization_percent: None,
         power_draw_w: None,
@@ -2835,6 +3024,9 @@ fn detect_macos_gpu() -> Option<GpuProbe> {
         driver_version: None,
         cuda_version: None,
         rocm_version: None,
+        memory_used_mb: None,
+        performance_state: None,
+        rebar_status: None,
         temperature_c: None,
         utilization_percent: None,
         power_draw_w: None,
@@ -2877,6 +3069,9 @@ fn detect_linux_lspci() -> Option<GpuProbe> {
         driver_version: None,
         cuda_version: None,
         rocm_version,
+        memory_used_mb: None,
+        performance_state: None,
+        rebar_status: None,
         temperature_c: None,
         utilization_percent: None,
         power_draw_w: None,
@@ -4546,6 +4741,83 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
         assert_eq!(name, "NVIDIA GeForce RTX 4080 SUPER");
         assert_eq!(vram_gb, Some(16));
         assert_eq!(driver_version.as_deref(), Some("32.0.15.6603"));
+    }
+
+    #[test]
+    fn parses_nvidia_hardware_doctor_signals() {
+        let probe = parse_nvidia_smi_csv(
+            "NVIDIA GeForce RTX 4080 SUPER, 16376, 1024, 576.80, P2, 55, 90, 120.5, 320, 16, 16, 4, 4",
+            Some("12.9".to_string()),
+            Some("enabled".to_string()),
+        )
+        .unwrap();
+
+        assert_eq!(probe.memory_used_mb, Some(1024));
+        assert_eq!(probe.performance_state.as_deref(), Some("P2"));
+        assert_eq!(probe.rebar_status.as_deref(), Some("enabled"));
+        assert_eq!(probe.temperature_c, Some(55.0));
+        assert_eq!(probe.utilization_percent, Some(90.0));
+        assert_eq!(probe.power_draw_w, Some(120.5));
+        assert_eq!(probe.pcie_link_width_current, Some(16));
+        assert_eq!(probe.pcie_link_gen_current, Some(4));
+    }
+
+    #[test]
+    fn rebar_status_requires_an_explicit_driver_signal() {
+        assert_eq!(
+            parse_nvidia_rebar_status("Resizable BAR : Enabled"),
+            Some("enabled".to_string())
+        );
+        assert_eq!(
+            parse_nvidia_rebar_status("Resizable BAR\n    Current : Disabled"),
+            Some("disabled".to_string())
+        );
+        assert_eq!(
+            parse_nvidia_rebar_status("Resizable BAR\n    BAR1 Memory Usage"),
+            Some("reported_unconfirmed".to_string())
+        );
+        assert_eq!(parse_nvidia_rebar_status("GPU 00000000:01:00.0"), None);
+    }
+
+    #[test]
+    fn parses_ollama_runtime_gpu_offload_evidence() {
+        let payload = serde_json::json!({
+            "models": [{
+                "name": "qwen3:0.6b",
+                "size": 1_000_000_000_u64,
+                "size_vram": 750_000_000_u64
+            }]
+        });
+        let evidence = parse_ollama_runtime_evidence(&payload, "qwen3:0.6b").unwrap();
+
+        assert_eq!(evidence.model_size_bytes, 1_000_000_000);
+        assert_eq!(evidence.vram_bytes, 750_000_000);
+        assert_eq!(evidence.gpu_offload_percent, 75.0);
+        assert_eq!(evidence.processor, "hybrid");
+        assert_eq!(evidence.source, "ollama_api_ps");
+    }
+
+    #[test]
+    fn ollama_runtime_evidence_distinguishes_cpu_and_gpu() {
+        let cpu_payload = serde_json::json!({
+            "models": [{"name": "qwen3:0.6b", "size": 500_u64, "size_vram": 0_u64}]
+        });
+        let gpu_payload = serde_json::json!({
+            "models": [{"name": "qwen3:0.6b", "size": 500_u64, "size_vram": 500_u64}]
+        });
+
+        assert_eq!(
+            parse_ollama_runtime_evidence(&cpu_payload, "qwen3:0.6b")
+                .unwrap()
+                .processor,
+            "cpu"
+        );
+        assert_eq!(
+            parse_ollama_runtime_evidence(&gpu_payload, "qwen3:0.6b")
+                .unwrap()
+                .processor,
+            "gpu"
+        );
     }
 
     #[test]

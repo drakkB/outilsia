@@ -12,6 +12,7 @@ const state = {
   release: null,
   appBuildInfo: null,
   recommendationRun: null,
+  capabilityPassport: null,
   localSnapshots: [],
   installingModels: {},
   optimisticInstalledModels: []
@@ -291,6 +292,11 @@ const els = {
   copyStrategyBridgeJsonBtn: $("copyStrategyBridgeJsonBtn"),
   downloadStrategyBridgeJsonBtn: $("downloadStrategyBridgeJsonBtn"),
   copyStrategyBridgeMdBtn: $("copyStrategyBridgeMdBtn"),
+  capabilityPassportState: $("capabilityPassportState"),
+  capabilityPassportBox: $("capabilityPassportBox"),
+  generateCapabilityPassportBtn: $("generateCapabilityPassportBtn"),
+  copyCapabilityPassportBtn: $("copyCapabilityPassportBtn"),
+  downloadCapabilityPassportBtn: $("downloadCapabilityPassportBtn"),
   fieldTestState: $("fieldTestState"),
   fieldTestProfileSelect: $("fieldTestProfileSelect"),
   fieldTestBox: $("fieldTestBox"),
@@ -2038,6 +2044,45 @@ function motherboardRamAdvice(scan = {}) {
   };
 }
 
+function doctorRuntimeEvidence(scan = state.scan || {}, model = "qwen3:0.6b") {
+  const automatic = latestBenchmarkFor(model, { executionMode: "auto" });
+  const cpu = latestBenchmarkFor(model, { executionMode: "cpu" });
+  const processor = String(automatic?.runtime_processor || "unknown").toLowerCase();
+  const offloadPercent = Number(automatic?.runtime_gpu_offload_percent || 0);
+  const hasAllocationProof = Boolean(
+    automatic?.success
+    && automatic?.runtime_evidence_source === "ollama_api_ps"
+    && ["gpu", "hybrid", "cpu"].includes(processor)
+  );
+  const speedup = automatic?.success && cpu?.success && Number(cpu.estimated_tokens_per_second || 0) > 0
+    ? Math.round((Number(automatic.estimated_tokens_per_second || 0) / Number(cpu.estimated_tokens_per_second || 1)) * 100) / 100
+    : 0;
+  let status = "untested";
+  if (hasAllocationProof) status = `${processor}-proven`;
+  else if (automatic?.success) status = "automatic-only";
+  else if (cpu?.success) status = "cpu-fallback-only";
+  return {
+    status,
+    model,
+    processor: hasAllocationProof ? processor : "unknown",
+    gpu_offload_percent: hasAllocationProof ? offloadPercent : 0,
+    model_size_bytes: Number(automatic?.runtime_model_size_bytes || 0),
+    vram_bytes: Number(automatic?.runtime_vram_bytes || 0),
+    source: hasAllocationProof ? "ollama_api_ps" : automatic?.measurement_source || "",
+    automatic_tokens_per_second: Number(automatic?.estimated_tokens_per_second || 0),
+    cpu_tokens_per_second: Number(cpu?.estimated_tokens_per_second || 0),
+    automatic_success: Boolean(automatic?.success),
+    cpu_success: Boolean(cpu?.success),
+    speedup_vs_cpu: speedup,
+    measured_at_ms: Number(automatic?.created_at_ms || cpu?.created_at_ms || 0),
+    limitation: hasAllocationProof
+      ? "Allocation observée via Ollama /api/ps après le benchmark."
+      : automatic?.success
+        ? "Benchmark automatique réussi, mais Ollama /api/ps n'a pas fourni de preuve d'allocation CPU/GPU."
+        : "Aucun benchmark automatique réussi : l'accélération n'est pas mesurée."
+  };
+}
+
 function hardwareDoctorAnalysis(scan = {}) {
   const probe = scan?.raw_scan?.gpu_probe || {};
   const memory = scan?.raw_scan?.memory_probe || {};
@@ -2061,6 +2106,8 @@ function hardwareDoctorAnalysis(scan = {}) {
   const wsl = wslRuntimeInfo(scan);
   const vramSuffix = vramConfidenceSuffix(probe, scan);
   const boardAdvice = motherboardRamAdvice(scan);
+  const runtimeEvidence = doctorRuntimeEvidence(scan);
+  const rebarStatus = String(probe.rebar_status || "");
   let score = 35;
   const checks = [];
   const actions = [];
@@ -2144,10 +2191,10 @@ function hardwareDoctorAnalysis(scan = {}) {
   }
 
   if (temp >= 84) {
-    addCheck("Thermique", "warn", `${formatDoctorNumber(temp, " °C")} : risque de throttling pendant un long test.`, -8);
+    addCheck("Thermique au scan", "warn", `${formatDoctorNumber(temp, " °C")} instantanés : risque à confirmer sous charge longue.`, -8);
     addAction("Surveiller température/ventilation avant un gros modèle.");
   } else if (temp > 0) {
-    addCheck("Thermique", "ok", `${formatDoctorNumber(temp, " °C")} : marge correcte au moment du scan.`, 8);
+    addCheck("Thermique au scan", "ok", `${formatDoctorNumber(temp, " °C")} instantanés : aucun signal critique au moment de la mesure.`, 8);
   }
 
   if (powerDraw > 0 && powerLimit > 0) {
@@ -2170,10 +2217,42 @@ function hardwareDoctorAnalysis(scan = {}) {
     }
   }
 
+  if (rebarStatus === "enabled") {
+    addCheck("Resizable BAR", "ok", "Activé selon nvidia-smi.", 3);
+  } else if (rebarStatus === "disabled") {
+    addCheck("Resizable BAR", "warn", "Désactivé selon nvidia-smi ; le gain dépend du GPU et du runtime.", -1);
+    addAction("Vérifier ReBAR dans le BIOS seulement si la carte mère et le GPU le supportent.");
+  } else if (rebarStatus === "reported_unconfirmed") {
+    addCheck("Resizable BAR", "warn", "Section détectée, état non confirmé : aucune conclusion automatique.", 0);
+  }
+
   if (hasOllama) addCheck("Runtime IA", "ok", `${ollamaRuntimeLabel(scan)} prêt.`, 10);
   else {
     addCheck("Runtime IA", "bad", "Ollama non prêt pour lancer un modèle.", -8);
     addAction("Installer Ollama Windows ou préparer Ollama dans WSL.");
+  }
+
+  if (runtimeEvidence.status === "gpu-proven") {
+    addCheck("Offload Ollama", "ok", `${runtimeEvidence.gpu_offload_percent.toFixed(1)} % du modèle observés en VRAM via /api/ps.`, 8);
+  } else if (runtimeEvidence.status === "hybrid-proven") {
+    addCheck("Offload Ollama", "warn", `${runtimeEvidence.gpu_offload_percent.toFixed(1)} % en VRAM : exécution hybride CPU/GPU mesurée.`, 4);
+    addAction("Réduire modèle ou contexte si tu veux augmenter l'offload GPU.");
+  } else if (runtimeEvidence.status === "cpu-proven" && Number(scan.vram_gb || 0) > 0) {
+    addCheck("Offload Ollama", "bad", "0 % en VRAM : Ollama a exécuté le modèle sur CPU malgré le GPU détecté.", -8);
+    addAction("Vérifier pilote et runtime GPU, puis relancer le benchmark automatique.");
+  } else if (runtimeEvidence.status === "automatic-only") {
+    addCheck("Offload Ollama", "warn", "Benchmark réussi, allocation GPU non prouvée par /api/ps.", 1);
+  } else if (hasOllama) {
+    addCheck("Offload Ollama", "warn", "Non mesuré : lancer le benchmark léger pour distinguer CPU, hybride et GPU.", 0);
+  }
+
+  if (runtimeEvidence.speedup_vs_cpu > 0) {
+    addCheck(
+      "Gain automatique/CPU",
+      runtimeEvidence.speedup_vs_cpu >= 1.2 ? "ok" : "warn",
+      `x${runtimeEvidence.speedup_vs_cpu.toFixed(2)} sur le même modèle (${runtimeEvidence.automatic_tokens_per_second.toFixed(1)} vs ${runtimeEvidence.cpu_tokens_per_second.toFixed(1)} tok/s).`,
+      runtimeEvidence.speedup_vs_cpu >= 1.2 ? 4 : 0
+    );
   }
 
   if (wsl.kind === "ready") addCheck("WSL", "ok", "Ollama WSL prêt pour workflows Linux.", 4);
@@ -2202,7 +2281,12 @@ function hardwareDoctorAnalysis(scan = {}) {
       : score >= 50
         ? "Le diagnostic peut fonctionner, mais il faut valider par benchmark court avant d'acheter."
         : "OutilsIA doit privilégier les petits modèles et les recommandations prudentes.";
-  return { score, headline, summary, checks, actions: actions.slice(0, 4), source: probe.source || "scan système" };
+  const confidence = runtimeEvidence.status.endsWith("-proven") && probe.source === "nvidia-smi"
+    ? "measured"
+    : runtimeEvidence.automatic_success || probe.source
+      ? "mixed"
+      : "estimated";
+  return { score, headline, summary, checks, actions: actions.slice(0, 4), source: probe.source || "scan système", confidence, runtimeEvidence };
 }
 
 function hardwareDoctorSnapshot(scan = state.scan || {}) {
@@ -2222,10 +2306,13 @@ function hardwareDoctorSnapshot(scan = state.scan || {}) {
     .replace("single_channel_estimated", "single estimé")
     .replace("unknown", "inconnu");
   return {
+    schema: "outilsia.hardware_doctor.v2",
+    measured_at: new Date().toISOString(),
     score: analysis.score,
     headline: analysis.headline,
     summary: analysis.summary,
     source: analysis.source,
+    confidence: analysis.confidence,
     checks: analysis.checks,
     actions: analysis.actions,
     ram: {
@@ -2246,6 +2333,9 @@ function hardwareDoctorSnapshot(scan = state.scan || {}) {
       driver_version: probe.driver_version || "",
       cuda_version: probe.cuda_version || "",
       rocm_version: probe.rocm_version || "",
+      memory_used_mb: Number(probe.memory_used_mb || 0),
+      performance_state: probe.performance_state || "",
+      rebar_status: probe.rebar_status || "unknown",
       driver_url: driverLink?.url || "",
       driver_label: driverLink?.label || "",
       temperature_c: Number(probe.temperature_c || 0),
@@ -2259,7 +2349,8 @@ function hardwareDoctorSnapshot(scan = state.scan || {}) {
     },
     runtime: {
       ollama: ollamaRuntimeLabel(scan),
-      wsl: wslInfo.title || wslInfo.kind || "non détecté"
+      wsl: wslInfo.title || wslInfo.kind || "non détecté",
+      evidence: analysis.runtimeEvidence
     },
     motherboard: {
       label: motherboardLabel(board),
@@ -2278,7 +2369,7 @@ function hardwareDoctorSnapshot(scan = state.scan || {}) {
 function hardwareDoctorSummaryLines(snapshot = hardwareDoctorSnapshot()) {
   if (!snapshot) return ["Hardware Doctor: scan requis."];
   const lines = [
-    `Hardware Doctor: ${snapshot.score}/100 - ${snapshot.headline}`,
+    `Hardware Doctor 2.0: ${snapshot.score}/100 - ${snapshot.headline} - confiance ${snapshot.confidence}`,
     `RAM: ${snapshot.ram.total_gb || "?"} Go - ${snapshot.ram.module_count || "?"} module(s) - ${snapshot.ram.channel_mode} - ${snapshot.ram.effective_clock_label}`,
     `GPU: ${snapshot.gpu.confidence}${snapshot.gpu.unified_memory ? ` - mémoire unifiée utile estimée ${snapshot.gpu.effective_model_memory_gb || "?"} Go` : ""}${snapshot.gpu.driver_version ? ` - driver ${snapshot.gpu.driver_version}` : ""}${snapshot.gpu.cuda_version ? ` - CUDA ${snapshot.gpu.cuda_version}` : ""}${snapshot.gpu.rocm_version ? ` - ROCm ${snapshot.gpu.rocm_version}` : ""}`,
     snapshot.motherboard?.source && snapshot.motherboard.source !== "not_detected"
@@ -2286,6 +2377,10 @@ function hardwareDoctorSummaryLines(snapshot = hardwareDoctorSnapshot()) {
       : "",
     `Runtime: ${snapshot.runtime.ollama}${snapshot.runtime.wsl ? ` - WSL ${snapshot.runtime.wsl}` : ""}`
   ].filter(Boolean);
+  if (snapshot.runtime?.evidence?.status?.endsWith("-proven")) {
+    lines.push(`Offload Ollama: ${snapshot.runtime.evidence.processor} - ${snapshot.runtime.evidence.gpu_offload_percent.toFixed(1)} % GPU - preuve ${snapshot.runtime.evidence.source}`);
+  }
+  if (snapshot.gpu.rebar_status && snapshot.gpu.rebar_status !== "unknown") lines.push(`ReBAR: ${snapshot.gpu.rebar_status}`);
   if (snapshot.gpu.temperature_c) lines.push(`Thermique: ${formatDoctorNumber(snapshot.gpu.temperature_c, " °C")}`);
   if (snapshot.gpu.pcie_link_width_current || snapshot.gpu.pcie_link_width_max) {
     lines.push(`PCIe: x${snapshot.gpu.pcie_link_width_current || "?"}/x${snapshot.gpu.pcie_link_width_max || "?"}`);
@@ -2309,6 +2404,12 @@ function renderHardwareDoctor(scan) {
   if (probe.driver_version) rows.push(["Driver", probe.driver_version]);
   if (probe.cuda_version) rows.push(["CUDA driver max", probe.cuda_version]);
   if (probe.rocm_version) rows.push(["ROCm", probe.rocm_version]);
+  if (probe.memory_used_mb != null) rows.push(["VRAM utilisée au scan", `${Number(probe.memory_used_mb)} Mo`]);
+  if (probe.performance_state) rows.push(["État GPU", probe.performance_state]);
+  if (probe.rebar_status) rows.push(["Resizable BAR", probe.rebar_status]);
+  if (analysis.runtimeEvidence.status.endsWith("-proven")) {
+    rows.push(["Offload Ollama", `${analysis.runtimeEvidence.processor} · ${analysis.runtimeEvidence.gpu_offload_percent.toFixed(1)} % GPU`]);
+  }
   if (boardAdvice.row) rows.push(["Carte mère", boardAdvice.row]);
   if (probe.temperature_c != null) rows.push(["Température", formatDoctorNumber(probe.temperature_c, " °C")]);
   if (probe.utilization_percent != null) rows.push(["Charge GPU", formatDoctorNumber(probe.utilization_percent, " %")]);
@@ -2338,7 +2439,7 @@ function renderHardwareDoctor(scan) {
   els.hardwareDoctorBox.innerHTML = `
     <div class="hardware-doctor-head">
       <div>
-        <span class="label">Hardware Doctor</span>
+        <span class="label">Hardware Doctor 2.0</span>
         <strong>${escapeHtml(analysis.headline)}</strong>
         <p>${escapeHtml(analysis.summary)}</p>
       </div>
@@ -2348,7 +2449,7 @@ function renderHardwareDoctor(scan) {
       </div>
     </div>
     <div class="doctor-status-row">
-      <span class="doctor-source">${escapeHtml(source)}</span>
+      <span class="doctor-source">${escapeHtml(source)} · confiance ${escapeHtml(analysis.confidence)}</span>
       ${analysis.actions.length ? `<span>${escapeHtml(analysis.actions[0])}</span>` : "<span>Aucune action urgente détectée.</span>"}
     </div>
     <div class="doctor-checks">
@@ -2800,6 +2901,7 @@ function useUsageProfilePack(target = "benchmark") {
 }
 
 function renderScan(scan) {
+  state.capabilityPassport = null;
   state.scan = scan;
   els.sourceText.textContent = scan.source || "local";
   els.machineKey.textContent = scan.machine_key || "machine locale";
@@ -2817,6 +2919,7 @@ function renderScan(scan) {
   if (els.topOsText) els.topOsText.textContent = `${scan.os_name || "OS"} ${scan.os_version || ""}`.trim();
   if (els.topOllamaText) els.topOllamaText.textContent = topRuntimeOllama(scan);
   renderHardwareDoctor(scan);
+  renderCapabilityPassportPanel();
   renderWslRuntime(scan);
   els.checkBtn.disabled = false;
   els.memoryBtn.disabled = false;
@@ -3733,11 +3836,41 @@ function runtimeReadinessState(model = "qwen3:0.6b") {
   }
   const automaticResult = latestBenchmarkFor(model, { executionMode: "auto" });
   if (automaticResult?.success) {
+    const evidence = doctorRuntimeEvidence(state.scan, model);
+    if (evidence.status === "gpu-proven") {
+      return {
+        key: "ready",
+        label: "Accélération GPU observée",
+        detail: `${automaticResult.estimated_tokens_per_second || 0} tok/s · ${evidence.gpu_offload_percent.toFixed(1)} % du modèle en VRAM selon Ollama /api/ps.`,
+        tone: "ok",
+        evidence
+      };
+    }
+    if (evidence.status === "hybrid-proven") {
+      return {
+        key: "ready",
+        label: "Exécution hybride observée",
+        detail: `${automaticResult.estimated_tokens_per_second || 0} tok/s · ${evidence.gpu_offload_percent.toFixed(1)} % du modèle en VRAM, reste sur CPU.`,
+        tone: "ok",
+        evidence
+      };
+    }
+    if (evidence.status === "cpu-proven") {
+      const dedicatedGpuExpected = Number(state.scan?.vram_gb || 0) > 0;
+      return {
+        key: dedicatedGpuExpected ? "cpu-only" : "ready",
+        label: dedicatedGpuExpected ? "Runtime automatique sur CPU" : "Exécution CPU observée",
+        detail: `${automaticResult.estimated_tokens_per_second || 0} tok/s · Ollama /api/ps observe 0 % du modèle en VRAM.`,
+        tone: dedicatedGpuExpected ? "warn" : "ok",
+        evidence
+      };
+    }
     return {
       key: "ready",
-      label: "Accélération validée",
-      detail: `${automaticResult.estimated_tokens_per_second || 0} tok/s en mode automatique.`,
-      tone: "ok"
+      label: "Runtime automatique validé · GPU non prouvé",
+      detail: `${automaticResult.estimated_tokens_per_second || 0} tok/s, sans preuve d'allocation CPU/GPU renvoyée par Ollama /api/ps.`,
+      tone: "warn",
+      evidence
     };
   }
   const cpuSuccess = readBenchmarkHistory().find((item) =>
@@ -3754,7 +3887,8 @@ function runtimeReadinessState(model = "qwen3:0.6b") {
       key: "cpu-only",
       label: "CPU validé · GPU à corriger",
       detail: `${cpuSuccess.estimated_tokens_per_second || 0} tok/s sans GPU. Le matériel fonctionne, le pilote/runtime GPU reste bloqué.`,
-      tone: "warn"
+      tone: "warn",
+      evidence: doctorRuntimeEvidence(state.scan, model)
     };
   }
   if (isCudaBenchmarkFailure(automaticResult)) {
@@ -4202,6 +4336,7 @@ function readinessReport() {
       ollama: runtimeOllama(scan)
     },
     hardware_doctor: hardwareDoctor,
+    capability_passport: capabilityPassportSummary(),
     usage_profile: {
       key: usage.key,
       label: usage.label,
@@ -4283,6 +4418,7 @@ function readinessMarkdown(report = readinessReport()) {
     `- Statut: ${report.status}`,
     `- Potentiel matériel: ${report.score === null ? "non calculé" : `${report.score}/100`}`,
     `- État du runtime: ${report.runtime_readiness?.label || "non vérifié"} - ${report.runtime_readiness?.detail || ""}`,
+    `- AI Capability Passport: ${report.capability_passport ? `SHA-256 ${report.capability_passport.digest}` : "non généré ou à régénérer"}`,
     `- Machine: ${report.machine.name}`,
     `- CPU: ${report.machine.cpu}`,
     `- RAM: ${report.machine.ram}`,
@@ -4400,6 +4536,7 @@ function readinessSummaryText(report = readinessReport()) {
     `Prompt: ${prompt}`,
     `Arena: ${readinessArenaLabel(report)}`,
     `Recommandation mesurée: ${report.recommendation_engine?.winner ? `${report.recommendation_engine.verdict} (${report.recommendation_engine.winner.score}/100, confiance ${report.recommendation_engine.confidence})` : "non lancée"}`,
+    `AI Capability Passport: ${report.capability_passport ? `SHA-256 ${report.capability_passport.digest}` : "non généré"}`,
     `Upgrade utile: ${upgrade}`,
     `Prochaine action: ${report.next[0] || "sauvegarder le rapport"}`
   ];
@@ -4474,6 +4611,7 @@ function premiumReportHtml(report = readinessReport()) {
     report.promptForge ? `PromptForge : ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100` : "PromptForge non utilisé",
     report.arena?.compromise ? `Arena : ${readinessArenaLabel(report)}` : "Arena locale à comparer",
     recommendation?.winner ? `Recommendation Engine : ${recommendation.verdict} (${recommendation.winner.score}/100)` : "Recommendation Engine v2 à lancer",
+    report.capability_passport ? `Capability Passport : SHA-256 ${report.capability_passport.digest}` : "AI Capability Passport à générer dans Détails",
     model.ref ? `Modèle suivant : ${model.ref}` : "Modèle suivant à déterminer"
   ];
   const installNow = model.ref || report.test_model || "qwen3:0.6b";
@@ -5122,6 +5260,7 @@ function cockpitMemoryMarkdown() {
   sections.push(memoryBenchmarkCards());
   sections.push(memoryDecisionCard());
   sections.push(readinessMarkdown());
+  sections.push(capabilityPassportMarkdown());
   const arena = readLastArenaRun();
   if (arena?.results?.length) {
     sections.push(arenaRunMarkdown(arena));
@@ -5163,6 +5302,7 @@ function renderReadinessPanel() {
       <span>${report.recommended_model ? `2e modèle : ${escapeHtml(report.recommended_model.ref)} · ${report.recommended_model.installed ? "installé" : "à installer"}` : "Deuxième modèle recommandé non déterminé."}</span>
       <span>${report.arena?.compromise ? `Arena : rapide ${escapeHtml(report.arena.fastest || "n/a")} · assistant ${escapeHtml(report.arena.assistant || "n/a")} · compromis ${escapeHtml(report.arena.compromise)} (${escapeHtml(report.arena.compromise_score)}/100)` : "Arena locale non encore lancée."}</span>
       <span>${report.recommendation_engine?.winner ? `Recommandation mesurée : ${escapeHtml(report.recommendation_engine.verdict)} · ${escapeHtml(report.recommendation_engine.winner.score)}/100 · confiance ${escapeHtml(report.recommendation_engine.confidence)}` : "Recommendation Engine v2 non encore lancé."}</span>
+      <span>${report.capability_passport ? `Passport : SHA-256 ${escapeHtml(`${report.capability_passport.digest.slice(0, 16)}…`)}` : "AI Capability Passport disponible dans Détails après génération."}</span>
       <span>${report.upgrades[0] ? `Upgrade utile : ${escapeHtml(report.upgrades[0].title)}` : "Aucun achat prioritaire pour l'instant."}</span>
       <span>${report.account_ready ? "Compte prêt : rapport partageable disponible après synchronisation." : "Connecte le compte pour sauvegarder et partager ce rapport."}</span>
     </div>
@@ -5182,6 +5322,7 @@ function renderReadinessPanel() {
   els.topCopyWindowsRecipeBtn.disabled = !state.scan;
   els.topDownloadWindowsRecipeBtn.disabled = !state.scan;
   queueWindowsRecipeAutosave();
+  renderCapabilityPassportPanel();
 }
 
 async function copyReadinessSummary() {
@@ -7005,6 +7146,7 @@ function strategyArenaReadiness() {
       candidate_refs: recommendation.candidate_refs,
       results: recommendation.results
     } : null,
+    capability_passport: capabilityPassportSummary(),
     recommended_roles: {
       fastest: winners?.fastest?.model || "",
       assistant: winners?.assistant?.model || "",
@@ -7074,6 +7216,7 @@ function strategyBridgeMarkdown() {
     `- Import Strategy Arena: ${profile.handoff_manifest?.import_label || "Modèles locaux disponibles via OutilsIA"}`,
     `- Fichier attendu: ${profile.handoff_manifest?.file_name || profile.import_file}`,
     `- Résumé: ${profile.bridge_summary}`,
+    `- AI Capability Passport: ${profile.capability_passport ? `${profile.capability_passport.schema} · SHA-256 ${profile.capability_passport.digest}` : "non généré"}`,
     "",
     "## Modèles installés",
     "",
@@ -7123,6 +7266,302 @@ function strategyBridgeMarkdown() {
     "## Prochaine action",
     "",
     `- ${profile.next_action}`
+  ].join("\n");
+}
+
+function stableCanonicalValue(value) {
+  if (Array.isArray(value)) return value.map(stableCanonicalValue);
+  if (value && typeof value === "object") {
+    return Object.keys(value).sort().reduce((result, key) => {
+      result[key] = stableCanonicalValue(value[key]);
+      return result;
+    }, {});
+  }
+  return value;
+}
+
+function canonicalJson(value) {
+  return JSON.stringify(stableCanonicalValue(value));
+}
+
+async function sha256Hex(value) {
+  if (!globalThis.crypto?.subtle) throw new Error("SHA-256 indisponible dans ce runtime");
+  const bytes = new TextEncoder().encode(typeof value === "string" ? value : canonicalJson(value));
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function capabilityPassportSourceRevision() {
+  const proof = releaseProof();
+  const benchmark = readBenchmarkHistory()[0] || state.benchmark || {};
+  const recommendation = readRecommendationRun() || {};
+  const arena = readLastArenaRun() || {};
+  return [
+    state.scan?.machine_key || "unscanned",
+    proof.app_version || "",
+    proof.build_id || "",
+    benchmark.created_at_ms || 0,
+    benchmark.model || "",
+    recommendation.created_at_ms || recommendation.id || "",
+    arena.created_at_ms || arena.id || "",
+    (state.scan?.installed_models || []).map(modelLabel).sort().join(","),
+    canonicalJson({
+      gpu: state.scan?.raw_scan?.gpu_probe || {},
+      memory: state.scan?.raw_scan?.memory_probe || {},
+      motherboard: state.scan?.raw_scan?.motherboard_probe || {},
+      runtimes: state.scan?.runtimes || {}
+    })
+  ].join("|");
+}
+
+function capabilityPassportIsCurrent(passport = state.capabilityPassport) {
+  return Boolean(
+    passport
+    && passport.schema === "outilsia.ai_capability_passport.v1"
+    && passport.source_revision === capabilityPassportSourceRevision()
+    && passport.binding?.machine_key === (state.scan?.machine_key || "")
+  );
+}
+
+function capabilityPassportSummary(passport = state.capabilityPassport) {
+  if (!capabilityPassportIsCurrent(passport)) return null;
+  return {
+    schema: passport.schema,
+    passport_version: passport.passport_version,
+    generated_at: passport.generated_at,
+    machine_key: passport.binding.machine_key,
+    app_version: passport.binding.app_version,
+    build_id: passport.binding.build_id,
+    doctor_score: passport.hardware_doctor?.score ?? null,
+    runtime_status: passport.runtime_readiness?.key || "untested",
+    digest_algorithm: passport.integrity?.algorithm || "",
+    digest: passport.integrity?.digest || "",
+    identity_signature: false,
+    verified: true
+  };
+}
+
+function capabilityPassportDocument() {
+  if (!state.scan) throw new Error("Scan requis avant création du passeport");
+  const proof = releaseProof();
+  const scan = state.scan;
+  const report = readinessReport();
+  const doctor = hardwareDoctorSnapshot(scan);
+  const bridge = strategyArenaReadiness();
+  const history = readBenchmarkHistory();
+  const successful = history.filter((item) => item?.success).slice(0, 12);
+  const runtimeEvidence = doctorRuntimeEvidence(scan, report.test_model || "qwen3:0.6b");
+  return {
+    schema: "outilsia.ai_capability_passport.v1",
+    passport_version: "1.0.0",
+    generated_at: new Date().toISOString(),
+    source_revision: capabilityPassportSourceRevision(),
+    issuer: {
+      name: "OutilsIA Local Cockpit",
+      url: "https://outilsia.fr/telecharger-scanner-ia-local",
+      role: "local_ai_capability_assessment"
+    },
+    binding: {
+      machine_key: scan.machine_key || "",
+      app_version: proof.app_version || "0.1.1",
+      build_id: proof.build_id || "unknown-build",
+      source_commit: proof.source_commit || "",
+      os: [scan.os_name, scan.os_version].filter(Boolean).join(" ")
+    },
+    machine: {
+      cpu: scan.cpu_name || "non détecté",
+      cpu_cores: Number(scan.cpu_cores || 0),
+      ram_gb: Number(scan.ram_gb || 0),
+      gpu: scan.gpu_name || "non détecté",
+      gpu_vendor: scan.gpu_vendor || "",
+      vram_gb: Number(scan.vram_gb || 0),
+      unified_memory: Boolean(scan.unified_memory),
+      storage_free_gb: Number(scan.storage_free_gb || 0)
+    },
+    hardware_doctor: doctor,
+    runtime_readiness: {
+      ...report.runtime_readiness,
+      evidence: runtimeEvidence
+    },
+    capabilities: {
+      scan_hardware: true,
+      detect_windows_ollama: Boolean(scan.runtimes?.ollama?.installed),
+      detect_wsl: Boolean(scan.runtimes?.wsl?.installed),
+      detect_wsl_ollama: Boolean(scan.runtimes?.ollama_wsl?.installed || scan.runtimes?.wsl?.ollama_ready),
+      manage_ollama_models: hasUsableOllamaRuntime(scan),
+      run_local_benchmark: hasUsableOllamaRuntime(scan),
+      run_local_dialogue: hasUsableOllamaRuntime(scan),
+      gpu_allocation_proven: runtimeEvidence.status === "gpu-proven" || runtimeEvidence.status === "hybrid-proven",
+      hardware_doctor_v2: doctor?.schema === "outilsia.hardware_doctor.v2",
+      recommendation_engine_v2: Boolean(report.recommendation_engine?.winner),
+      local_arena: Boolean(report.arena),
+      strategy_arena_profile_export: true
+    },
+    installed_models: (scan.installed_models || []).map((model) => ({
+      ref: modelLabel(model),
+      size_gb: model.size_gb == null ? null : Number(model.size_gb),
+      runtime: model.source || model.runtime || "ollama"
+    })),
+    benchmark_proofs: successful.map((item) => ({
+      model: item.model,
+      measured_at_ms: Number(item.created_at_ms || 0),
+      execution_mode: item.execution_mode || "auto",
+      measurement_source: item.measurement_source || "legacy_history",
+      tokens_per_second: Number(item.estimated_tokens_per_second || 0),
+      elapsed_ms: Number(item.elapsed_ms || 0),
+      runtime_processor: item.runtime_processor || "unknown",
+      gpu_offload_percent: Number(item.runtime_gpu_offload_percent || 0),
+      runtime_evidence_source: item.runtime_evidence_source || ""
+    })),
+    recommendation: {
+      usage_profile: report.usage_profile,
+      recommended_model: report.recommended_model,
+      engine: report.recommendation_engine,
+      upgrade: report.upgrades?.[0] || null
+    },
+    arena: report.arena,
+    strategy_arena_handoff: {
+      schema: bridge.schema,
+      status: bridge.status,
+      recommended_model: bridge.recommended_model,
+      recommended_roles: bridge.recommended_roles,
+      boundary: bridge.separation_rules
+    },
+    privacy: {
+      local_generation: true,
+      excludes_account_tokens: true,
+      excludes_prompt_and_model_outputs: true,
+      excludes_personal_files: true,
+      machine_key_is_local_pseudonymous_identifier: true
+    },
+    limitations: [
+      "Le diagnostic décrit les signaux exposés au moment du scan et du benchmark ; il ne certifie pas la stabilité sous charge longue.",
+      "La fréquence et le canal mémoire peuvent être estimés selon les informations fournies par le système.",
+      "La preuve d'offload GPU dépend de la disponibilité de l'API Ollama /api/ps après le benchmark.",
+      "L'empreinte SHA-256 détecte une modification du document ; elle ne prouve ni l'identité du PC ni celle du propriétaire.",
+      "Ce passeport ne constitue pas une validation de stratégie financière ni un résultat de backtest."
+    ]
+  };
+}
+
+async function verifyCapabilityPassportIntegrity(passport) {
+  if (!passport?.integrity?.digest) return false;
+  const unsigned = JSON.parse(JSON.stringify(passport));
+  delete unsigned.integrity;
+  const digest = await sha256Hex(unsigned);
+  return digest === passport.integrity.digest;
+}
+
+async function buildCapabilityPassport() {
+  const passport = capabilityPassportDocument();
+  passport.integrity = {
+    algorithm: "SHA-256",
+    canonicalization: "recursive-key-sort-json-v1",
+    scope: "canonical_document_without_integrity",
+    digest: await sha256Hex(passport),
+    identity_signature: false,
+    statement: "Empreinte d'intégrité uniquement : elle ne prouve pas l'identité de la machine ou du propriétaire."
+  };
+  return passport;
+}
+
+function renderCapabilityPassportPanel() {
+  if (!els.capabilityPassportBox) return;
+  const passport = capabilityPassportIsCurrent() ? state.capabilityPassport : null;
+  els.generateCapabilityPassportBtn.disabled = !state.scan;
+  els.copyCapabilityPassportBtn.disabled = !passport;
+  els.downloadCapabilityPassportBtn.disabled = !passport;
+  if (!state.scan) {
+    els.capabilityPassportState.textContent = "scan requis";
+    els.capabilityPassportBox.className = "capability-passport-box empty";
+    els.capabilityPassportBox.textContent = "Scanne la machine pour créer un passeport portable de ses capacités IA locales.";
+    return;
+  }
+  if (!passport) {
+    els.capabilityPassportState.textContent = state.capabilityPassport ? "à régénérer" : "prêt à générer";
+    els.capabilityPassportBox.className = "capability-passport-box empty";
+    els.capabilityPassportBox.innerHTML = `
+      <strong>${state.capabilityPassport ? "Les preuves locales ont changé." : "Le scan est prêt."}</strong>
+      <span>Génère un JSON versionné après les benchmarks utiles. Aucun prompt, réponse de modèle ou jeton de compte n'y est inclus.</span>
+    `;
+    return;
+  }
+  const digest = passport.integrity.digest;
+  els.capabilityPassportState.textContent = "intégrité vérifiée";
+  els.capabilityPassportBox.className = "capability-passport-box";
+  els.capabilityPassportBox.innerHTML = `
+    <div class="passport-proof-grid">
+      <div><span>Doctor</span><strong>${escapeHtml(passport.hardware_doctor?.score ?? "?")}/100</strong></div>
+      <div><span>Runtime</span><strong>${escapeHtml(passport.runtime_readiness?.label || "à mesurer")}</strong></div>
+      <div><span>Modèles</span><strong>${escapeHtml(passport.installed_models.length)} installé(s)</strong></div>
+    </div>
+    <div class="doctor-status-row">
+      <span>SHA-256 ${escapeHtml(`${digest.slice(0, 16)}…${digest.slice(-8)}`)}</span>
+      <span>Empreinte d'intégrité, pas signature d'identité.</span>
+    </div>
+  `;
+}
+
+async function generateCapabilityPassport() {
+  if (!state.scan) {
+    setStatus("Scan requis avant passeport IA", "warn");
+    return null;
+  }
+  try {
+    state.capabilityPassport = await buildCapabilityPassport();
+    const verified = await verifyCapabilityPassportIntegrity(state.capabilityPassport);
+    if (!verified) throw new Error("l'empreinte générée n'a pas pu être relue");
+    renderCapabilityPassportPanel();
+    renderReadinessPanel();
+    setStatus("AI Capability Passport généré et vérifié", "ok");
+    return state.capabilityPassport;
+  } catch (error) {
+    state.capabilityPassport = null;
+    renderCapabilityPassportPanel();
+    setStatus(`Passeport impossible : ${error}`, "error");
+    return null;
+  }
+}
+
+async function copyCapabilityPassport() {
+  if (!capabilityPassportIsCurrent()) {
+    setStatus("Génère d'abord un passeport à jour", "warn");
+    return;
+  }
+  await navigator.clipboard.writeText(`${JSON.stringify(state.capabilityPassport, null, 2)}\n`);
+  setStatus("AI Capability Passport copié", "ok");
+}
+
+function downloadCapabilityPassport() {
+  if (!capabilityPassportIsCurrent()) {
+    setStatus("Génère d'abord un passeport à jour", "warn");
+    return;
+  }
+  const blob = new Blob([`${JSON.stringify(state.capabilityPassport, null, 2)}\n`], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `outilsia-ai-capability-passport-${state.scan.machine_key || "local"}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  setStatus("AI Capability Passport téléchargé", "ok");
+}
+
+function capabilityPassportMarkdown(passport = state.capabilityPassport) {
+  const summary = capabilityPassportSummary(passport);
+  if (!summary) return "## AI Capability Passport\n\n- Non généré ou à régénérer après les dernières mesures.";
+  return [
+    "## AI Capability Passport",
+    "",
+    `- Schéma: ${summary.schema}`,
+    `- Généré: ${summary.generated_at}`,
+    `- Doctor: ${summary.doctor_score}/100`,
+    `- Runtime: ${summary.runtime_status}`,
+    `- Build: ${summary.build_id}`,
+    `- SHA-256: ${summary.digest}`,
+    "- Portée: intégrité du document uniquement, pas signature d'identité."
   ].join("\n");
 }
 
@@ -7314,6 +7753,7 @@ function fieldTestMachineEntry() {
   const recommendation = report.recommendation_engine || null;
   const upgrade = report.upgrades[0];
   const doctor = report.hardware_doctor || hardwareDoctorSnapshot(scan);
+  const passport = capabilityPassportSummary();
   const os = [scan.os_name, scan.os_version].filter(Boolean).join(" ").trim();
   return {
     profile: fieldProfile.profile,
@@ -7326,6 +7766,7 @@ function fieldTestMachineEntry() {
     ram_gb: Number(scan.ram_gb || 0),
     vram_gb: Number(scan.vram_gb || 0),
     hardware_doctor: doctor ? {
+      schema: doctor.schema || "outilsia.hardware_doctor.v1",
       score: doctor.score,
       headline: doctor.headline,
       summary: doctor.summary,
@@ -7351,6 +7792,9 @@ function fieldTestMachineEntry() {
       wsl_runtime: doctor.runtime.wsl,
       first_action: doctor.actions[0] || ""
     } : null,
+    capability_passport_ok: Boolean(passport),
+    capability_passport_schema: passport?.schema || "",
+    capability_passport_digest: passport?.digest || "",
     scan_ok: Boolean(state.scan),
     score: report.score === null ? 0 : Number(report.score),
     score_label: scoreLabel(report.score),
@@ -10057,10 +10501,32 @@ function demoScan() {
       }
     },
     installed_models: [
+      { model_name: "qwen3", model_tag: "0.6b", size_gb: 0.5, runtime: "ollama" },
       { model_name: "qwen3", model_tag: "latest", size_gb: 5.2, runtime: "ollama" },
       { model_name: "hermes3", model_tag: "8b", size_gb: 4.7, runtime: "ollama" }
     ],
     raw_scan: {
+      gpu_probe: {
+        name: "NVIDIA GeForce RTX 3090",
+        vendor: "NVIDIA",
+        category: "high-end",
+        vram_gb: 24,
+        source: "nvidia-smi",
+        driver_version: "576.80",
+        cuda_version: "12.9",
+        rocm_version: null,
+        memory_used_mb: 820,
+        performance_state: "P2",
+        rebar_status: "enabled",
+        temperature_c: 48,
+        utilization_percent: 12,
+        power_draw_w: 72,
+        power_limit_w: 350,
+        pcie_link_width_current: 16,
+        pcie_link_width_max: 16,
+        pcie_link_gen_current: 4,
+        pcie_link_gen_max: 4
+      },
       memory_probe: {
         total_gb: 64,
         module_count: 2,
@@ -10135,6 +10601,12 @@ function demoBenchmark(model) {
     timed_out: false,
     output_preview: "La VRAM stocke les poids du modèle et le contexte, ce qui évite les allers-retours lents avec la RAM.",
     error: null,
+    execution_mode: "auto",
+    runtime_model_size_bytes: 5_200_000_000,
+    runtime_vram_bytes: 5_200_000_000,
+    runtime_gpu_offload_percent: 100,
+    runtime_processor: "gpu",
+    runtime_evidence_source: "ollama_api_ps",
     created_at_ms: Date.now()
   };
 }
@@ -10194,12 +10666,42 @@ function installTestHarness() {
     recommendationEngineCandidates,
     demoRecommendationOutput,
     arenaObjectiveProfileScore,
+    doctorRuntimeEvidence,
+    hardwareDoctorSnapshot,
+    buildCapabilityPassport,
+    verifyCapabilityPassportIntegrity,
+    capabilityPassportSummary,
     strategyArenaReadiness,
     setViewMode,
     defaultOllamaRuntime,
     ollamaRuntimePayload,
     ollamaRuntimeCommandLabel,
     installedOllamaRuntimeFor,
+    async applyCapabilityPassportState() {
+      this.applyDemoState();
+      const passport = await generateCapabilityPassport();
+      const verified = await verifyCapabilityPassportIntegrity(passport);
+      const tampered = JSON.parse(JSON.stringify(passport));
+      tampered.machine.ram_gb += 1;
+      const tamperedVerified = await verifyCapabilityPassportIntegrity(tampered);
+      const historyBefore = readBenchmarkHistory();
+      writeBenchmarkHistory([{ ...demoBenchmark("qwen3:0.6b"), created_at_ms: Date.now() + 10_000 }, ...historyBefore]);
+      const staleSummary = capabilityPassportSummary();
+      writeBenchmarkHistory(historyBefore);
+      return {
+        passport,
+        verified,
+        tamperedVerified,
+        staleSummary,
+        summary: capabilityPassportSummary(),
+        doctor: hardwareDoctorSnapshot(),
+        readiness: readinessReport(),
+        bridge: strategyArenaReadiness(),
+        field: fieldTestMachineEntry(),
+        memory: cockpitMemoryMarkdown(),
+        panel: els.capabilityPassportBox?.textContent || ""
+      };
+    },
     applyDemoState() {
       writeRecommendationRun(null);
       const scan = demoScan();
@@ -10769,6 +11271,9 @@ els.copyWslCommandBtn?.addEventListener("click", copyWslCommand);
 els.copyStrategyBridgeJsonBtn.addEventListener("click", copyStrategyBridgeJson);
 els.downloadStrategyBridgeJsonBtn?.addEventListener("click", downloadStrategyBridgeJson);
 els.copyStrategyBridgeMdBtn.addEventListener("click", copyStrategyBridgeMarkdown);
+els.generateCapabilityPassportBtn?.addEventListener("click", generateCapabilityPassport);
+els.copyCapabilityPassportBtn?.addEventListener("click", copyCapabilityPassport);
+els.downloadCapabilityPassportBtn?.addEventListener("click", downloadCapabilityPassport);
 els.copyFieldTestBtn.addEventListener("click", copyFieldTestMarkdown);
 els.copyFieldTestJsonBtn?.addEventListener("click", copyFieldTestJson);
 els.downloadFieldTestJsonBtn?.addEventListener("click", downloadFieldTestJson);

@@ -1622,7 +1622,8 @@ h2 {
 .arena-panel { grid-column: span 12; order: 21; }
 .readiness-panel { grid-column: span 12; order: 22; }
 .strategy-bridge-panel { grid-column: span 12; order: 23; }
-.field-test-panel { grid-column: span 12; order: 24; }
+.capability-passport-panel { grid-column: span 12; order: 24; }
+.field-test-panel { grid-column: span 12; order: 25; }
 .models-panel { grid-column: span 6; order: 25; }
 .commands-panel { grid-column: span 6; order: 26; }
 .account-panel { grid-column: span 6; order: 30; }
@@ -2020,6 +2021,7 @@ dd {
 .first-test-box,
 .arena-box,
 .strategy-bridge-box,
+.capability-passport-box,
 .field-test-box {
   display: grid;
   gap: 7px;
@@ -2091,6 +2093,7 @@ dd {
 .upgrade-impact-box.empty,
 .arena-box.empty,
 .strategy-bridge-box.empty,
+.capability-passport-box.empty,
 .field-test-box.empty {
   align-items: center;
   color: var(--muted);
@@ -2203,6 +2206,37 @@ dd {
     linear-gradient(135deg, rgba(24, 22, 15, 0.94), rgba(10, 17, 22, 0.92));
   border: 1px solid rgba(241, 201, 107, 0.20);
   border-radius: 8px;
+}
+
+.capability-passport-box {
+  display: grid;
+  gap: 10px;
+}
+
+.passport-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.passport-proof-grid div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+
+.passport-proof-grid span,
+.passport-proof-grid strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.passport-proof-grid span {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .bridge-summary,
@@ -3661,6 +3695,7 @@ dd {
   .first-test-panel,
   .arena-panel,
   .strategy-bridge-panel,
+  .capability-passport-panel,
   .field-test-panel,
   .operation-panel,
   .readiness-panel,
@@ -3880,6 +3915,10 @@ dd {
   }
 
   .field-test-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .passport-proof-grid {
     grid-template-columns: 1fr;
   }
 

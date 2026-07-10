@@ -188,6 +188,9 @@ const release = {
   published_at: publishedAt,
   build_provenance: buildProvenance,
   release_notes: [
+    "Hardware Doctor 2.0 : signaux RAM/GPU/driver/PCIe/ReBAR/thermiques clairement sourcés, mesures instantanées étiquetées et inconnues conservées comme inconnues.",
+    "Preuve d'offload Ollama : après benchmark, /api/ps distingue CPU, hybride et GPU depuis size_vram / size au lieu de déduire l'accélération depuis le pilote.",
+    "AI Capability Passport v1 : export JSON optionnel lié à la machine et au build avec capacités, modèles, preuves, recommandation, limites et SHA-256 d'intégrité — pas une signature d'identité.",
     "Recommendation Engine v2 : choisir Chat, Code, Mémoire, Français, Portable ou Polyvalent, comparer deux candidats avec sept preuves et obtenir une décision « Garder ce modèle » avec vitesse, latence, ressources et limites exportées.",
     "Proof Engine Ollama exact : chargement, préremplissage et génération tokens/s utilisent les métriques natives de l'API, avec repli CLI signalé comme estimation.",
     "Arena objective v1 : chaque modèle reçoit le même micro-test et conserve six preuves vérifiables — JSON, instruction, mémoire, calcul, français et action.",

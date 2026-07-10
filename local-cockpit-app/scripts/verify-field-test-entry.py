@@ -17,6 +17,10 @@ REQUIRED_FIELDS = {
     "gpu",
     "ram_gb",
     "vram_gb",
+    "hardware_doctor",
+    "capability_passport_ok",
+    "capability_passport_schema",
+    "capability_passport_digest",
     "scan_ok",
     "score",
     "score_label",
@@ -77,6 +81,8 @@ def main():
         raise AssertionError(f"manual profile override failed: {manual}")
     if entry.get("scan_ok") is not True:
         raise AssertionError("demo field entry should have scan_ok=true")
+    if entry.get("hardware_doctor", {}).get("schema") != "outilsia.hardware_doctor.v2":
+        raise AssertionError(f"Hardware Doctor v2 missing from field entry: {entry.get('hardware_doctor')}")
     if entry.get("promptforge_ok") is not True or entry.get("dialogue_ok") is not True or entry.get("arena_ok") is not True:
         raise AssertionError(f"demo field entry should prove prompt/dialogue/arena: {entry}")
     if not entry.get("benchmark_model") or float(entry.get("benchmark_tokens_per_second") or 0) <= 0:

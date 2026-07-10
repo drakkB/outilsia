@@ -16,6 +16,17 @@ OutilsIA is a French-first toolbox for running AI on your own machine: free in-b
 | [Comparateur](https://outilsia.fr/comparateur) | Independent comparison of the major AI models |
 | [Benchmark local vs cloud](https://outilsia.fr/benchmark-local-vs-cloud) | Calculates when a GPU is cheaper than your cloud subscriptions |
 
+## OutilsIA Local Cockpit
+
+[Download the Windows/Linux beta](https://outilsia.fr/telecharger-scanner-ia-local) or read the [scanner hub](https://outilsia.fr/scanner-ia-local).
+
+The open desktop client scans CPU, RAM, GPU, VRAM, storage and Ollama runtimes, installs models only after explicit confirmation, benchmarks them with native Ollama metrics and recommends which tested model to keep.
+
+- **Hardware Doctor 2.0** separates detected drivers from observed runtime allocation. After a benchmark it uses Ollama `/api/ps` (`size_vram / size`) to report CPU, hybrid CPU/GPU or GPU execution; missing evidence stays unknown.
+- **AI Capability Passport v1** exports a versioned JSON document containing hardware evidence, runtimes, installed models, benchmarks, recommendation and the read-only Strategy Arena handoff boundary.
+- The passport SHA-256 detects document modification. It is not an identity signature for the PC or its owner.
+- Prompts, model outputs, personal files and account tokens are excluded from the passport.
+
 ## Guides
 
 - [Local AI guide](https://outilsia.fr/ia-locale) — Ollama, LM Studio, llama.cpp, offline AI, local RAG, private assistants
