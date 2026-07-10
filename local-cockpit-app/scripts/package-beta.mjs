@@ -188,6 +188,10 @@ const release = {
   published_at: publishedAt,
   build_provenance: buildProvenance,
   release_notes: [
+    "Retest CPU après erreur CUDA : OutilsIA force num_gpu=0 via l'API Ollama pour distinguer un modèle fonctionnel d'un pilote GPU bloqué.",
+    "Potentiel matériel et état du runtime sont séparés : un score GPU élevé ne masque plus un échec CUDA/Ollama réel.",
+    "DriverDoctor : détection des pilotes NVIDIA/AMD/Intel, conseils CUDA/ROCm/Vulkan, RAM dual-channel, fréquence mémoire et mémoire unifiée.",
+    "Mode Essentiel resserré : une action principale, le matériel directement sous le scan et la preuve benchmark conservée à l'écran.",
     "Bibliothèque Mes prompts : sauvegarder les prompts optimisés, les réutiliser dans Benchmark ou Dialogue, copier/exporter la bibliothèque.",
     "Parcours guidé étendu : scan, diagnostic, Ollama, modèle test, benchmark, PromptForge, dialogue local, Arena et rapport final MemoryForge.",
     "PromptForge local intégré : optimiser un prompt de benchmark/dialogue, l'envoyer vers Ollama et le sauvegarder dans MemoryForge.",

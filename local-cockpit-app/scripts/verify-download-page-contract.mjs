@@ -6,13 +6,13 @@ import { fileURLToPath } from "node:url";
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(appRoot, "..");
 const pagePath = join(repoRoot, "server-work", "static", "pages", "telecharger-scanner-ia-local.html");
-const releasePath = join(repoRoot, "server-work", "static", "downloads", "local-cockpit", "release.json");
-const downloadRoot = join(repoRoot, "server-work", "static", "downloads", "local-cockpit");
+const defaultDownloadRoot = join(repoRoot, "server-work", "static", "downloads", "local-cockpit");
 
 function usage() {
   console.log(`Usage:
   node scripts/verify-download-page-contract.mjs [--require-freshness]
   node scripts/verify-download-page-contract.mjs [--require-local-files]
+  node scripts/verify-download-page-contract.mjs [--release-dir <candidate-dir>]
 
 Checks that the public download page contract matches the local release manifest:
   page button, counter, build id, SHA256, changelog, freshness and tracked download URL.`);
@@ -23,8 +23,9 @@ function fail(message) {
 }
 
 function parseArgs(argv) {
-  const opts = { requireFreshness: false, requireLocalFiles: false };
-  for (const arg of argv) {
+  const opts = { requireFreshness: false, requireLocalFiles: false, releaseDir: defaultDownloadRoot };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
     if (arg === "--help" || arg === "-h") {
       usage();
       process.exit(0);
@@ -35,6 +36,10 @@ function parseArgs(argv) {
     }
     if (arg === "--require-local-files") {
       opts.requireLocalFiles = true;
+      continue;
+    }
+    if (arg === "--release-dir") {
+      opts.releaseDir = resolve(argv[++index] || "");
       continue;
     }
     throw new Error(`Unknown argument: ${arg}`);
@@ -66,7 +71,7 @@ function validateFreshness(release, required) {
   return "ok";
 }
 
-function validateRelease(release, opts) {
+function validateRelease(release, opts, downloadRoot) {
   if (release.ok !== true) fail("release.ok must be true");
   if (release.product !== "OutilsIA Local Cockpit") fail("Unexpected release.product");
   if (release.channel !== "beta") fail("release.channel must be beta");
@@ -95,11 +100,13 @@ function validateRelease(release, opts) {
 
 function main() {
   const opts = parseArgs(process.argv.slice(2));
+  const releasePath = join(opts.releaseDir, "release.json");
+  const downloadRoot = opts.releaseDir;
   if (!existsSync(pagePath)) fail(`Download page not found: ${pagePath}`);
   if (!existsSync(releasePath)) fail(`Release manifest not found: ${releasePath}`);
   const html = readFileSync(pagePath, "utf8");
   const release = readJson(releasePath);
-  const freshness = validateRelease(release, opts);
+  const freshness = validateRelease(release, opts, downloadRoot);
 
   assertIncludes(html, [
     'const releaseUrl = "/static/downloads/local-cockpit/release.json"',
