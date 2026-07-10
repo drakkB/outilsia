@@ -161,6 +161,8 @@ const $ = (id) => document.getElementById(id);
 
 const els = {
   appShell: $("appShell"),
+  quickDecisionStrip: document.querySelector(".quick-decision-strip"),
+  quickMomentCell: document.querySelector(".quick-moment-cell"),
   viewModeTitle: $("viewModeTitle"),
   viewEssentialBtn: $("viewEssentialBtn"),
   viewAdvancedBtn: $("viewAdvancedBtn"),
@@ -1594,6 +1596,7 @@ function preferredModelCommand(models = []) {
 function primaryActionState() {
   const flow = prepareFlowState();
   const recommended = recommendedModelState();
+  const runtime = runtimeReadinessState(flow.testModel);
 
   if (!flow.scanned) {
     return {
@@ -1623,12 +1626,30 @@ function primaryActionState() {
     };
   }
   if (!flow.benchmarkReady) {
+    if (runtime.key === "cuda-blocked") {
+      return {
+        key: "benchmark-test-cpu",
+        label: "Retester sans GPU",
+        detail: flow.testModel,
+        status: "Le test CPU dira si le blocage vient bien du pilote CUDA et non du modèle.",
+        command: "benchmark-test-cpu"
+      };
+    }
     return {
       key: "benchmark-test",
       label: "Lancer le benchmark recommandé",
       detail: flow.testModel,
       status: "Première preuve locale : temps de réponse, tokens/s et résultat lisible.",
       command: "benchmark-test"
+    };
+  }
+  if (runtime.key === "cpu-only") {
+    return {
+      key: "open-gpu-driver",
+      label: "Corriger le pilote GPU",
+      detail: "CPU validé",
+      status: "Le modèle marche sans GPU. Mets à jour le pilote officiel puis relance le benchmark automatique.",
+      command: "open-gpu-driver"
     };
   }
   if (recommended.ref && !recommended.installed) {
@@ -1750,6 +1771,7 @@ function renderQuickDecision(action = primaryActionState()) {
   const upgrades = compatibility.upgrades || compatibility.recommended_upgrades || compatibility.shopping_list || [];
   const upgrade = upgrades.find((item) => item && typeof item === "object") || null;
   const benchmark = successfulBenchmarkFor(flow.testModel);
+  const runtime = runtimeReadinessState(flow.testModel);
   const recommended = flow.recommended;
   const recommendedLabel = recommended?.ref
     ? `${recommended.title || "Modèle"}`
@@ -1757,17 +1779,21 @@ function renderQuickDecision(action = primaryActionState()) {
   const recommendedDetail = recommended?.ref
     ? `${recommended.ref} · ${recommended.installed ? recommended.benchmarked ? "benchmarké" : "installé" : "à installer"}`
     : state.scan ? `${flow.testModel} pour valider Ollama` : "OutilsIA affichera quoi installer.";
-  const proofLabel = benchmark?.success
-    ? `${benchmark.model || flow.testModel}`
-    : flow.benchmarkReady ? "Preuve obtenue" : "À obtenir";
-  const proofDetail = benchmark?.success
-    ? `${benchmark.estimated_tokens_per_second || 0} tok/s · ${benchmark.elapsed_ms || 0} ms`
-    : flow.modelReady ? "Lance un benchmark court visible dans l'app." : "Installe le modèle test puis mesure.";
+  const proofLabel = runtime.key === "cuda-blocked"
+    ? "GPU/CUDA bloqué"
+    : benchmark?.success
+      ? `${benchmark.model || flow.testModel}`
+      : flow.benchmarkReady ? "Preuve obtenue" : "À obtenir";
+  const proofDetail = runtime.key === "cuda-blocked"
+    ? runtime.detail
+    : benchmark?.success
+      ? `${benchmark.estimated_tokens_per_second || 0} tok/s · ${benchmark.elapsed_ms || 0} ms · ${String(benchmark.execution_mode || "auto") === "cpu" ? "CPU seul" : "mode automatique"}`
+      : flow.modelReady ? "Lance un benchmark court visible dans l'app." : "Installe le modèle test puis mesure.";
   const upgradeLabel = upgrade?.label || upgrade?.name || (state.scan ? "Aucun achat urgent" : "Pas encore");
   const upgradeDetail = upgrade?.reason || upgrade?.price_range_eur || (state.scan ? "Teste d'abord, achète seulement si un blocage est prouvé." : "Aucun achat avant diagnostic.");
   els.quickActionText.textContent = state.scan ? action.label : "Analyser ce PC";
   els.quickActionDetail.textContent = state.scan
-    ? `${localCapabilitySentence(compatibility)} ${score === null ? "Score à calculer" : `Score ${score}/100`} · ${action.status}`
+    ? `${score === null ? "Potentiel à calculer" : `Potentiel matériel ${score}/100`} · Runtime : ${runtime.label}. ${action.status}`
     : localCapabilitySentence(compatibility);
   els.quickModelText.textContent = recommendedLabel;
   els.quickModelDetail.textContent = recommendedDetail;
@@ -1778,6 +1804,8 @@ function renderQuickDecision(action = primaryActionState()) {
       ? `${moment.ref} · ${moment.signal || moment.profile.label} · ${moment.installed ? moment.benchmarked ? "mesuré" : "installé" : "à tester"}`
       : "Le catalogue vivant choisira un modèle récent compatible.";
   }
+  const momentRedundant = Boolean(moment.ref && recommended?.ref && sameOllamaModel(moment.ref, recommended.ref));
+  els.quickDecisionStrip?.classList.toggle("moment-redundant", momentRedundant);
   els.quickProofText.textContent = proofLabel;
   els.quickProofDetail.textContent = proofDetail;
   els.quickUpgradeText.textContent = upgradeLabel;
@@ -2674,6 +2702,7 @@ function renderVerdict(score, verdict, compatibility, scan) {
   const scoreClass = score === null ? "neutral" : score >= 80 ? "ok" : score >= 55 ? "warn" : "bad";
   const encouragement = machineEncouragement(scan);
   const action = primaryActionState();
+  const runtime = runtimeReadinessState();
   const recommended = topRecommendedModel();
   const recommendedRef = actionableOllamaRef(recommended);
   return `
@@ -2683,8 +2712,14 @@ function renderVerdict(score, verdict, compatibility, scan) {
         <span>/100</span>
       </div>
       <div>
+        <span class="label">Potentiel matériel</span>
         <strong>${escapeHtml(scoreLabel(score))}</strong>
         <span>${escapeHtml(models.length)} modèle(s) compatibles · ${escapeHtml(blocked.length)} palier(s) proches</span>
+      </div>
+      <div class="runtime-readiness ${escapeHtml(runtime.tone)}">
+        <span class="label">État du runtime</span>
+        <strong>${escapeHtml(runtime.label)}</strong>
+        <span>${escapeHtml(runtime.detail)}</span>
       </div>
     </div>
     <p>${escapeHtml(verdict)}</p>
@@ -3316,6 +3351,73 @@ function successfulBenchmarkFor(model) {
     .find((item) => item.success && sameOllamaModel(item.model, clean)) || null;
 }
 
+function latestBenchmarkFor(model, { executionMode = "" } = {}) {
+  const clean = normalizeOllamaRef(model);
+  if (!clean) return null;
+  const matchesMode = (item) => !executionMode || String(item?.execution_mode || "auto") === executionMode;
+  if (state.benchmark && sameOllamaModel(state.benchmark.model, clean) && matchesMode(state.benchmark)) {
+    return state.benchmark;
+  }
+  return readBenchmarkHistory()
+    .find((item) => sameOllamaModel(item.model, clean) && matchesMode(item)) || null;
+}
+
+function isCudaBenchmarkFailure(result) {
+  if (!result || result.success) return false;
+  const message = String(result.error || result.output_preview || "").toLowerCase();
+  return [
+    "unsupported toolchain",
+    "cuda error",
+    "llama-server process has terminated",
+    "0xc0000409",
+    "ptx was compiled"
+  ].some((signal) => message.includes(signal));
+}
+
+function runtimeReadinessState(model = "qwen3:0.6b") {
+  if (!state.scan) {
+    return { key: "unscanned", label: "À analyser", detail: "Aucun runtime vérifié.", tone: "neutral" };
+  }
+  if (!hasUsableOllamaRuntime(state.scan)) {
+    return { key: "missing", label: "Ollama absent", detail: "Installe le moteur local avant le test.", tone: "bad" };
+  }
+  const automaticResult = latestBenchmarkFor(model, { executionMode: "auto" });
+  if (automaticResult?.success) {
+    return {
+      key: "ready",
+      label: "Accélération validée",
+      detail: `${automaticResult.estimated_tokens_per_second || 0} tok/s en mode automatique.`,
+      tone: "ok"
+    };
+  }
+  const cpuSuccess = readBenchmarkHistory().find((item) =>
+    item.success
+    && sameOllamaModel(item.model, model)
+    && String(item.execution_mode || "") === "cpu"
+  ) || (state.benchmark?.success
+    && sameOllamaModel(state.benchmark.model, model)
+    && String(state.benchmark.execution_mode || "") === "cpu"
+      ? state.benchmark
+      : null);
+  if (cpuSuccess) {
+    return {
+      key: "cpu-only",
+      label: "CPU validé · GPU à corriger",
+      detail: `${cpuSuccess.estimated_tokens_per_second || 0} tok/s sans GPU. Le matériel fonctionne, le pilote/runtime GPU reste bloqué.`,
+      tone: "warn"
+    };
+  }
+  if (isCudaBenchmarkFailure(automaticResult)) {
+    return {
+      key: "cuda-blocked",
+      label: "GPU/CUDA bloqué",
+      detail: "Reteste sans GPU pour isoler le pilote du reste de la machine.",
+      tone: "bad"
+    };
+  }
+  return { key: "untested", label: "À mesurer", detail: "Lance le modèle léger pour vérifier la chaîne locale.", tone: "neutral" };
+}
+
 function markOllamaModelInstalled(model) {
   const clean = preferredInstallRef(model);
   if (!clean) return;
@@ -3379,7 +3481,7 @@ function friendlyOllamaError(error) {
     || lower.includes("0xc0000409")
     || lower.includes("ptx was compiled")
   ) {
-    return "Ollama a planté côté CUDA sur ce GPU/driver. Sur GTX 10xx/Pascal, teste d'abord un modèle très léger, mets à jour Ollama + pilote NVIDIA, puis compare avec un lancement CPU si le crash revient.";
+    return "Ollama a planté côté CUDA sur ce GPU/driver. Utilise « Retester sans GPU » : si le modèle marche en CPU, le pilote/runtime GPU est bien la cause et le matériel principal reste utilisable.";
   }
   if (lower.includes("impossible de lancer ollama") || lower.includes("no such file") || lower.includes("os error 2")) {
     return "Ollama n'est pas détecté. Installe Ollama, relance l'app, puis réessaie.";
@@ -3690,6 +3792,7 @@ function readinessReport() {
     || compatibility.score?.label
     || (state.scan ? fallbackVerdict(state.scan) : "");
   const benchmark = successfulBenchmarkFor(flow.testModel);
+  const runtimeReadiness = runtimeReadinessState(flow.testModel);
   const promptForge = currentPromptForgeResult();
   const arenaRun = readLastArenaRun();
   const arena = arenaRun ? arenaWinners(arenaRun.results || []) : null;
@@ -3709,16 +3812,21 @@ function readinessReport() {
       url: item.guide_url || item.url || ""
     });
   const buyingLinks = buildBuyingLinks(compatibility, compatibility.upgrades || compatibility.recommended_upgrades || compatibility.shopping_list || []);
-  const ready = flow.scanned && flow.ollamaReady && flow.modelReady && flow.benchmarkReady;
-  const status = ready ? "prêt" : flow.status;
-  const title = ready ? "Machine prête pour l'IA locale" : "Machine à compléter";
+  const ready = flow.scanned && flow.ollamaReady && flow.modelReady && flow.benchmarkReady && runtimeReadiness.key === "ready";
+  const status = ready ? "prêt" : runtimeReadiness.key === "cpu-only" ? "CPU prêt · GPU bloqué" : flow.status;
+  const title = ready
+    ? "Machine prête pour l'IA locale"
+    : runtimeReadiness.key === "cpu-only"
+      ? "IA locale validée en CPU · accélération GPU à corriger"
+      : "Machine à compléter";
   const next = [];
   if (!flow.scanned) next.push("Scanner la machine.");
   if (flow.scanned && !flow.ollamaReady) next.push("Installer Ollama puis relancer le scan.");
   if (flow.ollamaReady && !flow.modelReady) next.push(`Installer ${flow.testModel}.`);
   if (flow.modelReady && !flow.benchmarkReady) next.push(`Lancer le benchmark ${flow.testModel}.`);
-  if (flow.benchmarkReady && flow.recommended?.ref && !flow.recommended.installed) next.push(`Installer le deuxième modèle recommandé : ${flow.recommended.ref}.`);
-  if (flow.recommended?.ref && flow.recommended.installed && !flow.recommended.benchmarked) next.push(`Benchmarker le deuxième modèle recommandé : ${flow.recommended.ref}.`);
+  if (runtimeReadiness.key === "cpu-only") next.push("Mettre à jour le pilote GPU officiel, puis relancer le benchmark automatique.");
+  if (runtimeReadiness.key === "ready" && flow.benchmarkReady && flow.recommended?.ref && !flow.recommended.installed) next.push(`Installer le deuxième modèle recommandé : ${flow.recommended.ref}.`);
+  if (runtimeReadiness.key === "ready" && flow.recommended?.ref && flow.recommended.installed && !flow.recommended.benchmarked) next.push(`Benchmarker le deuxième modèle recommandé : ${flow.recommended.ref}.`);
   if (flow.benchmarkReady && !flow.chatReady) next.push("Poser une première question au modèle local.");
   if (flow.chatReady && !flow.arenaReady && arenaInstalledCandidates().length >= 2) next.push("Lancer Arena locale pour comparer les modèles installés.");
   if (flow.benchmarkReady && !flow.promptReady) next.push("Optionnel : améliorer un prompt avec PromptForge.");
@@ -3729,6 +3837,7 @@ function readinessReport() {
     status,
     ready,
     score,
+    runtime_readiness: runtimeReadiness,
     verdict,
     release: proof,
     machine: {
@@ -3812,7 +3921,8 @@ function readinessMarkdown(report = readinessReport()) {
     "",
     `- Date: ${report.generated_at}`,
     `- Statut: ${report.status}`,
-    `- Score OutilsIA: ${report.score === null ? "non calculé" : `${report.score}/100`}`,
+    `- Potentiel matériel: ${report.score === null ? "non calculé" : `${report.score}/100`}`,
+    `- État du runtime: ${report.runtime_readiness?.label || "non vérifié"} - ${report.runtime_readiness?.detail || ""}`,
     `- Machine: ${report.machine.name}`,
     `- CPU: ${report.machine.cpu}`,
     `- RAM: ${report.machine.ram}`,
@@ -3845,7 +3955,7 @@ function readinessMarkdown(report = readinessReport()) {
     "## Preuve locale",
     "",
     report.benchmark
-      ? `- Benchmark: ${report.benchmark.model} - ${report.benchmark.estimated_tokens_per_second} tok/s - ${report.benchmark.elapsed_ms} ms - succès ${report.benchmark.success ? "oui" : "non"}`
+      ? `- Benchmark: ${report.benchmark.model} - ${report.benchmark.estimated_tokens_per_second} tok/s - ${report.benchmark.elapsed_ms} ms - ${benchmarkExecutionLabel(report.benchmark)} - succès ${report.benchmark.success ? "oui" : "non"}`
       : "- Aucun benchmark lancé.",
     report.benchmark?.output_preview ? `- Réponse: ${report.benchmark.output_preview}` : "",
     `- Dialogue local: ${report.chat_ready ? "réponse reçue" : "non validé"}`,
@@ -6369,7 +6479,7 @@ function fieldTestFirst30sProof({ scan = {}, report = {}, action = {}, profile =
       hardwareVisible ? `${scan.gpu_name || "GPU"} · ${formatVram(scan.vram_gb)} · ${Number(scan.ram_gb || 0)} Go RAM` : "matériel à confirmer",
       scoreVisible ? `score ${Number(report.score)}/100` : "score absent",
       model ? `modèle ${model}` : "modèle absent",
-      benchmarkProof ? `preuve ${benchmark.model || "benchmark"} à ${Number(benchmark.estimated_tokens_per_second || 0).toFixed(1)} tok/s` : "benchmark à lancer",
+      benchmarkProof ? `preuve ${benchmark.model || "benchmark"} à ${Number(benchmark.estimated_tokens_per_second || 0).toFixed(1)} tok/s (${benchmarkExecutionLabel(benchmark)})` : "benchmark à lancer",
       doctor ? `doctor ${doctor.score}/100` : "doctor absent",
       `upgrade: ${upgradeTitle}`
     ].join(" | ")
@@ -6428,12 +6538,15 @@ function fieldTestMachineEntry() {
     scan_ok: Boolean(state.scan),
     score: report.score === null ? 0 : Number(report.score),
     score_label: scoreLabel(report.score),
+    runtime_readiness: report.runtime_readiness?.key || "untested",
+    runtime_readiness_label: report.runtime_readiness?.label || "À mesurer",
     recommended_model: report.recommended_model?.ref || report.models[0]?.title || report.test_model || "",
     first_action: action.label || profile.nextActions[0] || "",
     upgrade_recommendation: upgrade?.title || "Aucun achat prioritaire avant benchmark terrain complet",
     benchmark_model: benchmark?.model || "",
     benchmark_tokens_per_second: Number(benchmark?.estimated_tokens_per_second || 0),
     benchmark_elapsed_ms: Number(benchmark?.elapsed_ms || 0),
+    benchmark_execution_mode: benchmark?.execution_mode || "auto",
     promptforge_ok: Boolean(promptForge?.optimized),
     dialogue_ok: Boolean(state.chatResult?.success && state.chatResult?.output_preview),
     arena_ok: Boolean(successfulArena),
@@ -6969,6 +7082,7 @@ async function generateMemory() {
 }
 
 async function runBenchmark(options = {}) {
+  const forceCpu = Boolean(options.forceCpu);
   const rawModel = els.benchmarkModelInput.value.trim();
   const model = ollamaActionRef(rawModel);
   if (!model) {
@@ -6998,15 +7112,15 @@ async function runBenchmark(options = {}) {
     }
   }
   els.benchmarkBtn.disabled = true;
-  resetOperationConsole(`Benchmark Ollama lancé : ${model}`);
-  setOperationFocus(`Benchmark en cours : ${model}`, [
-    "Ollama reçoit un prompt court.",
+  resetOperationConsole(`${forceCpu ? "Retest CPU" : "Benchmark Ollama"} lancé : ${model}`);
+  setOperationFocus(`${forceCpu ? "Retest CPU sans GPU" : "Benchmark en cours"} : ${model}`, [
+    forceCpu ? "Ollama force num_gpu=0 pour isoler le pilote GPU." : "Ollama reçoit un prompt court.",
     "Le résultat affichera temps de réponse, vitesse estimée et aperçu.",
     "Reste sur cet écran : le suivi direct apparaît ici."
   ]);
   appendOperationLine(`Prompt : ${els.benchmarkPromptInput.value.trim() || "prompt court par défaut"}`, "info");
-  els.benchmarkResult.textContent = "Benchmark Ollama en cours...";
-  setStatus(`Benchmark ${model} en cours...`);
+  els.benchmarkResult.textContent = forceCpu ? "Retest CPU Ollama en cours..." : "Benchmark Ollama en cours...";
+  setStatus(`${forceCpu ? "Retest CPU" : "Benchmark"} ${model} en cours...`);
   try {
     const result = invoke
       ? await invoke("benchmark_ollama", {
@@ -7014,14 +7128,20 @@ async function runBenchmark(options = {}) {
             model,
             prompt: els.benchmarkPromptInput.value.trim(),
             timeout_seconds: 45,
+            force_cpu: forceCpu,
             ...ollamaRuntimePayload(model)
           }
         })
-      : demoBenchmark(model);
-    state.benchmark = result;
-    renderBenchmark(result);
-    appendBenchmarkToConsole(result);
-    saveBenchmarkHistoryEntry(result);
+      : { ...demoBenchmark(model), execution_mode: forceCpu ? "cpu" : "auto" };
+    const normalizedResult = {
+      ...result,
+      execution_mode: result.execution_mode || (forceCpu ? "cpu" : "auto")
+    };
+    state.benchmark = normalizedResult;
+    renderBenchmark(normalizedResult);
+    appendBenchmarkToConsole(normalizedResult);
+    saveBenchmarkHistoryEntry(normalizedResult);
+    renderPrimaryAction();
     renderFirstTestPanel();
     renderPreparePanel();
     renderReadinessPanel();
@@ -7029,8 +7149,8 @@ async function runBenchmark(options = {}) {
     renderStrategyBridgePanel();
     renderFieldTestPanel();
     await refreshAuthState();
-    finishOperationMonitor(result.success ? "Benchmark terminé" : "Benchmark terminé avec erreur");
-    setStatus(result.success ? "Benchmark termine" : "Benchmark termine avec erreur", result.success ? "ok" : "warn");
+    finishOperationMonitor(normalizedResult.success ? "Benchmark terminé" : "Benchmark terminé avec erreur");
+    setStatus(normalizedResult.success ? "Benchmark terminé" : "Benchmark terminé avec erreur", normalizedResult.success ? "ok" : "warn");
   } catch (error) {
     const message = friendlyOllamaError(error);
     appendOperationLine(message, "erreur");
@@ -7044,7 +7164,7 @@ async function runBenchmark(options = {}) {
 
 function appendBenchmarkToConsole(result) {
   appendOperationLine(`${result.success ? "Test réussi" : "Test terminé avec erreur"} : ${result.model}`, result.success ? "ok" : "erreur");
-  appendOperationLine(`Temps: ${result.elapsed_ms ?? 0} ms · Vitesse: ${result.estimated_tokens_per_second ?? 0} tok/s`, "bench");
+  appendOperationLine(`Temps: ${result.elapsed_ms ?? 0} ms · Vitesse: ${result.estimated_tokens_per_second ?? 0} tok/s · Mode: ${String(result.execution_mode || "auto") === "cpu" ? "CPU seul" : "automatique"}`, "bench");
   const output = result.success
     ? result.output_preview || "Sortie vide"
     : friendlyOllamaError(result.error || result.output_preview || "Sortie vide");
@@ -7457,6 +7577,20 @@ async function runPrimaryCommand(command, model = "") {
       setStatus(`Benchmark du modèle test ${flow.testModel}...`);
       await runBenchmark({ source: "primary-action" });
       break;
+    case "benchmark-test-cpu":
+      els.benchmarkModelInput.value = flow.testModel;
+      els.chatModelInput.value = flow.testModel;
+      setStatus(`Retest CPU du modèle ${flow.testModel}...`);
+      await runBenchmark({ source: "primary-action", forceCpu: true });
+      break;
+    case "open-gpu-driver": {
+      const driver = gpuDriverLink(state.scan || {});
+      if (!driver?.url) throw new Error("Aucun pilote GPU officiel identifié pour cette machine");
+      if (invoke) await invoke("open_external_url", { url: driver.url });
+      else window.open(driver.url, "_blank", "noopener,noreferrer");
+      setStatus(`${driver.label} ouvert. Après mise à jour, relance le benchmark automatique.`, "ok");
+      break;
+    }
     case "install-recommended":
       if (!nextModel) throw new Error("Aucun modèle recommandé à installer");
       setStatus(`Installation du modèle recommandé ${nextModel}...`);
@@ -8023,9 +8157,17 @@ function benchmarkQualityVerdict(result) {
   return "Qualité courte : preuve technique obtenue, qualité à confirmer avec un prompt plus long.";
 }
 
+function benchmarkExecutionLabel(result) {
+  return String(result?.execution_mode || "auto") === "cpu" ? "CPU seulement" : "Automatique GPU/CPU";
+}
+
 function renderBenchmark(result) {
   const model = ollamaActionRef(result.model || "");
   const quality = benchmarkQualityVerdict(result);
+  const executionMode = benchmarkExecutionLabel(result);
+  const cpuRetry = model && isCudaBenchmarkFailure(result)
+    ? `<button type="button" class="cpu-retry-btn" data-retry-benchmark-cpu="${escapeHtml(model)}">Retester sans GPU</button>`
+    : "";
   const output = result.success
     ? result.output_preview || "Sortie vide"
     : friendlyOllamaError(result.error || result.output_preview || "Sortie vide");
@@ -8034,6 +8176,7 @@ function renderBenchmark(result) {
       <strong>${escapeHtml(result.success ? "Test réussi" : "Test terminé avec erreur")} - ${escapeHtml(result.model)}</strong>
       <span>Temps de réponse : ${escapeHtml(result.elapsed_ms ?? 0)} ms${result.timed_out ? " - test interrompu" : ""}</span>
       <span>Vitesse estimée : ${escapeHtml(result.estimated_tokens_per_second ?? 0)} tok/s</span>
+      <span>Exécution : ${escapeHtml(executionMode)}</span>
       <span>${escapeHtml(quality)}</span>
       <span>${escapeHtml(output)}</span>
     </div>
@@ -8043,6 +8186,7 @@ function renderBenchmark(result) {
       ${model ? `<button type="button" data-post-install-arena="${escapeHtml(model)}">Comparer</button>` : ""}
       <button type="button" data-copy-test-report="true">Copier le rapport</button>
       <button type="button" data-focus-feedback="true">Signaler un résultat</button>
+      ${cpuRetry}
     </div>
   `;
 }
@@ -8077,6 +8221,7 @@ function benchmarkHistoryEntry(result) {
     timed_out: Boolean(result.timed_out),
     output_preview: result.output_preview || "",
     error: result.error || "",
+    execution_mode: result.execution_mode || "auto",
     machine: {
       name: scan.name || "Machine IA locale",
       cpu_name: scan.cpu_name || "",
@@ -9206,6 +9351,56 @@ function installTestHarness() {
       };
     },
     wslRuntimeInfo,
+    applyCudaFailureState() {
+      const scan = demoScan();
+      scan.installed_models = [
+        ...(scan.installed_models || []),
+        { model_name: "qwen3", model_tag: "0.6b", size_gb: 0.5, runtime: "ollama", source: "ollama" }
+      ];
+      const failure = {
+        ...demoBenchmark("qwen3:0.6b"),
+        success: false,
+        estimated_tokens_per_second: 0,
+        output_preview: "",
+        error: "CUDA error: the provided PTX was compiled with an unsupported toolchain.",
+        execution_mode: "auto"
+      };
+      renderScan(scan);
+      renderCompatibility(demoCompatibility());
+      state.benchmark = failure;
+      writeBenchmarkHistory([failure]);
+      renderBenchmark(failure);
+      renderPreparePanel();
+      renderReadinessPanel();
+      renderPrimaryAction();
+      return {
+        action: primaryActionState(),
+        runtime: runtimeReadinessState("qwen3:0.6b"),
+        cpuRetryVisible: Boolean(document.querySelector("[data-retry-benchmark-cpu]")),
+        proof: els.quickProofText?.textContent || ""
+      };
+    },
+    applyCpuFallbackSuccessState() {
+      const failed = this.applyCudaFailureState();
+      const cpu = {
+        ...demoBenchmark("qwen3:0.6b"),
+        estimated_tokens_per_second: 5.4,
+        elapsed_ms: 6200,
+        execution_mode: "cpu"
+      };
+      state.benchmark = cpu;
+      writeBenchmarkHistory([cpu, latestBenchmarkFor("qwen3:0.6b", { executionMode: "auto" })].filter(Boolean));
+      renderBenchmark(cpu);
+      renderPreparePanel();
+      renderReadinessPanel();
+      renderPrimaryAction();
+      return {
+        previous: failed,
+        action: primaryActionState(),
+        runtime: runtimeReadinessState("qwen3:0.6b"),
+        report: readinessReport()
+      };
+    },
     applyPromptForgeNeededState() {
       const scan = demoScan();
       const qwen = demoBenchmark("qwen3:0.6b");
@@ -9667,6 +9862,15 @@ document.addEventListener("click", async (event) => {
   const oldPortablePresetButton = event.target?.closest?.("[data-old-portable-preset]");
   if (oldPortablePresetButton) {
     applyOldPortablePreset();
+    return;
+  }
+  const cpuRetryButton = event.target?.closest?.("[data-retry-benchmark-cpu]");
+  const cpuRetryModel = cpuRetryButton?.getAttribute?.("data-retry-benchmark-cpu");
+  if (cpuRetryModel) {
+    const model = ollamaActionRef(cpuRetryModel);
+    els.benchmarkModelInput.value = model;
+    els.chatModelInput.value = model;
+    await runBenchmark({ source: "cuda-fallback", forceCpu: true });
     return;
   }
   const postInstallChatButton = event.target?.closest?.("[data-post-install-chat]");

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::hash::{Hash, Hasher};
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -160,6 +160,7 @@ pub struct BenchmarkRequest {
     prompt: Option<String>,
     timeout_seconds: Option<u64>,
     runtime: Option<String>,
+    force_cpu: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -194,6 +195,8 @@ pub struct BenchmarkResult {
     timed_out: bool,
     output_preview: String,
     error: Option<String>,
+    #[serde(default)]
+    execution_mode: String,
     created_at_ms: u128,
 }
 
@@ -1094,11 +1097,8 @@ fn open_obsidian_vault(app: AppHandle, path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn benchmark_ollama(request: BenchmarkRequest) -> Result<BenchmarkResult, String> {
-    let model = request.model.trim().to_string();
-    if model.is_empty() {
-        return Err("Modele Ollama requis.".to_string());
-    }
+async fn benchmark_ollama(request: BenchmarkRequest) -> Result<BenchmarkResult, String> {
+    let model = validate_ollama_model_ref(&request.model)?;
     let user_prompt = request
         .prompt
         .unwrap_or_else(|| {
@@ -1113,15 +1113,15 @@ fn benchmark_ollama(request: BenchmarkRequest) -> Result<BenchmarkResult, String
     );
     let timeout = Duration::from_secs(request.timeout_seconds.unwrap_or(45).clamp(5, 180));
     let runtime = normalize_ollama_runtime(request.runtime.as_deref());
-    run_ollama_prompt(model, prompt, timeout, runtime)
+    if request.force_cpu.unwrap_or(false) {
+        return run_ollama_cpu_prompt(model, prompt, timeout, runtime).await;
+    }
+    run_ollama_prompt_async(model, prompt, timeout, runtime).await
 }
 
 #[tauri::command]
-fn chat_ollama(request: BenchmarkRequest) -> Result<BenchmarkResult, String> {
-    let model = request.model.trim().to_string();
-    if model.is_empty() {
-        return Err("Modele Ollama requis.".to_string());
-    }
+async fn chat_ollama(request: BenchmarkRequest) -> Result<BenchmarkResult, String> {
+    let model = validate_ollama_model_ref(&request.model)?;
     let user_prompt = request
         .prompt
         .unwrap_or_default()
@@ -1136,7 +1136,152 @@ fn chat_ollama(request: BenchmarkRequest) -> Result<BenchmarkResult, String> {
         format!("/no_think\nRéponds en français, clairement et directement.\n\n{user_prompt}");
     let timeout = Duration::from_secs(request.timeout_seconds.unwrap_or(90).clamp(5, 300));
     let runtime = normalize_ollama_runtime(request.runtime.as_deref());
-    run_ollama_prompt(model, prompt, timeout, runtime)
+    if request.force_cpu.unwrap_or(false) {
+        return run_ollama_cpu_prompt(model, prompt, timeout, runtime).await;
+    }
+    run_ollama_prompt_async(model, prompt, timeout, runtime).await
+}
+
+async fn run_ollama_prompt_async(
+    model: String,
+    prompt: String,
+    timeout: Duration,
+    runtime: OllamaRuntime,
+) -> Result<BenchmarkResult, String> {
+    tauri::async_runtime::spawn_blocking(move || run_ollama_prompt(model, prompt, timeout, runtime))
+        .await
+        .map_err(|err| format!("Tâche Ollama interrompue: {err}"))?
+}
+
+fn ollama_cpu_generate_payload(model: &str, prompt: &str) -> Value {
+    json!({
+        "model": model,
+        "prompt": prompt,
+        "stream": false,
+        "keep_alive": "2m",
+        "options": {
+            "num_gpu": 0,
+            "num_ctx": 2048
+        }
+    })
+}
+
+fn benchmark_result_from_ollama_api(
+    model: String,
+    prompt: String,
+    payload: Value,
+    elapsed: Duration,
+) -> Result<BenchmarkResult, String> {
+    if let Some(error) = payload.get("error").and_then(Value::as_str) {
+        return Err(format!("Ollama CPU a refusé le test: {error}"));
+    }
+    let output = payload
+        .get("response")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    let output_chars = output.chars().count();
+    let eval_count = payload
+        .get("eval_count")
+        .and_then(Value::as_u64)
+        .unwrap_or_else(|| ((output_chars as f64) / 4.0).round().max(0.0) as u64);
+    let eval_duration_ns = payload
+        .get("eval_duration")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let measured_seconds = if eval_duration_ns > 0 {
+        (eval_duration_ns as f64 / 1_000_000_000.0).max(0.001)
+    } else {
+        elapsed.as_secs_f64().max(0.001)
+    };
+    let estimated_tokens_per_second =
+        (((eval_count as f64) / measured_seconds) * 10.0).round() / 10.0;
+    Ok(BenchmarkResult {
+        model,
+        prompt,
+        elapsed_ms: elapsed.as_millis(),
+        output_chars,
+        estimated_tokens: eval_count.min(u32::MAX as u64) as u32,
+        estimated_tokens_per_second,
+        success: payload.get("done").and_then(Value::as_bool).unwrap_or(true),
+        timed_out: false,
+        output_preview: output.chars().take(700).collect(),
+        error: None,
+        execution_mode: "cpu".to_string(),
+        created_at_ms: now_ms(),
+    })
+}
+
+async fn run_ollama_cpu_prompt(
+    model: String,
+    prompt: String,
+    timeout: Duration,
+    runtime: OllamaRuntime,
+) -> Result<BenchmarkResult, String> {
+    let payload = ollama_cpu_generate_payload(&model, &prompt);
+    if runtime == OllamaRuntime::Wsl && cfg!(target_os = "windows") {
+        return tauri::async_runtime::spawn_blocking(move || {
+            run_wsl_ollama_cpu_prompt(model, prompt, payload, timeout)
+        })
+        .await
+        .map_err(|err| format!("Tâche Ollama CPU WSL interrompue: {err}"))?;
+    }
+
+    let started = Instant::now();
+    let client = reqwest::Client::builder()
+        .timeout(timeout)
+        .build()
+        .map_err(|err| format!("Client Ollama CPU indisponible: {err}"))?;
+    let response = client
+        .post("http://127.0.0.1:11434/api/generate")
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|err| format!("API Ollama CPU inaccessible: {err}"))?;
+    let status = response.status();
+    let response_payload = response
+        .json::<Value>()
+        .await
+        .map_err(|err| format!("Réponse Ollama CPU illisible: {err}"))?;
+    if !status.is_success() {
+        return Err(format!("Ollama CPU a répondu {status}: {response_payload}"));
+    }
+    benchmark_result_from_ollama_api(model, prompt, response_payload, started.elapsed())
+}
+
+fn run_wsl_ollama_cpu_prompt(
+    model: String,
+    prompt: String,
+    payload: Value,
+    timeout: Duration,
+) -> Result<BenchmarkResult, String> {
+    let started = Instant::now();
+    let mut command = Command::new("wsl.exe");
+    let script = format!(
+        "curl -fsS --max-time {} -H 'Content-Type: application/json' --data-binary @- http://127.0.0.1:11434/api/generate",
+        timeout.as_secs()
+    );
+    command.args(["sh", "-lc", &script]);
+    let input = serde_json::to_vec(&payload)
+        .map_err(|err| format!("Requête Ollama CPU WSL illisible: {err}"))?;
+    let (stdout, stderr, success, timed_out) =
+        command_output_with_input_timeout(command, &input, timeout, "Ollama CPU WSL")?;
+    if timed_out {
+        return Err(format!(
+            "Ollama CPU WSL stoppé après {} secondes.",
+            timeout.as_secs()
+        ));
+    }
+    if !success {
+        return Err(format!(
+            "Ollama CPU WSL indisponible: {}",
+            stderr.trim().chars().take(500).collect::<String>()
+        ));
+    }
+    let response_payload = serde_json::from_str::<Value>(&stdout)
+        .map_err(|err| format!("Réponse Ollama CPU WSL illisible: {err}"))?;
+    benchmark_result_from_ollama_api(model, prompt, response_payload, started.elapsed())
 }
 
 fn run_ollama_prompt(
@@ -1230,6 +1375,7 @@ fn run_ollama_prompt(
         } else {
             Some(stderr.chars().take(500).collect())
         },
+        execution_mode: "auto".to_string(),
         created_at_ms: now_ms(),
     })
 }
@@ -1826,6 +1972,66 @@ fn command_output_with_timeout(
         .wait_with_output()
         .map_err(|err| format!("Sortie {label} indisponible: {err}"))?;
     Ok((output, timed_out))
+}
+
+fn command_output_with_input_timeout(
+    mut command: Command,
+    input: &[u8],
+    timeout: Duration,
+    label: &str,
+) -> Result<(String, String, bool, bool), String> {
+    let started = Instant::now();
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|err| format!("Impossible de lancer {label}: {err}"))?;
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(input)
+            .map_err(|err| format!("Entrée {label} indisponible: {err}"))?;
+    }
+
+    let stdout_preview = Arc::new(Mutex::new(String::new()));
+    let stderr_preview = Arc::new(Mutex::new(String::new()));
+    let mut readers = Vec::new();
+    if let Some(stdout) = child.stdout.take() {
+        readers.push(spawn_output_collector(stdout, stdout_preview.clone()));
+    }
+    if let Some(stderr) = child.stderr.take() {
+        readers.push(spawn_output_collector(stderr, stderr_preview.clone()));
+    }
+
+    let mut timed_out = false;
+    let status = loop {
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|err| format!("{label} illisible: {err}"))?
+        {
+            break status;
+        }
+        if started.elapsed() >= timeout {
+            timed_out = true;
+            let _ = child.kill();
+            break child
+                .wait()
+                .map_err(|err| format!("Fin {label} indisponible: {err}"))?;
+        }
+        thread::sleep(Duration::from_millis(120));
+    };
+    for reader in readers {
+        let _ = reader.join();
+    }
+    let stdout = stdout_preview
+        .lock()
+        .map(|value| value.clone())
+        .unwrap_or_default();
+    let stderr = stderr_preview
+        .lock()
+        .map(|value| value.clone())
+        .unwrap_or_default();
+    Ok((stdout, stderr, status.success(), timed_out))
 }
 
 #[tauri::command]
@@ -4244,5 +4450,44 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
             assert!(program.contains("ollama"));
             assert!(args.is_empty());
         }
+    }
+
+    #[test]
+    fn cpu_generate_payload_forces_zero_gpu_layers() {
+        let payload = ollama_cpu_generate_payload("qwen3:0.6b", "bonjour");
+        assert_eq!(
+            payload.get("model").and_then(Value::as_str),
+            Some("qwen3:0.6b")
+        );
+        assert_eq!(
+            payload.pointer("/options/num_gpu").and_then(Value::as_i64),
+            Some(0)
+        );
+        assert_eq!(
+            payload.pointer("/options/num_ctx").and_then(Value::as_i64),
+            Some(2048)
+        );
+        assert_eq!(payload.get("stream").and_then(Value::as_bool), Some(false));
+    }
+
+    #[test]
+    fn cpu_generate_response_uses_real_ollama_metrics() {
+        let result = benchmark_result_from_ollama_api(
+            "qwen3:0.6b".to_string(),
+            "bonjour".to_string(),
+            json!({
+                "response": "CPU OK",
+                "done": true,
+                "eval_count": 20,
+                "eval_duration": 2_000_000_000_u64
+            }),
+            Duration::from_secs(3),
+        )
+        .unwrap();
+        assert!(result.success);
+        assert_eq!(result.execution_mode, "cpu");
+        assert_eq!(result.estimated_tokens, 20);
+        assert_eq!(result.estimated_tokens_per_second, 10.0);
+        assert_eq!(result.output_preview, "CPU OK");
     }
 }

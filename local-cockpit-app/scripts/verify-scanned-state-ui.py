@@ -162,9 +162,8 @@ def check_scanned_view(browser, width: int, height: int, label: str):
     assert_idle_console_button_hidden(page, label)
     assert_single_header_action(page, label)
     assert_text(page, "#quickActionText", "Installer le modèle de test", f"{label} quick action")
-    assert_text(page, "#quickActionDetail", "Score", f"{label} quick score context")
-    assert_text(page, "#quickActionDetail", "modèle(s) compatibles", f"{label} quick compatible models")
-    assert_text(page, ".quick-decision-strip", "Modèle conseillé", f"{label} recommended model label")
+    assert_text(page, "#quickActionDetail", "Potentiel matériel", f"{label} quick potential context")
+    assert_text(page, ".quick-decision-strip", "MODÈLE CONSEILLÉ", f"{label} recommended model label")
     assert_text(page, "#topOllamaText", "Prêt", f"{label} runtime summary")
     assert_text(page, "#topGpuText", "RTX", f"{label} machine summary gpu")
     assert_text(page, "#quickModelDetail", "benchmarké", f"{label} quick model")
@@ -364,6 +363,22 @@ def check_scanned_view(browser, width: int, height: int, label: str):
         raise AssertionError(f"{label}: essential mode should not expose the top cancel button {install_state}")
     if not install_state.get("panelVisible"):
         raise AssertionError(f"{label}: active pull should reveal detailed console in essential mode {install_state}")
+
+    cuda_state = page.evaluate("""() => window.__OUTILSIA_TEST__.applyCudaFailureState()""")
+    if cuda_state["action"].get("command") != "benchmark-test-cpu":
+        raise AssertionError(f"{label}: CUDA failure must make CPU fallback the next action {cuda_state}")
+    if cuda_state["runtime"].get("key") != "cuda-blocked" or not cuda_state.get("cpuRetryVisible"):
+        raise AssertionError(f"{label}: CUDA failure must expose a visible CPU retry {cuda_state}")
+    if "GPU/CUDA bloqué" not in cuda_state.get("proof", ""):
+        raise AssertionError(f"{label}: quick proof must explain the CUDA block {cuda_state}")
+
+    cpu_state = page.evaluate("""() => window.__OUTILSIA_TEST__.applyCpuFallbackSuccessState()""")
+    if cpu_state["runtime"].get("key") != "cpu-only":
+        raise AssertionError(f"{label}: CPU fallback success must preserve the GPU warning {cpu_state}")
+    if cpu_state["action"].get("command") != "open-gpu-driver":
+        raise AssertionError(f"{label}: CPU fallback success must lead to the official GPU driver {cpu_state}")
+    if cpu_state["report"].get("ready"):
+        raise AssertionError(f"{label}: CPU fallback alone must not claim full GPU readiness {cpu_state}")
 
     page.close()
     return screenshot

@@ -109,8 +109,7 @@ def assert_scanned_contract(page, label: str):
     quick = text(page, ".quick-decision-strip")
     required = [
         "Installer le modèle de test",
-        "Score",
-        "modèle(s) compatibles",
+        "Potentiel matériel",
         "hermes3:8b",
         "benchmarké",
         "qwen3:0.6b",
