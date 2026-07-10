@@ -4,12 +4,12 @@
   "channel": "beta",
   "version": "0.1.1",
   "label": "0.1.1-beta",
-  "build_id": "291051072031",
-  "published_at": "2026-07-10T15:53:22.001Z",
+  "build_id": "291204755461",
+  "published_at": "2026-07-10T20:14:38.298Z",
   "build_provenance": {
     "schema": "outilsia.local_cockpit_build_provenance.v1",
-    "packaged_at": "2026-07-10T15:53:22.001Z",
-    "build_id": "291051072031",
+    "packaged_at": "2026-07-10T20:14:38.298Z",
+    "build_id": "291204755461",
     "version": "0.1.1",
     "ci": true,
     "runner_os": "Linux",
@@ -21,10 +21,10 @@
     ],
     "github": {
       "workflow": "Local Cockpit Cross Platform Beta",
-      "run_id": "29105107203",
+      "run_id": "29120475546",
       "run_attempt": "1",
       "ref": "refs/heads/main",
-      "sha": "7f1549f188cb0186dd0f33b09f7aff2a4d9645cd",
+      "sha": "ca27835b5292bf524f30f37bd964d14c4b254d36",
       "repository": "drakkB/outilsia"
     },
     "merged_release": true,
@@ -59,107 +59,107 @@
     "MemoryForge/Obsidian enrichi avec fiches machine, modèles, benchmarks, décisions et état catalogues."
   ],
   "freshness": {
-    "newest_source": "local-cockpit-app/src/assets/local-ai-scanner-thumb.png",
-    "newest_source_mtime_ms": 1783698573413,
+    "newest_source": "local-cockpit-app/src/styles.css",
+    "newest_source_mtime_ms": 1783714223119,
     "oldest_artifact": "local-cockpit-app/src-tauri/target/release/bundle/deb/OutilsIA Local Cockpit_0.1.1_amd64.deb",
-    "oldest_artifact_mtime_ms": 1783698725963,
+    "oldest_artifact_mtime_ms": 1783714397670,
     "allow_stale": false,
     "stale": false
   },
   "primary_download": {
-    "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-windows-x64.exe",
+    "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-windows-x64.exe",
     "original_name": "OutilsIA Local Cockpit_0.1.1_x64-setup.exe",
     "platform": "windows-x64",
-    "size_bytes": 3814804,
-    "sha256": "3a9ee4599b1a68b4af5238b907f6be9c4bddb643ca53ef6eb36895add6c9cb06",
-    "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-windows-x64.exe"
+    "size_bytes": 3822036,
+    "sha256": "75861657751c46637bc5924c63255e2bbd60b4b400f984c9b190f4e294a51b42",
+    "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-windows-x64.exe"
   },
   "downloads_by_platform": {
     "windows-x64": [
       {
-        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-windows-x64.exe",
+        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-windows-x64.exe",
         "original_name": "OutilsIA Local Cockpit_0.1.1_x64-setup.exe",
         "platform": "windows-x64",
-        "size_bytes": 3814804,
-        "sha256": "3a9ee4599b1a68b4af5238b907f6be9c4bddb643ca53ef6eb36895add6c9cb06",
-        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-windows-x64.exe"
+        "size_bytes": 3822036,
+        "sha256": "75861657751c46637bc5924c63255e2bbd60b4b400f984c9b190f4e294a51b42",
+        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-windows-x64.exe"
       },
       {
-        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-windows-x64.msi",
+        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-windows-x64.msi",
         "original_name": "OutilsIA Local Cockpit_0.1.1_x64_en-US.msi",
         "platform": "windows-x64",
-        "size_bytes": 5246976,
-        "sha256": "fddbdc1c29e1d1295ed3e57c9d7407c16bdaacb8a44a339c0fc8580b5eb3d70e",
-        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-windows-x64.msi"
+        "size_bytes": 5255168,
+        "sha256": "ad7bccdd4805f90a58dea717013669459d36dd40125a828d00af011cb4676fe3",
+        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-windows-x64.msi"
       }
     ],
     "linux": [
       {
-        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-linux.appimage",
+        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-linux.appimage",
         "original_name": "OutilsIA Local Cockpit_0.1.1_amd64.AppImage",
         "platform": "linux",
         "size_bytes": 79845880,
-        "sha256": "8192902540299a6de33cd1766c035f546810559df6121526d5731e81d7c0da0f",
-        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-linux.appimage"
+        "sha256": "745d6430be05de39a43b457e873d37252d5dd88ef51f98ce9988e4f0170479c1",
+        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-linux.appimage"
       },
       {
-        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-linux.deb",
+        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-linux.deb",
         "original_name": "OutilsIA Local Cockpit_0.1.1_amd64.deb",
         "platform": "linux",
-        "size_bytes": 5477390,
-        "sha256": "7e4d3c2421a242f7fcd32abfd17d2002b560e708db1a190ee6a91ee0ffeb10af",
-        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-linux.deb"
+        "size_bytes": 5485158,
+        "sha256": "27797a0e1d43be99695324ea2effbc22e966adbe973512a3c0b4728e09185b7e",
+        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-linux.deb"
       },
       {
-        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-linux.rpm",
+        "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-linux.rpm",
         "original_name": "OutilsIA Local Cockpit-0.1.1-1.x86_64.rpm",
         "platform": "linux",
-        "size_bytes": 5477237,
-        "sha256": "64c30249e588886b92884ce81b078d70176757a99ba701da59965cd676721675",
-        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-linux.rpm"
+        "size_bytes": 5485087,
+        "sha256": "b3e2d7f4081991d939cad61b23cee4d99434f736d60b89830dab05a6a8171cf8",
+        "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-linux.rpm"
       }
     ]
   },
   "files": [
     {
-      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-windows-x64.exe",
+      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-windows-x64.exe",
       "original_name": "OutilsIA Local Cockpit_0.1.1_x64-setup.exe",
       "platform": "windows-x64",
-      "size_bytes": 3814804,
-      "sha256": "3a9ee4599b1a68b4af5238b907f6be9c4bddb643ca53ef6eb36895add6c9cb06",
-      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-windows-x64.exe"
+      "size_bytes": 3822036,
+      "sha256": "75861657751c46637bc5924c63255e2bbd60b4b400f984c9b190f4e294a51b42",
+      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-windows-x64.exe"
     },
     {
-      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-windows-x64.msi",
+      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-windows-x64.msi",
       "original_name": "OutilsIA Local Cockpit_0.1.1_x64_en-US.msi",
       "platform": "windows-x64",
-      "size_bytes": 5246976,
-      "sha256": "fddbdc1c29e1d1295ed3e57c9d7407c16bdaacb8a44a339c0fc8580b5eb3d70e",
-      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-windows-x64.msi"
+      "size_bytes": 5255168,
+      "sha256": "ad7bccdd4805f90a58dea717013669459d36dd40125a828d00af011cb4676fe3",
+      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-windows-x64.msi"
     },
     {
-      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-linux.appimage",
+      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-linux.appimage",
       "original_name": "OutilsIA Local Cockpit_0.1.1_amd64.AppImage",
       "platform": "linux",
       "size_bytes": 79845880,
-      "sha256": "8192902540299a6de33cd1766c035f546810559df6121526d5731e81d7c0da0f",
-      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-linux.appimage"
+      "sha256": "745d6430be05de39a43b457e873d37252d5dd88ef51f98ce9988e4f0170479c1",
+      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-linux.appimage"
     },
     {
-      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-linux.deb",
+      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-linux.deb",
       "original_name": "OutilsIA Local Cockpit_0.1.1_amd64.deb",
       "platform": "linux",
-      "size_bytes": 5477390,
-      "sha256": "7e4d3c2421a242f7fcd32abfd17d2002b560e708db1a190ee6a91ee0ffeb10af",
-      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-linux.deb"
+      "size_bytes": 5485158,
+      "sha256": "27797a0e1d43be99695324ea2effbc22e966adbe973512a3c0b4728e09185b7e",
+      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-linux.deb"
     },
     {
-      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-linux.rpm",
+      "name": "OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-linux.rpm",
       "original_name": "OutilsIA Local Cockpit-0.1.1-1.x86_64.rpm",
       "platform": "linux",
-      "size_bytes": 5477237,
-      "sha256": "64c30249e588886b92884ce81b078d70176757a99ba701da59965cd676721675",
-      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291051072031-linux.rpm"
+      "size_bytes": 5485087,
+      "sha256": "b3e2d7f4081991d939cad61b23cee4d99434f736d60b89830dab05a6a8171cf8",
+      "url": "/static/downloads/local-cockpit/OutilsIA-Local-Cockpit-0.1.1-beta-291204755461-linux.rpm"
     }
   ]
 }

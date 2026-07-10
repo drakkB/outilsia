@@ -17,7 +17,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - Ajouter une empreinte SHA-256 couvrant le document hors bloc d'intégrité. Cette empreinte détecte une modification ; elle ne constitue pas une signature d'identité.
 - Garder le passeport dans le mode Détails pour ne pas encombrer le parcours Essentiel.
 
-État au 10 juillet 2026 : source, gates, build et publication Windows/Linux terminés sur le build `291051072031` issu du commit `7f1549f`. La recette terrain physique reste à finaliser sans fixture ni preuve fabriquée.
+État au 10 juillet 2026 : source, gates, build et publication Windows/Linux terminés sur le build public `291204755461` issu du commit `ca27835` et du run CI `29120475546`. La recette terrain physique reste à finaliser sans fixture ni preuve fabriquée.
 
 - [x] Sondes NVIDIA : VRAM utilisée, P-state, PCIe et ReBAR seulement quand explicitement exposé.
 - [x] Preuve d'offload Ollama `/api/ps` : CPU, hybride ou GPU, avec état « non prouvé » en absence de mesure.
@@ -44,7 +44,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - Borner chaque campagne par un budget de temps, de disque et de téléchargements accepté par l'utilisateur.
 - Ne jamais remplacer une configuration qui fonctionne sans comparaison mesurée et possibilité de restaurer le profil précédent.
 
-Premier jalon publié au 10 juillet 2026 dans le build `291051072031` : campagne bornée sur un modèle déjà installé. La quantification, les couches GPU et la comparaison multi-runtime restent des phases ultérieures après validation terrain.
+Premier jalon publié au 10 juillet 2026 dans le build public `291204755461` : campagne bornée sur un modèle déjà installé. La quantification, les couches GPU et la comparaison multi-runtime restent des phases ultérieures après validation terrain.
 
 - [x] Comparer trois profils Rapide, Équilibré et Qualité / contexte sur le même modèle.
 - [x] Borner côté Rust `num_ctx`, `num_batch` et `num_thread`.
@@ -67,7 +67,7 @@ Premier jalon publié au 10 juillet 2026 dans le build `291051072031` : campagne
 - Comparer les performances, l'offload et les thermiques avec l'état précédent.
 - Expliquer la cause probable sans présenter une corrélation comme une certitude.
 
-Premier jalon v1 implémenté le 10 juillet 2026 en source : référence locale explicite par machine et modèle, comparaison stricte des conditions, historique restaurable et export JSON/Markdown. Publication Windows/Linux conditionnée aux gates complètes.
+Premier jalon v1 publié le 10 juillet 2026 dans le build Windows/Linux `291204755461` : référence locale explicite par machine et modèle, comparaison stricte des conditions, historique restaurable et export JSON/Markdown. Le build provient du commit `ca27835` et du run CI `29120475546` ; ses cinq artefacts et leurs SHA-256 ont été vérifiés en production.
 
 - [x] Enregistrer une référence seulement après benchmark Ollama API réussi et action explicite.
 - [x] Lier chaque capture à la machine, au build, au modèle, au runtime, au protocole, au prompt et au profil Autopilot.
@@ -77,7 +77,8 @@ Premier jalon v1 implémenté le 10 juillet 2026 en source : référence locale 
 - [x] Conserver plusieurs références locales, réactiver une référence précédente et exporter JSON/Markdown.
 - [x] Propager un résumé borné vers rapport, MemoryForge, Passport, terrain et Strategy Arena en lecture seule.
 - [x] Garantir que Flight Recorder ne fabrique jamais de preuve terrain physique.
-- [ ] Valider puis publier le build Windows/Linux contenant Flight Recorder v1.
+- [x] Valider puis publier le build Windows/Linux contenant Flight Recorder v1.
+- [x] Documenter l'override de publication utilisé uniquement pour conserver la parité Windows/Linux : terrain toujours `0/5`, prochaine cible `old_laptop`, aucune revendication de validation physique.
 - [ ] Confirmer les seuils sur les cinq machines physiques et les recaler seulement à partir de mesures réelles.
 
 ## Phase 5 - Upgrade Digital Twin
