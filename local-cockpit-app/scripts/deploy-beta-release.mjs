@@ -8,8 +8,10 @@ import { fileURLToPath } from "node:url";
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(appRoot, "..");
 const defaultReleaseDir = join(repoRoot, "server-work", "static", "downloads", "local-cockpit");
+const defaultPagePath = join(repoRoot, "server-work", "static", "pages", "telecharger-scanner-ia-local.html");
 const defaultRemote = process.env.OUTILSIA_DEPLOY_REMOTE || "";
 const defaultRemoteDir = "/var/www/outilsia/static/downloads/local-cockpit";
+const defaultRemotePagePath = "/var/www/outilsia/static/pages/telecharger-scanner-ia-local.html";
 
 function usage() {
   console.log(`Usage:
@@ -19,6 +21,7 @@ Default:
   --release-dir ${defaultReleaseDir}
   --remote ${defaultRemote || "<set OUTILSIA_DEPLOY_REMOTE or pass --remote>"}
   --remote-dir ${defaultRemoteDir}
+  --remote-page ${defaultRemotePagePath}
 
 Without --deploy, the script validates only and prints the planned deployment.`);
 }
@@ -28,6 +31,7 @@ function parseArgs(argv) {
     releaseDir: defaultReleaseDir,
     remote: defaultRemote,
     remoteDir: defaultRemoteDir,
+    remotePagePath: defaultRemotePagePath,
     deploy: false,
     requireFreshness: false,
   };
@@ -55,6 +59,10 @@ function parseArgs(argv) {
     }
     if (arg === "--remote-dir") {
       opts.remoteDir = argv[++i] || "";
+      continue;
+    }
+    if (arg === "--remote-page") {
+      opts.remotePagePath = argv[++i] || "";
       continue;
     }
     throw new Error(`Unknown argument: ${arg}`);
@@ -148,16 +156,21 @@ function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
 
-function deploy({ releasePath, files }, opts) {
+function deploy({ releasePath, files, pagePath }, opts) {
   const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
   const backupDir = `/var/backups/outilsia-local-cockpit/release_${stamp}`;
   const remoteDir = opts.remoteDir.replace(/\/+$/, "");
+  const remotePagePath = opts.remotePagePath;
   const stagingDir = `${remoteDir}.upload_${stamp}`;
   const prepareCommand = [
     "set -e",
     `mkdir -p ${shellQuote(backupDir)}`,
     `mkdir -p ${shellQuote(remoteDir)}`,
     `cp -a ${shellQuote(remoteDir)}/. ${shellQuote(backupDir)}/ 2>/dev/null || true`,
+    ...(pagePath && remotePagePath ? [
+      `mkdir -p ${shellQuote(dirname(remotePagePath))}`,
+      `cp -a ${shellQuote(remotePagePath)} ${shellQuote(`${backupDir}/${basename(remotePagePath)}`)} 2>/dev/null || true`,
+    ] : []),
     `rm -rf ${shellQuote(stagingDir)}`,
     `mkdir -p ${shellQuote(stagingDir)}`,
     `echo backup:${backupDir}`,
@@ -168,6 +181,9 @@ function deploy({ releasePath, files }, opts) {
     run("scp", [file.path, `${opts.remote}:${stagingDir}/${basename(file.path)}`]);
   }
   run("scp", [releasePath, `${opts.remote}:${stagingDir}/release.json`]);
+  if (pagePath && remotePagePath) {
+    run("scp", [pagePath, `${opts.remote}:${stagingDir}/${basename(remotePagePath)}`]);
+  }
 
   const verifyScript = [
     "import hashlib, json, pathlib, sys",
@@ -183,6 +199,9 @@ function deploy({ releasePath, files }, opts) {
     `test -s ${shellQuote(stagingDir)}/release.json`,
     `python3 -c ${shellQuote(verifyScript)} ${shellQuote(stagingDir)}`,
     ...files.map((file) => `mv -f ${shellQuote(`${stagingDir}/${file.name}`)} ${shellQuote(`${remoteDir}/${file.name}`)}`),
+    ...(pagePath && remotePagePath ? [
+      `mv -f ${shellQuote(`${stagingDir}/${basename(remotePagePath)}`)} ${shellQuote(remotePagePath)}`,
+    ] : []),
     `mv -f ${shellQuote(`${stagingDir}/release.json`)} ${shellQuote(`${remoteDir}/release.json`)}`,
     `rmdir ${shellQuote(stagingDir)}`,
     "echo release_activated",
@@ -193,7 +212,25 @@ function deploy({ releasePath, files }, opts) {
 
 try {
   const opts = parseArgs(process.argv.slice(2));
+  const managesPublicPage = resolve(opts.releaseDir) === resolve(defaultReleaseDir);
+  if (managesPublicPage) {
+    run("node", [
+      join(appRoot, "scripts", "sync-download-page-release.mjs"),
+      "--release",
+      join(opts.releaseDir, "release.json"),
+      "--page",
+      defaultPagePath,
+    ]);
+    run("node", [
+      join(appRoot, "scripts", "verify-download-page-contract.mjs"),
+      "--release-dir",
+      opts.releaseDir,
+      "--require-local-files",
+      "--require-freshness",
+    ]);
+  }
   const validated = validateRelease(opts.releaseDir, { requireFreshness: opts.requireFreshness });
+  validated.pagePath = managesPublicPage ? defaultPagePath : "";
   cleanupLocalReleaseDir(opts.releaseDir, new Set(validated.files.map((file) => file.name)));
   console.log("release_valid", validated.release.version, `${validated.files.length} file(s)${opts.requireFreshness ? " freshness=ok" : ""}`);
   for (const file of validated.files) {
@@ -201,6 +238,7 @@ try {
   }
   if (!opts.deploy) {
     console.log(`dry_run remote=${opts.remote} remote_dir=${opts.remoteDir}`);
+    if (managesPublicPage) console.log(`download_page_ready ${defaultPagePath}`);
     console.log("Add --deploy to publish this release.");
     process.exit(0);
   }

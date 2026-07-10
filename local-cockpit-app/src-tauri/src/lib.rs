@@ -193,6 +193,14 @@ pub struct OllamaTuningRequest {
     num_thread: Option<u32>,
 }
 
+#[derive(Debug, Clone, Default)]
+struct OllamaExecutionOptions {
+    force_cpu: bool,
+    benchmark_profile: bool,
+    num_predict_override: Option<u32>,
+    tuning: Option<OllamaTuningRequest>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct InstallModelRequest {
@@ -1191,10 +1199,12 @@ async fn benchmark_ollama(request: BenchmarkRequest) -> Result<BenchmarkResult, 
             prompt,
             timeout,
             runtime,
-            force_cpu,
-            true,
-            num_predict_override,
-            tuning,
+            OllamaExecutionOptions {
+                force_cpu,
+                benchmark_profile: true,
+                num_predict_override,
+                tuning,
+            },
         )
         .await;
     }
@@ -1239,7 +1249,15 @@ async fn chat_ollama(request: BenchmarkRequest) -> Result<BenchmarkResult, Strin
     let tuning = request.tuning;
     if force_cpu || tuning.is_some() {
         return run_ollama_api_prompt(
-            model, prompt, timeout, runtime, force_cpu, false, None, tuning,
+            model,
+            prompt,
+            timeout,
+            runtime,
+            OllamaExecutionOptions {
+                force_cpu,
+                tuning,
+                ..OllamaExecutionOptions::default()
+            },
         )
         .await;
     }
@@ -1259,10 +1277,11 @@ async fn run_ollama_api_with_cli_fallback(
         prompt.clone(),
         timeout,
         runtime,
-        false,
-        benchmark_profile,
-        num_predict_override,
-        None,
+        OllamaExecutionOptions {
+            benchmark_profile,
+            num_predict_override,
+            ..OllamaExecutionOptions::default()
+        },
     )
     .await
     {
@@ -1521,20 +1540,17 @@ async fn run_ollama_api_prompt(
     prompt: String,
     timeout: Duration,
     runtime: OllamaRuntime,
-    force_cpu: bool,
-    benchmark_profile: bool,
-    num_predict_override: Option<u32>,
-    tuning: Option<OllamaTuningRequest>,
+    options: OllamaExecutionOptions,
 ) -> Result<BenchmarkResult, String> {
     let payload = ollama_chat_payload(
         &model,
         &prompt,
-        force_cpu,
-        benchmark_profile,
-        num_predict_override,
-        tuning.as_ref(),
+        options.force_cpu,
+        options.benchmark_profile,
+        options.num_predict_override,
+        options.tuning.as_ref(),
     );
-    let execution_mode = if force_cpu { "cpu" } else { "auto" };
+    let execution_mode = if options.force_cpu { "cpu" } else { "auto" };
     if runtime == OllamaRuntime::Wsl && cfg!(target_os = "windows") {
         let execution_mode = execution_mode.to_string();
         return tauri::async_runtime::spawn_blocking(move || {
