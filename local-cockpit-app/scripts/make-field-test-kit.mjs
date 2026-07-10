@@ -5444,6 +5444,17 @@ ${postRows}
   };
   writeProofManifest(kitDir, baseProof);
 
+  const kitSelfCheck = spawnSync("powershell.exe", [
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    toWindowsPath(join(kitDir, "VERIFIER-KIT-WINDOWS.ps1")),
+  ], { encoding: "utf8" });
+  if (kitSelfCheck.status !== 0) {
+    throw new Error(`VERIFIER-KIT-WINDOWS.ps1 failed: ${(kitSelfCheck.stdout || "")}${kitSelfCheck.stderr || ""}`.trim());
+  }
+
   try {
     execFileSync("powershell.exe", [
       "-NoProfile",
