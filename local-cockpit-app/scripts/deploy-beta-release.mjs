@@ -149,40 +149,46 @@ function shellQuote(value) {
 }
 
 function deploy({ releasePath, files }, opts) {
-  const backupDir = `/var/backups/outilsia-local-cockpit/release_${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`;
+  const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+  const backupDir = `/var/backups/outilsia-local-cockpit/release_${stamp}`;
   const remoteDir = opts.remoteDir.replace(/\/+$/, "");
-  const keepNames = files.map((file) => file.name);
-  const backupCommand = [
+  const stagingDir = `${remoteDir}.upload_${stamp}`;
+  const prepareCommand = [
     "set -e",
     `mkdir -p ${shellQuote(backupDir)}`,
     `mkdir -p ${shellQuote(remoteDir)}`,
     `cp -a ${shellQuote(remoteDir)}/. ${shellQuote(backupDir)}/ 2>/dev/null || true`,
-    `python3 -c ${shellQuote("import pathlib, sys; base = pathlib.Path(sys.argv[1]); keep = set(sys.argv[2:]); [path.unlink() for path in base.glob('OutilsIA-Local-Cockpit-*') if path.name not in keep and path.is_file()]")} ${shellQuote(remoteDir)} ${keepNames.map(shellQuote).join(" ")}`,
+    `rm -rf ${shellQuote(stagingDir)}`,
+    `mkdir -p ${shellQuote(stagingDir)}`,
     `echo backup:${backupDir}`,
   ].join("; ");
-  run("ssh", [opts.remote, backupCommand]);
+  run("ssh", [opts.remote, prepareCommand]);
 
   for (const file of files) {
-    run("scp", [file.path, `${opts.remote}:${remoteDir}/${basename(file.path)}`]);
+    run("scp", [file.path, `${opts.remote}:${stagingDir}/${basename(file.path)}`]);
   }
-  run("scp", [releasePath, `${opts.remote}:${remoteDir}/release.json`]);
+  run("scp", [releasePath, `${opts.remote}:${stagingDir}/release.json`]);
 
-  const verifyCommand = [
-    "set -e",
-    `test -s ${shellQuote(remoteDir)}/release.json`,
-    `python3 - <<'PY'
-import hashlib, json, pathlib
-base = pathlib.Path(${JSON.stringify(remoteDir)})
-data = json.loads((base / "release.json").read_text())
-for item in data["files"]:
-    path = base / item["name"]
-    assert path.exists(), path
-    assert path.stat().st_size == int(item["size_bytes"]), item["name"]
-    assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"], item["name"]
-print("remote_release_ok", data["version"], len(data["files"]))
-PY`,
+  const verifyScript = [
+    "import hashlib, json, pathlib, sys",
+    "base = pathlib.Path(sys.argv[1])",
+    "data = json.loads((base / 'release.json').read_text())",
+    "assert all((base / item['name']).exists() for item in data['files'])",
+    "assert all((base / item['name']).stat().st_size == int(item['size_bytes']) for item in data['files'])",
+    "assert all(hashlib.sha256((base / item['name']).read_bytes()).hexdigest() == item['sha256'] for item in data['files'])",
+    "print('remote_release_ok', data['version'], len(data['files']))",
   ].join("; ");
-  run("ssh", [opts.remote, verifyCommand]);
+  const verifyAndActivateCommand = [
+    "set -e",
+    `test -s ${shellQuote(stagingDir)}/release.json`,
+    `python3 -c ${shellQuote(verifyScript)} ${shellQuote(stagingDir)}`,
+    ...files.map((file) => `mv -f ${shellQuote(`${stagingDir}/${file.name}`)} ${shellQuote(`${remoteDir}/${file.name}`)}`),
+    `mv -f ${shellQuote(`${stagingDir}/release.json`)} ${shellQuote(`${remoteDir}/release.json`)}`,
+    `rmdir ${shellQuote(stagingDir)}`,
+    "echo release_activated",
+    "echo previous_release_files_retained_for_cache_transition",
+  ].join("; ");
+  run("ssh", [opts.remote, verifyAndActivateCommand]);
 }
 
 try {
