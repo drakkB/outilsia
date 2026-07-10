@@ -180,6 +180,16 @@ function sortedFiles(files) {
   });
 }
 
+function normalizedBuildProvenance(release, files) {
+  const artifactPlatforms = [...new Set(files.map((file) => file.platform || "unknown"))].sort();
+  return {
+    ...(release.build_provenance || {}),
+    artifact_platforms: artifactPlatforms,
+    merged_release: artifactPlatforms.length > 1,
+    merge_verified_file_count: files.length,
+  };
+}
+
 function readExistingRelease(outputDir) {
   const releasePath = join(outputDir, "release.json");
   if (!existsSync(releasePath)) return null;
@@ -243,6 +253,7 @@ function importRelease(validated, outputDir, { replace, merge }) {
     primary_download: choosePrimaryDownload(files, existingRelease?.primary_download?.name),
     downloads_by_platform: downloadsByPlatform(files),
   };
+  release.build_provenance = normalizedBuildProvenance(release, files);
   writeFileSync(join(outputDir, "release.json"), `${JSON.stringify(release, null, 2)}\n`);
   for (const file of files) validateOutputFile(outputDir, file);
   writeFileSync(join(outputDir, ".gitkeep"), "", { flag: "a" });

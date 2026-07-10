@@ -132,6 +132,10 @@ try {
   if (!platforms.has("linux")) throw new Error("missing linux after publish script");
   if (!release.downloads_by_platform?.["windows-x64"]?.length) throw new Error("missing windows downloads_by_platform");
   if (!release.downloads_by_platform?.linux?.length) throw new Error("missing linux downloads_by_platform");
+  if (JSON.stringify(release.build_provenance?.artifact_platforms) !== JSON.stringify(["linux", "windows-x64"])) {
+    throw new Error(`bad cross-platform provenance ${JSON.stringify(release.build_provenance)}`);
+  }
+  if (release.build_provenance?.merged_release !== true) throw new Error("cross-platform provenance must mark merged_release=true");
   const previousFieldStatus = process.env.OUTILSIA_FIELD_STATUS_JSON;
   process.env.OUTILSIA_FIELD_STATUS_JSON = fieldStatus;
   runExpectFailure(["--windows", windows, "--linux", linux, "--release-dir", join(root, "deploy-blocked"), "--deploy"], "Linux public deploy blocked");

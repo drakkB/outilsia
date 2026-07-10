@@ -17,7 +17,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - Ajouter une empreinte SHA-256 couvrant le document hors bloc d'intégrité. Cette empreinte détecte une modification ; elle ne constitue pas une signature d'identité.
 - Garder le passeport dans le mode Détails pour ne pas encombrer le parcours Essentiel.
 
-État au 10 juillet 2026 : implémentation source terminée, gates Windows et interface vertes ; build public Windows/Linux et recette terrain réelle à finaliser.
+État au 10 juillet 2026 : source, gates, build et publication Windows/Linux terminés sur le build `290963424431` issu du commit `42f9fcb`. La recette terrain physique reste à finaliser sans fixture ni preuve fabriquée.
 
 - [x] Sondes NVIDIA : VRAM utilisée, P-state, PCIe et ReBAR seulement quand explicitement exposé.
 - [x] Preuve d'offload Ollama `/api/ps` : CPU, hybride ou GPU, avec état « non prouvé » en absence de mesure.
@@ -26,7 +26,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] SHA-256 canonique vérifié, test de falsification et avertissement « pas une signature d'identité ».
 - [x] Résumé Passport dans le rapport, MemoryForge, le pont Strategy Arena et le terrain, sans rendre le terrain artificiellement dépendant du passeport.
 - [x] Pages SEO/GEO, FAQ structurées, `llms.txt`, README et monitoring mis à jour.
-- [ ] Construire et publier le nouveau build Windows/Linux, puis vérifier les artefacts publics.
+- [x] Construire et publier le nouveau build Windows/Linux, puis vérifier les cinq artefacts publics et leurs SHA-256.
 - [ ] Confirmer l'offload réel sur les machines physiques de la campagne terrain.
 
 ## Phase 1 - Preuve terrain fiable

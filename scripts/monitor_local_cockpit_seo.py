@@ -61,6 +61,7 @@ KEY_SITEMAP_PATHS = [
 SCREENSHOT_PATHS = [
     "/static/images/local-cockpit/local-cockpit-scanned-desktop-20260703.png?v=202607032140",
     "/static/images/local-cockpit/local-cockpit-scanned-mobile-20260703.png?v=202607032140",
+    "/static/images/local-cockpit/local-cockpit-capability-passport-v1.png?v=20260710",
 ]
 
 FALSE_JS_LINK_RE = re.compile(r'(?:href|src)="(?:get[A-Z][^"]*|item\.[^"]*|\$\{[^"]*)')

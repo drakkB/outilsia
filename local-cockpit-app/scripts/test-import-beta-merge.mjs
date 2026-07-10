@@ -152,6 +152,12 @@ try {
   }
   if (!release.downloads_by_platform?.["windows-x64"]?.length) throw new Error("missing windows downloads_by_platform");
   if (!release.downloads_by_platform?.linux?.length) throw new Error("missing linux downloads_by_platform");
+  if (JSON.stringify(release.build_provenance?.artifact_platforms) !== JSON.stringify(["linux", "windows-x64"])) {
+    throw new Error(`bad merged artifact_platforms ${JSON.stringify(release.build_provenance)}`);
+  }
+  if (release.build_provenance?.merged_release !== true || release.build_provenance?.merge_verified_file_count !== 3) {
+    throw new Error(`missing merged release provenance ${JSON.stringify(release.build_provenance)}`);
+  }
   const linuxVerifyOutput = verifyLinuxArtifacts(out);
   if (!linuxVerifyOutput.includes("linux_artifacts_verified")) {
     throw new Error(`linux artifact verifier did not confirm merged release: ${linuxVerifyOutput}`);

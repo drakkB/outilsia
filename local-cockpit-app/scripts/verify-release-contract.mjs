@@ -129,6 +129,15 @@ try {
   if (!names.has(release.primary_download.name)) fail("primary_download is not listed in release.files");
   assertPlatformFile(release.primary_download);
 
+  const provenancePlatforms = [...new Set(release.build_provenance?.artifact_platforms || [])].sort();
+  const actualPlatforms = [...platforms].sort();
+  if (JSON.stringify(provenancePlatforms) !== JSON.stringify(actualPlatforms)) {
+    fail(`build_provenance.artifact_platforms mismatch: expected ${actualPlatforms.join(",")} got ${provenancePlatforms.join(",")}`);
+  }
+  if (actualPlatforms.length > 1 && release.build_provenance?.merged_release !== true) {
+    fail("Cross-platform release must set build_provenance.merged_release=true");
+  }
+
   for (const [platform, files] of Object.entries(release.downloads_by_platform)) {
     if (!platformExts[platform]) fail(`Unsupported downloads_by_platform key: ${platform}`);
     if (!Array.isArray(files) || !files.length) fail(`downloads_by_platform.${platform} must be non-empty`);
