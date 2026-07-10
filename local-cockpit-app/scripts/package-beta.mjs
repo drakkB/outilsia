@@ -188,6 +188,7 @@ const release = {
   published_at: publishedAt,
   build_provenance: buildProvenance,
   release_notes: [
+    "Upgrade Digital Twin v1 : simuler localement RAM, GPU/VRAM, SSD, alimentation et boîtier, conserver les inconnues physiques, comparer les scénarios et pouvoir conclure « N'achetez rien pour l'instant ».",
     "Hardware Doctor 2.0 : signaux RAM/GPU/driver/PCIe/ReBAR/thermiques clairement sourcés, mesures instantanées étiquetées et inconnues conservées comme inconnues.",
     "Model Autopilot v1 : trois profils bornés sur un modèle déjà installé, métriques API Ollama obligatoires, application explicite et restauration du profil précédent ou des réglages par défaut.",
     "Preuve d'offload Ollama : après benchmark, /api/ps distingue CPU, hybride et GPU depuis size_vram / size au lieu de déduire l'accélération depuis le pilote.",

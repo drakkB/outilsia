@@ -78,6 +78,9 @@ function validateRelease(release, opts, downloadRoot) {
   if (!release.version) fail("release.version is missing");
   if (!release.build_id) fail("release.build_id is missing");
   if (!Array.isArray(release.release_notes) || !release.release_notes.length) fail("release.release_notes must not be empty");
+  if (!release.release_notes.some((note) => String(note).includes("Upgrade Digital Twin v1"))) {
+    fail("release.release_notes must advertise Upgrade Digital Twin v1");
+  }
   if (!release.primary_download?.name) fail("release.primary_download.name is missing");
   if (!Array.isArray(release.files) || !release.files.length) fail("release.files must not be empty");
   const freshness = validateFreshness(release, opts.requireFreshness);
