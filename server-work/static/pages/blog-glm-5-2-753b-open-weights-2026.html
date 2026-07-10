@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Faire tourner GLM-5.2 en local : configs, Ollama et ZCode</title>
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="description" content="Faire tourner GLM-5.2 en local : tailles GGUF, commandes Ollama et llama.cpp, ZCode, configs 512 Go à 8 GPU et matériel adapté.">
+<link rel="canonical" href="https://outilsia.fr/blog/glm-5-2-753b-open-weights-2026">
+<meta property="og:title" content="Faire tourner GLM-5.2 en local : le guide matériel complet">
+<meta property="og:description" content="217 à 467 Go en GGUF, Ollama, llama.cpp, ZCode et trois configurations réalistes sans confondre PC et serveur 8 GPU.">
+<meta property="og:type" content="article">
+<meta property="og:image" content="https://outilsia.fr/static/og-cover.png">
+<meta property="og:url" content="https://outilsia.fr/blog/glm-5-2-753b-open-weights-2026">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:site_name" content="OutilsIA.fr">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://outilsia.fr/static/og-cover.png">
+<meta name="twitter:title" content="Faire tourner GLM-5.2 en local : configs et commandes">
+<meta name="twitter:description" content="Le poids réel de GLM-5.2, les quantifications, ZCode et le matériel nécessaire pour une expérience locale honnête.">
+<link rel="stylesheet" href="/static/css/tailwind.min.css">
+<script defer src="/static/js/alpine.min.js"></script>
+<style>
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#090914;color:#fff}
+.glass{background:rgba(15,15,26,.68);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.08)}
+.gradient-text{background:linear-gradient(135deg,#67e8f9,#fbbf24,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.prose h2{font-size:1.65rem;font-weight:900;color:#fff;margin-top:2.35rem;margin-bottom:1rem}
+.prose h3{font-size:1.16rem;font-weight:800;color:#e5e7eb;margin-top:1.6rem;margin-bottom:.6rem}
+.prose p,.prose li{color:#cbd5e1;line-height:1.75}
+.prose a{color:#67e8f9;text-decoration:underline;text-underline-offset:3px}
+.hero{position:relative;overflow:hidden;border-radius:18px;border:1px solid rgba(103,232,249,.24);background:radial-gradient(circle at 20% 20%,rgba(103,232,249,.20),transparent 30%),radial-gradient(circle at 78% 35%,rgba(251,191,36,.16),transparent 28%),linear-gradient(135deg,#080d18,#151126 60%,#080d18);min-height:310px;margin:24px 0;padding:24px}
+.chip{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:6px 10px;background:rgba(103,232,249,.10);border:1px solid rgba(103,232,249,.22);color:#67e8f9;font-size:.75rem;font-weight:900;text-transform:uppercase;letter-spacing:.05em}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:18px 0}
+.stat{padding:14px;border-radius:14px;background:rgba(15,23,42,.70);border:1px solid rgba(255,255,255,.10)}
+.stat strong{display:block;color:#fff;font-size:1.05rem;margin-bottom:5px}
+.stat span{display:block;color:#94a3b8;font-size:.9rem;line-height:1.45}
+.decision{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:18px 0}
+.card{padding:15px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.10)}
+.card strong{display:block;color:#fff;margin-bottom:6px}
+.card span{display:block;color:#cbd5e1;font-size:.92rem;line-height:1.55}
+.ok{border-color:rgba(34,197,94,.34);background:rgba(34,197,94,.08)}
+.warn{border-color:rgba(251,191,36,.34);background:rgba(251,191,36,.08)}
+.no{border-color:rgba(248,113,113,.34);background:rgba(248,113,113,.08)}
+table{width:100%;border-collapse:collapse;font-size:.92rem}th,td{border-bottom:1px solid rgba(255,255,255,.08);padding:10px;text-align:left}th{color:#94a3b8;text-transform:uppercase;font-size:.75rem;letter-spacing:.05em}
+pre{background:#020617;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px;overflow:auto;color:#cbd5e1}
+code{background:#020617;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:2px 6px;color:#67e8f9}
+.config-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin:18px 0}
+.config-card{padding:17px;border-radius:14px;background:#0b1220;border:1px solid rgba(103,232,249,.18)}
+.config-card h3{margin:.25rem 0 .65rem;color:#fff}.config-card ul{margin:.6rem 0 0;padding-left:1.2rem}
+.affiliate-box{padding:20px;border-radius:14px;background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.30);margin:22px 0}
+.parts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:16px 0}
+.part-link{display:block;padding:14px;border-radius:12px;background:rgba(15,23,42,.88);border:1px solid rgba(255,255,255,.10);text-decoration:none!important}
+.part-link strong,.part-link span{display:block}.part-link span{font-size:.88rem;color:#94a3b8;margin-top:4px}
+.callout{padding:16px;border-left:4px solid #67e8f9;background:rgba(103,232,249,.07);border-radius:0 12px 12px 0;margin:18px 0}
+</style>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"TechArticle","headline":"Faire tourner GLM-5.2 en local : configurations, Ollama et ZCode","description":"Guide français de déploiement local de GLM-5.2 : quantifications GGUF, mémoire, GPU, commandes et intégration ZCode.","author":{"@type":"Person","name":"Chris Drakkeng","url":"https://outilsia.fr/about"},"publisher":{"@type":"Organization","name":"OutilsIA.fr"},"datePublished":"2026-06-23","dateModified":"2026-07-10","mainEntityOfPage":"https://outilsia.fr/blog/glm-5-2-753b-open-weights-2026","about":["GLM-5.2","IA locale","Ollama","llama.cpp","ZCode","configuration PC IA"],"mentions":[{"@type":"SoftwareApplication","name":"GLM-5.2","url":"https://huggingface.co/zai-org/GLM-5.2"},{"@type":"SoftwareApplication","name":"ZCode","url":"https://zcode.z.ai/"},{"@type":"Organization","name":"Z.ai","url":"https://z.ai/"}]}
+</script>
+<script type="application/ld+json" data-outilsia-author-block>{"@context":"https://schema.org","@type":"BlogPosting","@id":"https://outilsia.fr/blog/glm-5-2-753b-open-weights-2026#article","mainEntityOfPage":"https://outilsia.fr/blog/glm-5-2-753b-open-weights-2026","headline":"Faire tourner GLM-5.2 en local : configurations, Ollama et ZCode","description":"Guide complet GLM-5.2 local : poids, quantifications, RAM, GPU, Ollama, llama.cpp et ZCode.","image":"https://outilsia.fr/static/og-cover.png","inLanguage":"fr-FR","datePublished":"2026-06-23","dateModified":"2026-07-10","author":{"@type":"Person","@id":"https://outilsia.fr/#chris","name":"Chris Drakkeng","url":"https://outilsia.fr/about"},"publisher":{"@type":"Organization","@id":"https://outilsia.fr/#organization","name":"OutilsIA.fr","logo":{"@type":"ImageObject","url":"https://outilsia.fr/static/og-home.png"}},"isPartOf":{"@type":"WebSite","@id":"https://outilsia.fr/#website"},"speakable":{"@type":"SpeakableSpecification","cssSelector":["h1",".lead"]}}</script>
+<script type="application/ld+json" data-outilsia-breadcrumb>{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Accueil","item":"https://outilsia.fr/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://outilsia.fr/blog"},{"@type":"ListItem","position":3,"name":"Faire tourner GLM-5.2 en local","item":"https://outilsia.fr/blog/glm-5-2-753b-open-weights-2026"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Peut-on lancer GLM-5.2 avec Ollama ?","acceptedAnswer":{"@type":"Answer","text":"Oui via un GGUF Hugging Face, mais le plus petit fichier public pèse environ 217 Go et le Q4_K_M environ 466 Go. Il ne s'agit pas d'un modèle grand public à télécharger sans vérifier RAM et stockage."}},{"@type":"Question","name":"Une RTX 5090 suffit-elle pour GLM-5.2 ?","acceptedAnswer":{"@type":"Answer","text":"Non. Ses 32 Go de VRAM peuvent accélérer une partie du modèle, mais ne contiennent pas les 217 à 467 Go des quantifications GGUF courantes."}},{"@type":"Question","name":"ZCode exécute-t-il GLM-5.2 en local ?","acceptedAnswer":{"@type":"Answer","text":"Par défaut avec Coding Plan, l'interface est locale mais l'inférence utilise le service Z.ai ou BigModel. ZCode accepte aussi un fournisseur OpenAI ou Anthropic compatible auto-hébergé."}},{"@type":"Question","name":"Quelle RAM faut-il pour GLM-5.2 en local ?","acceptedAnswer":{"@type":"Answer","text":"384 à 512 Go pour expérimenter avec IQ1/IQ2, 512 Go pour certains Q3, et 768 Go à 1 To conseillé pour un Q4 avec marge."}}]}</script>
+</head>
+<body class="antialiased">
+<nav class="fixed top-0 w-full z-50 glass">
+  <div class="max-w-7xl mx-auto px-4 flex items-center justify-between h-16">
+    <a href="/" class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-violet-400 flex items-center justify-center text-sm font-black">IA</div><span class="text-xl font-bold">Outils<span class="gradient-text">IA</span></span></a>
+    <div class="hidden md:flex items-center gap-6 text-sm">
+      <a href="/ia-locale" class="text-gray-400 hover:text-cyan-400">IA Locale</a>
+      <a href="/materiel" class="text-gray-400 hover:text-cyan-400">Matériel</a>
+      <a href="/mon-pc-peut-il" class="text-gray-400 hover:text-cyan-400">Mon PC</a>
+      <a href="/blog" class="text-cyan-400 font-semibold">Blog</a>
+    </div>
+  </div>
+</nav>
+
+<article class="pt-28 pb-20 px-4">
+  <div class="max-w-4xl mx-auto">
+    <div class="text-xs text-gray-500 mb-8"><a href="/" class="hover:text-cyan-400">Accueil</a> &rsaquo; <a href="/blog" class="hover:text-cyan-400">Blog</a> &rsaquo; GLM-5.2</div>
+
+    <header>
+      <div class="chip mb-4">Guide local &middot; Config matérielle &middot; ZCode</div>
+      <h1 class="text-3xl sm:text-5xl font-black tracking-tight mb-4">Faire tourner GLM-5.2 en local : <span class="gradient-text">la configuration complète</span></h1>
+<p class="author-byline" data-outilsia-author-block style="margin:6px 0 0;font-size:14px;color:#94a3b8">Par <a href="/about" rel="author" style="color:inherit;font-weight:700">Chris Drakkeng</a> — passionné IA, développeur (Python/FastAPI), tests sur banc réel</p>
+      <p class="lead text-lg text-gray-300 leading-relaxed">GLM-5.2 peut réellement tourner hors cloud, mais le plus petit GGUF public pèse encore 217 Go. Voici les commandes, le rôle exact de ZCode et trois machines adaptées, sans faire passer une RTX 5090 seule pour un serveur 8 GPU.</p>
+      <div class="flex flex-wrap gap-3 text-sm text-gray-500 mt-4"><span>Mis à jour le 10 juillet 2026</span><span>&bull;</span><span>16 min</span><span>&bull;</span><span>Guide vérifié sur sources officielles</span></div>
+    </header>
+
+    <section class="hero" role="img" aria-label="GLM-5.2 représenté comme un grand modèle open weights pour agents de code">
+	      <div style="position:absolute;left:28px;top:26px;color:#e5e7eb;font-weight:900;font-size:1.05rem;">~743B total &middot; 39B actifs &middot; 1M contexte</div>
+      <div style="position:absolute;left:8%;bottom:44px;width:250px;height:76px;border-radius:18px;background:linear-gradient(180deg,#1f2937,#030712);box-shadow:0 28px 80px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.14);"></div>
+      <div style="position:absolute;right:8%;top:80px;width:min(430px,58%);display:grid;gap:12px;">
+        <div style="height:18px;border-radius:999px;background:linear-gradient(90deg,rgba(103,232,249,.78),rgba(251,191,36,.30));"></div>
+        <div style="height:18px;width:86%;border-radius:999px;background:linear-gradient(90deg,rgba(103,232,249,.58),rgba(168,85,247,.28));"></div>
+        <div style="height:18px;width:70%;border-radius:999px;background:linear-gradient(90deg,rgba(103,232,249,.42),rgba(251,191,36,.24));"></div>
+      </div>
+      <div style="position:absolute;right:20%;bottom:64px;width:86px;height:86px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(15,23,42,.88);box-shadow:0 0 40px rgba(103,232,249,.18);"></div>
+    </section>
+
+    <section class="glass rounded-2xl p-6 border border-cyan-400/20 mb-10">
+      <p class="chip mb-3">Verdict matériel</p>
+      <h2 style="margin-top:0" class="text-2xl font-black mb-3">Oui en local, mais pas comme un modèle 40B classique</h2>
+      <p class="text-gray-300 leading-relaxed">Le MoE n'active qu'environ 39 milliards de paramètres par token, mais il faut tout de même stocker ses quelque 743 à 753 milliards de poids. En pratique : 217 à 254 Go pour une quantification très agressive, 365 à 467 Go en 4 bits, environ 750 Go en FP8 et 1,51 To en BF16.</p>
+      <div class="statgrid">
+        <div class="stat"><strong>743-753B total</strong><span>Le comptage varie selon le checkpoint et les outils.</span></div>
+        <div class="stat"><strong>39B actifs</strong><span>MoE à 256 experts, 8 experts routés par token.</span></div>
+        <div class="stat"><strong>1M tokens</strong><span>Contexte massif pour dépôts, plans et tâches longues.</span></div>
+        <div class="stat"><strong>MIT</strong><span>Open weights, plus permissif que beaucoup de modèles fermés.</span></div>
+      </div>
+    </section>
+
+    <section class="glass rounded-2xl p-6 border border-cyan-400/25 mb-10">
+      <p class="chip mb-3">Avant de télécharger 200 à 500 Go</p>
+      <h2 style="margin-top:0" class="text-2xl font-black mb-3">Mesurez d'abord la RAM, la VRAM, le stockage et le runtime</h2>
+      <p class="text-gray-300 leading-relaxed">OutilsIA Local Cockpit détecte le matériel, Windows/WSL/Linux, Ollama et les modèles installés. Pour GLM-5.2, il doit surtout vous empêcher un mauvais achat : une carte 24 ou 32 Go ne suffit pas seule, et 128 Go de mémoire unifiée restent sous le plus petit fichier GGUF public.</p>
+      <div class="decision">
+        <a class="card ok" href="/telecharger-scanner-ia-local"><strong>Télécharger le scanner</strong><span>Diagnostic Windows/Linux avec score IA locale et modèles compatibles.</span></a>
+        <a class="card" href="/exemples-rapports-ia-locale"><strong>Voir un rapport exemple</strong><span>Laptop sans GPU, RTX 3060 ou RTX 3090 : trois cas concrets.</span></a>
+        <a class="card" href="/beta-testeurs-scanner-ia-local"><strong>Rejoindre la bêta</strong><span>Aidez-nous à valider les nouveaux modèles locaux à mesure qu'ils sortent.</span></a>
+      </div>
+    </section>
+
+    <div class="prose prose-invert max-w-none">
+      <h2>Ce que GLM-5.2 change vraiment</h2>
+      <p>GLM-5.2 n'est pas juste un chatbot de plus. C'est un modèle pensé pour les tâches longues : lire beaucoup de contexte, garder un plan, modifier du code, lancer des outils, revenir sur ses erreurs et continuer à travailler pendant longtemps. C'est exactement le territoire des agents de code.</p>
+      <p>Le blog officiel annonce un contexte solide de 1 million de tokens, plusieurs niveaux d'effort pour le code et IndexShare pour réduire le coût du long contexte. Hugging Face affiche 753B paramètres pour le checkpoint BF16, tandis que la recette vLLM décrit environ 743B paramètres totaux et 39B actifs.</p>
+
+      <h2>753B ou 743B : pourquoi les chiffres ne collent pas toujours</h2>
+      <p>Deux chiffres officiels coexistent : <strong>753B</strong> dans la fiche Hugging Face et <strong>environ 743B / 39B actifs</strong> dans la recette vLLM. Les outils ne comptent pas toujours de la même manière les embeddings, têtes auxiliaires ou variantes de checkpoint.</p>
+      <p>La formulation prudente est donc : GLM-5.2 est un énorme MoE d'environ 743 à 753 milliards de paramètres, dont environ 39 milliards sont actifs par token. Pour le matériel, la taille exacte du checkpoint choisi reste la mesure utile.</p>
+
+      <h2>Benchmarks : là où il fait très mal</h2>
+      <div class="overflow-x-auto">
+        <table>
+          <thead><tr><th>Benchmark</th><th>GLM-5.2</th><th>Signal</th></tr></thead>
+          <tbody>
+            <tr><td>Terminal-Bench 2.1</td><td>81.0 selon Z.ai/HF</td><td>Proche de Claude Opus 4.8, devant Gemini 3.1 Pro dans le tableau officiel.</td></tr>
+            <tr><td>SWE-bench Pro</td><td>62.1</td><td>Devant GLM-5.1 et GPT-5.5 dans le tableau Z.ai/HF, derrière Claude Opus 4.8.</td></tr>
+            <tr><td>FrontierSWE</td><td>74.4</td><td>Très fort sur tâches longues, quasiment au niveau Opus 4.8 selon le blog Z.ai.</td></tr>
+            <tr><td>Contexte</td><td>1M tokens</td><td>Gros avantage pour repo-scale refactors et agents qui gardent beaucoup d'historique.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Est-ce qu'il me dépasse ?</h2>
+      <p>La bonne réponse est : <strong>sur certaines tâches, probablement oui</strong>. Si la tâche est un long projet de code avec beaucoup de fichiers, beaucoup de contexte et un agent qui doit tenir une stratégie pendant longtemps, GLM-5.2 peut être plus adapté que beaucoup de modèles généralistes.</p>
+      <p>Mais il ne faut pas transformer un benchmark en religion. Un modèle peut battre GPT ou Claude sur Terminal-Bench, puis être moins bon en écriture, multimodal, instruction-following fin, sécurité, latence, coût, disponibilité ou stabilité API. GLM-5.2 est surtout une alerte : l'open-weights chinois arrive très fort sur le code agentique.</p>
+
+      <h2>Quelle taille faut-il réellement charger ?</h2>
+      <p>La fiche GGUF d'Unsloth expose désormais plusieurs quantifications publiques. La taille du fichier n'est pas la mémoire totale requise : gardez une marge pour le système, le runtime et le cache KV. Le contexte de 1 million de tokens n'est donc pas un réglage à activer par défaut sur une station domestique.</p>
+      <div class="overflow-x-auto">
+        <table>
+          <thead><tr><th>Format</th><th>Taille publiée</th><th>Mémoire machine raisonnable</th><th>Usage</th></tr></thead>
+          <tbody>
+            <tr><td>IQ1_S / IQ1_M</td><td>217 / 228 Go</td><td>256 Go très serré, 384 Go préférable</td><td>Preuve technique, forte perte de précision possible</td></tr>
+            <tr><td>IQ2 / Q2</td><td>238 à 254 Go</td><td>384 à 512 Go</td><td>Point d'entrée expérimental</td></tr>
+            <tr><td>Q3</td><td>282 à 343 Go</td><td>512 Go</td><td>Meilleur compromis si la bande passante RAM suit</td></tr>
+            <tr><td>Q4</td><td>365 à 467 Go</td><td>768 Go à 1 To</td><td>Qualité locale ambitieuse</td></tr>
+            <tr><td>FP8</td><td>environ 700 à 750 Go</td><td>8 GPU serveur de 96 à 180 Go</td><td>Déploiement officiel recommandé</td></tr>
+            <tr><td>BF16</td><td>1,51 To</td><td>2 To HBM ou multi-nœud</td><td>Référence, pas PC grand public</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout"><strong>Le piège du “39B actifs” :</strong> ce chiffre décrit le calcul par token, pas la taille à stocker. Une RTX 5090 32 Go, une RTX 4090 24 Go ou 128 Go de mémoire unifiée ne peuvent pas contenir seules le checkpoint quantifié le plus léger.</div>
+
+      <h2>Trois configurations adaptées à GLM-5.2</h2>
+      <div class="config-grid">
+        <section class="config-card warn">
+          <span class="chip">Minimum expérimental</span>
+          <h3>GGUF 1 à 2 bits, surtout en RAM</h3>
+          <ul>
+            <li>Threadripper Pro ou EPYC avec beaucoup de canaux mémoire</li>
+            <li>384 Go minimum, 512 Go DDR5 ECC conseillé</li>
+            <li>1 à 2 GPU de 24/32 Go pour accélérer une partie des couches</li>
+            <li>SSD NVMe 2 To minimum, 4 To conseillé</li>
+            <li>Ubuntu Linux, llama.cpp récent</li>
+          </ul>
+          <p><strong>But :</strong> prouver que le modèle répond. Débit et qualité dépendent fortement de la quantification ; aucune vitesse n'est promise.</p>
+        </section>
+        <section class="config-card ok">
+          <span class="chip">Station locale cohérente</span>
+          <h3>GGUF Q3/Q4 avec marge</h3>
+          <ul>
+            <li>Threadripper Pro WRX90 ou serveur EPYC mono-socket</li>
+            <li>768 Go à 1 To de RAM ECC, 8 canaux si possible</li>
+            <li>2 à 4 GPU 32/48 Go selon budget et châssis</li>
+            <li>NVMe 4 To pour les poids, 2 To séparés pour le système</li>
+            <li>Alimentation et refroidissement dimensionnés par un intégrateur</li>
+          </ul>
+          <p><strong>But :</strong> utiliser un Q3/Q4 local avec contexte modéré. C'est une station de laboratoire, pas un PC gaming classique.</p>
+        </section>
+        <section class="config-card">
+          <span class="chip">Recette officielle FP8</span>
+          <h3>Serveur 8 GPU</h3>
+          <ul>
+            <li>8× NVIDIA H200/H20 pour le checkpoint FP8</li>
+            <li>8× B200 pour viser le contexte complet de 1M avec vLLM</li>
+            <li>SGLang 0.5.13.post1+ ou vLLM 0.23.0+</li>
+            <li>Tensor parallel 8, cache KV FP8</li>
+            <li>Linux, Docker, refroidissement datacenter</li>
+          </ul>
+          <p><strong>But :</strong> servir le modèle dans les conditions documentées. Le BF16 de 1,51 To demande encore davantage.</p>
+        </section>
+      </div>
+
+      <h2>La configuration OutilsIA à construire</h2>
+      <p>Pour une machine réellement achetable, notre choix est une <strong>station 512 Go orientée GGUF IQ2/Q3</strong>. Le CPU et les huit canaux mémoire comptent davantage qu'un simple record de VRAM, car la majorité des poids reste en RAM. Deux GPU accélèrent l'inférence, mais ne transforment pas 64 Go de VRAM en 254 Go.</p>
+      <div class="affiliate-box">
+        <strong>Transparence affiliation</strong>
+        <p>Les liens Amazon ci-dessous sont affiliés : OutilsIA peut recevoir une commission sans surcoût. Ce sont des recherches de composants, pas une garantie de compatibilité entre vendeurs. Pour une station multi-GPU de cette puissance, vérifiez le manuel de la carte mère, les lignes PCIe, le format du boîtier, l'alimentation et la liste mémoire certifiée avant achat.</p>
+        <div class="parts-grid">
+          <a class="part-link" href="https://www.amazon.fr/s?k=AMD+Ryzen+Threadripper+PRO+7975WX&amp;tag=boiral21-21&amp;ascsubtag=outilsia-glm52-cpu" target="_blank" rel="sponsored nofollow noopener"><strong>CPU Threadripper Pro</strong><span>7975WX ou classe équivalente, priorité aux canaux mémoire et lignes PCIe.</span></a>
+          <a class="part-link" href="https://www.amazon.fr/s?k=carte+mere+WRX90+Threadripper+Pro&amp;tag=boiral21-21&amp;ascsubtag=outilsia-glm52-wrx90" target="_blank" rel="sponsored nofollow noopener"><strong>Carte mère WRX90</strong><span>Vérifier 8 slots RDIMM et l'espacement de plusieurs GPU.</span></a>
+          <a class="part-link" href="https://www.amazon.fr/s?k=512GB+DDR5+ECC+RDIMM+kit&amp;tag=boiral21-21&amp;ascsubtag=outilsia-glm52-ram512" target="_blank" rel="sponsored nofollow noopener"><strong>512 Go DDR5 ECC RDIMM</strong><span>Kit validé par la QVL de la carte mère, pas huit barrettes choisies au hasard.</span></a>
+          <a class="part-link" href="https://www.amazon.fr/s?k=RTX+5090+32GB&amp;tag=boiral21-21&amp;ascsubtag=outilsia-glm52-gpu" target="_blank" rel="sponsored nofollow noopener"><strong>GPU 32 Go</strong><span>Un ou deux GPU pour l'offload ; mesurer dimensions, câbles et puissance.</span></a>
+          <a class="part-link" href="https://www.amazon.fr/s?k=SSD+NVMe+4To+PCIe+4&amp;tag=boiral21-21&amp;ascsubtag=outilsia-glm52-nvme" target="_blank" rel="sponsored nofollow noopener"><strong>SSD NVMe 4 To</strong><span>Les poids Q4 occupent jusqu'à 467 Go avant caches et autres modèles.</span></a>
+          <a class="part-link" href="https://www.amazon.fr/s?k=alimentation+1600W+ATX+3.1&amp;tag=boiral21-21&amp;ascsubtag=outilsia-glm52-psu" target="_blank" rel="sponsored nofollow noopener"><strong>Alimentation 1600 W ATX 3.1</strong><span>Seulement après calcul de charge et validation des connecteurs.</span></a>
+          <a class="part-link" href="https://www.amazon.fr/s?k=boitier+full+tower+SSI+EEB+multi+GPU&amp;tag=boiral21-21&amp;ascsubtag=outilsia-glm52-case" target="_blank" rel="sponsored nofollow noopener"><strong>Boîtier full tower / SSI-EEB</strong><span>Vérifier le format WRX90, l'airflow et l'épaisseur réelle des GPU.</span></a>
+        </div>
+      </div>
+
+      <h2>Installer GLM-5.2 avec Ollama ou llama.cpp</h2>
+      <p>La bibliothèque Ollama classique ne fournit pas encore un petit tag officiel prêt à l'emploi. Hugging Face documente en revanche le lancement direct des GGUF Unsloth. Commencez par la quantification la plus légère compatible avec votre RAM, sur un disque disposant de plusieurs centaines de gigaoctets libres.</p>
+      <p>Le catalogue OutilsIA classe donc GLM-5.2 comme modèle de station et n'en lance pas automatiquement le téléchargement. C'est volontaire : un clic ne doit pas déclencher silencieusement 239 ou 466 Go de transfert.</p>
+      <h3>Windows ou Linux avec Ollama</h3>
+      <pre><code># Quantification 2 bits : environ 239 Go
+ollama run hf.co/unsloth/GLM-5.2-GGUF:UD-IQ2_M
+
+# Quantification Q4_K_M documentée : environ 466 Go
+ollama run hf.co/unsloth/GLM-5.2-GGUF:UD-Q4_K_M</code></pre>
+      <p>Le second téléchargement n'a de sens que sur une machine disposant d'au moins 768 Go de mémoire exploitable. Sur 512 Go, restez sur IQ2/Q3 et réduisez le contexte initial.</p>
+      <h3>llama.cpp : serveur local compatible OpenAI</h3>
+      <pre><code># Windows
+winget install llama.cpp
+llama serve -hf unsloth/GLM-5.2-GGUF:UD-IQ2_M --ctx-size 8192
+
+# Puis tester l'API locale
+curl http://127.0.0.1:8080/v1/models</code></pre>
+      <p>Augmentez le contexte seulement après avoir mesuré la mémoire. Le “1M context” est une capacité architecturale, pas une promesse que le cache KV tiendra dans votre station.</p>
+
+      <h2>ZCode avec GLM-5.2 : ce qui est local et ce qui ne l'est pas</h2>
+      <p><strong>ZCode est un environnement de développement agentique de bureau</strong> conçu autour de GLM-5.2. Il regroupe objectifs longs, lecture et modification de fichiers, terminal, Git, revue, sous-agents, compétences, plugins, MCP, contrôle mobile et développement distant par SSH ou Docker.</p>
+      <div class="decision">
+        <div class="card ok"><strong>ZCode + Coding Plan</strong><span>Installation locale de l'interface, mais inférence GLM-5.2 réalisée par le service Z.ai/BigModel. C'est la voie simple.</span></div>
+        <div class="card warn"><strong>ZCode + serveur auto-hébergé</strong><span>ZCode accepte un fournisseur OpenAI/Anthropic compatible sur réseau privé. Vous pouvez viser votre serveur llama.cpp/SGLang, sous réserve que l'endpoint expose correctement les modèles.</span></div>
+        <div class="card"><strong>Remote Development</strong><span>Les fichiers, commandes, Git et l'Agent runtime s'exécutent sur la machine SSH/Docker ; le compte et la configuration modèle restent sur le client desktop.</span></div>
+      </div>
+      <h3>Parcours ZCode recommandé</h3>
+      <ol>
+        <li>Installez ZCode depuis le site officiel et ouvrez un projet test.</li>
+        <li>Pour démarrer vite, connectez un compte Z.ai et sélectionnez GLM-5.2 dans le sélecteur de modèles.</li>
+        <li>Pour du vrai local, démarrez d'abord le serveur GLM-5.2 sur <code>http://127.0.0.1:8080/v1</code>.</li>
+        <li>Dans Model Settings, ajoutez un fournisseur personnalisé OpenAI compatible et renseignez cette Base URL.</li>
+        <li>Testez une instruction courte avant Goal Mode ; n'accordez les permissions terminal qu'après lecture du plan.</li>
+        <li>Pour une station distante, créez la connexion SSH depuis le bureau. Le contrôle mobile ne crée pas lui-même une nouvelle connexion SSH.</li>
+      </ol>
+      <div class="callout"><strong>Confidentialité :</strong> “ZCode installé sur mon PC” ne signifie pas automatiquement “modèle exécuté sur mon PC”. Vérifiez le fournisseur sélectionné. Coding Plan et API Z.ai sont des services distants ; un endpoint <code>127.0.0.1</code> ou privé peut être local/auto-hébergé.</div>
+
+      <h2>Quel chemin choisir ?</h2>
+      <ol>
+        <li><strong>Vous avez moins de 256 Go de RAM :</strong> utilisez ZCode avec Coding Plan/API ou choisissez un modèle local 14B/32B.</li>
+        <li><strong>Vous avez 384 à 512 Go :</strong> expérimentez IQ1/IQ2 avec llama.cpp ou Ollama, contexte court, sans promesse de fluidité.</li>
+        <li><strong>Vous construisez une station 768 Go/1 To :</strong> Q3/Q4 devient envisageable ; privilégiez ECC, bande passante mémoire et stockage.</li>
+        <li><strong>Vous servez plusieurs utilisateurs :</strong> suivez les recettes FP8 SGLang/vLLM sur 8 GPU serveur.</li>
+      </ol>
+
+      <h2>Questions fréquentes</h2>
+      <h3>Peut-on lancer GLM-5.2 avec Ollama ?</h3>
+      <p>Oui via les GGUF Hugging Face, notamment ceux d'Unsloth. Ce n'est toutefois pas un petit modèle de la bibliothèque Ollama : vérifiez plusieurs centaines de gigaoctets libres avant le premier téléchargement.</p>
+      <h3>Une seule RTX 5090 suffit-elle ?</h3>
+      <p>Non. Ses 32 Go servent à l'offload et accélèrent une partie du calcul, mais le modèle quantifié reste majoritairement en RAM. Même deux RTX 5090 totalisent seulement 64 Go de VRAM.</p>
+      <h3>Un mini-PC Strix Halo 128 Go peut-il le charger ?</h3>
+      <p>Non pour les quantifications complètes listées ici : le plus petit GGUF public fait environ 217 Go. Strix Halo reste excellent pour des modèles beaucoup plus petits, mais pas pour ce checkpoint intégral.</p>
+      <h3>ZCode est-il une solution locale ?</h3>
+      <p>L'application et l'espace de travail sont locaux. Avec Coding Plan, le modèle est distant. Pour une chaîne totalement auto-hébergée, il faut sélectionner dans ZCode un fournisseur personnalisé qui pointe vers votre serveur compatible OpenAI/Anthropic.</p>
+
+      <h2>Verdict OutilsIA</h2>
+      <p>GLM-5.2 est probablement l'un des modèles open-weights les plus importants de 2026 pour le code agentique. Il ne remplace pas votre assistant local aujourd'hui, mais il montre la direction : grands contextes, agents longue durée, licences ouvertes, et pression énorme sur les modèles fermés.</p>
+      <p>La phrase juste n'est pas "GLM-5.2 bat tout le monde". La phrase juste est : <strong>GLM-5.2 prouve qu'un modèle open-weights peut entrer dans la même conversation que GPT, Claude et Gemini sur des tâches de code très difficiles.</strong></p>
+
+      <section class="glass rounded-2xl p-6 border border-amber-300/30 my-10">
+        <p class="chip mb-3">À lire ensuite</p>
+        <div class="decision">
+          <a class="card" href="/blog/meilleur-gpu-ia-locale-2026"><strong>Meilleur GPU IA locale</strong><span>Ce que vous pouvez vraiment faire tourner chez vous.</span></a>
+          <a class="card" href="/mon-pc-peut-il"><strong>Tester mon PC</strong><span>GPU, RAM, VRAM : savoir quels modèles tournent.</span></a>
+          <a class="card" href="/blog/active-wiki-rag-pomdp-2026"><strong>Active Wiki / RAG</strong><span>Pourquoi les agents ont besoin de mémoire longue.</span></a>
+        </div>
+      </section>
+
+      <h2>Sources</h2>
+      <ul>
+        <li><a href="https://z.ai/blog/glm-5.2" target="_blank" rel="nofollow noopener">Z.ai : GLM-5.2 Built for Long-Horizon Tasks</a></li>
+        <li><a href="https://huggingface.co/zai-org/GLM-5.2" target="_blank" rel="nofollow noopener">Fiche Hugging Face GLM-5.2</a></li>
+        <li><a href="https://huggingface.co/unsloth/GLM-5.2-GGUF" target="_blank" rel="nofollow noopener">Unsloth / Hugging Face : GGUF, tailles et commandes</a></li>
+        <li><a href="https://recipes.vllm.ai/zai-org/GLM-5.2" target="_blank" rel="nofollow noopener">vLLM : recette GLM-5.2 FP8</a></li>
+        <li><a href="https://docs.sglang.io/cookbook/autoregressive/GLM/GLM-5.2" target="_blank" rel="nofollow noopener">SGLang : matériel, mémoire et déploiement GLM-5.2</a></li>
+        <li><a href="https://github.com/kvcache-ai/ktransformers/blob/main/doc/en/kt-kernel/GLM-5.2-Tutorial.md" target="_blank" rel="nofollow noopener">KTransformers : tutoriel CPU-GPU GLM-5.2</a></li>
+        <li><a href="https://zcode.z.ai/en/docs/welcome" target="_blank" rel="nofollow noopener">Documentation officielle ZCode</a></li>
+        <li><a href="https://zcode.z.ai/en/docs/configuration" target="_blank" rel="nofollow noopener">ZCode : Coding Plan, API et fournisseurs auto-hébergés</a></li>
+        <li><a href="https://zcode.z.ai/en/docs/remote-development" target="_blank" rel="nofollow noopener">ZCode : développement distant SSH et Docker</a></li>
+      </ul>
+    </div>
+  </div>
+</article>
+
+<footer class="border-t border-white/5 py-10 px-4">
+  <div class="max-w-4xl mx-auto text-sm text-gray-500">
+    <p>OutilsIA.fr analyse les modèles IA avec prudence : les benchmarks officiels doivent être lus avec leurs conditions de test, leurs coûts et leurs limites matérielles.</p>
+  </div>
+</footer>
+</body>
+</html>
