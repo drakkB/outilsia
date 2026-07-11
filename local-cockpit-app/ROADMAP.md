@@ -28,6 +28,10 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Pages SEO/GEO, FAQ structurées, `llms.txt`, README et monitoring mis à jour.
 - [x] Construire et publier le nouveau build Windows/Linux, puis vérifier les cinq artefacts publics et leurs SHA-256.
 - [x] Enrichir le kit terrain avec Doctor 2.0, preuve d'allocation Ollama et Passport facultatif, sans modifier les huit preuves bloquantes.
+- [x] Hardware Truth : conserver GPU et VRAM comme inconnus quand les sondes échouent, sans fabriquer un état CPU-only/0 Go.
+- [x] Hardware Truth : publier le nombre de modules et la fréquence RAM sans déduire single/dual/quad-channel du seul nombre de barrettes.
+- [x] Linux sans privilèges : lire carte mère et BIOS via `/sys/class/dmi/id`, puis enrichir avec `dmidecode` seulement s'il est disponible.
+- [ ] Publier le build Windows/Linux contenant Hardware Truth v1 avant les essais physiques.
 - [ ] Confirmer l'offload réel sur les machines physiques de la campagne terrain.
 
 ## Phase 1 - Preuve terrain fiable

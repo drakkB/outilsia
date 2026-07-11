@@ -1973,8 +1973,8 @@ function localCapabilitySentence(compatibility = {}) {
     ...(compatibility.near_models || [])
   ].length;
   const installedCount = state.scan?.installed_models?.length || 0;
-  const gpu = state.scan?.gpu_name || "GPU non détecté";
-  const vram = state.scan?.vram_gb ? `${formatGb(state.scan.vram_gb)} VRAM` : "VRAM à confirmer";
+  const gpu = gpuDisplayLabel(state.scan);
+  const vram = state.scan?.vram_gb == null ? "VRAM non déterminée" : `${formatGb(state.scan.vram_gb)} VRAM`;
   const ram = state.scan?.ram_gb ? `${formatGb(state.scan.ram_gb)} RAM` : "RAM à confirmer";
   const runtime = ollamaRuntimeLabel(state.scan);
   const modelPart = title ? ` Modèle conseillé : ${title}.` : "";
@@ -2021,13 +2021,39 @@ function gpuConfidenceLabel(probe = {}, scan = {}) {
   if (source.includes("videocontroller")) return "GPU détecté par Windows, VRAM estimée";
   if (source === "lspci") return "GPU détecté par Linux, VRAM à confirmer";
   if (source === "system_profiler") return scan?.unified_memory ? "Mémoire unifiée détectée, VRAM dédiée non applicable" : "GPU macOS détecté, mémoire à confirmer";
-  if (source === "none") return "Aucun GPU dédié confirmé";
+  if (source === "not_detected" || source === "none") return "Détection GPU non concluante, état CPU/GPU inconnu";
   return source ? `Source ${source}, à confirmer par benchmark` : "Source GPU inconnue";
+}
+
+function gpuProbeIsUnknown(scan = {}, probe = scan?.raw_scan?.gpu_probe || {}) {
+  const source = String(probe.source || "").toLowerCase();
+  return !scan?.gpu_name
+    && scan?.vram_gb == null
+    && (!source || source === "not_detected" || source === "none");
+}
+
+function gpuDisplayLabel(scan = {}) {
+  if (scan?.gpu_name) return scan.gpu_name;
+  if (scan?.vram_gb === 0 && String(scan?.gpu_category || "").toLowerCase() === "cpu-only") {
+    return "Aucun GPU dédié déclaré";
+  }
+  return "GPU non déterminé";
+}
+
+function memoryChannelLabel(memory = {}) {
+  const mode = String(memory.channel_mode || "unknown");
+  if (mode === "multiple_modules_detected") return "canal inconnu · plusieurs modules";
+  if (mode === "single_module_detected") return "canal inconnu · un module";
+  if (mode === "dual_channel_estimated") return "dual estimé historique · non confirmé";
+  if (mode === "multi_channel_estimated") return "multi estimé historique · non confirmé";
+  if (mode === "single_channel_estimated") return "single estimé historique · non confirmé";
+  return "canal inconnu";
 }
 
 function memoryConfidenceLabel(memory = {}) {
   const confidence = String(memory.confidence || "");
   if (confidence === "estimated_from_populated_modules") return "Canal/fréquence estimés depuis les barrettes détectées";
+  if (confidence === "module_layout_only") return "Barrettes et fréquence détectées, mode canal non confirmé";
   if (confidence === "capacity_only") return "Capacité RAM seule, canal et fréquence non confirmés";
   return confidence ? confidence.replaceAll("_", " ") : "Confiance mémoire inconnue";
 }
@@ -2037,7 +2063,7 @@ function vramConfidenceSuffix(probe = {}, scan = {}) {
   if (source === "nvidia-smi") return "mesurés";
   if (scan?.unified_memory) return "mémoire unifiée";
   if (source.includes("videocontroller")) return "estimés";
-  if (source === "none") return "non confirmés";
+  if (source === "not_detected" || source === "none") return "non mesurés";
   return "à confirmer";
 }
 
@@ -2165,6 +2191,7 @@ function hardwareDoctorAnalysis(scan = {}) {
   const probe = scan?.raw_scan?.gpu_probe || {};
   const memory = scan?.raw_scan?.memory_probe || {};
   const board = scan?.raw_scan?.motherboard_probe || {};
+  const gpuUnknown = gpuProbeIsUnknown(scan, probe);
   const vram = Number(scan.vram_gb || probe.vram_gb || 0);
   const ram = Number(scan.ram_gb || 0);
   const unifiedEffective = effectiveModelMemoryGb(scan);
@@ -2209,6 +2236,9 @@ function hardwareDoctorAnalysis(scan = {}) {
   } else if (scan.unified_memory) {
     addCheck("Mémoire unifiée", "warn", `${formatGb(ram)} partagés : utilisable, mais marge limitée pour gros modèles.`, 8);
     addAction("Tester un modèle léger puis valider le backend GPU/CPU.");
+  } else if (gpuUnknown) {
+    addCheck("VRAM", "warn", "GPU et VRAM non déterminés : le scan ne conclut pas que la machine est CPU-only.", 0);
+    addAction("Vérifier le pilote GPU puis relancer l'analyse avant toute recommandation d'achat.");
   } else if (vram >= 24) addCheck("VRAM", "ok", `${formatGb(vram)} ${vramSuffix} : gros modèles quantifiés et contexte confortable.`, 22);
   else if (vram >= 16) addCheck("VRAM", "ok", `${formatGb(vram)} ${vramSuffix} : très bon palier 7B-14B, certains 32B à valider.`, 18);
   else if (vram >= 12) addCheck("VRAM", "ok", `${formatGb(vram)} ${vramSuffix} : ticket sérieux pour 7B/8B et plusieurs 14B quantifiés.`, 14);
@@ -2230,16 +2260,18 @@ function hardwareDoctorAnalysis(scan = {}) {
     addAction("Viser 32 Go RAM si le PC le permet.");
   }
 
-  if (channelMode.includes("dual") || channelMode.includes("multi")) {
+  if (channelMode === "multiple_modules_detected") {
     addCheck(
       "Canal mémoire",
-      "ok",
-      `${moduleCount || "?"} barrette(s) · ${channelMode.includes("multi") ? "multi/dual estimé" : "dual estimé"}${memoryClock ? ` · ${memoryClock} MT/s` : ""}.`,
-      5
+      "warn",
+      `${moduleCount || "?"} barrettes détectées${memoryClock ? ` · ${memoryClock} MT/s` : ""}, mais le mode single/dual/quad n'est pas exposé par le système.`,
+      0
     );
-  } else if (channelMode.includes("single")) {
-    addCheck("Canal mémoire", "warn", `${moduleCount || 1} barrette · single estimé${memoryClock ? ` · ${memoryClock} MT/s` : ""}.`, -4);
-    addAction("Ajouter une barrette jumelle peut améliorer CPU/offload et confort RAG.");
+  } else if (channelMode === "single_module_detected") {
+    addCheck("Canal mémoire", "warn", `Une barrette détectée${memoryClock ? ` · ${memoryClock} MT/s` : ""} ; le mode canal reste à confirmer.`, 0);
+    addAction("Vérifier le mode canal dans le BIOS ou un outil constructeur avant d'acheter de la RAM.");
+  } else if (channelMode.includes("channel_estimated")) {
+    addCheck("Canal mémoire", "warn", `${memoryChannelLabel(memory)} : ancienne estimation conservée, pas une mesure matérielle.`, 0);
   } else if (memory.source) {
     addCheck("Canal mémoire", "warn", "Canal non confirmé par le système.", 0);
   }
@@ -2265,7 +2297,7 @@ function hardwareDoctorAnalysis(scan = {}) {
     addCheck("Mesure GPU", "warn", `${gpuConfidenceLabel(probe, scan)}.`, 6);
     addAction("Vérifier le driver GPU si les performances semblent anormales.");
   } else {
-    addCheck("Mesure GPU", "warn", "Pas de signal GPU dédié exploitable.", 0);
+    addCheck("Mesure GPU", "warn", gpuUnknown ? "Sondes GPU non concluantes : présence et accélération restent inconnues." : "Pas de signal GPU dédié exploitable.", 0);
   }
 
   if (temp >= 84) {
@@ -2361,7 +2393,7 @@ function hardwareDoctorAnalysis(scan = {}) {
         : "OutilsIA doit privilégier les petits modèles et les recommandations prudentes.";
   const confidence = runtimeEvidence.status.endsWith("-proven") && probe.source === "nvidia-smi"
     ? "measured"
-    : runtimeEvidence.automatic_success || probe.source
+    : runtimeEvidence.automatic_success || (probe.source && !gpuUnknown)
       ? "mixed"
       : "estimated";
   return { score, headline, summary, checks, actions: actions.slice(0, 4), source: probe.source || "scan système", confidence, runtimeEvidence };
@@ -2378,11 +2410,7 @@ function hardwareDoctorSnapshot(scan = state.scan || {}) {
   const driverLink = gpuDriverLink(scan, probe);
   const boardAdvice = motherboardRamAdvice(scan);
   const clock = Number(memory.configured_clock_mhz || memory.speed_mhz || 0);
-  const channel = String(memory.channel_mode || "unknown")
-    .replace("dual_channel_estimated", "dual estimé")
-    .replace("multi_channel_estimated", "multi estimé")
-    .replace("single_channel_estimated", "single estimé")
-    .replace("unknown", "inconnu");
+  const channel = memoryChannelLabel(memory);
   return {
     schema: "outilsia.hardware_doctor.v2",
     measured_at: new Date().toISOString(),
@@ -2503,11 +2531,7 @@ function renderHardwareDoctor(scan) {
     rows.push(["PCIe", width]);
   }
   if (memory.module_count || memory.configured_clock_mhz || memory.speed_mhz) {
-    const mode = String(memory.channel_mode || "unknown")
-      .replace("dual_channel_estimated", "dual estimé")
-      .replace("multi_channel_estimated", "multi estimé")
-      .replace("single_channel_estimated", "single estimé")
-      .replace("unknown", "inconnu");
+    const mode = memoryChannelLabel(memory);
     const clock = memory.configured_clock_mhz || memory.speed_mhz;
     rows.push(["Mémoire", `${memory.memory_type || "type inconnu"} · ${memory.module_count || "?"} module(s) · ${mode}${clock ? ` · ${clock} MT/s` : ""}`]);
   }
@@ -2993,14 +3017,14 @@ function renderScan(scan) {
   els.machineKey.textContent = scan.machine_key || "machine locale";
   els.cpuText.textContent = scan.cpu_name || "CPU inconnu";
   els.ramText.textContent = formatGb(scan.ram_gb);
-  els.gpuText.textContent = scan.gpu_name || "GPU non détecté";
+  els.gpuText.textContent = gpuDisplayLabel(scan);
   els.vramText.textContent = memoryDisplayLabel(scan);
   els.osText.textContent = `${scan.os_name || "OS"} ${scan.os_version || ""}`.trim();
   els.ollamaText.textContent = runtimeOllama(scan);
   if (els.topMachineKey) els.topMachineKey.textContent = scan.machine_key || "machine locale";
   if (els.topCpuText) els.topCpuText.textContent = scan.cpu_name || "CPU inconnu";
   if (els.topRamText) els.topRamText.textContent = formatGb(scan.ram_gb);
-  if (els.topGpuText) els.topGpuText.textContent = scan.gpu_name || "GPU non détecté";
+  if (els.topGpuText) els.topGpuText.textContent = gpuDisplayLabel(scan);
   if (els.topVramText) els.topVramText.textContent = memoryDisplayLabel(scan);
   if (els.topOsText) els.topOsText.textContent = `${scan.os_name || "OS"} ${scan.os_version || ""}`.trim();
   if (els.topOllamaText) els.topOllamaText.textContent = topRuntimeOllama(scan);
@@ -3171,6 +3195,7 @@ function scoreLabel(score) {
 
 function machineEncouragement(scan) {
   const gpu = String(scan?.gpu_name || "").toLowerCase();
+  const gpuUnknown = gpuProbeIsUnknown(scan);
   const vram = Number(scan?.vram_gb || 0);
   const ram = Number(scan?.ram_gb || 0);
   const storage = Number(scan?.storage_free_gb || scan?.free_storage_gb || 0);
@@ -3180,6 +3205,14 @@ function machineEncouragement(scan) {
       text: "Scanne la machine pour obtenir un verdict utile, pas une note abstraite.",
       blocker: "Aucun blocage identifié avant scan.",
       action: "Scanner ce PC"
+    };
+  }
+  if (gpuUnknown) {
+    return {
+      title: "GPU à confirmer",
+      text: "Le scan matériel n'a pas obtenu de preuve GPU fiable. Cela ne signifie pas que cette machine est CPU-only.",
+      blocker: "Pilote, permissions ou outil système peuvent masquer le GPU et la VRAM.",
+      action: "Vérifier le pilote puis rescanner"
     };
   }
   if (gpu.includes("1080 ti") || gpu.includes("1080ti")) {
@@ -3458,7 +3491,7 @@ function digitalTwinMachineSnapshot(scan = state.scan || {}) {
       source: board.source || "not_detected"
     },
     gpu: {
-      name: scan.gpu_name || gpu.name || "GPU non détecté",
+      name: scan.gpu_name || gpu.name || gpuDisplayLabel(scan),
       vendor: detectedGpuVendor(scan, gpu) || scan.gpu_vendor || "",
       vram_gb: numberOrNull(scan.vram_gb ?? gpu.vram_gb),
       driver_version: gpu.driver_version || "",
@@ -5266,7 +5299,7 @@ function readinessReport() {
       name: scan.name || "Machine IA locale",
       cpu: scan.cpu_name || "non scanné",
       ram: formatGb(scan.ram_gb),
-      gpu: scan.gpu_name || "non détecté",
+      gpu: gpuDisplayLabel(scan),
       vram: memoryDisplayLabel(scan),
       os: [scan.os_name, scan.os_version].filter(Boolean).join(" ") || "non scanné",
       ollama: runtimeOllama(scan)
@@ -7646,7 +7679,7 @@ function renderArenaPanel() {
   els.arenaBox.innerHTML = `
     <div class="arena-summary">
       <strong>${escapeHtml(state.scan.name || "Machine IA locale")}</strong>
-      <span>${escapeHtml(state.scan.gpu_name || "GPU non détecté")} - ${escapeHtml(formatGb(state.scan.vram_gb))} VRAM - ${escapeHtml(formatGb(state.scan.ram_gb))} RAM</span>
+      <span>${escapeHtml(gpuDisplayLabel(state.scan))} - ${escapeHtml(formatVram(state.scan.vram_gb))} - ${escapeHtml(formatGb(state.scan.ram_gb))} RAM</span>
       <span>${benchmark?.success ? `Dernier test : ${escapeHtml(benchmark.model)} à ${escapeHtml(benchmark.estimated_tokens_per_second)} tok/s` : "Prochaine étape : benchmarker le modèle léger puis comparer un modèle recommandé."}</span>
       <span>Sélection Arena : ${escapeHtml(candidates.length)} candidat(s). Liste complète : panneau Ollama installé.</span>
       <span>Run auto : ${installedCandidates.length >= 2 ? `${escapeHtml(installedCandidates.length)} modèle(s) installés prêts` : "installer au moins 2 modèles pour comparer automatiquement"}.</span>
@@ -7720,7 +7753,7 @@ function renderArenaProgress(models, results = [], activeRef = "") {
   els.arenaBox.innerHTML = `
     <div class="arena-summary">
       <strong>Arena automatique en cours</strong>
-      <span>${escapeHtml(scan.gpu_name || "GPU non détecté")} - ${escapeHtml(formatGb(scan.vram_gb))} VRAM - ${escapeHtml(formatGb(scan.ram_gb))} RAM</span>
+      <span>${escapeHtml(gpuDisplayLabel(scan))} - ${escapeHtml(formatVram(scan.vram_gb))} - ${escapeHtml(formatGb(scan.ram_gb))} RAM</span>
       <span>Micro-test objectif : ${escapeHtml(results.length)} / ${escapeHtml(models.length)} modèle(s) terminé(s).</span>
     </div>
     <div class="arena-grid">
@@ -8111,7 +8144,13 @@ function strategyArenaReadiness() {
       gpu_vendor: scan.gpu_vendor || "",
       vram_gb: scan.vram_gb || null,
       storage_free_gb: scan.storage_free_gb || null,
-      gpu_readiness: scan.gpu_name ? "gpu_detected" : "gpu_not_detected"
+      gpu_readiness: scan.gpu_name
+        ? "gpu_detected"
+        : scan.vram_gb == null
+          ? "gpu_unknown"
+          : Number(scan.vram_gb) === 0
+            ? "cpu_only_reported"
+            : "gpu_detected_without_name"
     },
     runtimes: scan.runtimes || {},
     installed_models: installed,
@@ -8398,7 +8437,7 @@ function capabilityPassportDocument() {
       cpu: scan.cpu_name || "non détecté",
       cpu_cores: numberOrNull(scan.cpu_cores),
       ram_gb: numberOrNull(scan.ram_gb),
-      gpu: scan.gpu_name || "non détecté",
+      gpu: gpuDisplayLabel(scan),
       gpu_vendor: scan.gpu_vendor || "",
       vram_gb: numberOrNull(scan.vram_gb),
       unified_memory: Boolean(scan.unified_memory),
@@ -8756,7 +8795,7 @@ function fieldTestFirst30sProof({ scan = {}, report = {}, action = {}, profile =
   const hardwareVisible = Boolean(
     scan.cpu_name &&
     Number(scan.ram_gb || 0) > 0 &&
-    (scan.gpu_name || Number(scan.vram_gb || 0) === 0)
+    (scan.gpu_name || scan.vram_gb != null)
   );
   const scoreVisible = report.score !== null && report.score !== undefined && Number.isFinite(Number(report.score));
   const benchmarkProof = Boolean(benchmark?.success && Number(benchmark?.estimated_tokens_per_second || 0) > 0);
@@ -9136,7 +9175,7 @@ function buildDecisionPack(compatibility, models, blocked, upgrades, newModels =
       name: scan.name || "Machine IA locale",
       cpu: scan.cpu_name || "CPU inconnu",
       ram: formatGb(scan.ram_gb),
-      gpu: scan.gpu_name || "GPU non détecté",
+      gpu: gpuDisplayLabel(scan),
       vram: memoryDisplayLabel(scan),
       os: `${scan.os_name || "OS"} ${scan.os_version || ""}`.trim(),
       ollama: runtimeOllama(scan)
@@ -12646,8 +12685,8 @@ function demoScan() {
         memory_type: "DDR5",
         configured_clock_mhz: 6000,
         speed_mhz: 6000,
-        channel_mode: "dual_channel_estimated",
-        confidence: "estimated_from_populated_modules",
+        channel_mode: "multiple_modules_detected",
+        confidence: "module_layout_only",
         source: "demo",
         modules: [
           { size_gb: 32, memory_type: "DDR5", configured_clock_mhz: 6000, speed_mhz: 6000, manufacturer: "Demo", part_number: "DDR5-6000", slot: "A2" },
@@ -12795,6 +12834,10 @@ function installTestHarness() {
     demoRecommendationOutput,
     arenaObjectiveProfileScore,
     doctorRuntimeEvidence,
+    gpuProbeIsUnknown,
+    gpuDisplayLabel,
+    memoryChannelLabel,
+    hardwareDoctorAnalysis,
     hardwareDoctorSnapshot,
     buildCapabilityPassport,
     verifyCapabilityPassportIntegrity,
@@ -13172,6 +13215,61 @@ function installTestHarness() {
         readinessMarkdown: readinessMarkdown(),
         pdf: premiumReportHtml(),
         panel: els.upgradeImpactBox?.textContent || ""
+      };
+    },
+    applyHardwareTruthState() {
+      this.applyDemoState();
+      const unknownScan = JSON.parse(JSON.stringify(demoScan()));
+      unknownScan.name = "Machine GPU à confirmer";
+      unknownScan.machine_key = "demo-gpu-unknown";
+      delete unknownScan.gpu_name;
+      delete unknownScan.gpu_vendor;
+      delete unknownScan.vram_gb;
+      unknownScan.gpu_category = "unknown";
+      unknownScan.raw_scan.gpu_probe = {
+        name: null,
+        vendor: null,
+        category: "unknown",
+        vram_gb: null,
+        source: "not_detected"
+      };
+      renderScan(unknownScan);
+      renderCompatibility(demoCompatibility());
+      const unknownDoctor = hardwareDoctorSnapshot(unknownScan);
+      const unknownField = fieldTestMachineEntry();
+      const unknownPassport = capabilityPassportDocument();
+      const unknownUi = {
+        gpu: els.gpuText?.textContent || "",
+        topGpu: els.topGpuText?.textContent || "",
+        doctor: els.hardwareDoctorBox?.textContent || ""
+      };
+
+      const fourModuleScan = JSON.parse(JSON.stringify(demoScan()));
+      fourModuleScan.raw_scan.memory_probe = {
+        ...fourModuleScan.raw_scan.memory_probe,
+        module_count: 4,
+        channel_mode: "multiple_modules_detected",
+        confidence: "module_layout_only",
+        modules: ["A1", "A2", "B1", "B2"].map((slot) => ({
+          size_gb: 16,
+          memory_type: "DDR5",
+          configured_clock_mhz: 6000,
+          speed_mhz: 6000,
+          slot
+        }))
+      };
+      renderScan(fourModuleScan);
+      renderCompatibility(demoCompatibility());
+      const fourModuleDoctor = hardwareDoctorSnapshot(fourModuleScan);
+      const fourModuleUi = els.hardwareDoctorBox?.textContent || "";
+
+      return {
+        unknownDoctor,
+        unknownField,
+        unknownPassport,
+        unknownUi,
+        fourModuleDoctor,
+        fourModuleUi
       };
     },
     applyDemoState() {

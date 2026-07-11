@@ -178,9 +178,9 @@
     <section class="wrap panel" id="hardware-doctor-capability-passport" style="margin-bottom:18px;border-color:rgba(103,232,249,.36);background:linear-gradient(135deg,rgba(103,232,249,.10),rgba(15,23,42,.92),rgba(34,197,94,.07))">
       <span class="pill">Hardware Doctor 2.0 + AI Capability Passport v1</span>
       <h2>Mesurer le PC, prouver l'offload Ollama, exporter les capacités</h2>
-      <p class="muted">Le build courant distingue la présence d'un pilote de l'utilisation réelle du GPU. Après benchmark, Ollama <code>/api/ps</code> permet de classer l'exécution CPU, hybride ou GPU et d'enregistrer le pourcentage du modèle observé en VRAM.</p>
+      <p class="muted">Le build courant distingue la présence d'un pilote de l'utilisation réelle du GPU. Après benchmark, Ollama <code>/api/ps</code> permet de classer l'exécution CPU, hybride ou GPU et d'enregistrer le pourcentage du modèle observé en VRAM. Une sonde GPU muette reste « GPU non déterminé », jamais automatiquement « CPU-only ».</p>
       <div class="proof" style="margin-top:14px">
-        <div><strong>Doctor 2.0</strong><span>Driver, VRAM utilisée au scan, P-state, PCIe, ReBAR explicite, thermiques instantanées et RAM.</span></div>
+        <div><strong>Hardware Truth</strong><span>Driver, VRAM, P-state, PCIe, ReBAR, thermiques, fréquence et modules RAM sont sourcés ; le mode mémoire reste inconnu si le système ne l'expose pas.</span></div>
         <div><strong>Preuve runtime</strong><span>Source <code>ollama_api_ps</code>, processeur observé et pourcentage d'offload GPU.</span></div>
         <div><strong>Passport JSON</strong><span>Machine, build, capacités, modèles, preuves benchmark et recommandation exportables.</span></div>
         <div><strong>SHA-256</strong><span>Empreinte d'intégrité du document, explicitement pas une signature d'identité.</span></div>

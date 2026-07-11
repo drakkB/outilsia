@@ -2543,12 +2543,16 @@ fn detect_gpu() -> GpuProbe {
         return gpu;
     }
 
+    unknown_gpu_probe()
+}
+
+fn unknown_gpu_probe() -> GpuProbe {
     GpuProbe {
         name: None,
         vendor: None,
-        category: Some("cpu-only".to_string()),
-        vram_gb: Some(0),
-        source: "none".to_string(),
+        category: Some("unknown".to_string()),
+        vram_gb: None,
+        source: "not_detected".to_string(),
         driver_version: None,
         cuda_version: None,
         rocm_version: None,
@@ -2773,18 +2777,87 @@ fn detect_linux_motherboard_probe() -> Option<MotherboardProbe> {
     if cfg!(target_os = "windows") {
         return None;
     }
-    let baseboard = run_command("dmidecode", &["-t", "baseboard"])?;
-    let bios = run_command("dmidecode", &["-t", "bios"]).unwrap_or_default();
-    let memory = run_command("dmidecode", &["-t", "memory"]).unwrap_or_default();
+    let sysfs_probe = detect_linux_sysfs_motherboard_probe();
+    let baseboard = run_command("dmidecode", &["-t", "baseboard"]);
+    let bios = run_command("dmidecode", &["-t", "bios"]);
+    let memory = run_command("dmidecode", &["-t", "memory"]);
+
+    if baseboard.is_none() && bios.is_none() && memory.is_none() {
+        return sysfs_probe;
+    }
+
+    let had_sysfs = sysfs_probe.is_some();
+    let fallback = sysfs_probe.unwrap_or(MotherboardProbe {
+        manufacturer: None,
+        product: None,
+        version: None,
+        bios_version: None,
+        max_memory_gb: None,
+        memory_slots: None,
+        source: "not_detected".to_string(),
+    });
     Some(MotherboardProbe {
-        manufacturer: dmidecode_field(&baseboard, "Manufacturer"),
-        product: dmidecode_field(&baseboard, "Product Name"),
-        version: dmidecode_field(&baseboard, "Version"),
-        bios_version: dmidecode_field(&bios, "Version"),
-        max_memory_gb: parse_dmidecode_max_capacity_gb(&memory),
-        memory_slots: dmidecode_field(&memory, "Number Of Devices")
+        manufacturer: baseboard
+            .as_deref()
+            .and_then(|value| dmidecode_field(value, "Manufacturer"))
+            .or(fallback.manufacturer),
+        product: baseboard
+            .as_deref()
+            .and_then(|value| dmidecode_field(value, "Product Name"))
+            .or(fallback.product),
+        version: baseboard
+            .as_deref()
+            .and_then(|value| dmidecode_field(value, "Version"))
+            .or(fallback.version),
+        bios_version: bios
+            .as_deref()
+            .and_then(|value| dmidecode_field(value, "Version"))
+            .or(fallback.bios_version),
+        max_memory_gb: memory.as_deref().and_then(parse_dmidecode_max_capacity_gb),
+        memory_slots: memory
+            .as_deref()
+            .and_then(|value| dmidecode_field(value, "Number Of Devices"))
             .and_then(|value| parse_optional_u32(&value)),
-        source: "dmidecode".to_string(),
+        source: if had_sysfs {
+            "linux_sysfs_dmi+dmidecode".to_string()
+        } else {
+            "dmidecode".to_string()
+        },
+    })
+}
+
+fn detect_linux_sysfs_motherboard_probe() -> Option<MotherboardProbe> {
+    linux_sysfs_motherboard_probe_from_values(
+        read_clean_file("/sys/class/dmi/id/board_vendor"),
+        read_clean_file("/sys/class/dmi/id/board_name"),
+        read_clean_file("/sys/class/dmi/id/board_version"),
+        read_clean_file("/sys/class/dmi/id/bios_version"),
+    )
+}
+
+fn read_clean_file(path: &str) -> Option<String> {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|value| clean_optional_string(&value))
+}
+
+fn linux_sysfs_motherboard_probe_from_values(
+    manufacturer: Option<String>,
+    product: Option<String>,
+    version: Option<String>,
+    bios_version: Option<String>,
+) -> Option<MotherboardProbe> {
+    if manufacturer.is_none() && product.is_none() && version.is_none() && bios_version.is_none() {
+        return None;
+    }
+    Some(MotherboardProbe {
+        manufacturer,
+        product,
+        version,
+        bios_version,
+        max_memory_gb: None,
+        memory_slots: None,
+        source: "linux_sysfs_dmi".to_string(),
     })
 }
 
@@ -2988,12 +3061,10 @@ fn memory_probe_from_modules(
         .filter_map(|module| module.configured_clock_mhz)
         .min();
     let speed_mhz = modules.iter().filter_map(|module| module.speed_mhz).min();
-    let channel_mode = if module_count >= 4 {
-        "multi_channel_estimated"
-    } else if module_count >= 2 {
-        "dual_channel_estimated"
+    let channel_mode = if module_count >= 2 {
+        "multiple_modules_detected"
     } else {
-        "single_channel_estimated"
+        "single_module_detected"
     }
     .to_string();
     MemoryProbe {
@@ -3003,7 +3074,7 @@ fn memory_probe_from_modules(
         configured_clock_mhz,
         speed_mhz,
         channel_mode,
-        confidence: "estimated_from_populated_modules".to_string(),
+        confidence: "module_layout_only".to_string(),
         source: source.to_string(),
         modules,
     }
@@ -4770,7 +4841,7 @@ mod tests {
     }
 
     #[test]
-    fn memory_probe_estimates_channels_from_modules() {
+    fn memory_probe_reports_module_layout_without_claiming_channels() {
         let probe = memory_probe_from_modules(
             Some(64),
             vec![
@@ -4795,11 +4866,56 @@ mod tests {
             ],
             "test",
         );
-        assert_eq!(probe.channel_mode, "dual_channel_estimated");
+        assert_eq!(probe.channel_mode, "multiple_modules_detected");
+        assert_eq!(probe.confidence, "module_layout_only");
         assert_eq!(probe.configured_clock_mhz, Some(6000));
         assert_eq!(probe.speed_mhz, Some(5600));
         assert_eq!(probe.module_count, Some(2));
         assert_eq!(probe.memory_type.as_deref(), Some("DDR5"));
+    }
+
+    #[test]
+    fn four_memory_modules_do_not_claim_quad_or_multi_channel() {
+        let module = MemoryModule {
+            size_gb: Some(8),
+            memory_type: Some("DDR3".to_string()),
+            configured_clock_mhz: Some(1600),
+            speed_mhz: Some(1600),
+            manufacturer: Some("G.Skill".to_string()),
+            part_number: None,
+            slot: None,
+        };
+        let probe = memory_probe_from_modules(Some(32), vec![module; 4], "test");
+
+        assert_eq!(probe.module_count, Some(4));
+        assert_eq!(probe.channel_mode, "multiple_modules_detected");
+        assert_eq!(probe.confidence, "module_layout_only");
+    }
+
+    #[test]
+    fn missing_gpu_probe_stays_unknown_instead_of_cpu_only() {
+        let probe = unknown_gpu_probe();
+
+        assert_eq!(probe.name, None);
+        assert_eq!(probe.vram_gb, None);
+        assert_eq!(probe.category.as_deref(), Some("unknown"));
+        assert_eq!(probe.source, "not_detected");
+    }
+
+    #[test]
+    fn builds_linux_motherboard_probe_from_unprivileged_sysfs_values() {
+        let probe = linux_sysfs_motherboard_probe_from_values(
+            Some("Micro-Star International Co., Ltd.".to_string()),
+            Some("MPG X870E CARBON WIFI".to_string()),
+            Some("1.0".to_string()),
+            Some("1A20".to_string()),
+        )
+        .unwrap();
+
+        assert_eq!(probe.product.as_deref(), Some("MPG X870E CARBON WIFI"));
+        assert_eq!(probe.bios_version.as_deref(), Some("1A20"));
+        assert_eq!(probe.max_memory_gb, None);
+        assert_eq!(probe.source, "linux_sysfs_dmi");
     }
 
     #[test]
@@ -4961,7 +5077,8 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
         assert_eq!(modules[0].slot.as_deref(), Some("A2"));
         assert_eq!(modules[0].memory_type.as_deref(), Some("DDR5"));
         let probe = memory_probe_from_modules(Some(64), modules, "test-win32");
-        assert_eq!(probe.channel_mode, "dual_channel_estimated");
+        assert_eq!(probe.channel_mode, "multiple_modules_detected");
+        assert_eq!(probe.confidence, "module_layout_only");
         assert_eq!(probe.configured_clock_mhz, Some(6000));
         assert_eq!(probe.speed_mhz, Some(5600));
         assert_eq!(probe.memory_type.as_deref(), Some("DDR5"));

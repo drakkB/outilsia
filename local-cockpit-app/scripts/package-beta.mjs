@@ -189,6 +189,7 @@ const release = {
   build_provenance: buildProvenance,
   features: [
     "upgrade_digital_twin_v1",
+    "hardware_truth_v1",
     "hardware_doctor_v2",
     "ai_capability_passport_v1",
     "model_autopilot_v1",
@@ -196,6 +197,7 @@ const release = {
   ],
   release_notes: [
     "Upgrade Digital Twin v1 : simuler localement RAM, GPU/VRAM, SSD, alimentation et boîtier, conserver les inconnues physiques, comparer les scénarios et pouvoir conclure « N'achetez rien pour l'instant ».",
+    "Hardware Truth v1 : une sonde GPU muette reste inconnue au lieu de devenir CPU-only/0 Go ; la fréquence et le nombre de modules RAM sont publiés sans inventer un mode single, dual ou quad-channel.",
     "Hardware Doctor 2.0 : signaux RAM/GPU/driver/PCIe/ReBAR/thermiques clairement sourcés, mesures instantanées étiquetées et inconnues conservées comme inconnues.",
     "Model Autopilot v1 : trois profils bornés sur un modèle déjà installé, métriques API Ollama obligatoires, application explicite et restauration du profil précédent ou des réglages par défaut.",
     "Preuve d'offload Ollama : après benchmark, /api/ps distingue CPU, hybride et GPU depuis size_vram / size au lieu de déduire l'accélération depuis le pilote.",
@@ -205,7 +207,7 @@ const release = {
     "Arena objective v1 : chaque modèle reçoit le même micro-test et conserve six preuves vérifiables — JSON, instruction, mémoire, calcul, français et action.",
     "Retest CPU après erreur CUDA : OutilsIA force num_gpu=0 via l'API Ollama pour distinguer un modèle fonctionnel d'un pilote GPU bloqué.",
     "Potentiel matériel et état du runtime sont séparés : un score GPU élevé ne masque plus un échec CUDA/Ollama réel.",
-    "DriverDoctor : détection des pilotes NVIDIA/AMD/Intel, conseils CUDA/ROCm/Vulkan, RAM dual-channel, fréquence mémoire et mémoire unifiée.",
+    "DriverDoctor : détection des pilotes NVIDIA/AMD/Intel, conseils CUDA/ROCm/Vulkan, nombre de modules, fréquence mémoire et mémoire unifiée ; le mode canal reste inconnu sans mesure dédiée.",
     "Mode Essentiel resserré : une action principale, le matériel directement sous le scan et la preuve benchmark conservée à l'écran.",
     "Bibliothèque Mes prompts : sauvegarder les prompts optimisés, les réutiliser dans Benchmark ou Dialogue, copier/exporter la bibliothèque.",
     "Parcours guidé étendu : scan, diagnostic, Ollama, modèle test, benchmark, PromptForge, dialogue local, Arena et rapport final MemoryForge.",

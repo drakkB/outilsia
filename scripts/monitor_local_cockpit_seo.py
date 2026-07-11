@@ -276,6 +276,11 @@ def check_download_page(base_url: str) -> dict[str, object]:
         and "ollama_api_ps" in text
         and "pas une signature d'identité" in text
     )
+    hardware_truth_ok = (
+        "GPU non déterminé" in text
+        and "jamais automatiquement « CPU-only »" in text
+        and "mode mémoire reste inconnu" in text
+    )
     flight_recorder_ok = (
         "Flight Recorder v1" in text
         and "référence locale" in text
@@ -300,6 +305,7 @@ def check_download_page(base_url: str) -> dict[str, object]:
         "recommendation_engine_ok": recommendation_engine_ok,
         "model_autopilot_ok": model_autopilot_ok,
         "doctor_passport_ok": doctor_passport_ok,
+        "hardware_truth_ok": hardware_truth_ok,
         "flight_recorder_ok": flight_recorder_ok,
         "digital_twin_ok": digital_twin_ok,
         **faq,
@@ -313,6 +319,7 @@ def check_download_page(base_url: str) -> dict[str, object]:
         and recommendation_engine_ok
         and model_autopilot_ok
         and doctor_passport_ok
+        and hardware_truth_ok
         and flight_recorder_ok
         and digital_twin_ok
         and faq["faq_visible_ok"],
@@ -344,6 +351,11 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         and "size_vram / size" in text
         and "pas une signature d'identité" in text
     )
+    hardware_truth_ok = (
+        "GPU non déterminé" in text
+        and "faux PC CPU-only" in text
+        and "canal reste inconnu" in text
+    )
     flight_recorder_ok = (
         "Flight Recorder v1" in text
         and "Comparaison stricte" in text
@@ -367,6 +379,7 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         "recommendation_engine_ok": recommendation_engine_ok,
         "model_autopilot_ok": model_autopilot_ok,
         "doctor_passport_ok": doctor_passport_ok,
+        "hardware_truth_ok": hardware_truth_ok,
         "flight_recorder_ok": flight_recorder_ok,
         "digital_twin_ok": digital_twin_ok,
         **faq,
@@ -379,6 +392,7 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         and recommendation_engine_ok
         and model_autopilot_ok
         and doctor_passport_ok
+        and hardware_truth_ok
         and flight_recorder_ok
         and digital_twin_ok
         and faq["faq_visible_ok"],
@@ -397,6 +411,8 @@ def check_release_manifest(base_url: str) -> dict[str, object]:
     platforms = {str(item.get("platform") or "") for item in files if isinstance(item, dict)}
     digital_twin_note_ok = any("Upgrade Digital Twin v1" in str(note) for note in notes)
     digital_twin_feature_ok = "upgrade_digital_twin_v1" in features
+    hardware_truth_note_ok = any("Hardware Truth v1" in str(note) for note in notes)
+    hardware_truth_feature_ok = "hardware_truth_v1" in features
     provenance = release.get("build_provenance") if isinstance(release.get("build_provenance"), dict) else {}
     build_id_matches = str(provenance.get("build_id") or "") == str(release.get("build_id") or "")
     return {
@@ -406,6 +422,8 @@ def check_release_manifest(base_url: str) -> dict[str, object]:
         "platforms": sorted(platforms),
         "digital_twin_note_ok": digital_twin_note_ok,
         "digital_twin_feature_ok": digital_twin_feature_ok,
+        "hardware_truth_note_ok": hardware_truth_note_ok,
+        "hardware_truth_feature_ok": hardware_truth_feature_ok,
         "build_id_matches": build_id_matches,
         "merged_release_ok": provenance.get("merged_release") is True,
         "ok": result.get("status") == 200
@@ -413,6 +431,8 @@ def check_release_manifest(base_url: str) -> dict[str, object]:
         and {"windows-x64", "linux"}.issubset(platforms)
         and digital_twin_note_ok
         and digital_twin_feature_ok
+        and hardware_truth_note_ok
+        and hardware_truth_feature_ok
         and build_id_matches
         and provenance.get("merged_release") is True,
     }
@@ -440,6 +460,11 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
         and "size_vram / size" in text
         and "not an identity signature" in text
     )
+    hardware_truth_ok = (
+        "Hardware Truth" in text
+        and "never fabricated as CPU-only or 0 GB VRAM" in text
+        and "do not prove the active single/dual/quad-channel topology" in text
+    )
     flight_recorder_ok = (
         "Flight Recorder v1" in text
         and "suspends the regression verdict" in text
@@ -464,6 +489,7 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
         "recommendation_engine_ok": recommendation_engine_ok,
         "model_autopilot_ok": model_autopilot_ok,
         "doctor_passport_ok": doctor_passport_ok,
+        "hardware_truth_ok": hardware_truth_ok,
         "flight_recorder_ok": flight_recorder_ok,
         "digital_twin_ok": digital_twin_ok,
         "ok": result.get("status") == 200
@@ -475,6 +501,7 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
         and recommendation_engine_ok
         and model_autopilot_ok
         and doctor_passport_ok
+        and hardware_truth_ok
         and flight_recorder_ok
         and digital_twin_ok,
     }
@@ -602,19 +629,19 @@ def write_markdown(report: dict[str, object], path: Path) -> None:
     lines += ["", "## Téléchargement et screenshots", ""]
     hub = report["scanner_hub"]
     lines.append(
-        f"- `/scanner-ia-local` status={hub['status']} canonical={hub['canonical_ok']} download={hub['download_link_ok']} proof_engine={hub['proof_engine_ok']} objective_arena={hub['objective_arena_ok']} recommendation_engine={hub['recommendation_engine_ok']} flight_recorder={hub['flight_recorder_ok']} digital_twin={hub['digital_twin_ok']} faq_visible={hub['faq_visible_ok']} doctor_passport={hub['doctor_passport_ok']} terrain_caveat={hub['terrain_caveat_ok']}"
+        f"- `/scanner-ia-local` status={hub['status']} canonical={hub['canonical_ok']} download={hub['download_link_ok']} proof_engine={hub['proof_engine_ok']} objective_arena={hub['objective_arena_ok']} recommendation_engine={hub['recommendation_engine_ok']} flight_recorder={hub['flight_recorder_ok']} digital_twin={hub['digital_twin_ok']} hardware_truth={hub['hardware_truth_ok']} faq_visible={hub['faq_visible_ok']} doctor_passport={hub['doctor_passport_ok']} terrain_caveat={hub['terrain_caveat_ok']}"
     )
     dp = report["download_page"]
     lines.append(
-        f"- `/telecharger-scanner-ia-local` status={dp['status']} title={dp['title_signal_ok']} screenshots={dp['screenshot_refs_ok']} static_links={dp['static_links_ok']} proof_engine={dp['proof_engine_ok']} objective_arena={dp['objective_arena_ok']} recommendation_engine={dp['recommendation_engine_ok']} flight_recorder={dp['flight_recorder_ok']} digital_twin={dp['digital_twin_ok']} faq_visible={dp['faq_visible_ok']} doctor_passport={dp['doctor_passport_ok']} terrain_caveat={dp['terrain_caveat_ok']}"
+        f"- `/telecharger-scanner-ia-local` status={dp['status']} title={dp['title_signal_ok']} screenshots={dp['screenshot_refs_ok']} static_links={dp['static_links_ok']} proof_engine={dp['proof_engine_ok']} objective_arena={dp['objective_arena_ok']} recommendation_engine={dp['recommendation_engine_ok']} flight_recorder={dp['flight_recorder_ok']} digital_twin={dp['digital_twin_ok']} hardware_truth={dp['hardware_truth_ok']} faq_visible={dp['faq_visible_ok']} doctor_passport={dp['doctor_passport_ok']} terrain_caveat={dp['terrain_caveat_ok']}"
     )
     manifest = report["release_manifest"]
     lines.append(
-        f"- `release.json` status={manifest['status']} build={manifest['build_id']} files={manifest['file_count']} platforms={manifest['platforms']} digital_twin_feature={manifest['digital_twin_feature_ok']} digital_twin_note={manifest['digital_twin_note_ok']} provenance_match={manifest['build_id_matches']} merged={manifest['merged_release_ok']}"
+        f"- `release.json` status={manifest['status']} build={manifest['build_id']} files={manifest['file_count']} platforms={manifest['platforms']} digital_twin_feature={manifest['digital_twin_feature_ok']} digital_twin_note={manifest['digital_twin_note_ok']} hardware_truth_feature={manifest['hardware_truth_feature_ok']} hardware_truth_note={manifest['hardware_truth_note_ok']} provenance_match={manifest['build_id_matches']} merged={manifest['merged_release_ok']}"
     )
     llms = report["llms_txt"]
     lines.append(
-        f"- `/llms.txt` status={llms['status']} hub={llms['hub_ok']} download={llms['download_ok']} proof_engine={llms['proof_engine_ok']} objective_arena={llms['objective_arena_ok']} recommendation_engine={llms['recommendation_engine_ok']} flight_recorder={llms['flight_recorder_ok']} digital_twin={llms['digital_twin_ok']} doctor_passport={llms['doctor_passport_ok']} terrain_caveat={llms['terrain_caveat_ok']}"
+        f"- `/llms.txt` status={llms['status']} hub={llms['hub_ok']} download={llms['download_ok']} proof_engine={llms['proof_engine_ok']} objective_arena={llms['objective_arena_ok']} recommendation_engine={llms['recommendation_engine_ok']} flight_recorder={llms['flight_recorder_ok']} digital_twin={llms['digital_twin_ok']} hardware_truth={llms['hardware_truth_ok']} doctor_passport={llms['doctor_passport_ok']} terrain_caveat={llms['terrain_caveat_ok']}"
     )
     lines += ["", "## Promesses terrain", ""]
     for item in report["field_claims"]:

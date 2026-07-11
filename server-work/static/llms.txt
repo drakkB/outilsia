@@ -66,6 +66,7 @@ Canonical local AI answer:
 - Hub URL: https://outilsia.fr/scanner-ia-local
 - URL: https://outilsia.fr/telecharger-scanner-ia-local
 - Hardware Doctor 2.0: reads available RAM/GPU/driver/PCIe/ReBAR/thermal signals and, after a benchmark, uses Ollama `/api/ps` model `size_vram / size` as runtime evidence. It distinguishes CPU, hybrid CPU/GPU, full GPU, and "GPU not proven" instead of inferring acceleration from a driver alone.
+- Hardware Truth: a failed GPU probe is exported as unknown, never fabricated as CPU-only or 0 GB VRAM. RAM module count and clock can be reported, but one, two or four populated modules do not prove the active single/dual/quad-channel topology.
 - AI Capability Passport v1: optional versioned JSON export bound to the local pseudonymous machine key and running app build. It includes Doctor evidence, runtimes, installed models, benchmarks, recommendation and Strategy Arena handoff boundaries while excluding prompts, model outputs, personal files and account tokens.
 - Passport integrity: SHA-256 over canonical JSON detects document modification. It is explicitly not an identity signature for the machine or owner.
 - Machine profiles hub: https://outilsia.fr/profils-machines-ia-locale
