@@ -17,7 +17,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - Ajouter une empreinte SHA-256 couvrant le document hors bloc d'intégrité. Cette empreinte détecte une modification ; elle ne constitue pas une signature d'identité.
 - Garder le passeport dans le mode Détails pour ne pas encombrer le parcours Essentiel.
 
-État au 10 juillet 2026 : source, gates, build et publication Windows/Linux terminés sur le build public `291204755461` issu du commit `ca27835` et du run CI `29120475546`. La recette terrain physique reste à finaliser sans fixture ni preuve fabriquée.
+État au 11 juillet 2026 : Hardware Truth v1 est publié avec Hardware Doctor, Passport, Autopilot, Flight Recorder et Digital Twin dans le build Windows/Linux `291439601671`, issu du commit `6f5453d` et du run CI `29143960167`. Les cinq artefacts et leurs SHA-256 ont été revérifiés depuis la production ; le monitor SEO/GEO passe `33/33`. L'override conserve la parité Windows/Linux avant les essais : terrain toujours `0/5`, prochaine cible `old_laptop`, aucune revendication de validation physique.
 
 - [x] Sondes NVIDIA : VRAM utilisée, P-state, PCIe et ReBAR seulement quand explicitement exposé.
 - [x] Preuve d'offload Ollama `/api/ps` : CPU, hybride ou GPU, avec état « non prouvé » en absence de mesure.
@@ -31,7 +31,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Hardware Truth : conserver GPU et VRAM comme inconnus quand les sondes échouent, sans fabriquer un état CPU-only/0 Go.
 - [x] Hardware Truth : publier le nombre de modules et la fréquence RAM sans déduire single/dual/quad-channel du seul nombre de barrettes.
 - [x] Linux sans privilèges : lire carte mère et BIOS via `/sys/class/dmi/id`, puis enrichir avec `dmidecode` seulement s'il est disponible.
-- [ ] Publier le build Windows/Linux contenant Hardware Truth v1 avant les essais physiques.
+- [x] Publier le build Windows/Linux contenant Hardware Truth v1 avant les essais physiques.
 - [ ] Confirmer l'offload réel sur les machines physiques de la campagne terrain.
 
 ## Phase 1 - Preuve terrain fiable
