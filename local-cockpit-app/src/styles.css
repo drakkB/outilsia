@@ -850,6 +850,26 @@ h2 {
   display: none;
 }
 
+.runtime-driver-details {
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.runtime-driver-details strong {
+  color: var(--cyan);
+  font-size: 13px;
+}
+
+.runtime-driver-details span,
+.runtime-driver-details small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .mode-essential .status-strip,
 .mode-essential .operation-monitor,
 .mode-essential .sticky-action-strip {

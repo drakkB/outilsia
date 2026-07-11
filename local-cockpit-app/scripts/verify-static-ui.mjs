@@ -6,6 +6,7 @@ const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
 const rust = readFileSync(resolve(root, "src-tauri/src/lib.rs"), "utf8");
+const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
 
 const htmlIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]));
 const jsIds = new Set([...js.matchAll(/\$\("([^"]+)"\)/g)].map((match) => match[1]));
@@ -35,6 +36,13 @@ if (missingIds.length || missingCommands.length) {
 }
 
 const requiredFeatureText = [
+  ["html runtime driver matrix", html, "runtime-driver-matrix.js"],
+  ["generated runtime driver matrix schema", runtimeDriverMatrix, "outilsia.runtime_driver_matrix.v1"],
+  ["js runtime driver intelligence schema", js, "outilsia.runtime_driver_intelligence.v1"],
+  ["js runtime driver no silent install", js, "automatic_driver_install_supported: false"],
+  ["rust Intel official URL allowlist", rust, "https://www.intel.com/"],
+  ["rust Vulkan probe", rust, "parse_vulkan_version"],
+  ["rust WSL GPU bridge", rust, "wsl_dev_dxg"],
   ["html decision pack panel", html, "decisionPackBox"],
   ["html copy decision pack button", html, "copyDecisionPackBtn"],
   ["html copy shopping list button", html, "copyShoppingListBtn"],

@@ -34,6 +34,27 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Publier le build Windows/Linux contenant Hardware Truth v1 avant les essais physiques.
 - [ ] Confirmer l'offload réel sur les machines physiques de la campagne terrain.
 
+## Chantier actif - Runtime & Driver Intelligence v1
+
+État source au 11 juillet 2026 : implémenté et testé localement, pas encore publié dans le build public `291439601671`. Le site et le manifeste public ne doivent annoncer cette capacité qu'après build Windows/Linux, gates vertes et vérification des artefacts.
+
+- [x] Créer une matrice canonique versionnée, datée et sourcée pour NVIDIA, AMD, Intel, Apple et CPU.
+- [x] Séparer pilote détecté, API signalée, support Ollama documenté et preuve réelle `/api/ps`.
+- [x] Cadrer Pascal/GTX 10 : compute 6.x, CUDA toolkit 12.x maximum, dernière branche pilote R580 ; ne jamais conseiller CUDA 13.
+- [x] Séparer Strix Halo Windows (Vulkan Ollama expérimental, support framework ROCm distinct) et Linux (ROCm sur matériel listé).
+- [x] Ajouter Intel Arc/iGPU avec Vulkan expérimental, page Intel officielle et avertissement pilote OEM.
+- [x] Distinguer CUDA, ROCm/HIP, Vulkan, Metal, CPU et DirectML ; DirectML n'est pas présenté comme backend Ollama.
+- [x] Sonder métadonnées pilote Windows, pilote noyau Linux, chargeur Vulkan et pont GPU WSL `/dev/dxg` quand ils sont exposés.
+- [x] Refuser le faux `4 Go VRAM` produit par le plafond 32 bits de `Win32_VideoController` ; conserver la VRAM inconnue.
+- [x] Propager le verdict dans Hardware Doctor, Passport, rapport, MemoryForge, terrain, Flight Recorder et pont Strategy Arena en lecture seule.
+- [x] Corriger le parcours CPU-only : aucun bouton « corriger le pilote » sans accélérateur attendu et preuve suffisante.
+- [x] Garder l'action pilote manuelle et consentie : page officielle uniquement, aucune élévation ou installation silencieuse.
+- [x] Ajouter fixtures Pascal, RTX, Radeon, Strix Halo Windows/Linux, Intel Arc et CPU-only, plus tests Rust Windows natifs.
+- [ ] Valider le build Linux dans CI et le build Windows complet avec les nouvelles sondes.
+- [ ] Vérifier physiquement GTX 1080 Ti, AMD/Strix Halo et Intel Arc ; les fixtures ne constituent pas une preuve terrain.
+- [ ] Publier Windows/Linux et annoncer la fonction sur le site uniquement après toutes les gates et SHA-256 verts.
+- [ ] Envisager plus tard un installateur de pilote borné seulement si URL artefact, signature/hash, préflight, consentement, restauration et rollback sont tous prouvés ; sinon conserver le mode manuel officiel.
+
 ## Phase 1 - Preuve terrain fiable
 
 - Collecter les cinq profils physiques sans fabriquer de preuve.

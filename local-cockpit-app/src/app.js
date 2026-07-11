@@ -1,5 +1,20 @@
 const invoke = window.__TAURI__?.core?.invoke;
 const listen = window.__TAURI__?.event?.listen || window.__TAURI__?.core?.listen;
+const RUNTIME_DRIVER_MATRIX = globalThis.__OUTILSIA_RUNTIME_DRIVER_MATRIX__ || {
+  schema: "outilsia.runtime_driver_matrix.v1",
+  version: "offline-fallback",
+  updated_at: "",
+  review_after: "",
+  policy: {
+    unknown_is_not_failure: true,
+    reported_api_is_not_runtime_proof: true,
+    shared_memory_is_not_dedicated_vram: true,
+    driver_installation: { automatic_install_supported: false, explicit_user_consent_required: true, silent_elevation_forbidden: true }
+  },
+  sources: {},
+  backends: {},
+  vendors: {}
+};
 
 const state = {
   scan: null,
@@ -1794,13 +1809,16 @@ function primaryActionState() {
     };
   }
   if (runtime.key === "cpu-only") {
-    return {
-      key: "open-gpu-driver",
-      label: "Corriger le pilote GPU",
-      detail: "CPU validé",
-      status: "Le modèle marche sans GPU. Mets à jour le pilote officiel puis relance le benchmark automatique.",
-      command: "open-gpu-driver"
-    };
+    const intelligence = runtimeDriverIntelligence(state.scan || {});
+    if (intelligence.remediation.recommended && intelligence.remediation.official_url) {
+      return {
+        key: "open-gpu-driver",
+        label: "Vérifier le pilote GPU officiel",
+        detail: "CPU validé",
+        status: `${intelligence.verdict.label}. Ouvre uniquement la page officielle, puis relance le benchmark automatique.`,
+        command: "open-gpu-driver"
+      };
+    }
   }
   if (recommended.ref && !recommended.installed) {
     return {
@@ -2017,9 +2035,12 @@ function parseMajorVersion(value) {
 
 function gpuConfidenceLabel(probe = {}, scan = {}) {
   const source = String(probe.source || "").toLowerCase();
+  const vramConfidence = String(probe.vram_confidence || "");
   if (source === "nvidia-smi") return "GPU NVIDIA mesuré par nvidia-smi";
-  if (source.includes("videocontroller")) return "GPU détecté par Windows, VRAM estimée";
-  if (source === "lspci") return "GPU détecté par Linux, VRAM à confirmer";
+  if (source.includes("videocontroller")) return vramConfidence === "unknown_win32_32bit_limit"
+    ? "GPU détecté par Windows, VRAM inconnue (limite Win32 32 bits)"
+    : "GPU détecté par Windows, VRAM estimée";
+  if (source.startsWith("lspci")) return "GPU détecté par Linux, VRAM à confirmer";
   if (source === "system_profiler") return scan?.unified_memory ? "Mémoire unifiée détectée, VRAM dédiée non applicable" : "GPU macOS détecté, mémoire à confirmer";
   if (source === "not_detected" || source === "none") return "Détection GPU non concluante, état CPU/GPU inconnu";
   return source ? `Source ${source}, à confirmer par benchmark` : "Source GPU inconnue";
@@ -2060,15 +2081,14 @@ function memoryConfidenceLabel(memory = {}) {
 
 function vramConfidenceSuffix(probe = {}, scan = {}) {
   const source = String(probe.source || "").toLowerCase();
+  const confidence = String(probe.vram_confidence || "");
   if (source === "nvidia-smi") return "mesurés";
   if (scan?.unified_memory) return "mémoire unifiée";
+  if (confidence === "unknown_win32_32bit_limit") return "non mesurés (limite Win32)";
   if (source.includes("videocontroller")) return "estimés";
   if (source === "not_detected" || source === "none") return "non mesurés";
   return "à confirmer";
 }
-
-const NVIDIA_DRIVER_URL = "https://www.nvidia.com/Download/index.aspx";
-const AMD_DRIVER_URL = "https://www.amd.com/en/support/download/drivers.html";
 
 function detectedGpuVendor(scan = {}, probe = scan?.raw_scan?.gpu_probe || {}) {
   const vendor = String(probe.vendor || scan.gpu_vendor || "").toLowerCase();
@@ -2080,11 +2100,341 @@ function detectedGpuVendor(scan = {}, probe = scan?.raw_scan?.gpu_probe || {}) {
   return "";
 }
 
+function runtimeDriverSource(sourceId) {
+  if (!sourceId) return null;
+  const source = RUNTIME_DRIVER_MATRIX.sources?.[sourceId];
+  return source ? { id: sourceId, ...source } : null;
+}
+
 function gpuDriverLink(scan = {}, probe = scan?.raw_scan?.gpu_probe || {}) {
   const vendor = detectedGpuVendor(scan, probe);
-  if (vendor === "nvidia") return { label: "Driver NVIDIA", url: NVIDIA_DRIVER_URL };
-  if (vendor === "amd") return { label: "Driver AMD", url: AMD_DRIVER_URL };
-  return null;
+  const vendorPolicy = RUNTIME_DRIVER_MATRIX.vendors?.[vendor] || {};
+  const source = runtimeDriverSource(vendorPolicy.official_driver_source_id);
+  if (!source?.url) return null;
+  const label = vendor === "intel"
+    ? "Pilote Intel officiel · vérifier OEM"
+    : `Pilote ${vendorPolicy.label || vendor.toUpperCase()} officiel`;
+  return {
+    label,
+    url: source.url,
+    source_id: source.id,
+    checked_at: source.checked_at || "",
+    automatic_install: false,
+    explicit_consent_required: true,
+    oem_warning: vendor === "intel"
+  };
+}
+
+function runtimeDriverOsKey(scan = {}) {
+  const os = `${scan.os_name || ""} ${scan.os_version || ""}`.toLowerCase();
+  if (os.includes("windows")) return "windows";
+  if (os.includes("linux") || os.includes("ubuntu") || os.includes("debian")) return "linux";
+  if (os.includes("mac") || os.includes("darwin")) return "macos";
+  return "unknown";
+}
+
+function runtimeDriverFamily(scan = {}, vendor = detectedGpuVendor(scan)) {
+  const name = `${scan.gpu_name || ""} ${scan.cpu_name || ""}`.toLowerCase();
+  const families = RUNTIME_DRIVER_MATRIX.vendors?.[vendor]?.families || [];
+  return families.find((family) => (family.match_contains || []).some((needle) => name.includes(String(needle).toLowerCase()))) || null;
+}
+
+function nvidiaPublicDriverMajor(probe = {}) {
+  const major = parseMajorVersion(probe.driver_version);
+  if (!major) return null;
+  return String(probe.source || "").toLowerCase() === "nvidia-smi" || major >= 100 ? major : null;
+}
+
+function runtimeDriverAccelerationExpected(scan = {}) {
+  const probe = scan?.raw_scan?.gpu_probe || {};
+  if (gpuProbeIsUnknown(scan, probe)) return false;
+  const vendor = detectedGpuVendor(scan, probe);
+  const family = runtimeDriverFamily(scan, vendor);
+  if (vendor === "nvidia" || vendor === "apple") return true;
+  if (vendor === "amd") return Boolean(scan.unified_memory || Number(scan.vram_gb || probe.vram_gb || 0) > 0 || family);
+  if (vendor === "intel") return family?.id === "arc";
+  return false;
+}
+
+function runtimeDriverIntelligence(scan = {}, options = {}) {
+  const probe = scan?.raw_scan?.gpu_probe || {};
+  const os = runtimeDriverOsKey(scan);
+  const gpuUnknown = gpuProbeIsUnknown(scan, probe);
+  const detectedVendor = detectedGpuVendor(scan, probe);
+  const vendor = detectedVendor || (gpuUnknown ? "unknown" : "cpu");
+  const vendorPolicy = RUNTIME_DRIVER_MATRIX.vendors?.[vendor] || {};
+  const family = runtimeDriverFamily(scan, vendor);
+  const gpuName = String(scan.gpu_name || probe.name || "");
+  const gpuNameLower = gpuName.toLowerCase();
+  const driverLink = gpuDriverLink(scan, probe);
+  const runtimeEvidence = options.runtimeEvidence || doctorRuntimeEvidence(scan, options.model || "qwen3:0.6b");
+  const wsl = scan.runtimes?.wsl || {};
+  let backend = vendorPolicy.default_backend || "cpu";
+  let supportTier = vendor === "cpu" ? "stable" : "unknown";
+  let frameworkTier = "not_assessed";
+  let supportNote = "Compatibilité non déterminée : le benchmark local reste nécessaire.";
+  let minimumDriverMajor = null;
+  let driverStatus = probe.driver_version ? "detected" : "unknown";
+
+  if (vendor === "nvidia") {
+    minimumDriverMajor = Number(vendorPolicy.ollama?.[os]?.minimum_driver_major || vendorPolicy.ollama?.windows?.minimum_driver_major || 0) || null;
+    supportTier = family?.support_tier || vendorPolicy.ollama?.[os]?.tier || "stable";
+    supportNote = family?.note || "CUDA est documenté par Ollama pour les GPU NVIDIA compatibles ; l'offload doit encore être mesuré.";
+    const publicDriverMajor = nvidiaPublicDriverMajor(probe);
+    if (publicDriverMajor && minimumDriverMajor && publicDriverMajor < minimumDriverMajor) driverStatus = "below_minimum";
+  } else if (vendor === "amd") {
+    if (family?.id === "strix_halo") {
+      if (os === "linux") {
+        backend = family.preferred_linux_backend || "rocm";
+        supportTier = family.linux_ollama_tier || "stable_on_listed_hardware";
+      } else {
+        backend = family.preferred_windows_backend || "vulkan";
+        supportTier = family.windows_ollama_tier || "experimental";
+        frameworkTier = family.windows_framework_rocm_tier || "not_assessed";
+      }
+      supportNote = family.note;
+    } else if (os === "windows" && (vendorPolicy.windows_stable_match_contains || []).some((needle) => gpuNameLower.includes(needle))) {
+      backend = "rocm";
+      supportTier = "stable_on_listed_hardware";
+      supportNote = "Cette famille apparaît dans la liste ROCm Windows stable d'Ollama ; le benchmark doit confirmer l'offload.";
+    } else if (os === "linux" && probe.rocm_version) {
+      backend = "rocm";
+      supportTier = "runtime_detected_hardware_unverified";
+      supportNote = "ROCm est détecté, mais la présence du runtime ne prouve ni la liste matérielle Ollama ni l'offload du modèle.";
+    } else {
+      backend = "vulkan";
+      supportTier = "experimental";
+      supportNote = "Vulkan peut étendre le support AMD avec OLLAMA_VULKAN=1, mais ce backend reste expérimental dans Ollama.";
+    }
+  } else if (vendor === "intel") {
+    backend = "vulkan";
+    supportTier = "experimental";
+    supportNote = "Ollama classe Vulkan comme expérimental. Le pilote OEM peut être préférable au pilote générique Intel.";
+  } else if (vendor === "apple") {
+    backend = "metal";
+    supportTier = "stable";
+    supportNote = "Metal est le backend stable Ollama sur Apple Silicon.";
+  } else if (vendor === "cpu") {
+    backend = "cpu";
+    supportTier = "stable";
+    supportNote = "Le chemin CPU est valide ; aucune accélération GPU ne doit être inventée.";
+  }
+
+  const apiValue = backend === "cuda"
+    ? probe.cuda_version || ""
+    : backend === "rocm"
+      ? probe.rocm_version || ""
+      : backend === "vulkan"
+        ? probe.vulkan_version || ""
+        : backend === "metal"
+          ? "plateforme macOS"
+          : "";
+  const apiPolicy = RUNTIME_DRIVER_MATRIX.backends?.[backend] || {};
+  const accelerationExpected = runtimeDriverAccelerationExpected(scan);
+  const actualGpu = runtimeEvidence.status === "gpu-proven" || runtimeEvidence.status === "hybrid-proven";
+  const cpuFallback = runtimeEvidence.status === "cpu-proven" || runtimeEvidence.status === "cpu-fallback-only";
+  const remediationRecommended = Boolean(
+    driverLink
+    && accelerationExpected
+    && (driverStatus === "below_minimum" || (!probe.driver_version && backend !== "vulkan") || (cpuFallback && supportTier !== "experimental"))
+  );
+
+  let verdict = {
+    key: vendor === "unknown" ? "unknown" : vendor === "cpu" ? "cpu_path" : "supported_unverified",
+    label: vendor === "unknown" ? "GPU/runtime inconnus" : vendor === "cpu" ? "Chemin CPU valide" : "Support documenté · à mesurer",
+    detail: supportNote,
+    tone: vendor === "unknown" ? "warn" : "neutral"
+  };
+  if (actualGpu) {
+    verdict = {
+      key: runtimeEvidence.status,
+      label: runtimeEvidence.status === "gpu-proven" ? "GPU réellement utilisé" : "CPU/GPU réellement utilisés",
+      detail: `${runtimeEvidence.gpu_offload_percent.toFixed(1)} % du modèle observés en VRAM via Ollama /api/ps.`,
+      tone: "ok"
+    };
+  } else if (driverStatus === "below_minimum") {
+    verdict = {
+      key: "driver_below_minimum",
+      label: "Pilote NVIDIA trop ancien pour la règle Ollama",
+      detail: `Pilote ${probe.driver_version}; seuil documenté ${minimumDriverMajor}+ pour cette matrice.`,
+      tone: "bad"
+    };
+  } else if (cpuFallback && accelerationExpected) {
+    verdict = {
+      key: "cpu_fallback",
+      label: supportTier === "experimental" ? "CPU observé · backend GPU expérimental" : "CPU observé malgré un GPU compatible",
+      detail: supportTier === "experimental"
+        ? `${supportNote} Aucun défaut de pilote n'est affirmé sans autre preuve.`
+        : "Le modèle fonctionne, mais Ollama n'a pas alloué de VRAM lors de la mesure.",
+      tone: "warn"
+    };
+  } else if (supportTier === "legacy_supported") {
+    verdict = { key: "legacy_supported", label: "GPU legacy encore pris en charge", detail: supportNote, tone: "warn" };
+  } else if (supportTier === "experimental") {
+    verdict = { key: "experimental_unverified", label: "Backend expérimental · à mesurer", detail: supportNote, tone: "warn" };
+  } else if (apiValue) {
+    verdict = {
+      key: "api_reported_runtime_unverified",
+      label: `${apiPolicy.label || backend.toUpperCase()} signalé · offload non prouvé`,
+      detail: apiPolicy.reported_signal_meaning || supportNote,
+      tone: "neutral"
+    };
+  }
+
+  const sourceIds = new Set([
+    ...(apiPolicy.source_ids || []),
+    ...(family?.source_ids || []),
+    vendorPolicy.official_driver_source_id,
+    vendorPolicy.oem_driver_warning_source_id,
+    os === "windows" && wsl.installed ? "microsoft_wsl_gpu" : null
+  ].filter(Boolean));
+  const measuredVram = numberOrNull(scan.vram_gb ?? probe.vram_gb);
+  const dedicatedVram = scan.unified_memory || !(measuredVram > 0) ? null : measuredVram;
+  const sharedSystemMemory = scan.unified_memory ? numberOrNull(scan.ram_gb) : null;
+  return {
+    schema: "outilsia.runtime_driver_intelligence.v1",
+    matrix_schema: RUNTIME_DRIVER_MATRIX.schema,
+    matrix_version: RUNTIME_DRIVER_MATRIX.version,
+    matrix_updated_at: RUNTIME_DRIVER_MATRIX.updated_at,
+    matrix_review_after: RUNTIME_DRIVER_MATRIX.review_after,
+    assessed_at: new Date().toISOString(),
+    vendor,
+    vendor_label: vendorPolicy.label || (vendor === "unknown" ? "Inconnu" : vendor.toUpperCase()),
+    family: family ? {
+      id: family.id,
+      label: family.label,
+      support_tier: family.support_tier || supportTier,
+      compute_capability: family.compute_capability || "",
+      cuda_toolkit_max: family.cuda_toolkit_max || "",
+      last_driver_branch: family.last_driver_branch || "",
+      memory_model: family.memory_model || ""
+    } : null,
+    os,
+    backend: {
+      recommended: backend,
+      label: apiPolicy.label || backend.toUpperCase(),
+      ollama_support_tier: supportTier,
+      framework_support_tier: frameworkTier,
+      opt_in_environment: apiPolicy.opt_in_environment || (backend === "vulkan" ? "OLLAMA_VULKAN=1" : "")
+    },
+    driver: {
+      status: driverStatus,
+      version: probe.driver_version || "",
+      date: probe.driver_date || "",
+      provider: probe.driver_provider || "",
+      kernel_driver: probe.kernel_driver || "",
+      minimum_major: minimumDriverMajor,
+      official_url: driverLink?.url || "",
+      official_label: driverLink?.label || "",
+      automatic_install_supported: false,
+      explicit_consent_required: true,
+      silent_elevation: false,
+      oem_warning: Boolean(driverLink?.oem_warning),
+      installation_plan: {
+        mode: "manual_official_source",
+        preflight: [
+          "Noter la version actuelle et fermer les charges IA.",
+          vendor === "intel" ? "Vérifier d'abord si le constructeur du PC fournit un pilote OEM personnalisé." : "Confirmer le modèle exact du GPU sur la page constructeur.",
+          "Créer un point de restauration ou identifier la procédure de retour arrière du système."
+        ],
+        verification: [
+          "Télécharger uniquement depuis la source officielle.",
+          "Vérifier l'éditeur de la signature du paquet ; utiliser le hash constructeur lorsqu'il est publié.",
+          "Relancer le scan puis le même benchmark pour comparer avant/après."
+        ],
+        rollback: "Restaurer le pilote précédent via le système ou le gestionnaire de paquets si stabilité ou performances régressent.",
+        artifact_url: "",
+        artifact_sha256: "",
+        elevation_requested_by_outilsia: false
+      }
+    },
+    api_signal: {
+      key: backend,
+      label: apiPolicy.label || backend.toUpperCase(),
+      status: apiValue ? "reported" : "not_detected",
+      value: apiValue,
+      is_runtime_proof: false,
+      meaning: apiPolicy.reported_signal_meaning || "Signal de plateforme uniquement ; le benchmark reste nécessaire."
+    },
+    api_capabilities: {
+      cuda: {
+        status: probe.cuda_version ? "reported_driver_max" : vendor === "nvidia" ? "not_detected" : "not_applicable",
+        value: probe.cuda_version || "",
+        is_runtime_proof: false,
+        ollama_backend: vendor === "nvidia"
+      },
+      rocm_hip: {
+        status: probe.rocm_version ? "runtime_reported" : vendor === "amd" ? "not_detected" : "not_applicable",
+        value: probe.rocm_version || "",
+        is_runtime_proof: false,
+        ollama_backend: vendor === "amd"
+      },
+      vulkan: {
+        status: probe.vulkan_version ? "loader_reported" : ["amd", "intel"].includes(vendor) ? "not_detected" : "not_applicable",
+        value: probe.vulkan_version || "",
+        is_runtime_proof: false,
+        ollama_backend: ["amd", "intel"].includes(vendor),
+        ollama_support_tier: "experimental"
+      },
+      directml: {
+        status: os === "windows" ? "not_probed" : "not_applicable",
+        value: "",
+        is_runtime_proof: false,
+        ollama_backend: false,
+        note: "DirectML n'est pas utilisé comme backend Ollama dans cette matrice."
+      },
+      metal: {
+        status: vendor === "apple" ? "platform_available" : "not_applicable",
+        value: vendor === "apple" ? "macOS" : "",
+        is_runtime_proof: false,
+        ollama_backend: vendor === "apple"
+      }
+    },
+    actual_execution: {
+      status: runtimeEvidence.status,
+      processor: runtimeEvidence.processor,
+      gpu_offload_percent: runtimeEvidence.gpu_offload_percent,
+      source: runtimeEvidence.source,
+      runtime: runtimeEvidence.runtime || "",
+      is_proven: runtimeEvidence.status.endsWith("-proven")
+    },
+    memory: {
+      model: scan.unified_memory ? "unified" : dedicatedVram != null ? "dedicated" : vendor === "cpu" ? "none" : "unknown",
+      dedicated_vram_gb: dedicatedVram,
+      shared_system_memory_gb: sharedSystemMemory,
+      estimated_model_budget_gb: scan.unified_memory ? effectiveModelMemoryGb(scan) : dedicatedVram,
+      dedicated_vram_claimed_from_shared_memory: false,
+      vram_confidence: probe.vram_confidence || (dedicatedVram != null ? "scan_reported" : "unknown"),
+      note: scan.unified_memory
+        ? "La RAM partagée n'est pas déclarée comme VRAM dédiée ; seul un budget prudent de modèle est estimé."
+        : dedicatedVram != null
+          ? "VRAM dédiée issue du scan matériel."
+          : "Budget GPU non déterminé."
+    },
+    wsl: {
+      installed: Boolean(wsl.installed),
+      gpu_bridge: wsl.gpu_bridge || "unknown",
+      gpu_bridge_source: wsl.gpu_bridge_source || "",
+      host_driver_required: os === "windows" && Boolean(wsl.installed)
+    },
+    acceleration_expected: accelerationExpected,
+    verdict,
+    remediation: {
+      recommended: remediationRecommended,
+      kind: remediationRecommended ? "open_official_driver_page" : "none",
+      reason: remediationRecommended ? verdict.detail : "Aucune mise à jour pilote n'est imposée sans preuve suffisante.",
+      official_url: remediationRecommended ? driverLink?.url || "" : "",
+      requires_explicit_user_action: true,
+      automatic_install_supported: false
+    },
+    limitations: [
+      "Une API signalée n'est pas une preuve d'exécution GPU.",
+      "Le support framework ROCm Windows ne vaut pas automatiquement support stable Ollama.",
+      "La mémoire unifiée reste distincte de la VRAM dédiée.",
+      "Aucun pilote n'est téléchargé ou installé automatiquement dans Runtime & Driver Intelligence v1."
+    ],
+    sources: [...sourceIds].map(runtimeDriverSource).filter(Boolean)
+  };
 }
 
 function motherboardLabel(board = {}) {
@@ -2173,6 +2523,7 @@ function doctorRuntimeEvidence(scan = state.scan || {}, model = "qwen3:0.6b") {
     model_size_bytes: Number(automatic?.runtime_model_size_bytes || 0),
     vram_bytes: Number(automatic?.runtime_vram_bytes || 0),
     source: hasAllocationProof ? "ollama_api_ps" : automatic?.measurement_source || "",
+    runtime: automatic?.runtime || cpu?.runtime || "",
     automatic_tokens_per_second: Number(automatic?.estimated_tokens_per_second || 0),
     cpu_tokens_per_second: Number(cpu?.estimated_tokens_per_second || 0),
     automatic_success: Boolean(automatic?.success),
@@ -2212,6 +2563,7 @@ function hardwareDoctorAnalysis(scan = {}) {
   const vramSuffix = vramConfidenceSuffix(probe, scan);
   const boardAdvice = motherboardRamAdvice(scan);
   const runtimeEvidence = doctorRuntimeEvidence(scan);
+  const runtimeDriver = runtimeDriverIntelligence(scan, { runtimeEvidence });
   const rebarStatus = String(probe.rebar_status || "");
   let score = 35;
   const checks = [];
@@ -2276,28 +2628,32 @@ function hardwareDoctorAnalysis(scan = {}) {
     addCheck("Canal mémoire", "warn", "Canal non confirmé par le système.", 0);
   }
 
-  if (vendor === "nvidia" && hasNvidiaSignals) {
-    addCheck("Driver NVIDIA", "ok", `Driver ${probe.driver_version || "détecté"}${probe.cuda_version ? ` · CUDA driver max ${probe.cuda_version}` : " · CUDA à confirmer selon runtime"}.`, 16);
-    if (isLegacyPascalMachine(scan)) {
-      addCheck("GTX/Pascal", "warn", "GTX 10xx/Pascal : utile, mais sensible aux versions driver/Ollama/CUDA.", -2);
-      addAction("Mettre à jour le driver NVIDIA puis tester qwen3:0.6b avant upgrade.");
-    }
-  } else if (vendor === "nvidia") {
-    addCheck("Driver NVIDIA", "warn", `${gpuConfidenceLabel(probe, scan)}. Driver/CUDA non confirmés.`, 6);
-    addAction("Installer ou mettre à jour le driver NVIDIA officiel.");
-  } else if (vendor === "amd") {
-    if (probe.rocm_version) {
-      addCheck("AMD/ROCm", "ok", `GPU AMD détecté · ROCm ${probe.rocm_version}.`, 12);
-    } else {
-      addCheck("AMD/ROCm", "warn", "GPU AMD détecté, ROCm non confirmé : valider runtime et backend avant gros modèle.", 4);
-      addAction("Mettre à jour le driver AMD et vérifier ROCm/Adrenalin selon Windows ou Linux.");
-    }
-  } else if (hasNvidiaSignals) addCheck("Driver NVIDIA", "ok", `NVIDIA mesuré${probe.cuda_version ? ` · CUDA driver max ${probe.cuda_version}` : " · CUDA à confirmer selon runtime"}.`, 16);
-  else if (scan.gpu_name) {
-    addCheck("Mesure GPU", "warn", `${gpuConfidenceLabel(probe, scan)}.`, 6);
-    addAction("Vérifier le driver GPU si les performances semblent anormales.");
-  } else {
-    addCheck("Mesure GPU", "warn", gpuUnknown ? "Sondes GPU non concluantes : présence et accélération restent inconnues." : "Pas de signal GPU dédié exploitable.", 0);
+  const runtimeDriverPoints = runtimeDriver.verdict.tone === "ok"
+    ? 16
+    : runtimeDriver.verdict.key === "driver_below_minimum"
+      ? -8
+      : runtimeDriver.backend.ollama_support_tier === "stable"
+        ? 10
+        : runtimeDriver.backend.ollama_support_tier === "legacy_supported"
+          ? 6
+          : runtimeDriver.backend.ollama_support_tier === "experimental"
+            ? 2
+            : 0;
+  addCheck(
+    runtimeDriver.vendor === "nvidia" ? "NVIDIA/CUDA" : runtimeDriver.vendor === "amd" ? "AMD runtime" : runtimeDriver.vendor === "intel" ? "Intel/Vulkan" : "Pilote/runtime GPU",
+    runtimeDriver.verdict.tone === "bad" ? "bad" : runtimeDriver.verdict.tone === "ok" ? "ok" : "warn",
+    `${runtimeDriver.verdict.label} · ${runtimeDriver.verdict.detail}`,
+    runtimeDriverPoints
+  );
+  if (runtimeDriver.family?.id === "pascal") {
+    addCheck("GTX/Pascal", "warn", "CUDA toolkit 12.x maximum · dernière branche pilote R580 selon NVIDIA ; ne pas conseiller CUDA 13.", -1);
+  }
+  if (runtimeDriver.remediation.recommended) {
+    addAction(`${runtimeDriver.driver.official_label || "Pilote officiel"} : ouvrir la page constructeur, puis relancer le benchmark.`);
+  } else if (runtimeDriver.backend.ollama_support_tier === "experimental") {
+    addAction(`${runtimeDriver.backend.label} est expérimental dans Ollama : mesurer avant toute conclusion ou achat.`);
+  } else if (gpuUnknown) {
+    addAction("Relancer l'analyse après vérification du pilote ; l'état GPU reste inconnu.");
   }
 
   if (temp >= 84) {
@@ -2368,6 +2724,14 @@ function hardwareDoctorAnalysis(scan = {}) {
   if (wsl.kind === "ready") addCheck("WSL", "ok", "Ollama WSL prêt pour workflows Linux.", 4);
   else if (wsl.kind === "detected") addCheck("WSL", "warn", "WSL détecté, Ollama WSL à préparer si besoin.", 1);
   else if (wsl.kind === "missing" && !hasOllama) addAction("Optionnel : installer WSL pour workflows Linux.");
+  if (runtimeDriver.wsl.installed && runtimeDriver.wsl.gpu_bridge === "available") {
+    addCheck("Pont GPU WSL", "ok", "/dev/dxg exposé par WSL ; l'offload reste à prouver dans Ollama.", 2);
+  } else if (runtimeDriver.wsl.installed && runtimeDriver.wsl.gpu_bridge === "missing") {
+    addCheck("Pont GPU WSL", "warn", "WSL répond, mais /dev/dxg n'est pas exposé dans la distribution testée.", -2);
+    addAction("Mettre WSL et le pilote hôte à jour avant de conclure sur le GPU dans WSL.");
+  } else if (runtimeDriver.wsl.installed) {
+    addCheck("Pont GPU WSL", "warn", "État /dev/dxg non mesuré ; aucun accès GPU WSL n'est affirmé.", 0);
+  }
 
   if (board.source && board.source !== "not_detected") {
     addCheck("Carte mère/RAM", boardAdvice.state, boardAdvice.detail, boardAdvice.state === "ok" ? 4 : -1);
@@ -2396,7 +2760,7 @@ function hardwareDoctorAnalysis(scan = {}) {
     : runtimeEvidence.automatic_success || (probe.source && !gpuUnknown)
       ? "mixed"
       : "estimated";
-  return { score, headline, summary, checks, actions: actions.slice(0, 4), source: probe.source || "scan système", confidence, runtimeEvidence };
+  return { score, headline, summary, checks, actions: actions.slice(0, 4), source: probe.source || "scan système", confidence, runtimeEvidence, runtimeDriver };
 }
 
 function hardwareDoctorSnapshot(scan = state.scan || {}) {
@@ -2437,6 +2801,7 @@ function hardwareDoctorSnapshot(scan = state.scan || {}) {
       effective_model_memory_gb: effectiveModelMemoryGb(scan),
       confidence: gpuConfidenceLabel(probe, scan),
       source: probe.source || "scan système",
+      vram_confidence: probe.vram_confidence || "unknown",
       driver_version: probe.driver_version || "",
       cuda_version: probe.cuda_version || "",
       rocm_version: probe.rocm_version || "",
@@ -2445,6 +2810,11 @@ function hardwareDoctorSnapshot(scan = state.scan || {}) {
       rebar_status: probe.rebar_status || "unknown",
       driver_url: driverLink?.url || "",
       driver_label: driverLink?.label || "",
+      driver_date: probe.driver_date || "",
+      driver_provider: probe.driver_provider || "",
+      kernel_driver: probe.kernel_driver || "",
+      pnp_device_id: probe.pnp_device_id || "",
+      vulkan_version: probe.vulkan_version || "",
       temperature_c: Number(probe.temperature_c || 0),
       utilization_percent: Number(probe.utilization_percent || 0),
       power_draw_w: Number(probe.power_draw_w || 0),
@@ -2457,7 +2827,8 @@ function hardwareDoctorSnapshot(scan = state.scan || {}) {
     runtime: {
       ollama: ollamaRuntimeLabel(scan),
       wsl: wslInfo.title || wslInfo.kind || "non détecté",
-      evidence: analysis.runtimeEvidence
+      evidence: analysis.runtimeEvidence,
+      driver_intelligence: analysis.runtimeDriver
     },
     motherboard: {
       label: motherboardLabel(board),
@@ -2478,12 +2849,16 @@ function hardwareDoctorSummaryLines(snapshot = hardwareDoctorSnapshot()) {
   const lines = [
     `Hardware Doctor 2.0: ${snapshot.score}/100 - ${snapshot.headline} - confiance ${snapshot.confidence}`,
     `RAM: ${snapshot.ram.total_gb || "?"} Go - ${snapshot.ram.memory_type || "type inconnu"} - ${snapshot.ram.module_count || "?"} module(s) - ${snapshot.ram.channel_mode} - ${snapshot.ram.effective_clock_label}`,
-    `GPU: ${snapshot.gpu.confidence}${snapshot.gpu.unified_memory ? ` - mémoire unifiée utile estimée ${snapshot.gpu.effective_model_memory_gb || "?"} Go` : ""}${snapshot.gpu.driver_version ? ` - driver ${snapshot.gpu.driver_version}` : ""}${snapshot.gpu.cuda_version ? ` - CUDA ${snapshot.gpu.cuda_version}` : ""}${snapshot.gpu.rocm_version ? ` - ROCm ${snapshot.gpu.rocm_version}` : ""}`,
+    `GPU: ${snapshot.gpu.confidence}${snapshot.gpu.unified_memory ? ` - mémoire unifiée utile estimée ${snapshot.gpu.effective_model_memory_gb || "?"} Go` : ""}${snapshot.gpu.driver_version ? ` - driver ${snapshot.gpu.driver_version}` : ""}${snapshot.gpu.cuda_version ? ` - CUDA driver max ${snapshot.gpu.cuda_version}` : ""}${snapshot.gpu.rocm_version ? ` - ROCm ${snapshot.gpu.rocm_version}` : ""}${snapshot.gpu.vulkan_version ? ` - Vulkan ${snapshot.gpu.vulkan_version}` : ""}`,
     snapshot.motherboard?.source && snapshot.motherboard.source !== "not_detected"
       ? `Carte mère: ${snapshot.motherboard.label}${snapshot.motherboard.max_memory_gb ? ` - max RAM ${snapshot.motherboard.max_memory_gb} Go` : ""}${snapshot.motherboard.memory_slots ? ` - ${snapshot.ram.module_count || "?"}/${snapshot.motherboard.memory_slots} slots` : ""}`
       : "",
     `Runtime: ${snapshot.runtime.ollama}${snapshot.runtime.wsl ? ` - WSL ${snapshot.runtime.wsl}` : ""}`
   ].filter(Boolean);
+  if (snapshot.runtime?.driver_intelligence) {
+    const intelligence = snapshot.runtime.driver_intelligence;
+    lines.push(`Runtime & Driver Intelligence ${intelligence.matrix_version}: ${intelligence.verdict.label} - backend ${intelligence.backend.label} (${intelligence.backend.ollama_support_tier})`);
+  }
   if (snapshot.runtime?.evidence?.status?.endsWith("-proven")) {
     lines.push(`Offload Ollama: ${snapshot.runtime.evidence.processor} - ${snapshot.runtime.evidence.gpu_offload_percent.toFixed(1)} % GPU - preuve ${snapshot.runtime.evidence.source}`);
   }
@@ -2511,6 +2886,9 @@ function renderHardwareDoctor(scan) {
   if (probe.driver_version) rows.push(["Driver", probe.driver_version]);
   if (probe.cuda_version) rows.push(["CUDA driver max", probe.cuda_version]);
   if (probe.rocm_version) rows.push(["ROCm", probe.rocm_version]);
+  if (probe.vulkan_version) rows.push(["Vulkan", probe.vulkan_version]);
+  if (probe.kernel_driver) rows.push(["Pilote noyau", probe.kernel_driver]);
+  if (probe.driver_date) rows.push(["Date pilote", probe.driver_date]);
   if (probe.memory_used_mb != null) rows.push(["VRAM utilisée au scan", `${Number(probe.memory_used_mb)} Mo`]);
   if (probe.performance_state) rows.push(["État GPU", probe.performance_state]);
   if (probe.rebar_status) rows.push(["Resizable BAR", probe.rebar_status]);
@@ -2562,6 +2940,13 @@ function renderHardwareDoctor(scan) {
           <span>${escapeHtml(check.detail)}</span>
         </div>
       `).join("")}
+    </div>
+    <div class="runtime-driver-details advanced-panel">
+      <strong>Runtime & Driver Intelligence v1</strong>
+      <span>${escapeHtml(analysis.runtimeDriver.vendor_label)}${analysis.runtimeDriver.family ? ` · ${escapeHtml(analysis.runtimeDriver.family.label)}` : ""} · ${escapeHtml(analysis.runtimeDriver.backend.label)} · ${escapeHtml(analysis.runtimeDriver.backend.ollama_support_tier)}</span>
+      <span>${escapeHtml(analysis.runtimeDriver.api_signal.status === "reported" ? `${analysis.runtimeDriver.api_signal.label || analysis.runtimeDriver.backend.label} ${analysis.runtimeDriver.api_signal.value} signalé, offload non prouvé` : "API GPU non confirmée")}</span>
+      <span>${escapeHtml(analysis.runtimeDriver.memory.note)}</span>
+      <small>Matrice ${escapeHtml(analysis.runtimeDriver.matrix_version)} · revue ${escapeHtml(analysis.runtimeDriver.matrix_updated_at)} · installation pilote automatique désactivée</small>
     </div>
     ${driverLink ? `
       <div class="row-actions compact-actions doctor-actions">
@@ -4822,12 +5207,12 @@ function runtimeReadinessState(model = "qwen3:0.6b") {
       };
     }
     if (evidence.status === "cpu-proven") {
-      const dedicatedGpuExpected = Number(state.scan?.vram_gb || 0) > 0;
+      const gpuExpected = runtimeDriverAccelerationExpected(state.scan);
       return {
-        key: dedicatedGpuExpected ? "cpu-only" : "ready",
-        label: dedicatedGpuExpected ? "Runtime automatique sur CPU" : "Exécution CPU observée",
+        key: gpuExpected ? "cpu-only" : "ready",
+        label: gpuExpected ? "Runtime automatique sur CPU" : "Exécution CPU observée",
         detail: `${automaticResult.estimated_tokens_per_second || 0} tok/s · Ollama /api/ps observe 0 % du modèle en VRAM.`,
-        tone: dedicatedGpuExpected ? "warn" : "ok",
+        tone: gpuExpected ? "warn" : "ok",
         evidence
       };
     }
@@ -4849,11 +5234,14 @@ function runtimeReadinessState(model = "qwen3:0.6b") {
       ? state.benchmark
       : null);
   if (cpuSuccess) {
+    const gpuExpected = runtimeDriverAccelerationExpected(state.scan);
     return {
-      key: "cpu-only",
-      label: "CPU validé · GPU à corriger",
-      detail: `${cpuSuccess.estimated_tokens_per_second || 0} tok/s sans GPU. Le matériel fonctionne, le pilote/runtime GPU reste bloqué.`,
-      tone: "warn",
+      key: gpuExpected ? "cpu-only" : "ready",
+      label: gpuExpected ? "CPU validé · accélération GPU à vérifier" : "Exécution CPU validée",
+      detail: gpuExpected
+        ? `${cpuSuccess.estimated_tokens_per_second || 0} tok/s sans GPU. Le modèle fonctionne ; pilote et backend restent à vérifier sans conclure trop vite.`
+        : `${cpuSuccess.estimated_tokens_per_second || 0} tok/s sur CPU. Aucun GPU accélérateur attendu n'est affirmé.`,
+      tone: gpuExpected ? "warn" : "ok",
       evidence: doctorRuntimeEvidence(state.scan, model)
     };
   }
@@ -5249,6 +5637,7 @@ function readinessReport() {
   const arena = arenaRun ? arenaWinners(arenaRun.results || []) : null;
   const recommendationEngine = recommendationReportSnapshot();
   const hardwareDoctor = hardwareDoctorSnapshot(scan);
+  const runtimeDriver = hardwareDoctor?.runtime?.driver_intelligence || null;
   const flightRecorder = flightRecorderSummary();
   const upgradeDigitalTwin = digitalTwinSummary();
   const models = extractModels(compatibility).slice(0, 5).map((model) => ({
@@ -5268,18 +5657,29 @@ function readinessReport() {
     });
   const buyingLinks = digitalTwinSuppressesPurchases() ? [] : buildBuyingLinks(compatibility, effectiveUpgrades);
   const ready = flow.scanned && flow.ollamaReady && flow.modelReady && flow.benchmarkReady && runtimeReadiness.key === "ready";
-  const status = ready ? "prêt" : runtimeReadiness.key === "cpu-only" ? "CPU prêt · GPU bloqué" : flow.status;
+  const driverRemediation = Boolean(runtimeDriver?.remediation?.recommended);
+  const status = ready
+    ? "prêt"
+    : runtimeReadiness.key === "cpu-only"
+      ? driverRemediation ? "CPU prêt · pilote GPU à vérifier" : "CPU prêt · accélération GPU non validée"
+      : flow.status;
   const title = ready
     ? "Machine prête pour l'IA locale"
     : runtimeReadiness.key === "cpu-only"
-      ? "IA locale validée en CPU · accélération GPU à corriger"
+      ? driverRemediation
+        ? "IA locale validée en CPU · pilote GPU à vérifier"
+        : "IA locale validée en CPU · backend GPU à mesurer"
       : "Machine à compléter";
   const next = [];
   if (!flow.scanned) next.push("Scanner la machine.");
   if (flow.scanned && !flow.ollamaReady) next.push("Installer Ollama puis relancer le scan.");
   if (flow.ollamaReady && !flow.modelReady) next.push(`Installer ${flow.testModel}.`);
   if (flow.modelReady && !flow.benchmarkReady) next.push(`Lancer le benchmark ${flow.testModel}.`);
-  if (runtimeReadiness.key === "cpu-only") next.push("Mettre à jour le pilote GPU officiel, puis relancer le benchmark automatique.");
+  if (runtimeReadiness.key === "cpu-only") {
+    next.push(driverRemediation
+      ? "Ouvrir la page officielle du pilote, vérifier la version, puis relancer le benchmark automatique."
+      : `Consulter Runtime & Driver Intelligence : ${runtimeDriver?.backend?.label || "backend GPU"} reste ${runtimeDriver?.backend?.ollama_support_tier || "à mesurer"}, sans défaut pilote affirmé.`);
+  }
   if (runtimeReadiness.key === "ready" && flow.benchmarkReady && flow.recommended?.ref && !flow.recommended.installed) next.push(`Installer le deuxième modèle recommandé : ${flow.recommended.ref}.`);
   if (runtimeReadiness.key === "ready" && flow.recommended?.ref && flow.recommended.installed && !flow.recommended.benchmarked) next.push(`Benchmarker le deuxième modèle recommandé : ${flow.recommended.ref}.`);
   if (flow.benchmarkReady && !flow.chatReady) next.push("Poser une première question au modèle local.");
@@ -8032,6 +8432,7 @@ function strategyArenaReadiness() {
   const hasOllama = hasUsableOllamaRuntime(scan);
   const hasModel = installed.length > 0;
   const benchmark = successfulBenchmarkFor("qwen3:0.6b");
+  const runtimeDriver = hardwareDoctorSnapshot(scan)?.runtime?.driver_intelligence || null;
   const hasBenchmark = Boolean(benchmark?.success);
   const preferred = preferredModelCommand(candidates.map((model) => ({
     name: model.name,
@@ -8100,6 +8501,7 @@ function strategyArenaReadiness() {
         expose_model_autopilot_profile: Boolean(modelAutopilotSnapshot()?.active),
         expose_flight_recorder_summary_read_only: Boolean(flightRecorderSummary()),
         expose_upgrade_digital_twin_summary_read_only: Boolean(digitalTwinSummary()),
+        expose_runtime_driver_intelligence_read_only: Boolean(runtimeDriver),
         expose_runtime_command_prefix: true,
         install_or_delete_models_inside_strategy_arena: false,
         run_backtests_inside_outilsia: false
@@ -8153,6 +8555,18 @@ function strategyArenaReadiness() {
             : "gpu_detected_without_name"
     },
     runtimes: scan.runtimes || {},
+    runtime_driver_intelligence: runtimeDriver ? {
+      schema: runtimeDriver.schema,
+      matrix_version: runtimeDriver.matrix_version,
+      vendor: runtimeDriver.vendor,
+      family: runtimeDriver.family,
+      backend: runtimeDriver.backend,
+      driver_status: runtimeDriver.driver.status,
+      api_signal: runtimeDriver.api_signal,
+      actual_execution: runtimeDriver.actual_execution,
+      verdict: runtimeDriver.verdict,
+      read_only: true
+    } : null,
     installed_models: installed,
     candidate_models: candidates,
     best_models: {
@@ -8266,6 +8680,7 @@ function strategyBridgeMarkdown() {
     `- GPU: ${profile.machine.gpu || "non détecté"}`,
     `- VRAM: ${profile.machine.vram_gb || "?"} Go`,
     `- Runtime IA: ${profile.runtime_label}`,
+    `- Runtime/driver: ${profile.runtime_driver_intelligence ? `${profile.runtime_driver_intelligence.verdict.label} · backend ${profile.runtime_driver_intelligence.backend.label} · matrice ${profile.runtime_driver_intelligence.matrix_version} · lecture seule` : "non évalué"}`,
     `- Préfixe commande: ${profile.runtime_command_prefix}`,
     `- Import Strategy Arena: ${profile.handoff_manifest?.import_label || "Modèles locaux disponibles via OutilsIA"}`,
     `- Fichier attendu: ${profile.handoff_manifest?.file_name || profile.import_file}`,
@@ -8463,6 +8878,7 @@ function capabilityPassportDocument() {
       run_local_dialogue: hasUsableOllamaRuntime(scan),
       gpu_allocation_proven: runtimeEvidence.status === "gpu-proven" || runtimeEvidence.status === "hybrid-proven",
       hardware_doctor_v2: doctor?.schema === "outilsia.hardware_doctor.v2",
+      runtime_driver_intelligence_v1: doctor?.runtime?.driver_intelligence?.schema === "outilsia.runtime_driver_intelligence.v1",
       recommendation_engine_v2: Boolean(report.recommendation_engine?.winner),
       model_autopilot_v1: Boolean(report.model_autopilot?.active || report.model_autopilot?.recommended),
       flight_recorder_v1: Boolean(report.flight_recorder?.reference),
@@ -8881,6 +9297,19 @@ function fieldTestMachineEntry() {
         : "",
       ollama_runtime: doctor.runtime.ollama,
       wsl_runtime: doctor.runtime.wsl,
+      runtime_driver_intelligence: doctor.runtime?.driver_intelligence ? {
+        schema: doctor.runtime.driver_intelligence.schema,
+        matrix_version: doctor.runtime.driver_intelligence.matrix_version,
+        vendor: doctor.runtime.driver_intelligence.vendor,
+        family: doctor.runtime.driver_intelligence.family?.id || "",
+        backend: doctor.runtime.driver_intelligence.backend?.recommended || "",
+        ollama_support_tier: doctor.runtime.driver_intelligence.backend?.ollama_support_tier || "unknown",
+        driver_status: doctor.runtime.driver_intelligence.driver?.status || "unknown",
+        api_signal_status: doctor.runtime.driver_intelligence.api_signal?.status || "not_detected",
+        actual_execution_status: doctor.runtime.driver_intelligence.actual_execution?.status || "untested",
+        verdict: doctor.runtime.driver_intelligence.verdict?.key || "unknown",
+        automatic_driver_install_supported: false
+      } : null,
       first_action: doctor.actions[0] || ""
     } : null,
     capability_passport_ok: Boolean(passport),
@@ -10011,6 +10440,9 @@ function flightRecorderCapture(model = els.benchmarkModelInput?.value || state.b
       gpu_driver: doctor?.gpu?.driver_version || "",
       cuda_driver_max: doctor?.gpu?.cuda_version || "",
       rocm_version: doctor?.gpu?.rocm_version || "",
+      vulkan_version: doctor?.gpu?.vulkan_version || "",
+      runtime_driver_matrix: doctor?.runtime?.driver_intelligence?.matrix_version || "",
+      recommended_gpu_backend: doctor?.runtime?.driver_intelligence?.backend?.recommended || "",
       ollama_version: flightRecorderOllamaVersion(scan, runtime),
       performance_state: doctor?.gpu?.performance_state || "",
       rebar_status: doctor?.gpu?.rebar_status || "unknown",
@@ -12663,6 +13095,7 @@ function demoScan() {
         vendor: "NVIDIA",
         category: "high-end",
         vram_gb: 24,
+        vram_confidence: "measured_nvidia_smi",
         source: "nvidia-smi",
         driver_version: "576.80",
         cuda_version: "12.9",
@@ -12839,6 +13272,9 @@ function installTestHarness() {
     memoryChannelLabel,
     hardwareDoctorAnalysis,
     hardwareDoctorSnapshot,
+    runtimeDriverIntelligence,
+    runtimeDriverAccelerationExpected,
+    primaryActionState,
     buildCapabilityPassport,
     verifyCapabilityPassportIntegrity,
     capabilityPassportSummary,
@@ -12867,6 +13303,194 @@ function installTestHarness() {
     restorePreviousUpgradeDigitalTwinScenario,
     applyModelAutopilotRecommendation,
     rollbackModelAutopilotProfile,
+    applyRuntimeDriverIntelligenceState() {
+      const makeScan = ({
+        name,
+        vendor = "",
+        vram = null,
+        ram = 64,
+        unified = false,
+        os = "Windows 11",
+        source = "powershell-win32-videocontroller",
+        driver = "",
+        cuda = "",
+        rocm = "",
+        vulkan = "",
+        kernelDriver = "",
+        category = "unknown",
+        wslBridge = "unknown"
+      }) => {
+        const scan = JSON.parse(JSON.stringify(demoScan()));
+        scan.name = name || "Machine runtime test";
+        scan.machine_key = `runtime-${String(name || "test").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+        scan.os_name = os;
+        scan.os_version = "test";
+        scan.ram_gb = ram;
+        scan.gpu_name = name || null;
+        scan.gpu_vendor = vendor || null;
+        scan.gpu_category = category;
+        scan.vram_gb = vram;
+        scan.unified_memory = unified;
+        scan.runtimes.wsl.gpu_bridge = wslBridge;
+        scan.runtimes.wsl.gpu_bridge_source = wslBridge === "unknown" ? "" : "wsl_dev_dxg";
+        scan.raw_scan.memory_probe.total_gb = ram;
+        scan.raw_scan.gpu_probe = {
+          name: name || null,
+          vendor: vendor || null,
+          category,
+          vram_gb: vram,
+          source,
+          vram_confidence: unified
+            ? "unified_memory_not_dedicated_vram"
+            : source === "nvidia-smi"
+              ? "measured_nvidia_smi"
+              : vram > 0
+                ? "estimated_win32_adapter_ram"
+                : "unknown",
+          driver_version: driver || null,
+          driver_date: driver ? "2026-06-15" : null,
+          driver_provider: vendor || null,
+          pnp_device_id: vendor ? `PCI\\VEN_${vendor.toUpperCase()}` : null,
+          cuda_version: cuda || null,
+          rocm_version: rocm || null,
+          vulkan_version: vulkan || null,
+          kernel_driver: kernelDriver || null
+        };
+        return scan;
+      };
+      const untested = {
+        status: "untested",
+        processor: "unknown",
+        gpu_offload_percent: 0,
+        source: "",
+        automatic_success: false,
+        cpu_success: false
+      };
+      const cpuProven = {
+        ...untested,
+        status: "cpu-proven",
+        processor: "cpu",
+        source: "ollama_api_ps",
+        automatic_success: true
+      };
+      const gpuProven = {
+        ...untested,
+        status: "gpu-proven",
+        processor: "gpu",
+        gpu_offload_percent: 100,
+        source: "ollama_api_ps",
+        automatic_success: true
+      };
+      const pascalScan = makeScan({
+        name: "NVIDIA GeForce GTX 1080 Ti",
+        vendor: "NVIDIA",
+        vram: 11,
+        ram: 16,
+        source: "nvidia-smi",
+        driver: "576.80",
+        cuda: "12.9",
+        category: "unknown",
+        wslBridge: "available"
+      });
+      const oldPascalScan = JSON.parse(JSON.stringify(pascalScan));
+      oldPascalScan.raw_scan.gpu_probe.driver_version = "528.49";
+      const rtxScan = makeScan({
+        name: "NVIDIA GeForce RTX 4080 SUPER",
+        vendor: "NVIDIA",
+        vram: 16,
+        source: "nvidia-smi",
+        driver: "576.80",
+        cuda: "12.9",
+        category: "performance"
+      });
+      const amdScan = makeScan({
+        name: "AMD Radeon RX 7900 XTX",
+        vendor: "AMD",
+        vram: 24,
+        driver: "32.0.21031.1005",
+        rocm: "7.2.1",
+        vulkan: "1.3.290",
+        category: "high-end"
+      });
+      const strixWindowsScan = makeScan({
+        name: "AMD Radeon 8060S",
+        vendor: "AMD",
+        ram: 128,
+        unified: true,
+        driver: "32.0.21031.1005",
+        rocm: "7.2.1",
+        vulkan: "1.3.290",
+        category: "unified-memory"
+      });
+      const strixLinuxScan = makeScan({
+        name: "AMD Radeon 8060S",
+        vendor: "AMD",
+        ram: 128,
+        unified: true,
+        os: "Linux",
+        source: "lspci-nnk",
+        driver: "",
+        rocm: "7.0.0",
+        vulkan: "1.3.290",
+        kernelDriver: "amdgpu",
+        category: "unified-memory"
+      });
+      const intelScan = makeScan({
+        name: "Intel Arc B580",
+        vendor: "Intel",
+        vram: 12,
+        driver: "32.0.101.6739",
+        vulkan: "1.3.290",
+        category: "entry-local-ai"
+      });
+      const cpuScan = makeScan({
+        name: "",
+        vendor: "",
+        vram: 0,
+        ram: 16,
+        source: "cpu-only-declared",
+        category: "cpu-only"
+      });
+
+      const results = {
+        matrix: RUNTIME_DRIVER_MATRIX,
+        pascal: runtimeDriverIntelligence(pascalScan, { runtimeEvidence: untested }),
+        pascalOldDriver: runtimeDriverIntelligence(oldPascalScan, { runtimeEvidence: untested }),
+        pascalGpuProven: runtimeDriverIntelligence(pascalScan, { runtimeEvidence: gpuProven }),
+        rtx: runtimeDriverIntelligence(rtxScan, { runtimeEvidence: untested }),
+        amdWindows: runtimeDriverIntelligence(amdScan, { runtimeEvidence: untested }),
+        strixWindows: runtimeDriverIntelligence(strixWindowsScan, { runtimeEvidence: untested }),
+        strixLinux: runtimeDriverIntelligence(strixLinuxScan, { runtimeEvidence: untested }),
+        intelArc: runtimeDriverIntelligence(intelScan, { runtimeEvidence: cpuProven }),
+        cpuOnly: runtimeDriverIntelligence(cpuScan, { runtimeEvidence: cpuProven })
+      };
+
+      renderScan(cpuScan);
+      renderCompatibility(demoCompatibility());
+      const cpuBenchmark = {
+        ...demoBenchmark("qwen3:0.6b"),
+        runtime_processor: "cpu",
+        runtime_gpu_offload_percent: 0,
+        runtime_vram_bytes: 0,
+        runtime_evidence_source: "ollama_api_ps",
+        execution_mode: "auto"
+      };
+      state.benchmark = cpuBenchmark;
+      writeBenchmarkHistory([cpuBenchmark]);
+      state.markdown = "";
+      results.cpuOnlyPrimaryAction = primaryActionState();
+
+      renderScan(pascalScan);
+      renderCompatibility(demoCompatibility());
+      state.benchmark = cpuBenchmark;
+      writeBenchmarkHistory([cpuBenchmark]);
+      state.markdown = "";
+      results.pascalCpuFallback = runtimeDriverIntelligence(pascalScan, { runtimeEvidence: cpuProven });
+      results.pascalPrimaryAction = primaryActionState();
+      results.pascalDoctor = hardwareDoctorSnapshot(pascalScan);
+      results.pascalPanel = els.hardwareDoctorBox?.textContent || "";
+      return results;
+    },
     async applyModelAutopilotState() {
       window.localStorage?.removeItem(MODEL_AUTOPILOT_PROFILES_KEY);
       this.applyDemoState();
@@ -12962,7 +13586,7 @@ function installTestHarness() {
         ...currentScan,
         raw_scan: {
           ...(currentScan.raw_scan || {}),
-          gpu_probe: {
+      gpu_probe: {
             ...(currentScan.raw_scan?.gpu_probe || {}),
             driver_version: "577.10",
             temperature_c: 66

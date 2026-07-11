@@ -39,6 +39,12 @@ def main():
     assert "ne prouve" in passport["integrity"]["statement"]
     assert passport["hardware_doctor"]["schema"] == "outilsia.hardware_doctor.v2"
     assert passport["hardware_doctor"]["confidence"] == "measured"
+    runtime_driver = passport["hardware_doctor"]["runtime"]["driver_intelligence"]
+    assert runtime_driver["schema"] == "outilsia.runtime_driver_intelligence.v1"
+    assert runtime_driver["matrix_version"] == "2026-07-11.1"
+    assert runtime_driver["api_signal"]["is_runtime_proof"] is False
+    assert runtime_driver["actual_execution"]["is_proven"] is True
+    assert passport["capabilities"]["runtime_driver_intelligence_v1"] is True
     evidence = passport["runtime_readiness"]["evidence"]
     assert evidence["status"] == "gpu-proven", evidence
     assert evidence["source"] == "ollama_api_ps", evidence
@@ -67,6 +73,8 @@ def main():
     assert result["summary"]["digest"] == digest
     assert result["readiness"]["capability_passport"]["digest"] == digest
     assert result["bridge"]["capability_passport"]["digest"] == digest
+    assert result["bridge"]["runtime_driver_intelligence"]["read_only"] is True
+    assert result["field"]["hardware_doctor"]["runtime_driver_intelligence"]["schema"] == "outilsia.runtime_driver_intelligence.v1"
     assert result["field"]["capability_passport_ok"] is True
     assert result["field"]["capability_passport_digest"] == digest
     assert digest in result["memory"]

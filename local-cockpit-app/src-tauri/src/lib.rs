@@ -61,10 +61,16 @@ struct GpuProbe {
     vendor: Option<String>,
     category: Option<String>,
     vram_gb: Option<u32>,
+    vram_confidence: String,
     source: String,
     driver_version: Option<String>,
+    driver_date: Option<String>,
+    driver_provider: Option<String>,
+    pnp_device_id: Option<String>,
     cuda_version: Option<String>,
     rocm_version: Option<String>,
+    vulkan_version: Option<String>,
+    kernel_driver: Option<String>,
     memory_used_mb: Option<u32>,
     performance_state: Option<String>,
     rebar_status: Option<String>,
@@ -76,6 +82,17 @@ struct GpuProbe {
     pcie_link_width_max: Option<u32>,
     pcie_link_gen_current: Option<u32>,
     pcie_link_gen_max: Option<u32>,
+}
+
+#[derive(Debug, Clone)]
+struct WindowsGpuCandidate {
+    name: String,
+    vram_gb: Option<u32>,
+    vram_confidence: String,
+    driver_version: Option<String>,
+    driver_date: Option<String>,
+    pnp_device_id: Option<String>,
+    driver_provider: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -342,6 +359,11 @@ fn scan_machine_inner() -> Result<MachineScan, String> {
     let wsl_installed = wsl_version.is_some() || !wsl_distributions.is_empty();
     let wsl_state = wsl_runtime_state(ollama.installed, ollama_wsl.installed, wsl_installed);
     let wsl_default_distribution = wsl_distributions.first().cloned();
+    let wsl_gpu_bridge = if wsl_installed {
+        detect_wsl_gpu_bridge()
+    } else {
+        None
+    };
 
     let machine_name = build_machine_name(cpu_name.as_deref(), gpu.name.as_deref());
     let machine_key = stable_machine_key(
@@ -401,6 +423,8 @@ fn scan_machine_inner() -> Result<MachineScan, String> {
                 "default_distribution": wsl_default_distribution,
                 "distributions": wsl_distributions,
                 "ollama_ready": ollama_wsl.installed,
+                "gpu_bridge": wsl_gpu_bridge.clone().unwrap_or_else(|| "unknown".to_string()),
+                "gpu_bridge_source": if wsl_gpu_bridge.is_some() { "wsl_dev_dxg" } else { "" },
                 "install_command": if cfg!(target_os = "windows") { Some("wsl.exe --install") } else { None::<&str> },
                 "ollama_install_command": if cfg!(target_os = "windows") { Some("wsl.exe sh -lc \"curl -fsSL https://ollama.com/install.sh | sh\"") } else { None::<&str> },
                 "ollama_test_command": if cfg!(target_os = "windows") { Some("wsl.exe ollama run qwen3:0.6b") } else { None::<&str> }
@@ -424,7 +448,8 @@ fn open_external_url(url: String) -> Result<(), String> {
         || trimmed == "https://ollama.com/download"
         || trimmed.starts_with("https://ollama.com/download?")
         || trimmed.starts_with("https://www.nvidia.com/")
-        || trimmed.starts_with("https://www.amd.com/"))
+        || trimmed.starts_with("https://www.amd.com/")
+        || trimmed.starts_with("https://www.intel.com/"))
     {
         return Err("URL externe refusee.".to_string());
     }
@@ -2530,16 +2555,28 @@ fn open_ollama_download_page() -> Result<(), String> {
 }
 
 fn detect_gpu() -> GpuProbe {
-    if let Some(gpu) = detect_nvidia_smi() {
+    let vulkan_version = detect_vulkan_version();
+    if let Some(mut gpu) = detect_nvidia_smi() {
+        if let Some(metadata) = detect_windows_gpu() {
+            if metadata.vendor.as_deref() == Some("NVIDIA") {
+                gpu.driver_date = metadata.driver_date;
+                gpu.driver_provider = metadata.driver_provider;
+                gpu.pnp_device_id = metadata.pnp_device_id;
+            }
+        }
+        gpu.vulkan_version = vulkan_version;
         return gpu;
     }
-    if let Some(gpu) = detect_windows_gpu() {
+    if let Some(mut gpu) = detect_windows_gpu() {
+        gpu.vulkan_version = vulkan_version;
         return gpu;
     }
-    if let Some(gpu) = detect_macos_gpu() {
+    if let Some(mut gpu) = detect_macos_gpu() {
+        gpu.vulkan_version = vulkan_version;
         return gpu;
     }
-    if let Some(gpu) = detect_linux_lspci() {
+    if let Some(mut gpu) = detect_linux_lspci() {
+        gpu.vulkan_version = vulkan_version;
         return gpu;
     }
 
@@ -2552,10 +2589,16 @@ fn unknown_gpu_probe() -> GpuProbe {
         vendor: None,
         category: Some("unknown".to_string()),
         vram_gb: None,
+        vram_confidence: "unknown".to_string(),
         source: "not_detected".to_string(),
         driver_version: None,
+        driver_date: None,
+        driver_provider: None,
+        pnp_device_id: None,
         cuda_version: None,
         rocm_version: None,
+        vulkan_version: None,
+        kernel_driver: None,
         memory_used_mb: None,
         performance_state: None,
         rebar_status: None,
@@ -2611,10 +2654,16 @@ fn parse_nvidia_smi_csv(
         vendor: Some("NVIDIA".to_string()),
         category: Some(gpu_category(&name)),
         vram_gb: memory_mb.map(|mb| ((mb as f64) / 1024.0).round() as u32),
+        vram_confidence: "measured_nvidia_smi".to_string(),
         source: "nvidia-smi".to_string(),
         driver_version,
+        driver_date: None,
+        driver_provider: Some("NVIDIA".to_string()),
+        pnp_device_id: None,
         cuda_version,
         rocm_version: None,
+        vulkan_version: None,
+        kernel_driver: None,
         memory_used_mb,
         performance_state,
         rebar_status,
@@ -3104,12 +3153,12 @@ fn detect_windows_gpu() -> Option<GpuProbe> {
         &[
             "-NoProfile",
             "-Command",
-            "Get-CimInstance Win32_VideoController | ForEach-Object { \"$($_.Name)|$($_.AdapterRAM)|$($_.DriverVersion)\" }",
+            "Get-CimInstance Win32_VideoController | ForEach-Object { $d = if ($_.DriverDate) { $_.DriverDate.ToUniversalTime().ToString('yyyy-MM-dd') } else { '' }; \"$($_.Name)|$($_.AdapterRAM)|$($_.DriverVersion)|$d|$($_.PNPDeviceID)|$($_.AdapterCompatibility)\" }",
         ],
     )?;
-    let (name, vram_gb, driver_version) = preferred_windows_gpu_from_output(&output)?;
+    let candidate = preferred_windows_gpu_from_output(&output)?;
 
-    let vendor = detect_vendor(&name);
+    let vendor = detect_vendor(&candidate.name);
     let rocm_version = if vendor == "AMD" {
         detect_rocm_version()
     } else {
@@ -3117,13 +3166,19 @@ fn detect_windows_gpu() -> Option<GpuProbe> {
     };
     Some(GpuProbe {
         vendor: Some(vendor),
-        category: Some(gpu_category(&name)),
-        name: Some(name),
-        vram_gb,
+        category: Some(gpu_category(&candidate.name)),
+        name: Some(candidate.name),
+        vram_gb: candidate.vram_gb,
+        vram_confidence: candidate.vram_confidence,
         source: "powershell-win32-videocontroller".to_string(),
-        driver_version,
+        driver_version: candidate.driver_version,
+        driver_date: candidate.driver_date,
+        driver_provider: candidate.driver_provider,
+        pnp_device_id: candidate.pnp_device_id,
         cuda_version: None,
         rocm_version,
+        vulkan_version: None,
+        kernel_driver: None,
         memory_used_mb: None,
         performance_state: None,
         rebar_status: None,
@@ -3138,9 +3193,7 @@ fn detect_windows_gpu() -> Option<GpuProbe> {
     })
 }
 
-fn preferred_windows_gpu_from_output(
-    output: &str,
-) -> Option<(String, Option<u32>, Option<String>)> {
+fn preferred_windows_gpu_from_output(output: &str) -> Option<WindowsGpuCandidate> {
     output
         .lines()
         .filter_map(|line| {
@@ -3152,16 +3205,47 @@ fn preferred_windows_gpu_from_output(
             let name = parts.first().copied().unwrap_or(clean);
             let adapter_ram = parts.get(1).copied().unwrap_or("");
             let driver_version = parts.get(2).and_then(|value| clean_optional_string(value));
+            let driver_date = parts.get(3).and_then(|value| clean_optional_string(value));
+            let pnp_device_id = parts.get(4).and_then(|value| clean_optional_string(value));
+            let driver_provider = parts.get(5).and_then(|value| clean_optional_string(value));
             let name = clean_gpu_device_name(name);
             if name.is_empty() || is_placeholder_gpu_name(&name) {
                 return None;
             }
-            let vram_gb = adapter_ram.trim().parse::<u64>().ok().map(bytes_to_gb);
-            Some((name, vram_gb, driver_version))
+            let (vram_gb, vram_confidence) = windows_adapter_ram_probe(adapter_ram);
+            Some(WindowsGpuCandidate {
+                name,
+                vram_gb,
+                vram_confidence,
+                driver_version,
+                driver_date,
+                pnp_device_id,
+                driver_provider,
+            })
         })
-        .max_by_key(|(name, vram_gb, _)| {
-            gpu_preference_score(name).saturating_add(vram_gb.unwrap_or(0).min(32) as u8)
+        .max_by_key(|candidate| {
+            gpu_preference_score(&candidate.name)
+                .saturating_add(candidate.vram_gb.unwrap_or(0).min(32) as u8)
         })
+}
+
+fn windows_adapter_ram_probe(value: &str) -> (Option<u32>, String) {
+    let Some(bytes) = value.trim().parse::<u64>().ok().filter(|value| *value > 0) else {
+        return (None, "not_reported".to_string());
+    };
+    if (4_000_000_000..=u32::MAX as u64).contains(&bytes) {
+        return (None, "unknown_win32_32bit_limit".to_string());
+    }
+    if bytes > u32::MAX as u64 {
+        return (
+            Some(bytes_to_gb(bytes)),
+            "reported_nonstandard_64bit".to_string(),
+        );
+    }
+    (
+        Some(bytes_to_gb(bytes)),
+        "estimated_win32_adapter_ram".to_string(),
+    )
 }
 
 fn detect_macos_gpu() -> Option<GpuProbe> {
@@ -3182,10 +3266,16 @@ fn detect_macos_gpu() -> Option<GpuProbe> {
         category: Some(gpu_category(&name)),
         name: Some(name),
         vram_gb: None,
+        vram_confidence: "unified_memory_not_dedicated_vram".to_string(),
         source: "system_profiler".to_string(),
         driver_version: None,
+        driver_date: None,
+        driver_provider: Some("Apple".to_string()),
+        pnp_device_id: None,
         cuda_version: None,
         rocm_version: None,
+        vulkan_version: None,
+        kernel_driver: None,
         memory_used_mb: None,
         performance_state: None,
         rebar_status: None,
@@ -3205,16 +3295,8 @@ fn detect_linux_lspci() -> Option<GpuProbe> {
         return None;
     }
 
-    let output = run_command("lspci", &[])?;
-    let name = output
-        .lines()
-        .find(|line| {
-            let lower = line.to_lowercase();
-            lower.contains("vga") || lower.contains("3d controller") || lower.contains("display")
-        })?
-        .split_once(':')
-        .map(|(_, right)| right.trim().to_string())
-        .filter(|value| !value.is_empty())?;
+    let output = run_command("lspci", &["-nnk"])?;
+    let (name, kernel_driver) = preferred_linux_gpu_from_lspci_output(&output)?;
 
     let rocm_version = if detect_vendor(&name) == "AMD" {
         detect_rocm_version()
@@ -3227,10 +3309,16 @@ fn detect_linux_lspci() -> Option<GpuProbe> {
         category: Some(gpu_category(&name)),
         name: Some(name),
         vram_gb: None,
-        source: "lspci".to_string(),
+        vram_confidence: "unknown_lspci_no_memory_size".to_string(),
+        source: "lspci-nnk".to_string(),
         driver_version: None,
+        driver_date: None,
+        driver_provider: None,
+        pnp_device_id: None,
         cuda_version: None,
         rocm_version,
+        vulkan_version: None,
+        kernel_driver,
         memory_used_mb: None,
         performance_state: None,
         rebar_status: None,
@@ -3242,6 +3330,49 @@ fn detect_linux_lspci() -> Option<GpuProbe> {
         pcie_link_width_max: None,
         pcie_link_gen_current: None,
         pcie_link_gen_max: None,
+    })
+}
+
+fn preferred_linux_gpu_from_lspci_output(output: &str) -> Option<(String, Option<String>)> {
+    let lines: Vec<&str> = output.lines().collect();
+    lines
+        .iter()
+        .enumerate()
+        .filter_map(|(index, line)| {
+            let lower = line.to_lowercase();
+            if !(lower.contains("vga compatible controller")
+                || lower.contains("3d controller")
+                || lower.contains("display controller"))
+            {
+                return None;
+            }
+            let name = line
+                .split_once(": ")
+                .map(|(_, right)| right.trim().to_string())
+                .filter(|value| !value.is_empty())?;
+            let kernel_driver = lines
+                .iter()
+                .skip(index + 1)
+                .take_while(|next| next.starts_with(' ') || next.starts_with('\t'))
+                .find_map(|next| next.trim().strip_prefix("Kernel driver in use:"))
+                .and_then(clean_optional_string);
+            Some((name, kernel_driver))
+        })
+        .max_by_key(|(name, _)| gpu_preference_score(name))
+}
+
+fn detect_vulkan_version() -> Option<String> {
+    let output = run_command("vulkaninfo", &["--summary"])?;
+    parse_vulkan_version(&output)
+}
+
+fn parse_vulkan_version(output: &str) -> Option<String> {
+    output.lines().find_map(|line| {
+        let clean = line.trim();
+        let value = clean
+            .strip_prefix("Vulkan Instance Version:")
+            .or_else(|| clean.strip_prefix("Vulkan Instance Version"))?;
+        clean_optional_string(value.trim().trim_start_matches(':').trim())
     })
 }
 
@@ -3300,6 +3431,25 @@ fn detect_wsl_distributions() -> Vec<String> {
         .map(|line| line.trim().trim_end_matches('\r').to_string())
         .filter(|line| !line.is_empty())
         .collect()
+}
+
+fn detect_wsl_gpu_bridge() -> Option<String> {
+    if !cfg!(target_os = "windows") {
+        return None;
+    }
+    let output = run_command(
+        "wsl.exe",
+        &[
+            "sh",
+            "-lc",
+            "if [ -e /dev/dxg ]; then printf available; else printf missing; fi",
+        ],
+    )?;
+    match output.trim().to_lowercase().as_str() {
+        "available" => Some("available".to_string()),
+        "missing" => Some("missing".to_string()),
+        _ => None,
+    }
 }
 
 fn wsl_runtime_state(ollama_native: bool, ollama_wsl: bool, wsl_installed: bool) -> &'static str {
@@ -4942,15 +5092,52 @@ big-model:latest                          zzz999          1.2 TB    1 year ago
     #[test]
     fn chooses_discrete_windows_gpu_over_virtual_or_igpu() {
         let output = "\
-Name|AdapterRAM|DriverVersion
-Microsoft Basic Render Driver|0
-Intel(R) UHD Graphics|2147483648|31.0.101.5522
-NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
+Name|AdapterRAM|DriverVersion|DriverDate|PNPDeviceID|AdapterCompatibility
+Microsoft Basic Render Driver|0||||Microsoft
+Intel(R) UHD Graphics|2147483648|31.0.101.5522|2026-01-10|PCI\\VEN_8086|Intel Corporation
+NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603|2026-06-15|PCI\\VEN_10DE|NVIDIA
 ";
-        let (name, vram_gb, driver_version) = preferred_windows_gpu_from_output(output).unwrap();
-        assert_eq!(name, "NVIDIA GeForce RTX 4080 SUPER");
-        assert_eq!(vram_gb, Some(16));
-        assert_eq!(driver_version.as_deref(), Some("32.0.15.6603"));
+        let candidate = preferred_windows_gpu_from_output(output).unwrap();
+        assert_eq!(candidate.name, "NVIDIA GeForce RTX 4080 SUPER");
+        assert_eq!(candidate.vram_gb, Some(16));
+        assert_eq!(candidate.vram_confidence, "reported_nonstandard_64bit");
+        assert_eq!(candidate.driver_version.as_deref(), Some("32.0.15.6603"));
+        assert_eq!(candidate.driver_date.as_deref(), Some("2026-06-15"));
+        assert_eq!(candidate.pnp_device_id.as_deref(), Some("PCI\\VEN_10DE"));
+        assert_eq!(candidate.driver_provider.as_deref(), Some("NVIDIA"));
+    }
+
+    #[test]
+    fn refuses_win32_adapter_ram_value_at_the_32_bit_ceiling() {
+        let (vram, confidence) = windows_adapter_ram_probe("4293918720");
+        assert_eq!(vram, None);
+        assert_eq!(confidence, "unknown_win32_32bit_limit");
+
+        let (small_vram, small_confidence) = windows_adapter_ram_probe("2147483648");
+        assert_eq!(small_vram, Some(2));
+        assert_eq!(small_confidence, "estimated_win32_adapter_ram");
+    }
+
+    #[test]
+    fn chooses_discrete_linux_gpu_and_keeps_kernel_driver() {
+        let output = "\
+00:02.0 VGA compatible controller: Intel Corporation UHD Graphics 770 [8086:4690]
+\tKernel driver in use: i915
+\tKernel modules: i915
+01:00.0 VGA compatible controller: Advanced Micro Devices, Inc. [AMD/ATI] Radeon RX 7900 XTX [1002:744c]
+\tKernel driver in use: amdgpu
+\tKernel modules: amdgpu
+";
+        let (name, kernel_driver) = preferred_linux_gpu_from_lspci_output(output).unwrap();
+        assert!(name.contains("Radeon RX 7900 XTX"));
+        assert_eq!(kernel_driver.as_deref(), Some("amdgpu"));
+    }
+
+    #[test]
+    fn parses_vulkan_instance_version_without_claiming_runtime_use() {
+        let output = "VULKANINFO\nVulkan Instance Version: 1.3.290\n";
+        assert_eq!(parse_vulkan_version(output).as_deref(), Some("1.3.290"));
+        assert_eq!(parse_vulkan_version("Vulkan unavailable"), None);
     }
 
     #[test]

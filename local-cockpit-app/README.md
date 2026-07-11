@@ -58,6 +58,15 @@ Verification visuelle desktop/mobile :
 npm run verify:visual
 ```
 
+Contrat Runtime & Driver Intelligence :
+
+```bash
+npm run verify:runtime-driver-matrix
+npm run verify:runtime-driver-intelligence
+```
+
+La source canonique est `server-work/static/data/runtime-driver-matrix.json`. Le fichier `src/runtime-driver-matrix.js` est généré par `npm run sync:runtime-driver-matrix` et la gate refuse toute dérive. Une API signalée par le pilote ne constitue jamais une preuve d'offload ; seule la mesure Ollama `/api/ps` peut prouver CPU, hybride ou GPU. La v1 ouvre uniquement les pages officielles NVIDIA, AMD ou Intel après un clic explicite et n'installe aucun pilote automatiquement.
+
 Ce controle ouvre l'interface avec Playwright, verifie l'absence de debordement horizontal, la lisibilite des boutons et la grille desktop, puis genere les captures dans `.artifacts/visual-ui/`.
 
 Si `cargo` n'est pas dans le `PATH` mais que rustup existe, utiliser :

@@ -63,6 +63,7 @@ def main():
         "list_candidate_models",
         "expose_recommended_roles",
         "expose_benchmark_proof",
+        "expose_runtime_driver_intelligence_read_only",
         "expose_runtime_command_prefix",
     ]:
         if capabilities.get(key) is not True:
@@ -74,6 +75,11 @@ def main():
         raise AssertionError(f"allowed_use mismatch: {profile.get('allowed_use')}")
     if not profile.get("runtime_command_prefix"):
         raise AssertionError("missing runtime command prefix")
+    runtime_driver = profile.get("runtime_driver_intelligence") or {}
+    if runtime_driver.get("schema") != "outilsia.runtime_driver_intelligence.v1":
+        raise AssertionError(f"runtime/driver intelligence missing: {runtime_driver}")
+    if runtime_driver.get("read_only") is not True:
+        raise AssertionError("Strategy Arena runtime/driver payload must remain read-only")
     if not profile.get("recommended_model"):
         raise AssertionError("missing recommended model")
     if len(profile.get("installed_models") or []) < 2:
@@ -99,6 +105,7 @@ def main():
     for expected in [
         "Import Strategy Arena: Modèles locaux disponibles via OutilsIA",
         "Fichier attendu: outilsia-strategy-arena-profile.json",
+        "Runtime/driver:",
         "Strategy Arena ne gère pas l'installation, la suppression ou le benchmark généraliste des modèles.",
         "Gestion modèles dans Strategy Arena: non",
         "Backtests dans OutilsIA: non",

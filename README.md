@@ -23,12 +23,14 @@ OutilsIA is a French-first toolbox for running AI on your own machine: free in-b
 The open desktop client scans CPU, RAM, GPU, VRAM, storage and Ollama runtimes, installs models only after explicit confirmation, benchmarks them with native Ollama metrics and recommends which tested model to keep.
 
 - **Hardware Doctor 2.0** separates detected drivers from observed runtime allocation. After a benchmark it uses Ollama `/api/ps` (`size_vram / size`) to report CPU, hybrid CPU/GPU or GPU execution; missing evidence stays unknown.
+- **Runtime & Driver Intelligence v1 (next build, not yet claimed as public)** uses a dated official-source matrix to separate driver presence, CUDA/ROCm/Vulkan signals, Ollama support and measured `/api/ps` execution. Pascal remains capped at CUDA toolkit 12.x, Strix Halo Windows/Linux are evaluated separately, Intel keeps its OEM warning, and shared RAM is never relabeled as dedicated VRAM.
 - **Model Autopilot v1** compares three bounded Ollama execution profiles on one already-installed model, requires explicit consent before testing or applying, and can restore the previous profile or Ollama defaults.
 - **Flight Recorder v1** stores an explicit local performance reference, compares exact Ollama throughput/prefill/load/offload plus thermal context, suspends verdicts when test conditions differ, and keeps possible causes separate from proven facts.
 - **Upgrade Digital Twin v1** compares local-only RAM, GPU/VRAM, SSD, PSU, case and cooling scenarios against measured and catalog constraints. Missing physical facts stay unknown, price ranges are non-live, and the result can explicitly recommend buying nothing yet.
 - **AI Capability Passport v1** exports a versioned JSON document containing hardware evidence, runtimes, installed models, benchmarks, recommendation and the read-only Strategy Arena handoff boundary.
 - The passport SHA-256 detects document modification. It is not an identity signature for the PC or its owner.
 - Prompts, model outputs, personal files and account tokens are excluded from the passport.
+- Driver actions open only the official vendor page after an explicit click. The v1 source does not download, elevate or install a graphics driver automatically.
 
 ## Guides
 
