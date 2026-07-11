@@ -65,6 +65,15 @@ try {
     version: "0.1.0",
     label: "0.1.0-beta-test",
     build_id: "test",
+    build_provenance: {
+      schema: "outilsia.local_cockpit_build_provenance.v1",
+      build_id: "test",
+      ci: false,
+      artifact_platforms: ["linux", "windows-x64"],
+      merged_release: true,
+    },
+    features: ["upgrade_digital_twin_v1"],
+    release_notes: ["Upgrade Digital Twin v1 public verifier test"],
     primary_download: { ...windows, platform: "windows-x64" },
     downloads_by_platform: {
       "windows-x64": [{ ...windows, platform: "windows-x64" }],
@@ -120,6 +129,33 @@ try {
   const missing = await runVerifier(port, ["--require-platform", "macos"]);
   if (missing.status === 0 || !String(missing.stderr).includes("Missing required platform: macos")) {
     throw new Error(`expected missing platform failure\nstdout=${missing.stdout}\nstderr=${missing.stderr}`);
+  }
+
+  writeFileSync(join(root, "release.json"), `${JSON.stringify({ ...release, features: [] }, null, 2)}\n`);
+  const missingFeature = await runVerifier(port);
+  if (missingFeature.status === 0 || !String(missingFeature.stderr).includes("release.features must include upgrade_digital_twin_v1")) {
+    throw new Error(`expected missing feature failure\nstdout=${missingFeature.stdout}\nstderr=${missingFeature.stderr}`);
+  }
+
+  writeFileSync(join(root, "release.json"), `${JSON.stringify({
+    ...release,
+    build_provenance: { ...release.build_provenance, build_id: "different-build" },
+  }, null, 2)}\n`);
+  const badBuild = await runVerifier(port);
+  if (badBuild.status === 0 || !String(badBuild.stderr).includes("build_provenance.build_id must match release.build_id")) {
+    throw new Error(`expected build provenance failure\nstdout=${badBuild.stdout}\nstderr=${badBuild.stderr}`);
+  }
+
+  writeFileSync(join(root, "release.json"), `${JSON.stringify({
+    ...release,
+    downloads_by_platform: {
+      ...release.downloads_by_platform,
+      linux: release.downloads_by_platform["windows-x64"],
+    },
+  }, null, 2)}\n`);
+  const badPlatform = await runVerifier(port);
+  if (badPlatform.status === 0 || !String(badPlatform.stderr).includes("downloads_by_platform.linux contains")) {
+    throw new Error(`expected platform mapping failure\nstdout=${badPlatform.stdout}\nstderr=${badPlatform.stderr}`);
   }
 
   const staleRelease = {

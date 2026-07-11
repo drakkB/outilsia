@@ -2022,6 +2022,15 @@ dd {
   padding: 10px;
 }
 
+.affiliate-disclosure {
+  color: var(--muted);
+  display: block;
+  font-size: 11px;
+  grid-column: 1 / -1;
+  line-height: 1.4;
+  padding: 3px 2px 0;
+}
+
 .decision-pack,
 .upgrade-impact-box,
 .first-test-box,

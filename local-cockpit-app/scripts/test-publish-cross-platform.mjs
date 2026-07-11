@@ -67,12 +67,15 @@ function writeRelease(root, files, buildId) {
         repository: "",
       },
     },
-    release_notes: ["publish cross-platform test"],
+    features: ["upgrade_digital_twin_v1"],
+    release_notes: ["Upgrade Digital Twin v1 publish cross-platform test"],
     freshness: {
       stale: false,
       allow_stale: false,
-      newest_source_mtime_ms: 1,
-      oldest_artifact_mtime_ms: 2,
+      newest_source: "local-cockpit-app/src/app.js",
+      oldest_artifact: "fixture/native-artifact",
+      newest_source_mtime_ms: 1500,
+      oldest_artifact_mtime_ms: 1000,
     },
     primary_download: primary,
     downloads_by_platform: downloadsByPlatform,
@@ -142,6 +145,13 @@ try {
     throw new Error(`bad cross-platform provenance ${JSON.stringify(release.build_provenance)}`);
   }
   if (release.build_provenance?.merged_release !== true) throw new Error("cross-platform provenance must mark merged_release=true");
+  const publicReleasePath = resolve(appRoot, "..", "server-work", "static", "downloads", "local-cockpit", "release.json");
+  const publicReleaseBefore = readFileSync(publicReleasePath, "utf8");
+  const temporaryOutput = run(["--windows", windows, "--linux", linux]);
+  if (!temporaryOutput.includes("cross_platform_beta_ready dry_run")) throw new Error(temporaryOutput);
+  if (readFileSync(publicReleasePath, "utf8") !== publicReleaseBefore) {
+    throw new Error("dry run without --release-dir must not mutate the public release tree");
+  }
   const previousFieldStatus = process.env.OUTILSIA_FIELD_STATUS_JSON;
   process.env.OUTILSIA_FIELD_STATUS_JSON = fieldStatus;
   runExpectFailure(["--windows", windows, "--linux", linux, "--release-dir", join(root, "deploy-blocked"), "--deploy"], "Linux public deploy blocked");

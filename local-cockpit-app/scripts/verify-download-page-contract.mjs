@@ -77,6 +77,9 @@ function validateRelease(release, opts, downloadRoot) {
   if (release.channel !== "beta") fail("release.channel must be beta");
   if (!release.version) fail("release.version is missing");
   if (!release.build_id) fail("release.build_id is missing");
+  if (!Array.isArray(release.features) || !release.features.includes("upgrade_digital_twin_v1")) {
+    fail("release.features must include upgrade_digital_twin_v1");
+  }
   if (!Array.isArray(release.release_notes) || !release.release_notes.length) fail("release.release_notes must not be empty");
   if (!release.release_notes.some((note) => String(note).includes("Upgrade Digital Twin v1"))) {
     fail("release.release_notes must advertise Upgrade Digital Twin v1");
@@ -152,7 +155,11 @@ function main() {
     if (!html.includes(`href="${file.url}"`)) fail(`Static direct download link (href) missing for ${file.name}`);
   }
 
-  const staleBuildIds = [...new Set(html.match(/\b20\d{12}\b/g) || [])].filter((id) => id !== release.build_id);
+  const embeddedBuildIds = [
+    ...[...html.matchAll(/OutilsIA-Local-Cockpit-[^"'\s>]*?-([0-9]{11,14})-(?:windows|linux|macos)/g)].map((match) => match[1]),
+    ...[...html.matchAll(/Build ID:\s*([0-9]{11,14})/g)].map((match) => match[1]),
+  ];
+  const staleBuildIds = [...new Set(embeddedBuildIds)].filter((id) => id !== String(release.build_id));
   if (staleBuildIds.length) fail(`Stale build id(s) left in page: ${staleBuildIds.join(", ")}`);
   const knownShas = new Set(release.files.map((file) => file.sha256.toLowerCase()));
   const staleShas = [...new Set((html.match(/\b[a-f0-9]{64}\b/gi) || []).map((sha) => sha.toLowerCase()))]

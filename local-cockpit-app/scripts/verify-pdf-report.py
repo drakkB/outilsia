@@ -26,13 +26,13 @@ REQUIRED_TEXT = [
     "Décision OutilsIA",
     "Build",
     "SHA",
-    "Ce rapport prouve",
+    "Ce rapport sépare",
     "Synthèse terrain",
     "Profil terrain",
     "Compatibilité modèles",
     "Garde-fou médias",
     "Achat utile",
-    "Affiliation utile",
+    "Décision d'achat",
     "Avant upgrade",
     "Après upgrade",
     "Budget indicatif",
@@ -48,14 +48,14 @@ REQUIRED_TEXT = [
     "Rapport partageable",
     "Lien public prêt",
     "https://outilsia.fr/r/demo",
-    "Achat seulement après preuve",
+    "Achat seulement après vérification",
     "Dossier upgrade IA locale",
     "Acheter si",
     "Attendre si",
     "Contrôler avant achat",
     "Limites actuelles",
     "Modèles débloqués",
-    "compatibilité réelle",
+    "compatibilité à confirmer",
 ]
 
 
@@ -100,8 +100,8 @@ def main():
         if meters < 3:
             raise AssertionError(f"pdf should contain score/vram/ram meters, got {meters}")
         guide_links = page.locator("#printReportRoot .pdf-link-list li").count()
-        if guide_links < 1:
-            raise AssertionError("pdf should contain at least one guide or shopping link")
+        if guide_links < 1 and "Les liens d'achat sont masqués pendant la simulation Digital Twin" not in text:
+            raise AssertionError("pdf should contain a guide link or explicitly explain why Digital Twin hid it")
         proof_items = page.locator("#printReportRoot .pdf-proof-band li").count()
         if proof_items < 4:
             raise AssertionError(f"pdf should contain proof band items, got {proof_items}")

@@ -93,6 +93,13 @@ def main():
         assert blocked_checks["case_clearance"]["status"] == "blocked"
         assert blocked["physical_field_proof"] is False
 
+        assert result["beforeBenchmark"]["decision"]["key"] == "measure_first"
+        assert result["afterBenchmark"]["decision"]["key"] == "no_buy"
+        assert result["afterCompatibility"]["decision"]["key"] == "no_buy"
+        assert "N'achetez rien pour ce scénario" in result["afterCompatibilityUi"]
+        assert "Gros LLM 24 Go" not in result["afterCompatibilityUi"]
+        assert "Upgrade prioritaire" not in result["afterCompatibilityUi"]
+
         candidate = result["candidate"]
         candidate_checks = {item["key"]: item for item in candidate["compatibility"]["checks"]}
         assert candidate["decision"]["key"] == "candidate"
@@ -100,8 +107,9 @@ def main():
         assert candidate_checks["ram_capacity"]["status"] == "confirmed"
         assert candidate_checks["ram_type"]["status"] == "probable"
         assert candidate_checks["psu"]["status"] == "probable"
-        assert candidate_checks["case_clearance"]["status"] == "confirmed"
+        assert candidate_checks["case_clearance"]["status"] == "probable"
         assert candidate_checks["power_connectors"]["status"] == "unknown"
+        assert candidate_checks["driver"]["status"] == "unknown"
         assert candidate_checks["storage_interface"]["status"] == "unknown"
         assert candidate["current"]["ram"]["type"] == "DDR3"
         assert candidate["current"]["ram"]["motherboard_max_gb"] == 32
@@ -110,10 +118,15 @@ def main():
         assert candidate["impact"]["newly_reachable_models"]
         assert candidate["impact"]["cost_eur"]["max"] > candidate["impact"]["cost_eur"]["min"] > 0
         assert candidate["impact"]["cost_is_live"] is False
+        assert candidate["impact"]["cost_metadata"]["as_of"] == "2026-07-11"
+        assert candidate["impact"]["cost_metadata"]["is_live"] is False
         assert candidate["compatibility"]["confidence"] != "high"
         candidate_cost_keys = {item["key"] for item in candidate["impact"]["cost_components"]}
         assert "psu" not in candidate_cost_keys
         assert "cooling" not in candidate_cost_keys
+        assert all(item["source"] for item in candidate["impact"]["cost_components"])
+        assert all(item["as_of"] == "2026-07-11" for item in candidate["impact"]["cost_components"])
+        assert "Certains liens matériels sont affiliés" in result["candidateVisibleUi"]
 
         purchase_cost_keys = {item["key"] for item in result["purchaseBudget"]["impact"]["cost_components"]}
         assert "psu" in purchase_cost_keys
@@ -124,26 +137,68 @@ def main():
         assert missing_checks["ram_slots"]["status"] == "unknown"
         assert "0/4" not in missing_checks["ram_slots"]["detail"]
 
+        unknown_resources = result["unknownResources"]
+        assert unknown_resources["current"]["ram"]["total_gb"] is None
+        assert unknown_resources["current"]["gpu"]["vram_gb"] is None
+        assert unknown_resources["current"]["storage_free_gb"] is None
+        assert unknown_resources["target"]["ram_gb"] is None
+        assert unknown_resources["target"]["vram_gb"] is None
+        assert unknown_resources["target"]["storage_free_gb"] is None
+        assert unknown_resources["impact"]["newly_reachable_models"] == []
+        assert unknown_resources["decision"]["key"] == "measure_first"
+
+        unified = result["unifiedMemoryTarget"]
+        unified_checks = {item["key"]: item for item in unified["compatibility"]["checks"]}
+        assert unified["current"]["unified_memory"] is True
+        assert unified["current"]["gpu"]["vram_gb"] is None
+        assert unified["target"]["vram_gb"] == 24
+        assert unified["decision"]["key"] != "no_buy"
+        assert unified["impact"]["newly_reachable_models"] == []
+        assert unified_checks["gpu_baseline"]["status"] == "unknown"
+        assert "mémoire unifiée" in unified_checks["gpu_baseline"]["detail"]
+
         assert result["staleSummaryAfterRescan"] is None
         assert result["recalculatedAfterRescan"]["target"]["ram_gb"] == 64
         assert result["downgrade"]["decision"]["key"] == "no_buy"
         assert "réduit" in result["downgrade"]["decision"]["rationale"]
 
+        assert result["noChange"]["decision"]["key"] == "no_buy"
         assert result["noBuy"]["decision"]["key"] == "no_buy"
+        assert result["noBuyReport"]["purchases_suppressed_by_digital_twin"] is True
+        assert result["noBuyReport"]["upgrades"] == []
+        assert result["noBuyReport"]["buying_links"] == []
+        assert result["noBuyPack"]["purchases_suppressed_by_digital_twin"] is True
+        assert result["noBuyPack"]["upgrades"] == []
+        assert result["noBuyPack"]["buying_links"] == []
+        assert "amazon.fr" not in result["noBuyPdf"].lower()
+        assert "Aucun achat proposé" in result["noBuyPdf"]
+        assert "N'achetez rien pour ce scénario" in result["noBuyVisibleUi"]
+        assert "Conserver la machine" in result["noBuyVisibleUi"]
+        assert "Gros LLM 24 Go" not in result["noBuyVisibleUi"]
+        assert "Upgrade prioritaire" not in result["noBuyVisibleUi"]
+        assert "amazon.fr" not in result["noBuyVisibleUi"].lower()
         assert result["restored"]["draft"]["name"] == candidate["draft"]["name"]
         assert len(result["exportDocument"]["history"]) == 2
         assert len(result["exportDocument"]["comparison"]) == 2
         assert all(item["physical_field_proof"] is False for item in result["exportDocument"]["comparison"])
         assert result["summary"]["physical_field_proof"] is False
+        assert result["summary"]["cost"]["currency"] == "EUR"
+        assert result["summary"]["cost"]["as_of"] == "2026-07-11"
+        assert result["summary"]["cost"]["is_live"] is False
+        assert result["summary"]["cost_components"]
         assert result["report"]["upgrade_digital_twin"]["decision"]["key"] == "candidate"
         assert result["passport"]["capabilities"]["upgrade_digital_twin_v1"] is True
         assert result["passport"]["upgrade_digital_twin"]["physical_field_proof"] is False
         assert result["bridge"]["handoff_manifest"]["capabilities"]["expose_upgrade_digital_twin_summary_read_only"] is True
         assert result["bridge"]["upgrade_digital_twin"]["decision"]["key"] == "candidate"
+        assert result["bridge"]["upgrade_digital_twin"]["cost"]["currency"] == "EUR"
         assert result["field"]["upgrade_digital_twin_ok"] is True
         assert result["field"]["upgrade_digital_twin_physical_proof"] is False
         assert "Upgrade Digital Twin" in result["memory"]
         assert "aucune preuve terrain physique" in result["markdown"]
+        assert "Simulation d'upgrade - aucune preuve physique" in result["readinessMarkdown"]
+        assert "Scénario utile à vérifier" in result["pdf"]
+        assert "Gros LLM 24 Go" not in result["pdf"]
         assert "Scénario utile à vérifier" in result["panel"]
 
         page.set_viewport_size({"width": 390, "height": 1600})

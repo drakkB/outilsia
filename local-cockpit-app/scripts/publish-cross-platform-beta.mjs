@@ -6,8 +6,6 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const repoRoot = resolve(appRoot, "..");
-const defaultReleaseDir = join(repoRoot, "server-work", "static", "downloads", "local-cockpit");
 
 function usage() {
   console.log(`Usage:
@@ -20,6 +18,7 @@ Examples:
 
 The script imports the artifact(s), requires windows-x64 and linux, validates Linux native files, validates the release,
 then deploys only when --deploy is provided.
+Without --release-dir, validation uses a temporary directory and leaves the public release tree unchanged.
 
 Linux public deploy is blocked until at least two Windows terrain profiles are ready, unless --force-terrain-override is provided with an explicit manual decision.`);
 }
@@ -29,7 +28,7 @@ function parseArgs(argv) {
     input: "",
     windows: "",
     linux: "",
-    releaseDir: defaultReleaseDir,
+    releaseDir: "",
     deploy: false,
     forceTerrainOverride: false,
     remote: "",

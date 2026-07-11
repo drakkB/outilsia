@@ -63,7 +63,8 @@ function writeRelease(root, files, buildId) {
         repository: "",
       },
     },
-    release_notes: ["merge test"],
+    features: ["upgrade_digital_twin_v1"],
+    release_notes: ["Upgrade Digital Twin v1 merge test"],
     primary_download: primary,
     downloads_by_platform: downloadsByPlatform,
     files: releaseFiles,
@@ -115,6 +116,18 @@ function verifyLinuxArtifacts(releaseDir) {
   return result.stdout;
 }
 
+function verifyReleaseContract(releaseDir, expectedFailure = "") {
+  const result = spawnSync("node", ["scripts/verify-release-contract.mjs", "--input", releaseDir], {
+    cwd: appRoot,
+    encoding: "utf8",
+  });
+  const output = `${result.stdout}\n${result.stderr}`;
+  if (!expectedFailure && result.status !== 0) throw new Error(output);
+  if (expectedFailure && (result.status === 0 || !output.includes(expectedFailure))) {
+    throw new Error(`expected release contract failure ${expectedFailure}, got: ${output}`);
+  }
+}
+
 const root = mkdtempSync(join(tmpdir(), "outilsia-import-merge-test-"));
 try {
   const win = join(root, "windows");
@@ -162,6 +175,24 @@ try {
   if (!linuxVerifyOutput.includes("linux_artifacts_verified")) {
     throw new Error(`linux artifact verifier did not confirm merged release: ${linuxVerifyOutput}`);
   }
+  verifyReleaseContract(out);
+
+  const releasePath = join(out, "release.json");
+  writeFileSync(releasePath, `${JSON.stringify({
+    ...release,
+    build_provenance: { ...release.build_provenance, build_id: "different-build" },
+  }, null, 2)}\n`);
+  verifyReleaseContract(out, "build_provenance.build_id must match release.build_id");
+
+  writeFileSync(releasePath, `${JSON.stringify({
+    ...release,
+    downloads_by_platform: {
+      ...release.downloads_by_platform,
+      linux: release.downloads_by_platform["windows-x64"],
+    },
+  }, null, 2)}\n`);
+  verifyReleaseContract(out, "downloads_by_platform.linux contains");
+  writeFileSync(releasePath, `${JSON.stringify(release, null, 2)}\n`);
   console.log(`import_beta_merge_ok ${release.files.length} file(s)`);
 } finally {
   rmSync(root, { recursive: true, force: true });

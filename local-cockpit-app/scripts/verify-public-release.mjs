@@ -125,37 +125,95 @@ function validateRelease(release, requiredPlatforms = [], requireFreshness = fal
   if (release.product !== "OutilsIA Local Cockpit") fail("Unexpected product in release.json");
   if (release.channel !== "beta") fail("release.channel must be beta");
   if (!release.version || !/^\d+\.\d+\.\d+/.test(release.version)) fail("Invalid release.version");
+  if (!release.build_id) fail("Missing release.build_id");
+  if (!release.build_provenance || typeof release.build_provenance !== "object") {
+    fail("Missing release.build_provenance");
+  }
+  if (String(release.build_provenance.build_id || "") !== String(release.build_id)) {
+    fail("build_provenance.build_id must match release.build_id");
+  }
+  if (release.build_provenance.ci === true && !/^\d{11,14}$/.test(String(release.build_id))) {
+    fail("CI release.build_id must be an 11-14 digit GitHub run identifier");
+  }
+  if (!Array.isArray(release.features) || !release.features.includes("upgrade_digital_twin_v1")) {
+    fail("release.features must include upgrade_digital_twin_v1");
+  }
+  if (!Array.isArray(release.release_notes) || !release.release_notes.some((note) => String(note).includes("Upgrade Digital Twin v1"))) {
+    fail("release.release_notes must advertise Upgrade Digital Twin v1");
+  }
   if (!release.primary_download?.name) fail("Missing primary_download.name");
   if (!Array.isArray(release.files) || !release.files.length) fail("release.files must contain at least one file");
+  if (!release.downloads_by_platform || typeof release.downloads_by_platform !== "object") {
+    fail("Missing downloads_by_platform");
+  }
   if (requireFreshness) validateFreshness(release);
 
   const names = new Set();
+  const canonicalFiles = new Map();
   for (const file of release.files) {
     if (!file.name || file.name.includes("/") || file.name.includes("\\")) fail(`Invalid file name: ${file.name}`);
     if (names.has(file.name)) fail(`Duplicate file in release.json: ${file.name}`);
     names.add(file.name);
+    canonicalFiles.set(file.name, file);
     if (!file.url || !file.url.startsWith("/static/downloads/local-cockpit/")) fail(`Invalid URL for ${file.name}`);
     if (!/^[a-f0-9]{64}$/i.test(file.sha256 || "")) fail(`Invalid sha256 for ${file.name}`);
     if (!Number.isInteger(Number(file.size_bytes)) || Number(file.size_bytes) <= 0) fail(`Invalid size_bytes for ${file.name}`);
   }
   if (!names.has(release.primary_download.name)) fail("primary_download must be listed in files");
+  const primaryCanonical = canonicalFiles.get(release.primary_download.name);
+  if (release.primary_download.platform !== primaryCanonical.platform
+    || release.primary_download.url !== primaryCanonical.url
+    || release.primary_download.sha256 !== primaryCanonical.sha256
+    || Number(release.primary_download.size_bytes) !== Number(primaryCanonical.size_bytes)) {
+    fail("primary_download must match its canonical release.files entry");
+  }
   const platforms = new Set(release.files.map((file) => file.platform).filter(Boolean));
   if (![...platforms].some((platform) => supportedPlatforms.has(platform))) {
     fail("No supported desktop artifact found in release.files");
   }
-  if (release.downloads_by_platform) {
-    for (const [platform, items] of Object.entries(release.downloads_by_platform)) {
-      if (!Array.isArray(items) || !items.length) fail(`downloads_by_platform.${platform} must be a non-empty array`);
-      for (const item of items) {
-        if (!names.has(item.name)) fail(`downloads_by_platform.${platform} references unknown file: ${item.name}`);
+  const provenancePlatforms = [...new Set(release.build_provenance.artifact_platforms || [])].sort();
+  const actualPlatforms = [...platforms].sort();
+  if (JSON.stringify(provenancePlatforms) !== JSON.stringify(actualPlatforms)) {
+    fail(`build_provenance.artifact_platforms mismatch: expected ${actualPlatforms.join(",")} got ${provenancePlatforms.join(",")}`);
+  }
+  if (actualPlatforms.length > 1 && release.build_provenance.merged_release !== true) {
+    fail("Cross-platform release must set build_provenance.merged_release=true");
+  }
+  if (release.build_provenance.ci === true) {
+    for (const file of release.files) {
+      if (!file.name.includes(`-${release.build_id}-`)) {
+        fail(`CI artifact name must include build_id ${release.build_id}: ${file.name}`);
       }
     }
+  }
+
+  const groupedNames = new Set();
+  for (const [platform, items] of Object.entries(release.downloads_by_platform)) {
+    if (!supportedPlatforms.has(platform)) fail(`Unsupported downloads_by_platform key: ${platform}`);
+    if (!Array.isArray(items) || !items.length) fail(`downloads_by_platform.${platform} must be a non-empty array`);
+    for (const item of items) {
+      if (!names.has(item.name)) fail(`downloads_by_platform.${platform} references unknown file: ${item.name}`);
+      if (item.platform !== platform) {
+        fail(`downloads_by_platform.${platform} contains ${item.name} with platform ${item.platform}`);
+      }
+      if (groupedNames.has(item.name)) fail(`downloads_by_platform duplicates file: ${item.name}`);
+      groupedNames.add(item.name);
+      const canonical = canonicalFiles.get(item.name);
+      if (item.url !== canonical.url
+        || item.sha256 !== canonical.sha256
+        || Number(item.size_bytes) !== Number(canonical.size_bytes)) {
+        fail(`downloads_by_platform.${platform} entry must match release.files: ${item.name}`);
+      }
+    }
+  }
+  for (const file of release.files) {
+    if (!groupedNames.has(file.name)) fail(`downloads_by_platform is missing file: ${file.name}`);
   }
 
   for (const platform of requiredPlatforms) {
     if (!supportedPlatforms.has(platform)) fail(`Unsupported required platform: ${platform}`);
     if (!platforms.has(platform)) fail(`Missing required platform: ${platform}`);
-    if (release.downloads_by_platform && !release.downloads_by_platform[platform]?.length) {
+    if (!release.downloads_by_platform[platform]?.length) {
       fail(`Missing downloads_by_platform for required platform: ${platform}`);
     }
   }

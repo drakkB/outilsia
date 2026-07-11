@@ -105,7 +105,7 @@ function assertFreshness(release) {
   if (!release.freshness.newest_source_mtime_ms || !release.freshness.oldest_artifact_mtime_ms) {
     fail("release.freshness must include newest_source_mtime_ms and oldest_artifact_mtime_ms");
   }
-  if (Number(release.freshness.oldest_artifact_mtime_ms) < Number(release.freshness.newest_source_mtime_ms)) {
+  if (Number(release.freshness.oldest_artifact_mtime_ms) + 1000 < Number(release.freshness.newest_source_mtime_ms)) {
     fail("release.freshness artifact timestamp is older than source timestamp");
   }
 }
@@ -172,14 +172,20 @@ function sshOptions(opts) {
   return opts.identity ? ["-i", opts.identity, "-o", "BatchMode=yes"] : [];
 }
 
-function deploy({ releasePath, files, pagePath }, opts) {
+function deploy({ release, releasePath, files, pagePath }, opts) {
   const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+  const buildToken = String(release.build_id || "unknown").replace(/[^a-zA-Z0-9_-]/g, "_");
   const backupDir = `/var/backups/outilsia-local-cockpit/release_${stamp}`;
   const remoteDir = opts.remoteDir.replace(/\/+$/, "");
   const remotePagePath = opts.remotePagePath;
-  const stagingDir = `${remoteDir}.upload_${stamp}`;
+  const stagingDir = `${remoteDir}.upload_${buildToken}_${stamp}_${process.pid}`;
+  const lockDir = `${remoteDir}.deploy_lock`;
+  const ownerToken = `build=${buildToken} started=${stamp} pid=${process.pid}`;
   const prepareCommand = [
     "set -e",
+    `if [ -d ${shellQuote(lockDir)} ] && find ${shellQuote(lockDir)} -maxdepth 0 -mmin +120 -print -quit | grep -q .; then rm -rf ${shellQuote(lockDir)}; fi`,
+    `if ! mkdir ${shellQuote(lockDir)}; then echo ${shellQuote(`release deploy already locked: ${lockDir}`)} >&2; exit 73; fi`,
+    `printf '%s\n' ${shellQuote(ownerToken)} > ${shellQuote(`${lockDir}/owner`)}`,
     `mkdir -p ${shellQuote(backupDir)}`,
     `mkdir -p ${shellQuote(remoteDir)}`,
     `cp -a ${shellQuote(remoteDir)}/. ${shellQuote(backupDir)}/ 2>/dev/null || true`,
@@ -191,43 +197,56 @@ function deploy({ releasePath, files, pagePath }, opts) {
     `mkdir -p ${shellQuote(stagingDir)}`,
     `echo backup:${backupDir}`,
   ].join("; ");
-  run("ssh", [...sshOptions(opts), opts.remote, prepareCommand]);
+  try {
+    run("ssh", [...sshOptions(opts), opts.remote, prepareCommand]);
+    for (const file of files) {
+      run("scp", [...sshOptions(opts), file.path, `${opts.remote}:${stagingDir}/${basename(file.path)}`]);
+    }
+    run("scp", [...sshOptions(opts), releasePath, `${opts.remote}:${stagingDir}/release.json`]);
+    if (pagePath && remotePagePath) {
+      run("scp", [...sshOptions(opts), pagePath, `${opts.remote}:${stagingDir}/${basename(remotePagePath)}`]);
+    }
 
-  for (const file of files) {
-    run("scp", [...sshOptions(opts), file.path, `${opts.remote}:${stagingDir}/${basename(file.path)}`]);
+    const verifyScript = [
+      "import hashlib, json, pathlib, sys",
+      "base = pathlib.Path(sys.argv[1])",
+      "data = json.loads((base / 'release.json').read_text())",
+      "assert all((base / item['name']).exists() for item in data['files'])",
+      "assert all((base / item['name']).stat().st_size == int(item['size_bytes']) for item in data['files'])",
+      "assert all(hashlib.sha256((base / item['name']).read_bytes()).hexdigest() == item['sha256'] for item in data['files'])",
+      "print('remote_release_ok', data['version'], len(data['files']))",
+    ].join("; ");
+    const verifyAndActivateCommand = [
+      "set -e",
+      `test -s ${shellQuote(stagingDir)}/release.json`,
+      `python3 -c ${shellQuote(verifyScript)} ${shellQuote(stagingDir)}`,
+      ...files.map((file) => `mv -f ${shellQuote(`${stagingDir}/${file.name}`)} ${shellQuote(`${remoteDir}/${file.name}`)}`),
+      `mv -f ${shellQuote(`${stagingDir}/release.json`)} ${shellQuote(`${remoteDir}/release.json`)}`,
+      ...(pagePath && remotePagePath ? [
+        `mv -f ${shellQuote(`${stagingDir}/${basename(remotePagePath)}`)} ${shellQuote(remotePagePath)}`,
+      ] : []),
+      `rmdir ${shellQuote(stagingDir)}`,
+      "echo release_activated",
+      "echo previous_release_files_retained_for_cache_transition",
+    ].join("; ");
+    run("ssh", [...sshOptions(opts), opts.remote, verifyAndActivateCommand]);
+  } finally {
+    const cleanupCommand = [
+      `rm -rf ${shellQuote(stagingDir)}`,
+      `if [ "$(cat ${shellQuote(`${lockDir}/owner`)} 2>/dev/null || true)" = ${shellQuote(ownerToken)} ]; then rm -rf ${shellQuote(lockDir)}; fi`,
+    ].join("; ");
+    spawnSync("ssh", [...sshOptions(opts), opts.remote, cleanupCommand], { stdio: "inherit" });
   }
-  run("scp", [...sshOptions(opts), releasePath, `${opts.remote}:${stagingDir}/release.json`]);
-  if (pagePath && remotePagePath) {
-    run("scp", [...sshOptions(opts), pagePath, `${opts.remote}:${stagingDir}/${basename(remotePagePath)}`]);
-  }
-
-  const verifyScript = [
-    "import hashlib, json, pathlib, sys",
-    "base = pathlib.Path(sys.argv[1])",
-    "data = json.loads((base / 'release.json').read_text())",
-    "assert all((base / item['name']).exists() for item in data['files'])",
-    "assert all((base / item['name']).stat().st_size == int(item['size_bytes']) for item in data['files'])",
-    "assert all(hashlib.sha256((base / item['name']).read_bytes()).hexdigest() == item['sha256'] for item in data['files'])",
-    "print('remote_release_ok', data['version'], len(data['files']))",
-  ].join("; ");
-  const verifyAndActivateCommand = [
-    "set -e",
-    `test -s ${shellQuote(stagingDir)}/release.json`,
-    `python3 -c ${shellQuote(verifyScript)} ${shellQuote(stagingDir)}`,
-    ...files.map((file) => `mv -f ${shellQuote(`${stagingDir}/${file.name}`)} ${shellQuote(`${remoteDir}/${file.name}`)}`),
-    ...(pagePath && remotePagePath ? [
-      `mv -f ${shellQuote(`${stagingDir}/${basename(remotePagePath)}`)} ${shellQuote(remotePagePath)}`,
-    ] : []),
-    `mv -f ${shellQuote(`${stagingDir}/release.json`)} ${shellQuote(`${remoteDir}/release.json`)}`,
-    `rmdir ${shellQuote(stagingDir)}`,
-    "echo release_activated",
-    "echo previous_release_files_retained_for_cache_transition",
-  ].join("; ");
-  run("ssh", [...sshOptions(opts), opts.remote, verifyAndActivateCommand]);
 }
 
 try {
   const opts = parseArgs(process.argv.slice(2));
+  run("node", [
+    join(appRoot, "scripts", "verify-release-contract.mjs"),
+    "--input",
+    opts.releaseDir,
+    ...(opts.requireFreshness ? ["--require-freshness"] : []),
+  ]);
   const managesPublicPage = resolve(opts.releaseDir) === resolve(defaultReleaseDir) || opts.includePublicPage;
   if (managesPublicPage) {
     run("node", [

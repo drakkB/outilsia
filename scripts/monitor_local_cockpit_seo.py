@@ -15,6 +15,7 @@ import argparse
 import html
 import json
 import re
+import struct
 import sys
 import urllib.error
 import urllib.parse
@@ -75,6 +76,9 @@ META_DESC_RE = re.compile(
 )
 CANONICAL_LINK_RE = re.compile(r"<link[^>]+>", re.IGNORECASE)
 OG_URL_RE = re.compile(r'<meta[^>]+property="og:url"[^>]+content="([^"]*)"', re.IGNORECASE)
+JSON_LD_RE = re.compile(r'<script\s+type="application/ld\+json">(.*?)</script>', re.IGNORECASE | re.DOTALL)
+TAG_RE = re.compile(r"<[^>]+>")
+NON_VISIBLE_BLOCK_RE = re.compile(r"<(script|style)\b[^>]*>.*?</\1>", re.IGNORECASE | re.DOTALL)
 
 CTR_REQUIRED = {
     "/blog/chatgpt-gratuit-francais-guide-2026": ("ChatGPT gratuit", "scanner"),
@@ -146,6 +150,32 @@ def canonical_href(text: str) -> str:
     return ""
 
 
+def faq_visibility(text: str) -> dict[str, object]:
+    visible_source = NON_VISIBLE_BLOCK_RE.sub(" ", text)
+    visible = " ".join(html.unescape(TAG_RE.sub(" ", visible_source)).split())
+    faq_docs = []
+    for block in JSON_LD_RE.findall(text):
+        try:
+            document = json.loads(html.unescape(block.strip()))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(document, dict) and document.get("@type") == "FAQPage":
+            faq_docs.append(document)
+    entities = faq_docs[0].get("mainEntity", []) if len(faq_docs) == 1 else []
+    missing = []
+    for entity in entities if isinstance(entities, list) else []:
+        question = " ".join(str(entity.get("name") or "").split())
+        answer = " ".join(str((entity.get("acceptedAnswer") or {}).get("text") or "").split())
+        if not question or question not in visible or not answer or answer not in visible:
+            missing.append(question or "question sans nom")
+    return {
+        "faq_documents": len(faq_docs),
+        "faq_questions": len(entities) if isinstance(entities, list) else 0,
+        "faq_missing_visible": missing,
+        "faq_visible_ok": len(faq_docs) == 1 and bool(entities) and not missing,
+    }
+
+
 def check_legacy_404(base_url: str) -> list[dict[str, object]]:
     results = []
     for path in LEGACY_404_PATHS:
@@ -214,6 +244,7 @@ def check_teasers(base_url: str) -> list[dict[str, object]]:
 def check_download_page(base_url: str) -> dict[str, object]:
     result = fetch(absolute(base_url, "/telecharger-scanner-ia-local"))
     text = str(result.get("text") or "")
+    faq = faq_visibility(text)
     static_links_ok = all(
         pattern in text
         for pattern in (
@@ -271,6 +302,7 @@ def check_download_page(base_url: str) -> dict[str, object]:
         "doctor_passport_ok": doctor_passport_ok,
         "flight_recorder_ok": flight_recorder_ok,
         "digital_twin_ok": digital_twin_ok,
+        **faq,
         "ok": result.get("status") == 200
         and "Scanner PC IA locale" in text
         and all(path in text for path in SCREENSHOT_PATHS)
@@ -282,13 +314,15 @@ def check_download_page(base_url: str) -> dict[str, object]:
         and model_autopilot_ok
         and doctor_passport_ok
         and flight_recorder_ok
-        and digital_twin_ok,
+        and digital_twin_ok
+        and faq["faq_visible_ok"],
     }
 
 
 def check_scanner_hub(base_url: str) -> dict[str, object]:
     result = fetch(absolute(base_url, "/scanner-ia-local"))
     text = str(result.get("text") or "")
+    faq = faq_visibility(text)
     canonical = canonical_href(text)
     proof_engine_ok = "eval_count / eval_duration" in text and "prompt_eval_count" in text
     objective_arena_ok = "Arena objective v1" in text and "six vérifications" in text
@@ -334,6 +368,7 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         "doctor_passport_ok": doctor_passport_ok,
         "flight_recorder_ok": flight_recorder_ok,
         "digital_twin_ok": digital_twin_ok,
+        **faq,
         "ok": result.get("status") == 200
         and canonical == absolute(base_url, "/scanner-ia-local")
         and "/telecharger-scanner-ia-local" in text
@@ -344,7 +379,41 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         and model_autopilot_ok
         and doctor_passport_ok
         and flight_recorder_ok
-        and digital_twin_ok,
+        and digital_twin_ok
+        and faq["faq_visible_ok"],
+    }
+
+
+def check_release_manifest(base_url: str) -> dict[str, object]:
+    result = fetch(absolute(base_url, "/static/downloads/local-cockpit/release.json"), read_limit=300_000)
+    try:
+        release = json.loads(str(result.get("text") or "{}"))
+    except json.JSONDecodeError:
+        release = {}
+    files = release.get("files") if isinstance(release.get("files"), list) else []
+    notes = release.get("release_notes") if isinstance(release.get("release_notes"), list) else []
+    features = release.get("features") if isinstance(release.get("features"), list) else []
+    platforms = {str(item.get("platform") or "") for item in files if isinstance(item, dict)}
+    digital_twin_note_ok = any("Upgrade Digital Twin v1" in str(note) for note in notes)
+    digital_twin_feature_ok = "upgrade_digital_twin_v1" in features
+    provenance = release.get("build_provenance") if isinstance(release.get("build_provenance"), dict) else {}
+    build_id_matches = str(provenance.get("build_id") or "") == str(release.get("build_id") or "")
+    return {
+        "status": result.get("status"),
+        "build_id": release.get("build_id") or "",
+        "file_count": len(files),
+        "platforms": sorted(platforms),
+        "digital_twin_note_ok": digital_twin_note_ok,
+        "digital_twin_feature_ok": digital_twin_feature_ok,
+        "build_id_matches": build_id_matches,
+        "merged_release_ok": provenance.get("merged_release") is True,
+        "ok": result.get("status") == 200
+        and len(files) == 5
+        and {"windows-x64", "linux"}.issubset(platforms)
+        and digital_twin_note_ok
+        and digital_twin_feature_ok
+        and build_id_matches
+        and provenance.get("merged_release") is True,
     }
 
 
@@ -430,17 +499,44 @@ def check_field_claims(base_url: str) -> list[dict[str, object]]:
     return results
 
 
+def fetch_image_info(url: str) -> dict[str, object]:
+    request = urllib.request.Request(url, headers={"User-Agent": "OutilsIA-Local-Cockpit-SEO-monitor/20260711"})
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            body = response.read(1_000_000)
+            width = height = 0
+            if body.startswith(b"\x89PNG\r\n\x1a\n") and len(body) >= 24:
+                width, height = struct.unpack(">II", body[16:24])
+            return {
+                "status": response.status,
+                "content_type": response.headers.get("content-type", ""),
+                "content_length": response.headers.get("content-length", ""),
+                "bytes_read": len(body),
+                "width": width,
+                "height": height,
+            }
+    except Exception as error:
+        return {"status": "ERR", "error": str(error), "bytes_read": 0, "width": 0, "height": 0}
+
+
 def check_screenshots(base_url: str) -> list[dict[str, object]]:
     results = []
     for path in SCREENSHOT_PATHS:
-        result = fetch(absolute(base_url, path), method="HEAD")
+        result = fetch_image_info(absolute(base_url, path))
         results.append(
             {
                 "path": path,
                 "status": result.get("status"),
                 "content_type": result.get("content_type"),
                 "content_length": result.get("content_length"),
-                "ok": result.get("status") == 200 and "image/" in str(result.get("content_type", "")),
+                "bytes_read": result.get("bytes_read"),
+                "width": result.get("width"),
+                "height": result.get("height"),
+                "ok": result.get("status") == 200
+                and "image/" in str(result.get("content_type", ""))
+                and int(result.get("bytes_read") or 0) > 10_000
+                and int(result.get("width") or 0) >= 320
+                and int(result.get("height") or 0) >= 240,
             }
         )
     return results
@@ -469,6 +565,7 @@ def summarize(report: dict[str, object]) -> dict[str, int]:
     checks.extend(report["teaser_pages"])
     checks.append(report["scanner_hub"])
     checks.append(report["download_page"])
+    checks.append(report["release_manifest"])
     checks.append(report["llms_txt"])
     checks.extend(report["field_claims"])
     checks.extend(report["screenshots"])
@@ -503,11 +600,15 @@ def write_markdown(report: dict[str, object], path: Path) -> None:
     lines += ["", "## Téléchargement et screenshots", ""]
     hub = report["scanner_hub"]
     lines.append(
-        f"- `/scanner-ia-local` status={hub['status']} canonical={hub['canonical_ok']} download={hub['download_link_ok']} proof_engine={hub['proof_engine_ok']} objective_arena={hub['objective_arena_ok']} recommendation_engine={hub['recommendation_engine_ok']} flight_recorder={hub['flight_recorder_ok']} digital_twin={hub['digital_twin_ok']} doctor_passport={hub['doctor_passport_ok']} terrain_caveat={hub['terrain_caveat_ok']}"
+        f"- `/scanner-ia-local` status={hub['status']} canonical={hub['canonical_ok']} download={hub['download_link_ok']} proof_engine={hub['proof_engine_ok']} objective_arena={hub['objective_arena_ok']} recommendation_engine={hub['recommendation_engine_ok']} flight_recorder={hub['flight_recorder_ok']} digital_twin={hub['digital_twin_ok']} faq_visible={hub['faq_visible_ok']} doctor_passport={hub['doctor_passport_ok']} terrain_caveat={hub['terrain_caveat_ok']}"
     )
     dp = report["download_page"]
     lines.append(
-        f"- `/telecharger-scanner-ia-local` status={dp['status']} title={dp['title_signal_ok']} screenshots={dp['screenshot_refs_ok']} static_links={dp['static_links_ok']} proof_engine={dp['proof_engine_ok']} objective_arena={dp['objective_arena_ok']} recommendation_engine={dp['recommendation_engine_ok']} flight_recorder={dp['flight_recorder_ok']} digital_twin={dp['digital_twin_ok']} doctor_passport={dp['doctor_passport_ok']} terrain_caveat={dp['terrain_caveat_ok']}"
+        f"- `/telecharger-scanner-ia-local` status={dp['status']} title={dp['title_signal_ok']} screenshots={dp['screenshot_refs_ok']} static_links={dp['static_links_ok']} proof_engine={dp['proof_engine_ok']} objective_arena={dp['objective_arena_ok']} recommendation_engine={dp['recommendation_engine_ok']} flight_recorder={dp['flight_recorder_ok']} digital_twin={dp['digital_twin_ok']} faq_visible={dp['faq_visible_ok']} doctor_passport={dp['doctor_passport_ok']} terrain_caveat={dp['terrain_caveat_ok']}"
+    )
+    manifest = report["release_manifest"]
+    lines.append(
+        f"- `release.json` status={manifest['status']} build={manifest['build_id']} files={manifest['file_count']} platforms={manifest['platforms']} digital_twin_feature={manifest['digital_twin_feature_ok']} digital_twin_note={manifest['digital_twin_note_ok']} provenance_match={manifest['build_id_matches']} merged={manifest['merged_release_ok']}"
     )
     llms = report["llms_txt"]
     lines.append(
@@ -519,7 +620,7 @@ def write_markdown(report: dict[str, object], path: Path) -> None:
             f"- `{item['path']}` status={item['status']} 5_machines={item['mentions_five_machines']} claims_validated={item['claims_validated']} caveat={item['caveat_ok']}"
         )
     for item in report["screenshots"]:
-        lines.append(f"- `{item['path']}` status={item['status']} type={item['content_type']} bytes={item['content_length']}")
+        lines.append(f"- `{item['path']}` status={item['status']} type={item['content_type']} bytes_read={item['bytes_read']} dimensions={item['width']}x{item['height']}")
     lines += ["", "## Faux liens JS connus", ""]
     for item in report["false_js_links"]:
         lines.append(f"- `{item['path']}` status={item['status']} false_js_links={item['false_js_links']}")
@@ -542,6 +643,7 @@ def main(argv: list[str]) -> int:
         "teaser_pages": check_teasers(args.base_url),
         "scanner_hub": check_scanner_hub(args.base_url),
         "download_page": check_download_page(args.base_url),
+        "release_manifest": check_release_manifest(args.base_url),
         "llms_txt": check_llms_txt(args.base_url),
         "field_claims": check_field_claims(args.base_url),
         "screenshots": check_screenshots(args.base_url),

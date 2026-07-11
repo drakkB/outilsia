@@ -99,6 +99,21 @@ try {
   if (release.channel !== "beta") fail("release.channel must be beta");
   if (!/^\d+\.\d+\.\d+/.test(release.version || "")) fail("Invalid release.version");
   if (!release.build_id) fail("Missing release.build_id");
+  if (!release.build_provenance || typeof release.build_provenance !== "object") {
+    fail("Missing release.build_provenance");
+  }
+  if (String(release.build_provenance.build_id || "") !== String(release.build_id)) {
+    fail("build_provenance.build_id must match release.build_id");
+  }
+  if (release.build_provenance.ci === true && !/^\d{11,14}$/.test(String(release.build_id))) {
+    fail("CI release.build_id must be an 11-14 digit GitHub run identifier");
+  }
+  if (!Array.isArray(release.features) || !release.features.includes("upgrade_digital_twin_v1")) {
+    fail("release.features must include upgrade_digital_twin_v1");
+  }
+  if (!Array.isArray(release.release_notes) || !release.release_notes.some((note) => String(note).includes("Upgrade Digital Twin v1"))) {
+    fail("release.release_notes must advertise Upgrade Digital Twin v1");
+  }
   if (!release.primary_download?.name) fail("Missing primary_download.name");
   if (!Array.isArray(release.files) || !release.files.length) fail("release.files must be non-empty");
   if (!release.downloads_by_platform || typeof release.downloads_by_platform !== "object") {
@@ -108,10 +123,12 @@ try {
 
   const names = new Set();
   const platforms = new Set();
+  const canonicalFiles = new Map();
   for (const file of release.files) {
     if (!file.name || file.name !== basename(file.name)) fail(`Invalid release file name: ${file.name}`);
     if (names.has(file.name)) fail(`Duplicate release file: ${file.name}`);
     names.add(file.name);
+    canonicalFiles.set(file.name, file);
     platforms.add(file.platform);
     assertPlatformFile(file);
     if (!file.url || file.url !== `/static/downloads/local-cockpit/${file.name}`) {
@@ -126,7 +143,22 @@ try {
     if (sha256(path) !== file.sha256) fail(`SHA256 mismatch for ${file.name}`);
   }
 
+  if (release.build_provenance.ci === true) {
+    for (const file of release.files) {
+      if (!file.name.includes(`-${release.build_id}-`)) {
+        fail(`CI artifact name must include build_id ${release.build_id}: ${file.name}`);
+      }
+    }
+  }
+
   if (!names.has(release.primary_download.name)) fail("primary_download is not listed in release.files");
+  const primaryCanonical = canonicalFiles.get(release.primary_download.name);
+  if (release.primary_download.platform !== primaryCanonical.platform
+    || release.primary_download.url !== primaryCanonical.url
+    || release.primary_download.sha256 !== primaryCanonical.sha256
+    || Number(release.primary_download.size_bytes) !== Number(primaryCanonical.size_bytes)) {
+    fail("primary_download must match its canonical release.files entry");
+  }
   assertPlatformFile(release.primary_download);
 
   const provenancePlatforms = [...new Set(release.build_provenance?.artifact_platforms || [])].sort();
@@ -138,13 +170,28 @@ try {
     fail("Cross-platform release must set build_provenance.merged_release=true");
   }
 
+  const groupedNames = new Set();
   for (const [platform, files] of Object.entries(release.downloads_by_platform)) {
     if (!platformExts[platform]) fail(`Unsupported downloads_by_platform key: ${platform}`);
     if (!Array.isArray(files) || !files.length) fail(`downloads_by_platform.${platform} must be non-empty`);
     for (const file of files) {
       if (!names.has(file.name)) fail(`downloads_by_platform.${platform} references unknown file: ${file.name}`);
+      if (file.platform !== platform) {
+        fail(`downloads_by_platform.${platform} contains ${file.name} with platform ${file.platform}`);
+      }
+      if (groupedNames.has(file.name)) fail(`downloads_by_platform duplicates file: ${file.name}`);
+      groupedNames.add(file.name);
+      const canonical = canonicalFiles.get(file.name);
+      if (file.url !== canonical.url
+        || file.sha256 !== canonical.sha256
+        || Number(file.size_bytes) !== Number(canonical.size_bytes)) {
+        fail(`downloads_by_platform.${platform} entry must match release.files: ${file.name}`);
+      }
       assertPlatformFile(file);
     }
+  }
+  for (const file of release.files) {
+    if (!groupedNames.has(file.name)) fail(`downloads_by_platform is missing file: ${file.name}`);
   }
 
   for (const platform of opts.requiredPlatforms) {

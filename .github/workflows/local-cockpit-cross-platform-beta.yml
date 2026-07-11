@@ -11,6 +11,14 @@ on:
         options:
           - "false"
           - "true"
+      force_terrain_override:
+        description: "Allow deploy before the physical terrain gate (explicit manual decision)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 env:
   OUTILSIA_BUILD_ID: ${{ github.run_id }}${{ github.run_attempt }}
@@ -199,10 +207,14 @@ jobs:
         id: deploy_config
         env:
           DEPLOY_REQUESTED: ${{ github.event.inputs.deploy_to_vps }}
+          TERRAIN_OVERRIDE: ${{ github.event.inputs.force_terrain_override }}
           OUTILSIA_DEPLOY_SSH_KEY: ${{ secrets.OUTILSIA_DEPLOY_SSH_KEY }}
           OUTILSIA_DEPLOY_HOST: ${{ secrets.OUTILSIA_DEPLOY_HOST }}
         run: |
           if [ "$DEPLOY_REQUESTED" != "true" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          elif [ "$TERRAIN_OVERRIDE" != "true" ]; then
+            echo "::warning::Déploiement VPS refusé : la CI ne possède pas les fiches terrain locales. Relancer avec force_terrain_override=true après une décision manuelle documentée."
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           elif [ -z "$OUTILSIA_DEPLOY_SSH_KEY" ] || [ -z "$OUTILSIA_DEPLOY_HOST" ]; then
             echo "::warning::Déploiement VPS demandé mais secrets OUTILSIA_DEPLOY_SSH_KEY/OUTILSIA_DEPLOY_HOST absents. L'artefact fusionné reste disponible."
@@ -237,7 +249,7 @@ jobs:
         env:
           OUTILSIA_DEPLOY_REMOTE_DIR: ${{ secrets.OUTILSIA_DEPLOY_REMOTE_DIR }}
         run: |
-          npm run publish:cross-platform -- --input ../server-work/static/downloads/local-cockpit --release-dir .artifacts/deploy-gated-release --remote outilsia-deploy --remote-dir "${OUTILSIA_DEPLOY_REMOTE_DIR:-/var/www/outilsia/static/downloads/local-cockpit}" --deploy
+          npm run publish:cross-platform -- --input ../server-work/static/downloads/local-cockpit --release-dir .artifacts/deploy-gated-release --remote outilsia-deploy --remote-dir "${OUTILSIA_DEPLOY_REMOTE_DIR:-/var/www/outilsia/static/downloads/local-cockpit}" --force-terrain-override --deploy
 
       - name: Verify deployed public release
         if: ${{ steps.deploy_config.outputs.enabled == 'true' }}

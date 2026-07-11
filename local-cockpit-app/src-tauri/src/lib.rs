@@ -2630,6 +2630,10 @@ fn clean_optional_string(value: &str) -> Option<String> {
     if clean.is_empty()
         || clean.eq_ignore_ascii_case("[not supported]")
         || clean.eq_ignore_ascii_case("n/a")
+        || clean.eq_ignore_ascii_case("unknown")
+        || clean.eq_ignore_ascii_case("other")
+        || clean.eq_ignore_ascii_case("not specified")
+        || clean.eq_ignore_ascii_case("to be filled by o.e.m.")
     {
         None
     } else {
@@ -4926,6 +4930,20 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603
         assert_eq!(parse_memory_size_gb("8192 MB"), Some(8));
         assert_eq!(parse_memory_size_gb("32 GB"), Some(32));
         assert_eq!(parse_memory_size_gb("2 TB"), Some(2048));
+    }
+
+    #[test]
+    fn normalizes_unknown_hardware_strings_to_none() {
+        for value in [
+            "Unknown",
+            "Other",
+            "N/A",
+            "Not Specified",
+            "To Be Filled By O.E.M.",
+        ] {
+            assert_eq!(clean_optional_string(value), None, "{value}");
+        }
+        assert_eq!(clean_optional_string("DDR5").as_deref(), Some("DDR5"));
     }
 
     #[test]

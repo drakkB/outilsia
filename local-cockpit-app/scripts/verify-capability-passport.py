@@ -30,7 +30,7 @@ def main():
     serialized = json.dumps(passport, ensure_ascii=False)
 
     assert passport["schema"] == "outilsia.ai_capability_passport.v1", passport["schema"]
-    assert passport["passport_version"] == "1.0.0", passport["passport_version"]
+    assert passport["passport_version"] == "1.0.1", passport["passport_version"]
     assert result["verified"] is True, result
     assert result["tamperedVerified"] is False, result
     assert result["staleSummary"] is None, result["staleSummary"]
@@ -44,6 +44,15 @@ def main():
     assert evidence["source"] == "ollama_api_ps", evidence
     assert evidence["gpu_offload_percent"] == 100, evidence
     assert passport["capabilities"]["gpu_allocation_proven"] is True
+    unknown = result["unknownPassport"]
+    assert unknown["machine"]["ram_gb"] is None
+    assert unknown["machine"]["vram_gb"] is None
+    assert unknown["machine"]["storage_free_gb"] is None
+    assert unknown["machine_provenance"]["ram_gb"] == "not_detected"
+    assert unknown["machine_provenance"]["vram_gb"] == "not_detected"
+    assert unknown["machine_provenance"]["storage_free_gb"] == "not_detected"
+    assert result["unknownField"]["ram_gb"] is None
+    assert result["unknownField"]["vram_gb"] is None
     assert passport["privacy"]["excludes_prompt_and_model_outputs"] is True
     assert "Pourquoi la VRAM" not in serialized
     assert "La VRAM stocke les poids" not in serialized

@@ -187,6 +187,13 @@ const release = {
   build_id: buildId,
   published_at: publishedAt,
   build_provenance: buildProvenance,
+  features: [
+    "upgrade_digital_twin_v1",
+    "hardware_doctor_v2",
+    "ai_capability_passport_v1",
+    "model_autopilot_v1",
+    "flight_recorder_v1",
+  ],
   release_notes: [
     "Upgrade Digital Twin v1 : simuler localement RAM, GPU/VRAM, SSD, alimentation et boîtier, conserver les inconnues physiques, comparer les scénarios et pouvoir conclure « N'achetez rien pour l'instant ».",
     "Hardware Doctor 2.0 : signaux RAM/GPU/driver/PCIe/ReBAR/thermiques clairement sourcés, mesures instantanées étiquetées et inconnues conservées comme inconnues.",

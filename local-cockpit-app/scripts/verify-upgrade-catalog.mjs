@@ -63,12 +63,24 @@ function checkDigitalTwinContract(item, id) {
     if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max < min) fail(`${id}: invalid cost_eur range`);
     if (!String(cost.basis || "").trim()) fail(`${id}: cost_eur.basis missing`);
   }
+  const priceSource = item.price_source;
+  if (!priceSource || typeof priceSource !== "object") {
+    fail(`${id}: price_source missing`);
+  } else {
+    if (!String(priceSource.label || "").trim()) fail(`${id}: price_source.label missing`);
+    if (!isDate(priceSource.observed_at)) fail(`${id}: price_source.observed_at must be YYYY-MM-DD`);
+    if (!String(priceSource.market || "").trim()) fail(`${id}: price_source.market missing`);
+    if (!String(priceSource.method || "").toLowerCase().includes("non temps réel")) {
+      fail(`${id}: price_source.method must disclose non-live pricing`);
+    }
+  }
   const requirements = item.requirements;
   if (!requirements || typeof requirements !== "object") {
     fail(`${id}: requirements missing`);
     return;
   }
   if (item.component === "gpu") {
+    if (String(item.name || "").includes(" / ")) fail(`${id}: GPU entry must describe one exact product family`);
     if (!(number(requirements.system_power_w) > 0)) fail(`${id}: requirements.system_power_w missing`);
     if (!(number(requirements.gpu_power_w) > 0)) fail(`${id}: requirements.gpu_power_w missing`);
     const source = item.spec_source;
@@ -110,6 +122,7 @@ for (const [index, item] of (catalog.upgrades || []).entries()) {
   components.add(component);
   if (!["gpu", "ram", "storage", "cpu", "mac", "other"].includes(component)) fail(`${label}: unsupported component ${component}`);
   if (!String(item.name || "").trim()) fail(`${label}: name missing`);
+  if (/4060[^\n]*4070|4070[^\n]*4060/i.test(String(item.name || ""))) fail(`${label}: distinct GPU families must not share one requirements profile`);
   if (!String(item.label || "").trim()) fail(`${label}: label missing`);
   if (!String(item.reason || "").trim()) fail(`${label}: reason missing`);
   if (!Number.isFinite(number(item.priority))) fail(`${label}: priority missing`);
@@ -127,6 +140,14 @@ for (const [index, item] of (catalog.upgrades || []).entries()) {
 
 for (const required of ["gpu", "ram", "storage"]) {
   if (!components.has(required)) fail(`missing ${required} upgrade`);
+}
+
+const rtx4070TiSuper = (catalog.upgrades || []).find((item) => item.id === "gpu-rtx4070tis-16gb");
+if (!rtx4070TiSuper) {
+  fail("gpu-rtx4070tis-16gb missing");
+} else {
+  if (number(rtx4070TiSuper.requirements?.system_power_w) !== 700) fail("gpu-rtx4070tis-16gb: expected 700 W system requirement");
+  if (number(rtx4070TiSuper.requirements?.gpu_power_w) !== 285) fail("gpu-rtx4070tis-16gb: expected 285 W GPU power");
 }
 
 for (const error of errors) console.error(`error: ${error}`);

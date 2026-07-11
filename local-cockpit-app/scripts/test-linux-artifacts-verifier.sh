@@ -64,7 +64,8 @@ const release = {
       repository: ""
     }
   },
-  release_notes: ["linux verifier test"],
+  features: ["upgrade_digital_twin_v1"],
+  release_notes: ["Upgrade Digital Twin v1 linux verifier test"],
   primary_download: file,
   downloads_by_platform: { linux: [file] },
   files: [file],
