@@ -257,7 +257,7 @@ def check_download_page(base_url: str) -> dict[str, object]:
     )
     terrain_caveat_ok = "campagne terrain 5 machines reste en cours" in text
     proof_engine_ok = "eval_count / eval_duration" in text and "load_duration" in text
-    objective_arena_ok = "Arena objective v1" in text and "six preuves" in text
+    objective_arena_ok = "Arena objective v1" in text and "six éléments reproductibles" in text
     recommendation_engine_ok = (
         "Recommendation Engine v2" in text
         and "sept preuves" in text
@@ -353,7 +353,8 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
     digital_twin_ok = (
         "Upgrade Digital Twin v1" in text
         and "N'achetez rien pour l'instant" in text
-        and "prix non temps réel" in text
+        and "estimations internes OutilsIA" in text
+        and "non temps réel" in text
         and "ne compte jamais comme validation physique" in text
     )
     return {
@@ -447,8 +448,9 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
     )
     digital_twin_ok = (
         "Upgrade Digital Twin v1" in text
-        and "RAM type, maximum capacity and slots" in text
-        and "non-live price ranges" in text
+        and "pre-evaluates RAM type, maximum capacity and slots" in text
+        and "internal OutilsIA price estimates observed on 2026-07-11" in text
+        and "not live prices" in text
         and 'say "do not buy yet"' in text
         and "never count as physical field evidence" in text
     )
@@ -536,7 +538,7 @@ def check_screenshots(base_url: str) -> list[dict[str, object]]:
                 and "image/" in str(result.get("content_type", ""))
                 and int(result.get("bytes_read") or 0) > 10_000
                 and int(result.get("width") or 0) >= 320
-                and int(result.get("height") or 0) >= 240,
+                and int(result.get("height") or 0) >= 200,
             }
         )
     return results

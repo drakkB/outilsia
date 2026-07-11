@@ -87,7 +87,7 @@ Premier jalon v1 publié le 10 juillet 2026 dans le build Windows/Linux `2912047
 - Afficher modèles débloqués, gain attendu, coût, consommation et niveau de confiance.
 - Préserver la décision « n'achetez rien » lorsque la preuve locale est déjà suffisante.
 
-Premier jalon v1 implémenté dans les sources le 11 juillet 2026. La publication Windows/Linux reste conditionnée à la réussite de toutes les gates et ne remplace pas la campagne terrain physique.
+Premier jalon v1 publié le 11 juillet 2026 dans le build Windows/Linux `291337881421`, issu du commit `59b43c7` et du run CI `29133788142`. Les cinq artefacts, leurs tailles et SHA-256 ont été revérifiés depuis la production ; le monitor SEO/GEO passe `33/33`. L'override de publication conserve uniquement la parité Windows/Linux : terrain toujours `0/5`, prochaine cible `old_laptop`, aucune revendication de validation physique.
 
 - [x] Construire un instantané local depuis Hardware Doctor et le Capability Passport : RAM/type/modules/emplacements, carte mère/BIOS, GPU/PCIe/driver/puissance, stockage et runtimes.
 - [x] Comparer des scénarios RAM, GPU/VRAM, SSD, alimentation, longueur de carte et refroidissement sans modifier la machine.
@@ -99,7 +99,7 @@ Premier jalon v1 implémenté dans les sources le 11 juillet 2026. La publicatio
 - [x] Garantir qu'un scénario Digital Twin reste `simulation_only`, `local_only` et ne constitue jamais une preuve terrain physique.
 - [x] Ajouter les tests Rust, contrat catalogue et recette Playwright desktop/mobile.
 - [x] Documenter la fonction sur le hub, la page de téléchargement, `llms.txt`, le README et le monitoring SEO/GEO.
-- [ ] Publier le build Windows/Linux uniquement après toutes les gates vertes et vérifier les artefacts/SHA-256 en production.
+- [x] Publier le build Windows/Linux uniquement après toutes les gates vertes et vérifier les artefacts/SHA-256 en production.
 - [ ] Recaler coûts, consommation et contraintes seulement à partir de sources officielles ou de mesures terrain réelles.
 
 ## Phase 6 - Interopérabilité locale
