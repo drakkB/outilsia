@@ -341,8 +341,12 @@
                 <option value="2000">SSD 2 To</option>
               </select>
             </label>
-            <label class="field-label" for="digitalTwinPsuInput">Alimentation prévue (W)
+            <label class="field-label" for="digitalTwinPsuInput">Alimentation disponible ou visée (W)
               <input id="digitalTwinPsuInput" type="number" min="0" max="2000" step="50" value="0" inputmode="numeric">
+            </label>
+            <label class="digital-twin-purchase-toggle" for="digitalTwinPsuPurchaseInput">
+              <input id="digitalTwinPsuPurchaseInput" type="checkbox">
+              <span>Ajouter une alimentation au budget</span>
             </label>
             <label class="field-label" for="digitalTwinCaseClearanceInput">Place GPU boîtier (mm)
               <input id="digitalTwinCaseClearanceInput" type="number" min="0" max="1000" step="1" value="0" inputmode="numeric">
@@ -356,6 +360,10 @@
                 <option value="standard">Standard</option>
                 <option value="high">Bon flux d'air</option>
               </select>
+            </label>
+            <label class="digital-twin-purchase-toggle" for="digitalTwinCoolingPurchaseInput">
+              <input id="digitalTwinCoolingPurchaseInput" type="checkbox">
+              <span>Ajouter boîtier/refroidissement au budget</span>
             </label>
           </div>
           <div class="row-actions">

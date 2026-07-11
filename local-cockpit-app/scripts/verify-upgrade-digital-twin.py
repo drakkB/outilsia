@@ -25,9 +25,11 @@ def main():
         "digitalTwinRamSelect",
         "digitalTwinStorageSelect",
         "digitalTwinPsuInput",
+        "digitalTwinPsuPurchaseInput",
         "digitalTwinCaseClearanceInput",
         "digitalTwinGpuLengthInput",
         "digitalTwinAirflowSelect",
+        "digitalTwinCoolingPurchaseInput",
         "simulateDigitalTwinBtn",
         "saveDigitalTwinBtn",
         "restoreDigitalTwinBtn",
@@ -96,7 +98,7 @@ def main():
         assert candidate["decision"]["key"] == "candidate"
         assert candidate["compatibility"]["blocked_count"] == 0
         assert candidate_checks["ram_capacity"]["status"] == "confirmed"
-        assert candidate_checks["ram_type"]["status"] == "confirmed"
+        assert candidate_checks["ram_type"]["status"] == "probable"
         assert candidate_checks["psu"]["status"] == "probable"
         assert candidate_checks["case_clearance"]["status"] == "confirmed"
         assert candidate_checks["power_connectors"]["status"] == "unknown"
@@ -108,6 +110,24 @@ def main():
         assert candidate["impact"]["newly_reachable_models"]
         assert candidate["impact"]["cost_eur"]["max"] > candidate["impact"]["cost_eur"]["min"] > 0
         assert candidate["impact"]["cost_is_live"] is False
+        assert candidate["compatibility"]["confidence"] != "high"
+        candidate_cost_keys = {item["key"] for item in candidate["impact"]["cost_components"]}
+        assert "psu" not in candidate_cost_keys
+        assert "cooling" not in candidate_cost_keys
+
+        purchase_cost_keys = {item["key"] for item in result["purchaseBudget"]["impact"]["cost_components"]}
+        assert "psu" in purchase_cost_keys
+        assert "cooling" in purchase_cost_keys
+
+        missing_checks = {item["key"]: item for item in result["missingModules"]["compatibility"]["checks"]}
+        assert result["missingModules"]["current"]["ram"]["module_count"] is None
+        assert missing_checks["ram_slots"]["status"] == "unknown"
+        assert "0/4" not in missing_checks["ram_slots"]["detail"]
+
+        assert result["staleSummaryAfterRescan"] is None
+        assert result["recalculatedAfterRescan"]["target"]["ram_gb"] == 64
+        assert result["downgrade"]["decision"]["key"] == "no_buy"
+        assert "réduit" in result["downgrade"]["decision"]["rationale"]
 
         assert result["noBuy"]["decision"]["key"] == "no_buy"
         assert result["restored"]["draft"]["name"] == candidate["draft"]["name"]

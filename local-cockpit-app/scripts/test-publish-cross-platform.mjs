@@ -68,6 +68,12 @@ function writeRelease(root, files, buildId) {
       },
     },
     release_notes: ["publish cross-platform test"],
+    freshness: {
+      stale: false,
+      allow_stale: false,
+      newest_source_mtime_ms: 1,
+      oldest_artifact_mtime_ms: 2,
+    },
     primary_download: primary,
     downloads_by_platform: downloadsByPlatform,
     files: releaseFiles,

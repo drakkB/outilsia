@@ -241,4 +241,4 @@ jobs:
 
       - name: Verify deployed public release
         if: ${{ steps.deploy_config.outputs.enabled == 'true' }}
-        run: npm run verify:release:prod
+        run: npm run verify:release:prod:fresh

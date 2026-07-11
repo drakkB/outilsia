@@ -16,7 +16,7 @@ const defaultRemotePagePath = "/var/www/outilsia/static/pages/telecharger-scanne
 
 function usage() {
   console.log(`Usage:
-  node scripts/deploy-beta-release.mjs [--release-dir <dir>] [--remote <host>] [--remote-dir <dir>] [--deploy] [--require-freshness]
+  node scripts/deploy-beta-release.mjs [--release-dir <dir>] [--remote <host>] [--remote-dir <dir>] [--deploy] [--require-freshness] [--include-public-page]
 
 Default:
   --release-dir ${defaultReleaseDir}
@@ -37,6 +37,7 @@ function parseArgs(argv) {
     remotePagePath: defaultRemotePagePath,
     deploy: false,
     requireFreshness: false,
+    includePublicPage: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -50,6 +51,10 @@ function parseArgs(argv) {
     }
     if (arg === "--require-freshness") {
       opts.requireFreshness = true;
+      continue;
+    }
+    if (arg === "--include-public-page") {
+      opts.includePublicPage = true;
       continue;
     }
     if (arg === "--release-dir") {
@@ -223,7 +228,7 @@ function deploy({ releasePath, files, pagePath }, opts) {
 
 try {
   const opts = parseArgs(process.argv.slice(2));
-  const managesPublicPage = resolve(opts.releaseDir) === resolve(defaultReleaseDir);
+  const managesPublicPage = resolve(opts.releaseDir) === resolve(defaultReleaseDir) || opts.includePublicPage;
   if (managesPublicPage) {
     run("node", [
       join(appRoot, "scripts", "sync-download-page-release.mjs"),

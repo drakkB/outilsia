@@ -174,9 +174,10 @@ try {
       "scripts/deploy-beta-release.mjs",
       "--release-dir",
       releaseDir,
+      "--require-freshness",
       ...(opts.remote ? ["--remote", opts.remote] : []),
       ...(opts.remoteDir ? ["--remote-dir", opts.remoteDir] : []),
-      ...(opts.deploy ? ["--deploy"] : []),
+      ...(opts.deploy ? ["--include-public-page", "--deploy"] : []),
     ]);
     if (!opts.deploy) {
       console.log("cross_platform_beta_ready dry_run");

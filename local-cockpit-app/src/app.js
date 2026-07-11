@@ -359,9 +359,11 @@ const els = {
   digitalTwinRamSelect: $("digitalTwinRamSelect"),
   digitalTwinStorageSelect: $("digitalTwinStorageSelect"),
   digitalTwinPsuInput: $("digitalTwinPsuInput"),
+  digitalTwinPsuPurchaseInput: $("digitalTwinPsuPurchaseInput"),
   digitalTwinCaseClearanceInput: $("digitalTwinCaseClearanceInput"),
   digitalTwinGpuLengthInput: $("digitalTwinGpuLengthInput"),
   digitalTwinAirflowSelect: $("digitalTwinAirflowSelect"),
+  digitalTwinCoolingPurchaseInput: $("digitalTwinCoolingPurchaseInput"),
   simulateDigitalTwinBtn: $("simulateDigitalTwinBtn"),
   saveDigitalTwinBtn: $("saveDigitalTwinBtn"),
   restoreDigitalTwinBtn: $("restoreDigitalTwinBtn"),
@@ -3372,6 +3374,12 @@ function numberOrZero(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 const DIGITAL_TWIN_RAM_COSTS = {
   32: { min: 60, max: 130 },
   64: { min: 130, max: 260 },
@@ -3401,7 +3409,7 @@ function digitalTwinMachineSnapshot(scan = state.scan || {}) {
     ram: {
       total_gb: numberOrZero(scan.ram_gb || memory.total_gb),
       type: String(memory.memory_type || "").trim(),
-      module_count: numberOrZero(memory.module_count),
+      module_count: numberOrNull(memory.module_count),
       motherboard_slots: numberOrZero(board.memory_slots),
       motherboard_max_gb: numberOrZero(board.max_memory_gb),
       channel_mode: memory.channel_mode || "unknown",
@@ -3445,9 +3453,11 @@ function defaultDigitalTwinDraft() {
     ram_target_gb: 0,
     storage_add_gb: 0,
     planned_psu_w: 0,
+    psu_purchase_required: false,
     case_clearance_mm: 0,
     candidate_gpu_length_mm: 0,
-    airflow: "unknown"
+    airflow: "unknown",
+    cooling_purchase_required: false
   };
 }
 
@@ -3464,9 +3474,11 @@ function normalizeDigitalTwinDraft(draft = {}) {
     ram_target_gb: ramTarget,
     storage_add_gb: storageAdd,
     planned_psu_w: boundedDigitalTwinNumber(draft.planned_psu_w, 0, 2000),
+    psu_purchase_required: Boolean(draft.psu_purchase_required),
     case_clearance_mm: boundedDigitalTwinNumber(draft.case_clearance_mm, 0, 1000),
     candidate_gpu_length_mm: boundedDigitalTwinNumber(draft.candidate_gpu_length_mm, 0, 1000),
-    airflow
+    airflow,
+    cooling_purchase_required: Boolean(draft.cooling_purchase_required)
   };
 }
 
@@ -3477,9 +3489,11 @@ function digitalTwinDraftFromControls() {
     ram_target_gb: els.digitalTwinRamSelect?.value,
     storage_add_gb: els.digitalTwinStorageSelect?.value,
     planned_psu_w: els.digitalTwinPsuInput?.value,
+    psu_purchase_required: Boolean(els.digitalTwinPsuPurchaseInput?.checked),
     case_clearance_mm: els.digitalTwinCaseClearanceInput?.value,
     candidate_gpu_length_mm: els.digitalTwinGpuLengthInput?.value,
-    airflow: els.digitalTwinAirflowSelect?.value
+    airflow: els.digitalTwinAirflowSelect?.value,
+    cooling_purchase_required: Boolean(els.digitalTwinCoolingPurchaseInput?.checked)
   });
 }
 
@@ -3490,9 +3504,11 @@ function applyDigitalTwinDraftToControls(draft = {}) {
   if (els.digitalTwinRamSelect) els.digitalTwinRamSelect.value = String(normalized.ram_target_gb);
   if (els.digitalTwinStorageSelect) els.digitalTwinStorageSelect.value = String(normalized.storage_add_gb);
   if (els.digitalTwinPsuInput) els.digitalTwinPsuInput.value = String(normalized.planned_psu_w);
+  if (els.digitalTwinPsuPurchaseInput) els.digitalTwinPsuPurchaseInput.checked = normalized.psu_purchase_required;
   if (els.digitalTwinCaseClearanceInput) els.digitalTwinCaseClearanceInput.value = String(normalized.case_clearance_mm);
   if (els.digitalTwinGpuLengthInput) els.digitalTwinGpuLengthInput.value = String(normalized.candidate_gpu_length_mm);
   if (els.digitalTwinAirflowSelect) els.digitalTwinAirflowSelect.value = normalized.airflow;
+  if (els.digitalTwinCoolingPurchaseInput) els.digitalTwinCoolingPurchaseInput.checked = normalized.cooling_purchase_required;
   return normalized;
 }
 
@@ -3506,7 +3522,9 @@ function digitalTwinPresetKey(draft = digitalTwinDraftFromControls()) {
     && normalized.ram_target_gb === 0
     && normalized.storage_add_gb === 0
     && normalized.planned_psu_w === 0
-    && normalized.airflow === "unknown";
+    && normalized.psu_purchase_required === false
+    && normalized.airflow === "unknown"
+    && normalized.cooling_purchase_required === false;
   return unchanged ? "auto" : "";
 }
 
@@ -3578,7 +3596,7 @@ function digitalTwinCostComponents(machine, draft, gpuTarget) {
       provenance: "catalogue OutilsIA 2026-07-11 ; interface à confirmer"
     });
   }
-  if (draft.planned_psu_w > 0 && draft.gpu_target !== "current") {
+  if (draft.psu_purchase_required && draft.planned_psu_w > 0 && draft.gpu_target !== "current") {
     components.push({
       key: "psu",
       label: `Alimentation ${draft.planned_psu_w} W`,
@@ -3587,7 +3605,7 @@ function digitalTwinCostComponents(machine, draft, gpuTarget) {
       provenance: "fourchette OutilsIA indicative ; modèle, rendement et connecteurs à vérifier"
     });
   }
-  if (draft.airflow === "high") {
+  if (draft.cooling_purchase_required && draft.airflow === "high") {
     components.push({
       key: "cooling",
       label: "Boîtier / refroidissement bon flux d'air",
@@ -3637,9 +3655,11 @@ function buildUpgradeDigitalTwin(draftInput = digitalTwinDraftFromControls(), co
       checks.push(digitalTwinCheck("ram_capacity", "Capacité RAM", "confirmed", `${draft.ram_target_gb} Go restent sous le plafond détecté de ${machine.ram.motherboard_max_gb} Go.`, machine.motherboard.source));
     }
     checks.push(machine.ram.type
-      ? digitalTwinCheck("ram_type", "Type RAM", "confirmed", `${machine.ram.type} détectée ; acheter le même type, puis vérifier fréquence et QVL.`, machine.ram.source)
+      ? digitalTwinCheck("ram_type", "Type RAM", "probable", `${machine.ram.type} détectée ; le type correspond, mais fréquence, kit et QVL restent à vérifier.`, machine.ram.source)
       : digitalTwinCheck("ram_type", "Type RAM", "unknown", "Type DDR non exposé : ne pas acheter avant vérification du manuel ou de la référence des barrettes.", machine.ram.source));
-    if (machine.ram.motherboard_slots && machine.ram.module_count >= machine.ram.motherboard_slots) {
+    if (machine.ram.motherboard_slots && machine.ram.module_count === null) {
+      checks.push(digitalTwinCheck("ram_slots", "Slots RAM", "unknown", `${machine.ram.motherboard_slots} slots carte mère détectés, mais le nombre de barrettes installées n'est pas exposé.`, machine.ram.source));
+    } else if (machine.ram.motherboard_slots && machine.ram.module_count >= machine.ram.motherboard_slots) {
       checks.push(digitalTwinCheck("ram_slots", "Slots RAM", "probable", `${machine.ram.module_count}/${machine.ram.motherboard_slots} slots occupés : prévoir le remplacement du kit complet.`, machine.ram.source));
     } else if (machine.ram.motherboard_slots) {
       checks.push(digitalTwinCheck("ram_slots", "Slots RAM", "probable", `${machine.ram.module_count}/${machine.ram.motherboard_slots} slots détectés ; appairage et QVL restent à vérifier.`, machine.ram.source));
@@ -3709,11 +3729,16 @@ function buildUpgradeDigitalTwin(draftInput = digitalTwinDraftFromControls(), co
   const costs = digitalTwinCostComponents(machine, draft, gpuTarget);
   const cost = costs.reduce((total, item) => ({ min: total.min + item.min_eur, max: total.max + item.max_eur }), { min: 0, max: 0 });
   const unknownCount = checks.filter((item) => item.status === "unknown").length;
+  const probableCount = checks.filter((item) => item.status === "probable").length;
   const blockedCount = checks.filter((item) => item.status === "blocked").length;
   const comparableBenchmark = Boolean(successfulBenchmarkFor(prepareFlowState().testModel));
+  const gpuDowngrade = draft.gpu_target !== "current"
+    && currentModelMemory > 0
+    && targetVram > 0
+    && targetVram < currentModelMemory;
   let decision = "measure_first";
   if (blockedCount) decision = "blocked";
-  else if (!changedComponents.length || (comparableBenchmark && !newlyReachable.length && next.vram_gb <= currentModelMemory && next.ram_gb <= machine.ram.total_gb)) decision = "no_buy";
+  else if (gpuDowngrade || !changedComponents.length || (comparableBenchmark && !newlyReachable.length && next.vram_gb <= currentModelMemory && next.ram_gb <= machine.ram.total_gb)) decision = "no_buy";
   else if (newlyReachable.length || changedComponents.includes("storage") || changedComponents.includes("ram")) decision = "candidate";
   const labels = {
     blocked: "Scénario bloqué",
@@ -3721,7 +3746,8 @@ function buildUpgradeDigitalTwin(draftInput = digitalTwinDraftFromControls(), co
     candidate: "Scénario utile à vérifier",
     measure_first: "Mesurez avant d'acheter"
   };
-  const confidence = blockedCount ? "high" : unknownCount === 0 ? "high" : unknownCount <= 2 ? "mixed" : "low";
+  const uncertaintyCount = unknownCount + probableCount;
+  const confidence = uncertaintyCount === 0 ? "high" : uncertaintyCount <= 2 ? "mixed" : "low";
   const proof = releaseProof();
   return {
     schema: UPGRADE_DIGITAL_TWIN_PROTOCOL,
@@ -3745,16 +3771,19 @@ function buildUpgradeDigitalTwin(draftInput = digitalTwinDraftFromControls(), co
       changed_components: changedComponents
     },
     compatibility: {
-      status: blockedCount ? "blocked" : unknownCount ? "unknown" : "compatible",
+      status: blockedCount ? "blocked" : unknownCount ? "unknown" : probableCount ? "probable" : "compatible",
       confidence,
       checks,
       unknown_count: unknownCount,
+      probable_count: probableCount,
       blocked_count: blockedCount,
       statement: blockedCount
         ? "Au moins une contrainte bloque ce scénario avec les données fournies."
         : unknownCount
           ? "Aucun achat ne doit être déclenché avant vérification des inconnues physiques."
-          : "Les contraintes renseignées sont cohérentes ; montage et benchmark restent nécessaires."
+          : probableCount
+            ? "Les contraintes renseignées sont plausibles, mais les contrôles probables et la QVL doivent être vérifiés avant achat."
+            : "Les contraintes renseignées sont cohérentes ; montage et benchmark restent nécessaires."
     },
     impact: {
       newly_reachable_models: newlyReachable,
@@ -3773,7 +3802,9 @@ function buildUpgradeDigitalTwin(draftInput = digitalTwinDraftFromControls(), co
       rationale: decision === "blocked"
         ? "Corriger les contraintes bloquantes avant toute commande."
         : decision === "no_buy"
-          ? "La machine et la preuve locale ne montrent aucun nouveau palier utile dans ce scénario."
+          ? (gpuDowngrade
+              ? "La cible réduit une capacité GPU mesurée et ne constitue pas un upgrade utile."
+              : "La machine et la preuve locale ne montrent aucun nouveau palier utile dans ce scénario.")
           : decision === "candidate"
             ? "Le scénario apporte une capacité identifiable, mais les inconnues physiques doivent être levées."
             : "Le bénéfice n'est pas encore démontré par les données disponibles."
@@ -3781,8 +3812,8 @@ function buildUpgradeDigitalTwin(draftInput = digitalTwinDraftFromControls(), co
     provenance: [
       { kind: "measured", source: "scan OutilsIA", fields: ["machine", "RAM", "GPU", "VRAM", "stockage", "PCIe quand exposé"] },
       { kind: "catalog", source: gpuTarget.provenance, url: gpuTarget.source_url || "", fields: ["VRAM cible", "puissance GPU", "alimentation recommandée"] },
-      { kind: "user_declared", source: "contrôles Digital Twin", fields: ["alimentation prévue", "place boîtier", "longueur carte", "refroidissement"] },
-      { kind: "estimated", source: "catalogue OutilsIA", fields: ["coût", "usages débloqués"] }
+      { kind: "user_declared", source: "contrôles Digital Twin", fields: ["alimentation disponible ou visée", "place boîtier", "longueur carte", "refroidissement", "composants à acheter"] },
+      { kind: "estimated", source: "catalogue OutilsIA", fields: ["coût des composants cochés à acheter", "usages débloqués"] }
     ]
   };
 }
@@ -3800,7 +3831,7 @@ function activeDigitalTwinScenario() {
 }
 
 function digitalTwinSummary() {
-  const run = state.upgradeDigitalTwinRun || activeDigitalTwinScenario()?.result || null;
+  const run = state.upgradeDigitalTwinRun || null;
   if (!run || run.binding?.machine_key !== state.scan?.machine_key) return null;
   return {
     schema: UPGRADE_DIGITAL_TWIN_PROTOCOL,
@@ -3814,6 +3845,7 @@ function digitalTwinSummary() {
       status: run.compatibility?.status || "unknown",
       confidence: run.compatibility?.confidence || "low",
       unknown_count: Number(run.compatibility?.unknown_count || 0),
+      probable_count: Number(run.compatibility?.probable_count || 0),
       blocked_count: Number(run.compatibility?.blocked_count || 0)
     },
     target: {
@@ -3830,7 +3862,7 @@ function digitalTwinSummary() {
 }
 
 function digitalTwinExportDocument() {
-  const run = state.upgradeDigitalTwinRun || activeDigitalTwinScenario()?.result || null;
+  const run = state.upgradeDigitalTwinRun || null;
   const history = digitalTwinHistoryForMachine();
   return {
     schema: UPGRADE_DIGITAL_TWIN_PROTOCOL,
@@ -4063,7 +4095,7 @@ function renderUpgradeImpact(compatibility, blocked, upgrades) {
     ? "is-blocked"
     : run.decision.key === "no_buy"
       ? "is-no-buy"
-      : run.compatibility.status === "unknown"
+      : ["unknown", "probable"].includes(run.compatibility.status)
         ? "is-unknown"
         : "";
   const costLabel = run.impact.cost_eur.max > 0
@@ -4178,7 +4210,7 @@ function simulateUpgradeDigitalTwin() {
   state.upgradeDigitalTwinRun = buildUpgradeDigitalTwin();
   refreshDigitalTwinDependents();
   const run = state.upgradeDigitalTwinRun;
-  setStatus(`${run.decision.label} · compatibilité ${run.compatibility.status}`, run.decision.key === "blocked" ? "bad" : run.compatibility.status === "unknown" ? "warn" : "ok");
+  setStatus(`${run.decision.label} · compatibilité ${run.compatibility.status}`, run.decision.key === "blocked" ? "bad" : ["unknown", "probable"].includes(run.compatibility.status) ? "warn" : "ok");
   return run;
 }
 
@@ -5405,7 +5437,7 @@ function premiumReportHtml(report = readinessReport()) {
   const hardwareDoctor = report.hardware_doctor || hardwareDoctorSnapshot();
   const flightRecorder = report.flight_recorder || null;
   const upgradeDigitalTwin = report.upgrade_digital_twin || null;
-  const digitalTwinRun = state.upgradeDigitalTwinRun || activeDigitalTwinScenario()?.result || null;
+  const digitalTwinRun = state.upgradeDigitalTwinRun || null;
   const proofLabel = benchmark
     ? `${benchmark.model} · ${benchmark.estimated_tokens_per_second ?? "--"} tok/s`
     : "Benchmark à lancer";
@@ -12811,6 +12843,44 @@ function installTestHarness() {
       const noBuy = simulateUpgradeDigitalTwin();
       const savedNoBuy = saveUpgradeDigitalTwinScenario();
       const restored = restorePreviousUpgradeDigitalTwinScenario();
+
+      const purchaseBudget = buildUpgradeDigitalTwin({
+        ...candidate.draft,
+        psu_purchase_required: true,
+        cooling_purchase_required: true
+      }, compatibility.compatibility);
+
+      const missingModuleScan = JSON.parse(JSON.stringify(scan));
+      delete missingModuleScan.raw_scan.memory_probe.module_count;
+      delete missingModuleScan.raw_scan.memory_probe.modules;
+      renderScan(missingModuleScan);
+      renderCompatibility(compatibility);
+      applyDigitalTwinDraftToControls({ name: "RAM sans comptage modules", gpu_target: "current", ram_target_gb: 32 });
+      const missingModules = simulateUpgradeDigitalTwin();
+
+      state.upgradeDigitalTwinRun = candidate;
+      const upgradedScan = JSON.parse(JSON.stringify(scan));
+      upgradedScan.ram_gb = 64;
+      upgradedScan.raw_scan.memory_probe.total_gb = 64;
+      renderScan(upgradedScan);
+      const staleSummaryAfterRescan = digitalTwinSummary();
+      renderCompatibility(compatibility);
+      const recalculatedAfterRescan = digitalTwinSummary();
+
+      const strongerGpuScan = JSON.parse(JSON.stringify(scan));
+      strongerGpuScan.gpu_name = "NVIDIA GeForce RTX 3090";
+      strongerGpuScan.vram_gb = 24;
+      strongerGpuScan.raw_scan.gpu_probe.name = strongerGpuScan.gpu_name;
+      strongerGpuScan.raw_scan.gpu_probe.vram_gb = 24;
+      strongerGpuScan.raw_scan.gpu_probe.power_limit_w = 350;
+      renderScan(strongerGpuScan);
+      renderCompatibility(compatibility);
+      applyDigitalTwinDraftToControls({ name: "Downgrade 24 vers 12 Go", gpu_target: "rtx3060_12gb" });
+      const downgrade = simulateUpgradeDigitalTwin();
+
+      renderScan(scan);
+      renderCompatibility(compatibility);
+      activateUpgradeDigitalTwinScenario(savedCandidate.id);
       const passport = await buildCapabilityPassport();
       return {
         blocked,
@@ -12819,6 +12889,11 @@ function installTestHarness() {
         savedCandidate,
         savedNoBuy,
         restored,
+        purchaseBudget,
+        missingModules,
+        staleSummaryAfterRescan,
+        recalculatedAfterRescan,
+        downgrade,
         exportDocument: digitalTwinExportDocument(),
         summary: digitalTwinSummary(),
         report: readinessReport(),
