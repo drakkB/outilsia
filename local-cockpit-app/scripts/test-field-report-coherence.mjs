@@ -109,13 +109,27 @@ function baseEntry(overrides = {}) {
       { profile: "core_i7_gtx_1080_ti", gpu: "NVIDIA GTX 1080 Ti", cpu: "Core i7", vram_gb: 11, ram_gb: 32, tps: 33, model: "qwen3:8b" },
       { profile: "rtx_3060_12gb", gpu: "NVIDIA RTX 3060", cpu: "Ryzen 5", vram_gb: 12, ram_gb: 32, tps: 55, model: "hermes3:8b" },
       { profile: "rtx_4080_4090", gpu: "NVIDIA RTX 4080", cpu: "Ryzen 9", vram_gb: 16, ram_gb: 64, tps: 140, model: "hermes3:8b" },
-      { profile: "cpu_only", gpu: "CPU only / aucun GPU dédié", cpu: "Xeon", vram_gb: 0, ram_gb: 64, tps: 6, model: "qwen3:0.6b" },
+      { profile: "cpu_only", gpu: "GPU non déterminé", cpu: "Xeon", vram_gb: null, ram_gb: 64, tps: 6, model: "qwen3:0.6b" },
     ];
     profiles.forEach((p, i) => {
       const entry = baseEntry({
         profile: p.profile, gpu: p.gpu, cpu: p.cpu, vram_gb: p.vram_gb, ram_gb: p.ram_gb,
         benchmark_tokens_per_second: p.tps, recommended_model: p.model, benchmark_model: p.model,
         share_url: `https://outilsia.fr/r/FAKEtoken${String(i).padStart(2, "0")}AAAAAAAAAAAAAAAA`,
+        ...(p.profile === "cpu_only" ? {
+          profile_source: "manual",
+          benchmark_runtime_processor: "cpu",
+          benchmark_gpu_offload_percent: 0,
+          benchmark_runtime_evidence_source: "ollama_api_ps",
+          first_30s: {
+            hardware_visible: false,
+            score_visible: true,
+            recommended_model_visible: true,
+            benchmark_cta_or_proof_visible: true,
+            upgrade_visible: true,
+            summary: "GPU à confirmer ; exécution CPU prouvée par Ollama",
+          },
+        } : {}),
       });
       writeFileSync(join(dir, `outilsia-field-test-${p.profile}.json`), JSON.stringify({ schema: "outilsia.local_cockpit_field_tests.v1", machines: [entry] }));
     });

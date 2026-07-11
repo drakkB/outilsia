@@ -103,6 +103,71 @@ const explicit = validateSingleFieldEntry({
 }, "rtx_3060_12gb");
 if (explicit.first_30s_source !== "explicit") throw new Error("explicit UX 30s proof should be preserved");
 
+const cpuOnly = {
+  ...valid,
+  profile: "cpu_only",
+  machine_label: "fixture CPU-only",
+  cpu: "Intel Core i5",
+  gpu: "GPU non déterminé",
+  vram_gb: null,
+  profile_source: "manual",
+  score: 34,
+  score_label: "CPU utilisable en léger",
+  recommended_model: "qwen3:0.6b",
+  upgrade_recommendation: "Ajouter un GPU seulement si l'usage le justifie",
+  benchmark_runtime_processor: "cpu",
+  benchmark_gpu_offload_percent: 0,
+  benchmark_runtime_evidence_source: "ollama_api_ps",
+  first_30s: {
+    hardware_visible: false,
+    score_visible: true,
+    recommended_model_visible: true,
+    benchmark_cta_or_proof_visible: true,
+    upgrade_visible: true,
+    summary: "GPU à confirmer ; exécution CPU prouvée par Ollama",
+  },
+};
+const cpuOnlyResult = validateSingleFieldEntry(cpuOnly, "cpu_only");
+if (!cpuOnlyResult.runtime_evidence.proven || cpuOnlyResult.runtime_evidence.processor !== "cpu") {
+  throw new Error("truthful CPU-only runtime proof should be accepted");
+}
+
+const cpuOnlyIgp = validateSingleFieldEntry({
+  ...cpuOnly,
+  gpu: "Intel(R) Arc(TM) Graphics",
+  vram_gb: 2,
+  first_30s: { ...cpuOnly.first_30s, hardware_visible: true, summary: "iGPU visible ; exécution CPU prouvée par Ollama" },
+}, "cpu_only");
+if (!cpuOnlyIgp.runtime_evidence.proven) throw new Error("CPU-only proof should allow a small integrated GPU");
+
+failed = false;
+try {
+  validateSingleFieldEntry({ ...cpuOnly, profile_source: "auto" }, "cpu_only");
+} catch (error) {
+  failed = String(error.message || error).includes("profile_source must be manual");
+}
+if (!failed) throw new Error("CPU-only proof should reject an automatically inferred profile");
+
+failed = false;
+try {
+  validateSingleFieldEntry({
+    ...cpuOnly,
+    benchmark_runtime_processor: "unknown",
+    benchmark_runtime_evidence_source: "",
+  }, "cpu_only");
+} catch (error) {
+  failed = String(error.message || error).includes("benchmark_runtime_processor must be cpu");
+}
+if (!failed) throw new Error("CPU-only proof should reject an unmeasured runtime");
+
+failed = false;
+try {
+  validateSingleFieldEntry({ ...cpuOnly, gpu: "NVIDIA GeForce RTX 4090", vram_gb: 24 }, "cpu_only");
+} catch (error) {
+  failed = String(error.message || error).includes("gpu identifies a dedicated GPU");
+}
+if (!failed) throw new Error("CPU-only proof should reject a known dedicated GPU");
+
 failed = false;
 try {
   validateSingleFieldEntry({

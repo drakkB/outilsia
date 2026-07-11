@@ -6,7 +6,7 @@ const profileHardware = {
   core_i7_gtx_1080_ti: { os: "Windows 10", cpu: "Intel Core i7-7700K", gpu: "NVIDIA GeForce GTX 1080 Ti", ram_gb: 32, vram_gb: 11 },
   rtx_3060_12gb: { os: "Windows 11", cpu: "AMD Ryzen fixture", gpu: "NVIDIA GeForce RTX 3060", ram_gb: 32, vram_gb: 12 },
   rtx_4080_4090: { os: "Windows 11", cpu: "AMD Ryzen fixture", gpu: "NVIDIA GeForce RTX 4080 SUPER", ram_gb: 64, vram_gb: 16 },
-  cpu_only: { os: "Windows 11", cpu: "Intel CPU only", gpu: "CPU only / aucun GPU dédié", ram_gb: 16, vram_gb: 0 },
+  cpu_only: { os: "Windows 11", cpu: "Intel Core i5", gpu: "GPU non déterminé", ram_gb: 16, vram_gb: null },
 };
 
 const machines = REQUIRED_PROFILES.map((profile, index) => ({
@@ -33,6 +33,21 @@ const machines = REQUIRED_PROFILES.map((profile, index) => ({
   report_ok: true,
   share_url: `https://outilsia.fr/r/fixture-${profile}`,
   notes: "Fixture validator only.",
+  ...(profile === "cpu_only" ? {
+    profile_source: "manual",
+    benchmark_execution_mode: "auto",
+    benchmark_runtime_processor: "cpu",
+    benchmark_gpu_offload_percent: 0,
+    benchmark_runtime_evidence_source: "ollama_api_ps",
+    first_30s: {
+      hardware_visible: false,
+      score_visible: true,
+      recommended_model_visible: true,
+      benchmark_cta_or_proof_visible: true,
+      upgrade_visible: true,
+      summary: "GPU à confirmer ; exécution CPU prouvée par Ollama",
+    },
+  } : {}),
   ...(profile === "rtx_4080_4090" ? {
     hardware_doctor: { schema: "outilsia.hardware_doctor.v2", score: 92 },
     capability_passport_ok: true,
@@ -62,7 +77,7 @@ if (result.ok !== true || result.profile_count !== REQUIRED_PROFILES.length) {
   throw new Error(`Unexpected validation result: ${JSON.stringify(result)}`);
 }
 if (result.enriched_evidence.hardware_doctor_v2_profiles.join(",") !== "rtx_4080_4090"
-  || result.enriched_evidence.ollama_runtime_proof_profiles.join(",") !== "rtx_4080_4090"
+    || result.enriched_evidence.ollama_runtime_proof_profiles.join(",") !== "rtx_4080_4090,cpu_only"
   || result.enriched_evidence.capability_passport_profiles.join(",") !== "rtx_4080_4090") {
   throw new Error(`Unexpected enriched evidence: ${JSON.stringify(result.enriched_evidence)}`);
 }
@@ -109,6 +124,64 @@ try {
   failed = String(error.message || error).includes("rtx_3060_12gb.gpu");
 }
 if (!failed) throw new Error("field tests payload should reject profile/hardware mismatch");
+
+failed = false;
+try {
+  validateFieldTests({
+    ...payload,
+    machines: payload.machines.map((machine) => machine.profile === "rtx_3060_12gb" ? {
+      ...machine,
+      first_30s: {
+        hardware_visible: true,
+        score_visible: true,
+        recommended_model_visible: true,
+        benchmark_cta_or_proof_visible: false,
+        upgrade_visible: true,
+        summary: "benchmark absent de l'UX immédiate",
+      },
+    } : machine),
+  }, { verifyShareUrls: false });
+} catch (error) {
+  failed = String(error.message || error).includes("first_30s");
+}
+if (!failed) throw new Error("final field-tests payload should enforce the 30-second UX proof");
+
+failed = false;
+try {
+  validateFieldTests({
+    ...payload,
+    machines: payload.machines.map((machine) => machine.profile === "cpu_only" ? { ...machine, profile_source: "auto" } : machine),
+  }, { verifyShareUrls: false });
+} catch (error) {
+  failed = String(error.message || error).includes("profile_source must be manual");
+}
+if (!failed) throw new Error("cpu_only should require an explicit manual profile choice");
+
+failed = false;
+try {
+  validateFieldTests({
+    ...payload,
+    machines: payload.machines.map((machine) => machine.profile === "cpu_only"
+      ? { ...machine, benchmark_runtime_processor: "unknown", benchmark_runtime_evidence_source: "" }
+      : machine),
+  }, { verifyShareUrls: false });
+} catch (error) {
+  failed = String(error.message || error).includes("benchmark_runtime_processor must be cpu");
+}
+if (!failed) throw new Error("cpu_only should require an Ollama-proven CPU runtime");
+
+failed = false;
+try {
+  validateFieldTests({
+    ...payload,
+    machines: payload.machines.map((machine) => machine.profile === "cpu_only"
+      ? { ...machine, gpu: "NVIDIA GeForce RTX 4090", vram_gb: 24 }
+      : machine),
+  }, { verifyShareUrls: false });
+} catch (error) {
+  failed = String(error.message || error).includes("gpu identifies a dedicated GPU");
+}
+if (!failed) throw new Error("cpu_only should reject a known dedicated GPU");
 
 failed = false;
 try {

@@ -425,7 +425,7 @@ for (const needle of [
   if (!verifyKitPs.includes(needle)) fail(`PowerShell kit self-check missing ${needle}`);
 }
 const singleEntryPs = readFileSync(join(kitDir, "VALIDER-FICHE-WINDOWS.ps1"), "utf8");
-for (const needle of ["requiredProfiles", "EXPECTED-FIELD-PROFILE.txt", "profil attendu", "ne correspond pas au profil attendu", "app_version", "build_id", "Add-Member", "benchmark_tokens_per_second", "promptforge_ok", "dialogue_ok", "arena_ok", "report_ok", "share_url", "outilsia.fr", "/r/", "Test-ProfileHardware", "coherence materielle invalide", "rtx_3060_12gb.gpu", "cpu_only.vram_gb", "field_entry_ok"]) {
+for (const needle of ["requiredProfiles", "EXPECTED-FIELD-PROFILE.txt", "profil attendu", "ne correspond pas au profil attendu", "app_version", "build_id", "Add-Member", "benchmark_tokens_per_second", "promptforge_ok", "dialogue_ok", "arena_ok", "report_ok", "share_url", "outilsia.fr", "/r/", "Test-ProfileHardware", "Test-ManualCpuOnlyRuntimeProof", "benchmark_runtime_evidence_source doit etre ollama_api_ps", "coherence materielle invalide", "rtx_3060_12gb.gpu", "field_entry_ok"]) {
   if (!singleEntryPs.includes(needle)) fail(`PowerShell field validator missing ${needle}`);
 }
 const allEntriesCmd = readFileSync(join(kitDir, "VALIDER-FICHES.cmd"), "utf8");
@@ -433,7 +433,7 @@ if (!allEntriesCmd.includes("VALIDER-FICHES-WINDOWS.ps1")) fail("all entries cmd
 if (allEntriesCmd.includes("npm run validate:field-entries")) fail("all entries cmd should not require WSL/npm on physical PCs");
 if (!allEntriesCmd.includes("FIELD-ENTRIES-VALIDATION.html")) fail("all entries cmd must open the HTML validation report");
 const allEntriesPs = readFileSync(join(kitDir, "VALIDER-FICHES-WINDOWS.ps1"), "utf8");
-for (const needle of ["FIELD_ENTRIES_VALID", "FIELD_ENTRIES_INCOMPLETE", "profiles_missing", "profiles_incomplete", "next_profile_to_fix", "app_version", "build_id", "metadata_mixed", "Metadonnees melangees", "Add-Member", "share_url", "outilsia.fr", "/r/", "Test-ProfileHardware", "coherence materielle invalide", "rtx_3060_12gb.gpu", "cpu_only.vram_gb", "FIELD-ENTRIES-VALIDATION.md", "FIELD-ENTRIES-VALIDATION.html", "Validation fiches terrain OutilsIA"]) {
+for (const needle of ["FIELD_ENTRIES_VALID", "FIELD_ENTRIES_INCOMPLETE", "profiles_missing", "profiles_incomplete", "next_profile_to_fix", "app_version", "build_id", "metadata_mixed", "Metadonnees melangees", "Add-Member", "share_url", "outilsia.fr", "/r/", "Test-ProfileHardware", "Test-ManualCpuOnlyRuntimeProof", "benchmark_runtime_evidence_source doit etre ollama_api_ps", "coherence materielle invalide", "rtx_3060_12gb.gpu", "FIELD-ENTRIES-VALIDATION.md", "FIELD-ENTRIES-VALIDATION.html", "Validation fiches terrain OutilsIA"]) {
   if (!allEntriesPs.includes(needle)) fail(`PowerShell all-entries validator missing ${needle}`);
 }
 const exportEntriesCmd = readFileSync(join(kitDir, "EXPORTER-FICHES.cmd"), "utf8");

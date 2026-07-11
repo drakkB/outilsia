@@ -299,7 +299,7 @@ function html(report) {
     <h2>Preuves minimales attendues</h2>
     <ul>
       <li>Scan matériel détecté et cohérent avec le profil terrain.</li>
-      <li>UX 30 secondes : matériel visible, score visible, modèle conseillé, benchmark ou bouton de benchmark, upgrade utile.</li>
+      <li>UX 30 secondes : matériel prouvé ou signalé à confirmer, score visible, modèle conseillé, benchmark ou bouton de benchmark, upgrade utile.</li>
       <li>Benchmark local avec tokens/s supérieur à 0.</li>
       <li>PromptForge, dialogue local, Arena locale et rapport avec statut OK.</li>
       <li>URL partagée OutilsIA au format <code>https://outilsia.fr/r/...</code>.</li>

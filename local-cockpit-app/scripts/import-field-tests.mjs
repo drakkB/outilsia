@@ -17,6 +17,41 @@ export const REQUIRED_PROFILES = [
   "cpu_only",
 ];
 
+const DEDICATED_GPU_PATTERN = /\b(?:nvidia|geforce|quadro|tesla|rtx|gtx|radeon\s+(?:rx|pro|vii)|firepro|instinct|arc(?:\(tm\))?\s+(?:pro\s+)?[ab]\d{2,4})\b/i;
+
+export function manualCpuOnlyRuntimeProofIssues(machine = {}) {
+  const issues = [];
+  const profileSource = String(machine.profile_source || "").trim().toLowerCase();
+  const processor = String(machine.benchmark_runtime_processor || "unknown").trim().toLowerCase();
+  const evidenceSource = String(machine.benchmark_runtime_evidence_source || "").trim();
+  const gpu = String(machine.gpu || "").trim();
+  const hasOffload = machine.benchmark_gpu_offload_percent !== null
+    && machine.benchmark_gpu_offload_percent !== undefined
+    && String(machine.benchmark_gpu_offload_percent).trim() !== "";
+  const offload = Number(machine.benchmark_gpu_offload_percent);
+  const hasVram = machine.vram_gb !== null
+    && machine.vram_gb !== undefined
+    && String(machine.vram_gb).trim() !== "";
+  const vram = hasVram ? Number(machine.vram_gb) : null;
+
+  if (String(machine.profile || "") !== "cpu_only") issues.push("profile must be cpu_only");
+  if (profileSource !== "manual") issues.push("profile_source must be manual");
+  if (processor !== "cpu") issues.push("benchmark_runtime_processor must be cpu");
+  if (evidenceSource !== "ollama_api_ps") issues.push("benchmark_runtime_evidence_source must be ollama_api_ps");
+  if (!hasOffload || !Number.isFinite(offload) || offload !== 0) {
+    issues.push("benchmark_gpu_offload_percent must be measured at 0");
+  }
+  if (hasVram && (!Number.isFinite(vram) || vram < 0 || vram > 4)) {
+    issues.push("vram_gb must stay unknown or <= 4 Go");
+  }
+  if (DEDICATED_GPU_PATTERN.test(gpu)) issues.push("gpu identifies a dedicated GPU");
+  return issues;
+}
+
+export function isManualCpuOnlyRuntimeProof(machine = {}) {
+  return manualCpuOnlyRuntimeProofIssues(machine).length === 0;
+}
+
 export const FIELD_PROFILE_RULES = {
   old_laptop: {
     label: "Vieux laptop / portable modeste",
@@ -65,12 +100,8 @@ export const FIELD_PROFILE_RULES = {
   cpu_only: {
     label: "Machine CPU-only",
     validate(machine) {
-      const gpu = String(machine.gpu || "").toLowerCase();
-      const vram = Number(machine.vram_gb || 0);
-      if (vram !== 0) fail("cpu_only.vram_gb must be 0");
-      if (!gpu.includes("cpu") && !gpu.includes("aucun") && !gpu.includes("no gpu") && !gpu.includes("none")) {
-        fail("cpu_only.gpu must clearly indicate no dedicated GPU");
-      }
+      const issues = manualCpuOnlyRuntimeProofIssues(machine);
+      if (issues.length) fail(`cpu_only requires a manual Ollama CPU proof: ${issues.join(", ")}`);
     },
   },
 };
@@ -89,6 +120,59 @@ Writes:
 
 function fail(message) {
   throw new Error(message);
+}
+
+export function validateFieldFirst30sProof(entry) {
+  const proof = entry.first_30s;
+  const cpuOnlyRuntimeProven = isManualCpuOnlyRuntimeProof(entry);
+  const requiredKeys = [
+    "hardware_visible",
+    "score_visible",
+    "recommended_model_visible",
+    "benchmark_cta_or_proof_visible",
+    "upgrade_visible",
+  ];
+  if (proof && typeof proof === "object" && !Array.isArray(proof)) {
+    const missing = requiredKeys.filter((key) => {
+      if (proof[key] === true) return false;
+      return !(key === "hardware_visible" && proof[key] === false && cpuOnlyRuntimeProven);
+    });
+    if (missing.length) fail(`${entry.profile}.first_30s incomplete: ${missing.join(", ")}`);
+    if (!String(proof.summary || "").trim()) fail(`${entry.profile}.first_30s.summary is required`);
+    return {
+      complete: true,
+      source: "explicit",
+      summary: String(proof.summary || "").trim(),
+    };
+  }
+  const gpu = String(entry.gpu || "").trim();
+  const gpuIdentityKnown = Boolean(gpu) && !/(?:non d[ée]termin[ée]|non renseign[ée]|unknown|not[_ -]?detected)/i.test(gpu);
+  const derived = {
+    hardware_visible: Boolean(entry.scan_ok && entry.cpu && gpuIdentityKnown && Number(entry.ram_gb || 0) > 0),
+    score_visible: Number.isFinite(Number(entry.score)) && Number(entry.score) > 0 && Boolean(String(entry.score_label || "").trim()),
+    recommended_model_visible: Boolean(String(entry.recommended_model || "").trim()),
+    benchmark_cta_or_proof_visible: (
+      (Boolean(String(entry.benchmark_model || "").trim()) && Number(entry.benchmark_tokens_per_second || 0) > 0) ||
+      /bench|test|tester|lancer/i.test(String(entry.first_action || ""))
+    ),
+    upgrade_visible: Boolean(String(entry.upgrade_recommendation || "").trim()),
+  };
+  const missing = requiredKeys.filter((key) => {
+    if (derived[key] === true) return false;
+    return !(key === "hardware_visible" && cpuOnlyRuntimeProven);
+  });
+  if (missing.length) fail(`${entry.profile}.first_30s derived proof incomplete: ${missing.join(", ")}`);
+  return {
+    complete: true,
+    source: "derived_legacy",
+    summary: [
+      `${entry.gpu} · ${entry.vram_gb == null ? "VRAM non déterminée" : `${entry.vram_gb} Go VRAM`} · ${entry.ram_gb} Go RAM`,
+      `score ${entry.score}/100`,
+      `modele ${entry.recommended_model}`,
+      `benchmark ${entry.benchmark_model || "CTA"}`,
+      `upgrade ${entry.upgrade_recommendation}`,
+    ].join(" | "),
+  };
 }
 
 function parseArgs(argv) {
@@ -292,6 +376,7 @@ export function validateFieldTests(payload, options = {}) {
     shareUrls.add(shareUrl);
     assertFieldProfileHardware(machine, profile);
     assertBenchmarkPlausible(machine, profile);
+    validateFieldFirst30sProof(machine);
     const evidence = validateFieldEnrichment(machine);
     if (evidence.hardware_doctor.available) enrichedEvidence.hardware_doctor_v2_profiles.push(profile);
     if (evidence.runtime_evidence.proven) enrichedEvidence.ollama_runtime_proof_profiles.push(profile);

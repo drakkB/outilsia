@@ -85,15 +85,15 @@ const PROFILE_GUIDES = {
   },
   cpu_only: {
     title: "Machine CPU-only",
-    target: "PC sans GPU dédié exploitable.",
+    target: "PC sans GPU dédié exploitable, ou identité GPU inconnue avec exécution CPU prouvée.",
     goal: "Prouver que l'app donne un chemin réaliste sans vendre du rêve.",
-    expected: "Petit modèle CPU, message honnête, upgrade GPU/RAM pertinent, pas de promesse gros LLM.",
+    expected: "Profil choisi manuellement, petit modèle exécuté sur CPU selon Ollama, message honnête et pas de promesse gros LLM.",
     expected_score: "10-45/100 selon RAM et CPU.",
     expected_models: ["qwen3:0.6b", "phi4-mini", "llama3.2:3b"],
     benchmark_target: "Un petit modèle CPU doit être possible ou l'app doit expliquer le blocage.",
     upgrade_signal: "GPU dédié en priorité si usage LLM sérieux; RAM seulement si le CPU reste exploitable.",
-    must_confirm: ["CPU-only assumé", "pas de gros modèle conseillé", "message honnête", "upgrade priorisé"],
-    pitfalls: ["ne pas afficher de VRAM fantôme", "ne pas proposer Flux/SDXL comme action chat"],
+    must_confirm: ["profil CPU-only manuel", "preuve Ollama CPU à 0 % offload", "pas de gros modèle conseillé", "message honnête"],
+    pitfalls: ["ne pas transformer GPU inconnu en 0 Go VRAM", "ne pas proposer Flux/SDXL comme action chat"],
   },
 };
 
@@ -176,6 +176,32 @@ function Test-EnrichedEvidence($entry) {
 }
 `;
 
+const CPU_ONLY_RUNTIME_PROOF_POWERSHELL = String.raw`
+function Test-ManualCpuOnlyRuntimeProof($entry) {
+  if ([string]$entry.profile -ne "cpu_only") { return "profile doit etre cpu_only" }
+  if (([string]$entry.profile_source).Trim().ToLowerInvariant() -ne "manual") { return "profile_source doit etre manual" }
+  if (([string]$entry.benchmark_runtime_processor).Trim().ToLowerInvariant() -ne "cpu") { return "benchmark_runtime_processor doit etre cpu" }
+  if (([string]$entry.benchmark_runtime_evidence_source).Trim() -ne "ollama_api_ps") { return "benchmark_runtime_evidence_source doit etre ollama_api_ps" }
+  $offloadProperty = $entry.PSObject.Properties["benchmark_gpu_offload_percent"]
+  $offload = 0.0
+  if (!$offloadProperty -or ![double]::TryParse([string]$offloadProperty.Value, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$offload) -or $offload -ne 0) {
+    return "benchmark_gpu_offload_percent doit etre mesure a 0"
+  }
+  $vramProperty = $entry.PSObject.Properties["vram_gb"]
+  if ($vramProperty -and $null -ne $vramProperty.Value -and ![string]::IsNullOrWhiteSpace([string]$vramProperty.Value)) {
+    $vram = 0.0
+    if (![double]::TryParse([string]$vramProperty.Value, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$vram) -or $vram -lt 0 -or $vram -gt 4) {
+      return "vram_gb doit rester inconnue ou <= 4 Go"
+    }
+  }
+  $gpu = ([string]$entry.gpu).Trim().ToLowerInvariant()
+  if ($gpu -match "\b(?:nvidia|geforce|quadro|tesla|rtx|gtx|radeon\s+(?:rx|pro|vii)|firepro|instinct|arc(?:\(tm\))?\s+(?:pro\s+)?[ab]\d{2,4})\b") {
+    return "gpu identifie un GPU dedie"
+  }
+  return ""
+}
+`;
+
 const STRICT_PROFILE_RECIPES = {
   old_laptop: {
     title: "Recette stricte vieux laptop",
@@ -230,9 +256,11 @@ const STRICT_PROFILE_RECIPES = {
     file: "CPU-ONLY-RECETTE-STRICTE.html",
     command: "OUVRIR-CPU-ONLY-STRICT.cmd",
     models: ["qwen3:0.6b", "llama3.2:3b", "phi4-mini"],
-    firstProof: "Assumer le CPU-only : petit modèle, mesure honnête et upgrade GPU priorisé si usage sérieux.",
+    firstProof: "Choisir CPU-only manuellement, puis obtenir une preuve Ollama /api/ps avec processor=cpu et offload GPU=0 %.",
     hardRules: [
-      "Ne pas afficher de VRAM fantôme.",
+      "Une identité GPU inconnue reste inconnue : ne jamais la remplacer par 0 Go VRAM.",
+      "GPU inconnu ne prouve pas CPU-only : la preuve vient du benchmark Ollama exécuté sur CPU.",
+      "La fiche doit exporter benchmark_runtime_processor=cpu, benchmark_runtime_evidence_source=ollama_api_ps et benchmark_gpu_offload_percent=0.",
       "Ne pas proposer Flux/SDXL comme action chat.",
       "Ne pas promettre un gros LLM confortable sans GPU dédié.",
     ],
@@ -497,9 +525,10 @@ function templateMachine(profile) {
     machine_label: labels[profile] || profile,
     os: "",
     cpu: "",
-    gpu: profile === "cpu_only" ? "CPU only / aucun GPU dédié" : "",
+    profile_source: profile === "cpu_only" ? "manual" : "auto",
+    gpu: "",
     ram_gb: 0,
-    vram_gb: profile === "cpu_only" ? 0 : 0,
+    vram_gb: profile === "cpu_only" ? null : 0,
     scan_ok: false,
     score: 0,
     score_label: "",
@@ -509,6 +538,9 @@ function templateMachine(profile) {
     benchmark_model: "",
     benchmark_tokens_per_second: 0,
     benchmark_elapsed_ms: 0,
+    benchmark_runtime_processor: "unknown",
+    benchmark_gpu_offload_percent: 0,
+    benchmark_runtime_evidence_source: "",
     promptforge_ok: false,
     dialogue_ok: false,
     arena_ok: false,
@@ -664,7 +696,7 @@ function writeOperatorChecklist(kitDir, release) {
     build_id: buildId,
     blocking_rule: "Une machine terrain ne compte pas si scan, benchmark, PromptForge, dialogue, Arena, rapport et fiche JSON valide ne sont pas prouvés.",
     proof_items: [
-      "matériel reconnu : OS, CPU, GPU/VRAM ou CPU-only, RAM",
+      "matériel reconnu : OS, CPU, RAM, GPU/VRAM connus ou signalés à confirmer",
       "score et verdict OutilsIA visibles",
       "modèle conseillé ou modèle léger clairement proposé",
       "benchmark réel avec tokens/s supérieur à 0",
@@ -1080,7 +1112,7 @@ ${cards}
       "",
       "## Preuves minimales avant de quitter le PC",
       "",
-      "- Matériel reconnu : OS, CPU, GPU/VRAM ou CPU-only, RAM.",
+      "- Matériel reconnu : OS, CPU, RAM, GPU/VRAM connus ou signalés à confirmer.",
       "- Résultat immédiat clair : score, modèle conseillé, première action et upgrade utile.",
       "- Benchmark réel avec tokens/s supérieur à 0.",
       "- PromptForge testé ou statut explicite.",
@@ -1143,7 +1175,7 @@ ${cards}
   <section>
     <h2>Preuves minimales</h2>
     <ul>
-      <li>Matériel reconnu : OS, CPU, GPU/VRAM ou CPU-only, RAM.</li>
+      <li>Matériel reconnu : OS, CPU, RAM, GPU/VRAM connus ou signalés à confirmer.</li>
       <li>Score, modèle conseillé, première action et upgrade utile.</li>
       <li>Benchmark réel avec tokens/s supérieur à 0.</li>
       <li>PromptForge, dialogue local, Arena locale et rapport avec statut explicite.</li>
@@ -1442,7 +1474,7 @@ function writeFiveMinuteRecipe(kitDir, release) {
   <section>
     <h2>Preuve minimale attendue</h2>
     <div class="grid">
-      <div class="box"><strong class="ok">Scan</strong><ul><li>OS</li><li>CPU</li><li>GPU/VRAM ou CPU-only</li><li>RAM</li></ul></div>
+      <div class="box"><strong class="ok">Scan</strong><ul><li>OS</li><li>CPU</li><li>GPU/VRAM connus ou à confirmer</li><li>RAM</li></ul></div>
       <div class="box"><strong class="ok">Décision</strong><ul><li>Score</li><li>Modèle conseillé</li><li>Première action</li><li>Upgrade utile</li></ul></div>
       <div class="box"><strong class="ok">Usage local</strong><ul><li>Benchmark avec tokens/s</li><li>PromptForge</li><li>Dialogue local</li><li>Arena locale</li></ul></div>
       <div class="box"><strong class="ok">Sortie</strong><ul><li>Rapport généré ou partagé</li><li>Fiche JSON téléchargée</li><li>Validation PowerShell OK</li><li>Profil manuel correct</li></ul></div>
@@ -1525,7 +1557,7 @@ function writeStrictProfileRecipes(kitDir, release) {
   <section>
     <h2>Règle commune</h2>
     <ul>
-      <li><span class="ok">UX 30s</span> : matériel visible, score visible, modèle conseillé, bouton/preuve benchmark, upgrade utile.</li>
+      <li><span class="ok">UX 30s</span> : matériel prouvé ou signalé à confirmer, score visible, modèle conseillé, bouton/preuve benchmark, upgrade utile.</li>
       <li><span class="ok">Validation</span> : lancer <code>VALIDER-DERNIERE-FICHE.cmd</code> avant de quitter la machine.</li>
       <li><span class="bad">Interdit</span> : annoncer le goal terminé tant que les 5 profils ne sont pas prêts dans <code>FIELD-TESTS.json</code>.</li>
     </ul>
@@ -1606,7 +1638,7 @@ function writeStrictProfileRecipes(kitDir, release) {
     <h2>À confirmer</h2>
     <ul class="check">
       ${mustConfirm}
-      <li>UX 30s complète : matériel visible, score visible, modèle conseillé, benchmark/proof, upgrade utile.</li>
+      <li>UX 30s complète : matériel prouvé ou signalé à confirmer, score visible, modèle conseillé, benchmark/proof, upgrade utile.</li>
     </ul>
   </section>
   <section>
@@ -1751,16 +1783,18 @@ function main() {
     "- `core_i7_gtx_1080_ti` : vieux Core i7 + GTX 1080 Ti 11 Go.",
     "- `rtx_3060_12gb` : RTX 3060 12 Go.",
     "- `rtx_4080_4090` : RTX 4080 ou RTX 4090.",
-    "- `cpu_only` : machine sans GPU dédié.",
+    "- `cpu_only` : profil choisi manuellement, validé par une exécution Ollama sur CPU à 0 % d'offload GPU.",
     "",
     "## À remplir pour chaque machine",
     "",
-    "- Matériel détecté : OS, CPU, GPU, RAM, VRAM.",
+    "- Matériel détecté : OS, CPU, GPU, RAM, VRAM. GPU/VRAM peuvent rester inconnus si le scan ne sait pas les prouver.",
     "- Résultat 30 secondes : matériel reconnu, score visible, modèle conseillé, bouton/preuve benchmark, upgrade utile.",
     "- Benchmark : modèle, tokens/s, durée.",
     "- Flux complet : PromptForge, dialogue local, Arena, rapport.",
     "- Upgrade utile ou raison de ne pas upgrader.",
-    "- Facultatif : Doctor 2.0, preuve CPU/GPU/hybride Ollama et digest AI Capability Passport.",
+    "- Facultatif hors profil CPU-only : Doctor 2.0, preuve CPU/GPU/hybride Ollama et digest AI Capability Passport.",
+    "- Pour `cpu_only`, la preuve Ollama est obligatoire : profil manuel, processor `cpu`, source `ollama_api_ps`, offload GPU `0`.",
+    "- Un GPU inconnu ne signifie jamais qu'il est physiquement absent et ne doit pas être converti en `0 Go VRAM`.",
     "- Le Passport n'est pas une preuve d'identité et son absence ne bloque pas le terrain.",
     "",
     "## Flux recommande avec l'app",
@@ -1904,7 +1938,7 @@ function main() {
     "</head><body><main>",
     "<header><h1>Test express prochain PC</h1><p>Double-clique <strong>OUVRIR-TEST-EXPRESS.cmd</strong> ou <strong>STATUT.cmd</strong> pour generer cette page avec le profil a jour.</p></header>",
     "<section class=\"warn\"><h2>Regle bloquante</h2><p>Sans fichier <code>outilsia-field-test-&lt;profil&gt;.json</code> valide, le test ne compte pas. Le PDF et les captures aident, mais ne remplacent pas la fiche JSON.</p></section>",
-    "<section><h2>8 gestes terrain</h2><ol><li>Installer ou ouvrir OutilsIA Local Cockpit.</li><li>Cliquer <strong>Analyser ce PC</strong>.</li><li>Verifier CPU, GPU/VRAM ou CPU-only, RAM et OS.</li><li>Lancer le benchmark leger propose.</li><li>Tester PromptForge ou le justifier.</li><li>Poser une question locale au modele conseille.</li><li>Verifier Arena locale et rapport.</li><li>Telecharger la fiche terrain puis lancer <code>VALIDER-DERNIERE-FICHE.cmd</code>.</li></ol></section>",
+    "<section><h2>8 gestes terrain</h2><ol><li>Installer ou ouvrir OutilsIA Local Cockpit.</li><li>Cliquer <strong>Analyser ce PC</strong>.</li><li>Verifier CPU, RAM, OS et si GPU/VRAM sont connus ou a confirmer.</li><li>Lancer le benchmark leger propose.</li><li>Tester PromptForge ou le justifier.</li><li>Poser une question locale au modele conseille.</li><li>Verifier Arena locale et rapport.</li><li>Telecharger la fiche terrain puis lancer <code>VALIDER-DERNIERE-FICHE.cmd</code>.</li></ol></section>",
     "</main></body></html>",
     ""
   ].join("\n"), "utf8");
@@ -2346,7 +2380,7 @@ $expressPackHtml = @"
     <ol>
       <li>Installer ou ouvrir OutilsIA Local Cockpit.</li>
       <li>Cliquer <strong>Analyser ce PC</strong>.</li>
-      <li>Verifier CPU, GPU/VRAM ou CPU-only, RAM et OS.</li>
+      <li>Verifier CPU, RAM, OS et si GPU/VRAM sont connus ou a confirmer.</li>
       <li>Lancer le benchmark leger propose.</li>
       <li>Tester PromptForge ou le justifier.</li>
       <li>Poser une question locale au modele conseille.</li>
@@ -2599,7 +2633,7 @@ function ProfileTarget($profile) {
     "old_laptop" { return "Portable ancien, iGPU ou petit GPU, RAM limitee." }
     "core_i7_gtx_1080_ti" { return "Vieux PC encore solide avec GTX 1080 Ti 11 Go VRAM." }
     "rtx_3060_12gb" { return "Machine grand public RTX 3060 12 Go." }
-    "cpu_only" { return "PC sans GPU dedie exploitable." }
+    "cpu_only" { return "PC sans GPU dedie exploitable ou GPU inconnu avec execution CPU prouvee." }
     default { return "Machine physique correspondant au profil." }
   }
 }
@@ -2609,7 +2643,7 @@ function ProfileProof($profile) {
     "old_laptop" { return "Score realiste, modele leger, message encourageant, upgrade clair." }
     "core_i7_gtx_1080_ti" { return "1080 Ti reconnue, modele 7B/14B teste, upgrade 24 Go VRAM explique." }
     "rtx_3060_12gb" { return "Profil budget valide, benchmark reel, recommandation non agressive." }
-    "cpu_only" { return "Chemin CPU honnete, petit modele seulement, upgrade GPU/RAM utile." }
+    "cpu_only" { return "Profil manuel, execution CPU Ollama prouvee, petit modele et upgrade honnete." }
     default { return "Scan, benchmark, PromptForge, dialogue, Arena et rapport partageable." }
   }
 }
@@ -3600,15 +3634,17 @@ function Test-BenchmarkPlausible($entry) {
 }
 
 ${FIELD_ENRICHMENT_POWERSHELL}
-${FIELD_ENRICHMENT_POWERSHELL}
+${CPU_ONLY_RUNTIME_PROOF_POWERSHELL}
 function Test-First30sProof($entry) {
   $required = @("hardware_visible", "score_visible", "recommended_model_visible", "benchmark_cta_or_proof_visible", "upgrade_visible")
+  $cpuOnlyProofError = Test-ManualCpuOnlyRuntimeProof $entry
+  $allowHiddenHardware = [string]$entry.profile -eq "cpu_only" -and [string]::IsNullOrWhiteSpace($cpuOnlyProofError)
   $proofProperty = $entry.PSObject.Properties["first_30s"]
   if ($proofProperty -and $proofProperty.Value) {
     $proof = $proofProperty.Value
     $missing = @()
     foreach ($key in $required) {
-      if ($proof.$key -ne $true) { $missing += $key }
+      if ($proof.$key -ne $true -and !($key -eq "hardware_visible" -and $proof.$key -eq $false -and $allowHiddenHardware)) { $missing += $key }
     }
     if ($missing.Count -gt 0) {
       return @{ complete = $false; source = "explicit"; summary = ""; error = "first_30s incomplet: $($missing -join ', ')" }
@@ -3618,7 +3654,9 @@ function Test-First30sProof($entry) {
     }
     return @{ complete = $true; source = "explicit"; summary = [string]$proof.summary; error = "" }
   }
-  $hardwareVisible = $entry.scan_ok -eq $true -and ![string]::IsNullOrWhiteSpace([string]$entry.cpu) -and ![string]::IsNullOrWhiteSpace([string]$entry.gpu) -and [double]$entry.ram_gb -gt 0
+  $gpu = ([string]$entry.gpu).Trim()
+  $gpuKnown = ![string]::IsNullOrWhiteSpace($gpu) -and $gpu -notmatch "non d[ée]termin[ée]|non renseign[ée]|unknown|not[_ -]?detected"
+  $hardwareVisible = $entry.scan_ok -eq $true -and ![string]::IsNullOrWhiteSpace([string]$entry.cpu) -and $gpuKnown -and [double]$entry.ram_gb -gt 0
   $scoreVisible = [double]$entry.score -gt 0 -and ![string]::IsNullOrWhiteSpace([string]$entry.score_label)
   $recommendedVisible = ![string]::IsNullOrWhiteSpace([string]$entry.recommended_model)
   $benchmarkVisible = (![string]::IsNullOrWhiteSpace([string]$entry.benchmark_model) -and [double]$entry.benchmark_tokens_per_second -gt 0) -or ([string]$entry.first_action -match "bench|test|tester|lancer")
@@ -3632,12 +3670,13 @@ function Test-First30sProof($entry) {
   }
   $missingDerived = @()
   foreach ($key in $required) {
-    if ($derived[$key] -ne $true) { $missingDerived += $key }
+    if ($derived[$key] -ne $true -and !($key -eq "hardware_visible" -and $allowHiddenHardware)) { $missingDerived += $key }
   }
   if ($missingDerived.Count -gt 0) {
     return @{ complete = $false; source = "derived_legacy"; summary = ""; error = "first_30s deduit incomplet: $($missingDerived -join ', ')" }
   }
-  $summary = "$($entry.gpu) - $($entry.vram_gb) Go VRAM - $($entry.ram_gb) Go RAM | score $($entry.score)/100 | modele $($entry.recommended_model) | benchmark $($entry.benchmark_model) | upgrade $($entry.upgrade_recommendation)"
+  $vramLabel = if ($null -eq $entry.vram_gb -or [string]::IsNullOrWhiteSpace([string]$entry.vram_gb)) { "VRAM non determinee" } else { "$($entry.vram_gb) Go VRAM" }
+  $summary = "$($entry.gpu) - $vramLabel - $($entry.ram_gb) Go RAM | score $($entry.score)/100 | modele $($entry.recommended_model) | benchmark $($entry.benchmark_model) | upgrade $($entry.upgrade_recommendation)"
   return @{ complete = $true; source = "derived_legacy"; summary = $summary; error = "" }
 }
 
@@ -3676,11 +3715,7 @@ function Test-ProfileHardware($entry) {
       return ""
     }
     "cpu_only" {
-      if ($vram -ne 0) { return "cpu_only.vram_gb doit etre 0" }
-      if (!$gpu.Contains("cpu") -and !$gpu.Contains("aucun") -and !$gpu.Contains("no gpu") -and !$gpu.Contains("none")) {
-        return "cpu_only.gpu doit indiquer clairement l'absence de GPU dedie"
-      }
-      return ""
+      return Test-ManualCpuOnlyRuntimeProof $entry
     }
   }
   return "profil inconnu: $profile"
@@ -3774,13 +3809,13 @@ if (!(Test-ShareUrl $entry.share_url)) {
 if (!(Test-TestedAt $entry.tested_at)) {
   Fail "profil=$($entry.profile) tested_at invalide ou absent"
 }
-$first30s = Test-First30sProof $entry
-if ($first30s.complete -ne $true) {
-  Fail "profil=$($entry.profile) $($first30s.error)"
-}
 $profileHardwareError = Test-ProfileHardware $entry
 if (![string]::IsNullOrWhiteSpace($profileHardwareError)) {
   Fail "profil=$($entry.profile) coherence materielle invalide: $profileHardwareError"
+}
+$first30s = Test-First30sProof $entry
+if ($first30s.complete -ne $true) {
+  Fail "profil=$($entry.profile) $($first30s.error)"
 }
 $benchmarkPlausibilityError = Test-BenchmarkPlausible $entry
 if (![string]::IsNullOrWhiteSpace($benchmarkPlausibilityError)) {
@@ -3891,14 +3926,18 @@ function Test-BenchmarkPlausible($entry) {
   return ""
 }
 
+${FIELD_ENRICHMENT_POWERSHELL}
+${CPU_ONLY_RUNTIME_PROOF_POWERSHELL}
 function Test-First30sProof($entry) {
   $required = @("hardware_visible", "score_visible", "recommended_model_visible", "benchmark_cta_or_proof_visible", "upgrade_visible")
+  $cpuOnlyProofError = Test-ManualCpuOnlyRuntimeProof $entry
+  $allowHiddenHardware = [string]$entry.profile -eq "cpu_only" -and [string]::IsNullOrWhiteSpace($cpuOnlyProofError)
   $proofProperty = $entry.PSObject.Properties["first_30s"]
   if ($proofProperty -and $proofProperty.Value) {
     $proof = $proofProperty.Value
     $missing = @()
     foreach ($key in $required) {
-      if ($proof.$key -ne $true) { $missing += $key }
+      if ($proof.$key -ne $true -and !($key -eq "hardware_visible" -and $proof.$key -eq $false -and $allowHiddenHardware)) { $missing += $key }
     }
     if ($missing.Count -gt 0) {
       return @{ complete = $false; source = "explicit"; summary = ""; error = "first_30s incomplet: $($missing -join ', ')" }
@@ -3908,7 +3947,9 @@ function Test-First30sProof($entry) {
     }
     return @{ complete = $true; source = "explicit"; summary = [string]$proof.summary; error = "" }
   }
-  $hardwareVisible = $entry.scan_ok -eq $true -and ![string]::IsNullOrWhiteSpace([string]$entry.cpu) -and ![string]::IsNullOrWhiteSpace([string]$entry.gpu) -and [double]$entry.ram_gb -gt 0
+  $gpu = ([string]$entry.gpu).Trim()
+  $gpuKnown = ![string]::IsNullOrWhiteSpace($gpu) -and $gpu -notmatch "non d[ée]termin[ée]|non renseign[ée]|unknown|not[_ -]?detected"
+  $hardwareVisible = $entry.scan_ok -eq $true -and ![string]::IsNullOrWhiteSpace([string]$entry.cpu) -and $gpuKnown -and [double]$entry.ram_gb -gt 0
   $scoreVisible = [double]$entry.score -gt 0 -and ![string]::IsNullOrWhiteSpace([string]$entry.score_label)
   $recommendedVisible = ![string]::IsNullOrWhiteSpace([string]$entry.recommended_model)
   $benchmarkVisible = (![string]::IsNullOrWhiteSpace([string]$entry.benchmark_model) -and [double]$entry.benchmark_tokens_per_second -gt 0) -or ([string]$entry.first_action -match "bench|test|tester|lancer")
@@ -3922,12 +3963,13 @@ function Test-First30sProof($entry) {
   }
   $missingDerived = @()
   foreach ($key in $required) {
-    if ($derived[$key] -ne $true) { $missingDerived += $key }
+    if ($derived[$key] -ne $true -and !($key -eq "hardware_visible" -and $allowHiddenHardware)) { $missingDerived += $key }
   }
   if ($missingDerived.Count -gt 0) {
     return @{ complete = $false; source = "derived_legacy"; summary = ""; error = "first_30s deduit incomplet: $($missingDerived -join ', ')" }
   }
-  $summary = "$($entry.gpu) - $($entry.vram_gb) Go VRAM - $($entry.ram_gb) Go RAM | score $($entry.score)/100 | modele $($entry.recommended_model) | benchmark $($entry.benchmark_model) | upgrade $($entry.upgrade_recommendation)"
+  $vramLabel = if ($null -eq $entry.vram_gb -or [string]::IsNullOrWhiteSpace([string]$entry.vram_gb)) { "VRAM non determinee" } else { "$($entry.vram_gb) Go VRAM" }
+  $summary = "$($entry.gpu) - $vramLabel - $($entry.ram_gb) Go RAM | score $($entry.score)/100 | modele $($entry.recommended_model) | benchmark $($entry.benchmark_model) | upgrade $($entry.upgrade_recommendation)"
   return @{ complete = $true; source = "derived_legacy"; summary = $summary; error = "" }
 }
 
@@ -3966,11 +4008,7 @@ function Test-ProfileHardware($entry) {
       return ""
     }
     "cpu_only" {
-      if ($vram -ne 0) { return "cpu_only.vram_gb doit etre 0" }
-      if (!$gpu.Contains("cpu") -and !$gpu.Contains("aucun") -and !$gpu.Contains("no gpu") -and !$gpu.Contains("none")) {
-        return "cpu_only.gpu doit indiquer clairement l'absence de GPU dedie"
-      }
-      return ""
+      return Test-ManualCpuOnlyRuntimeProof $entry
     }
   }
   return "profil inconnu: $profile"
@@ -4044,13 +4082,13 @@ function Validate-Entry($entry) {
   if (!(Test-TestedAt $entry.tested_at)) {
     return @{ status = "incomplete"; error = "tested_at invalide ou absent" }
   }
-  $first30s = Test-First30sProof $entry
-  if ($first30s.complete -ne $true) {
-    return @{ status = "incomplete"; error = $first30s.error; first_30s_complete = $false; first_30s_source = $first30s.source; first_30s_summary = "" }
-  }
   $profileHardwareError = Test-ProfileHardware $entry
   if (![string]::IsNullOrWhiteSpace($profileHardwareError)) {
     return @{ status = "incomplete"; error = "coherence materielle invalide: $profileHardwareError" }
+  }
+  $first30s = Test-First30sProof $entry
+  if ($first30s.complete -ne $true) {
+    return @{ status = "incomplete"; error = $first30s.error; first_30s_complete = $false; first_30s_source = $first30s.source; first_30s_summary = "" }
   }
   $benchmarkPlausibilityError = Test-BenchmarkPlausible $entry
   if (![string]::IsNullOrWhiteSpace($benchmarkPlausibilityError)) {
@@ -4348,7 +4386,7 @@ $html = @"
     <h2>Preuves minimales attendues</h2>
     <ul>
       <li>Scan materiel detecte et coherent avec le profil terrain.</li>
-      <li>UX 30 secondes : materiel visible, score visible, modele conseille, benchmark ou bouton de benchmark, upgrade utile.</li>
+      <li>UX 30 secondes : materiel prouve ou signale a confirmer, score visible, modele conseille, benchmark ou bouton de benchmark, upgrade utile.</li>
       <li>Benchmark local avec tokens/s superieur a 0.</li>
       <li>PromptForge, dialogue local, Arena locale et rapport avec statut OK.</li>
       <li>URL partagee OutilsIA au format <code>https://outilsia.fr/r/...</code>.</li>
@@ -4751,7 +4789,7 @@ $expressSteps = if ($next) {
   @(
     "<li>Sur ce PC, ouvrir ou installer le build inclus dans le kit.</li>",
     "<li>Dans OutilsIA, cliquer <strong>Analyser ce PC</strong>.</li>",
-    "<li>Verifier que le materiel est visible : CPU, GPU/VRAM ou CPU-only, RAM, OS et Ollama.</li>",
+    "<li>Verifier le materiel prouve : CPU, RAM, OS, Ollama, puis GPU/VRAM connus ou clairement a confirmer.</li>",
     "<li>Lancer le benchmark leger propose et obtenir des tokens/s superieurs a 0.</li>",
     "<li>Optimiser le prompt avec PromptForge ou noter pourquoi ce n'est pas pertinent.</li>",
     "<li>Poser une question locale au modele conseille par OutilsIA.</li>",

@@ -2,7 +2,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { REQUIRED_PROFILES, assertFieldProfileHardware } from "./import-field-tests.mjs";
+import {
+  REQUIRED_PROFILES,
+  assertFieldProfileHardware,
+  validateFieldFirst30sProof,
+} from "./import-field-tests.mjs";
 import { validateFieldEnrichment } from "./validate-field-enrichment.mjs";
 
 const FIELD_KIT = existsSync("/mnt/c/Users/chris/Desktop")
@@ -172,50 +176,6 @@ function assertBenchmarkPlausible(entry) {
   }
 }
 
-function validateFirst30sProof(entry) {
-  const proof = entry.first_30s;
-  const requiredKeys = [
-    "hardware_visible",
-    "score_visible",
-    "recommended_model_visible",
-    "benchmark_cta_or_proof_visible",
-    "upgrade_visible",
-  ];
-  if (proof && typeof proof === "object" && !Array.isArray(proof)) {
-    const missing = requiredKeys.filter((key) => proof[key] !== true);
-    if (missing.length) fail(`${entry.profile}.first_30s incomplete: ${missing.join(", ")}`);
-    if (!String(proof.summary || "").trim()) fail(`${entry.profile}.first_30s.summary is required`);
-    return {
-      complete: true,
-      source: "explicit",
-      summary: String(proof.summary || "").trim(),
-    };
-  }
-  const derived = {
-    hardware_visible: Boolean(entry.scan_ok && entry.cpu && entry.gpu && Number(entry.ram_gb || 0) > 0),
-    score_visible: Number.isFinite(Number(entry.score)) && Number(entry.score) > 0 && Boolean(String(entry.score_label || "").trim()),
-    recommended_model_visible: Boolean(String(entry.recommended_model || "").trim()),
-    benchmark_cta_or_proof_visible: (
-      (Boolean(String(entry.benchmark_model || "").trim()) && Number(entry.benchmark_tokens_per_second || 0) > 0) ||
-      /bench|test|tester|lancer/i.test(String(entry.first_action || ""))
-    ),
-    upgrade_visible: Boolean(String(entry.upgrade_recommendation || "").trim()),
-  };
-  const missing = requiredKeys.filter((key) => derived[key] !== true);
-  if (missing.length) fail(`${entry.profile}.first_30s derived proof incomplete: ${missing.join(", ")}`);
-  return {
-    complete: true,
-    source: "derived_legacy",
-    summary: [
-      `${entry.gpu} · ${entry.vram_gb ?? 0} Go VRAM · ${entry.ram_gb} Go RAM`,
-      `score ${entry.score}/100`,
-      `modele ${entry.recommended_model}`,
-      `benchmark ${entry.benchmark_model || "CTA"}`,
-      `upgrade ${entry.upgrade_recommendation}`,
-    ].join(" | "),
-  };
-}
-
 export function validateSingleFieldEntry(entry, expectedProfile = "") {
   if (!REQUIRED_PROFILES.includes(entry.profile)) fail(`Unexpected profile: ${entry.profile}`);
   if (expectedProfile && entry.profile !== expectedProfile) {
@@ -233,7 +193,7 @@ export function validateSingleFieldEntry(entry, expectedProfile = "") {
   assertShareUrl(entry.share_url, `${entry.profile}.share_url`);
   assertFieldProfileHardware(entry, entry.profile);
   assertBenchmarkPlausible(entry);
-  const first30s = validateFirst30sProof(entry);
+  const first30s = validateFieldFirst30sProof(entry);
   const evidence = validateFieldEnrichment(entry);
   return {
     ok: true,

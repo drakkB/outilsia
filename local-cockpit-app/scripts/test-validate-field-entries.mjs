@@ -18,7 +18,7 @@ function baseEntry(profile) {
     core_i7_gtx_1080_ti: { cpu: "Intel Core i7-7700K", gpu: "NVIDIA GeForce GTX 1080 Ti", ram_gb: 32, vram_gb: 11 },
     rtx_3060_12gb: { cpu: "AMD Ryzen test", gpu: "NVIDIA GeForce RTX 3060", ram_gb: 32, vram_gb: 12 },
     rtx_4080_4090: { cpu: "AMD Ryzen test", gpu: "NVIDIA GeForce RTX 4080 SUPER", ram_gb: 64, vram_gb: 16 },
-    cpu_only: { cpu: "Intel CPU only", gpu: "CPU only / aucun GPU dédié", ram_gb: 16, vram_gb: 0 },
+    cpu_only: { cpu: "Intel Core i5", gpu: "GPU non déterminé", ram_gb: 16, vram_gb: null },
   }[profile];
   return {
     profile,
@@ -42,8 +42,15 @@ function baseEntry(profile) {
     dialogue_ok: true,
     arena_ok: true,
     report_ok: true,
+    ...(profile === "cpu_only" ? {
+      profile_source: "manual",
+      benchmark_execution_mode: "auto",
+      benchmark_runtime_processor: "cpu",
+      benchmark_gpu_offload_percent: 0,
+      benchmark_runtime_evidence_source: "ollama_api_ps",
+    } : {}),
     first_30s: {
-      hardware_visible: true,
+      hardware_visible: profile !== "cpu_only",
       score_visible: true,
       recommended_model_visible: true,
       benchmark_cta_or_proof_visible: true,

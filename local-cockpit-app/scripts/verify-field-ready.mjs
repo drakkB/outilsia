@@ -47,7 +47,7 @@ const strictProfileRecipes = {
     title: "Recette stricte CPU-only",
     file: "CPU-ONLY-RECETTE-STRICTE.html",
     command: "OUVRIR-CPU-ONLY-STRICT.cmd",
-    required: ["llama3.2:3b", "Ne pas afficher de VRAM fantôme"],
+    required: ["llama3.2:3b", "GPU inconnu ne prouve pas CPU-only", "ollama_api_ps"],
   },
 };
 
@@ -636,9 +636,10 @@ assertIncludes(join(kitDir, "VALIDER-FICHE-WINDOWS.ps1"), [
   "outilsia.fr",
   "/r/",
   "Test-ProfileHardware",
+  "Test-ManualCpuOnlyRuntimeProof",
+  "benchmark_runtime_evidence_source doit etre ollama_api_ps",
   "coherence materielle invalide",
   "rtx_3060_12gb.gpu",
-  "cpu_only.vram_gb",
   "field_entry_ok",
 ]);
 assertIncludes(join(kitDir, "VALIDER-FICHES.cmd"), [
@@ -662,13 +663,14 @@ assertIncludes(join(kitDir, "VALIDER-FICHES-WINDOWS.ps1"), [
   "Test-First30sProof",
   "first_30s_complete",
   "UX 30s",
-  "materiel visible, score visible, modele conseille",
+  "materiel prouve ou signale a confirmer, score visible, modele conseille",
   "outilsia.fr",
   "/r/",
   "Test-ProfileHardware",
+  "Test-ManualCpuOnlyRuntimeProof",
+  "benchmark_runtime_evidence_source doit etre ollama_api_ps",
   "coherence materielle invalide",
   "rtx_3060_12gb.gpu",
-  "cpu_only.vram_gb",
   "FIELD-ENTRIES-VALIDATION.md",
   "FIELD-ENTRIES-VALIDATION.html",
 ]);
