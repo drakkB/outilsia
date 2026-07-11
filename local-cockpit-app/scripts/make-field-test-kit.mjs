@@ -8,7 +8,6 @@ import { REQUIRED_PROFILES } from "./import-field-tests.mjs";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(appRoot, "..");
-const releasePath = join(repoRoot, "server-work", "static", "downloads", "local-cockpit", "release.json");
 const modelCatalogPath = join(repoRoot, "server-work", "static", "data", "local-ai-models.json");
 function argValue(name) {
   const index = process.argv.indexOf(name);
@@ -18,14 +17,18 @@ function argValue(name) {
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
   console.log(`Usage:
-  node scripts/make-field-test-kit.mjs [--kit-dir <path>] [--zip-dir <path>] [--wsl-distro <name>]
+  node scripts/make-field-test-kit.mjs [--release-dir <path>] [--kit-dir <path>] [--zip-dir <path>] [--wsl-distro <name>]
 
 Defaults keep the field kit on the Windows Desktop. Use --kit-dir for scratch/test
-generation without writing Desktop artifacts.`);
+generation without writing Desktop artifacts. Use --release-dir to prepare terrain
+tests from a validated CI candidate without changing the public release tree.`);
   process.exit(0);
 }
 
 const desktopRoot = existsSync("/mnt/c/Users/chris/Desktop") ? "/mnt/c/Users/chris/Desktop" : join(process.env.HOME || ".", "Desktop");
+const defaultReleaseDir = join(repoRoot, "server-work", "static", "downloads", "local-cockpit");
+const releaseDir = resolve(argValue("--release-dir") || process.env.OUTILSIA_FIELD_RELEASE_DIR || defaultReleaseDir);
+const releasePath = join(releaseDir, "release.json");
 const defaultKitDir = join(desktopRoot, "OutilsIA-Local-Cockpit-Field-Test-Kit");
 const kitDir = resolve(argValue("--kit-dir") || process.env.OUTILSIA_FIELD_KIT_DIR || defaultKitDir);
 const zipRoot = resolve(argValue("--zip-dir") || process.env.OUTILSIA_FIELD_ZIP_DIR || desktopRoot);
@@ -1696,7 +1699,7 @@ function main() {
   const fieldTestsPath = fieldTestsJsonPath;
   const primaryDownload = release.primary_download || {};
   const installerSource = primaryDownload.name
-    ? join(repoRoot, "server-work", "static", "downloads", "local-cockpit", primaryDownload.name)
+    ? join(releaseDir, primaryDownload.name)
     : "";
   for (const name of readdirSync(installerDir)) {
     if (/^OutilsIA-Local-Cockpit-/i.test(name) && name !== primaryDownload.name) {

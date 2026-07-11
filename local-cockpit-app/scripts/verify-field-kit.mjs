@@ -14,9 +14,11 @@ function argValue(name) {
   return process.argv[index + 1] || "";
 }
 
+const defaultReleaseDir = join(repoRoot, "server-work", "static", "downloads", "local-cockpit");
+const releaseDir = resolve(argValue("--release-dir") || process.env.OUTILSIA_FIELD_RELEASE_DIR || defaultReleaseDir);
 const kitDir = resolve(argValue("--kit-dir") || process.env.OUTILSIA_FIELD_KIT_DIR || join(desktopRoot, "OutilsIA-Local-Cockpit-Field-Test-Kit"));
 const zipRoot = resolve(argValue("--zip-dir") || process.env.OUTILSIA_FIELD_ZIP_DIR || desktopRoot);
-const releasePath = join(repoRoot, "server-work", "static", "downloads", "local-cockpit", "release.json");
+const releasePath = join(releaseDir, "release.json");
 
 function fail(message) {
   throw new Error(message);
