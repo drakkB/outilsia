@@ -222,6 +222,7 @@ fn create_probe_workspace(root: &Path) -> Result<PathBuf, String> {
     Ok(workspace)
 }
 
+#[cfg(any(not(target_os = "linux"), test))]
 fn unavailable_candidate(
     id: &str,
     label: &str,
