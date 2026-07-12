@@ -36,7 +36,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 
 ## Candidat validé - Runtime & Driver Intelligence v1
 
-État au 12 juillet 2026 : source commit `8f29b5e`, run GitHub Actions `29152574120` terminé avec succès et candidat cross-platform `291525741201` produit. Le build public reste `291439601671` et ne revendique pas encore cette capacité. La publication et la communication live attendent la décision de release, la synchronisation des pages et la vérification des artefacts/SHA-256 ; le terrain reste `0/5`.
+État au 12 juillet 2026 : Runtime & Driver Intelligence est inclus avec Tests privés dans le candidat cross-platform `291865767351`, commit `11fd02f`, run GitHub Actions `29186576735` terminé avec succès. Le build public reste `291439601671` et ne revendique pas encore ces capacités. Les cinq artefacts candidats et leurs SHA-256 ont été vérifiés hors production ; le terrain reste `0/5`.
 
 - [x] Créer une matrice canonique versionnée, datée et sourcée pour NVIDIA, AMD, Intel, Apple et CPU.
 - [x] Séparer pilote détecté, API signalée, support Ollama documenté et preuve réelle `/api/ps`.
@@ -86,7 +86,7 @@ Premier jalon publié au 10 juillet 2026 dans le build public `291204755461` : c
 - Exécuter exactement les mêmes tâches sur les candidats sans envoyer les fichiers au cloud.
 - Distinguer critères déterministes et éventuel jugement local optionnel.
 
-Premier jalon source v1 terminé le 12 juillet 2026. La fonction reste dans le mode Détails et n'est pas encore incluse dans le build public `291439601671`.
+Premier jalon candidat v1 terminé le 12 juillet 2026. La fonction reste dans le mode Détails et n'est pas encore incluse dans le build public `291439601671`. Le candidat Windows/Linux `291865767351`, commit `11fd02f`, run `29186576735`, contient les cinq artefacts attendus et passe le contrat de release renforcé.
 
 - [x] Créer cinq packs versionnés : Code, Français, résumé, Mémoire / Obsidian et métier personnalisé.
 - [x] Limiter une campagne à une tâche, 2 à 3 modèles déjà installés, 60 secondes par modèle et zéro téléchargement.
@@ -96,7 +96,7 @@ Premier jalon source v1 terminé le 12 juillet 2026. La fonction reste dans le m
 - [x] Propager une preuve bornée au rapport, PDF, MemoryForge et AI Capability Passport 1.1.0 sans contenu privé brut.
 - [x] Ajouter une recette Playwright desktop/mobile qui injecte un marqueur secret et échoue s'il apparaît dans un export.
 - [x] Documenter la fonction dans les sources du hub, de la page téléchargement, de `llms.txt` et du monitoring SEO/GEO.
-- [ ] Construire le candidat Windows/Linux avec Private Workload Packs v1 et vérifier les artefacts/SHA-256.
+- [x] Construire le candidat Windows/Linux avec Private Workload Packs v1 et vérifier les cinq artefacts/SHA-256.
 - [ ] Publier la fonction et les pages uniquement dans une release cohérente ; ne pas la présenter comme preuve terrain physique.
 - [ ] Confirmer les packs sur les machines physiques et ajuster seulement les critères qui échouent réellement.
 - [ ] Étudier un jugement local optionnel plus tard ; la v1 reste déterministe et n'appelle aucun juge cloud.
