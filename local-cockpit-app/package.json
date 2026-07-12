@@ -40,6 +40,7 @@
     "verify:private-workload-catalog": "node scripts/sync-private-workload-packs.mjs --check",
     "verify:private-workload-packs": "python3 scripts/verify-private-workload-packs.py",
     "verify:private-workload-seo": "node scripts/verify-private-workload-seo.mjs",
+    "verify:ci-source": "node --check src/app.js && npm run verify:ui && npm run verify:private-workload-catalog && npm run verify:private-workload-seo",
     "verify:runtime-driver-seo": "node scripts/verify-runtime-driver-seo.mjs",
     "verify:catalog": "node scripts/verify-model-catalog.mjs",
     "verify:model-catalog": "node scripts/verify-model-catalog.mjs",

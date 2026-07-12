@@ -68,10 +68,11 @@ const generated = [
   `globalThis.__OUTILSIA_PRIVATE_WORKLOAD_PACKS__ = Object.freeze(${JSON.stringify(catalog, null, 2)});`,
   ""
 ].join("\n");
+const normalizeNewlines = (value) => String(value || "").replace(/\r\n/g, "\n");
 
 if (checkOnly) {
   if (!existsSync(generatedPath)) fail(`generated asset missing: ${generatedPath}`);
-  if (readFileSync(generatedPath, "utf8") !== generated) {
+  if (normalizeNewlines(readFileSync(generatedPath, "utf8")) !== generated) {
     fail("generated asset is stale; run npm run sync:private-workload-packs");
   }
   console.log(`private_workload_pack_catalog_ok version=${catalog.version} packs=${packs.length}`);

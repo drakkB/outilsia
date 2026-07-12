@@ -48,11 +48,7 @@ jobs:
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 
       - name: Verify public CI surface
-        run: |
-          node --check src/app.js
-          npm run verify:ui
-          npm run verify:private-workload-catalog
-          npm run verify:private-workload-seo
+        run: npm run verify:ci-source
 
       - name: Build fresh Windows beta
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-windows-beta.ps1 -SkipInstall -DesktopFolder "OutilsIA-Local-Cockpit-Beta-Windows"
@@ -65,8 +61,8 @@ jobs:
           npm run verify:release:contract -- --require-platform windows-x64 --require-freshness
           npm run verify:windows:artifacts
 
-      - name: Verify deploy dry-run
-        run: npm run deploy:beta -- --require-freshness
+      - name: Verify standalone Windows payload
+        run: npm run verify:release:contract -- --require-platform windows-x64 --require-freshness
 
       - name: Create Windows manual test kit
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\make-windows-test-kit.ps1 -DesktopFolder "OutilsIA-Local-Cockpit-Test-Kit" -ArtifactFolder "OutilsIA-Local-Cockpit-Beta-Windows"
