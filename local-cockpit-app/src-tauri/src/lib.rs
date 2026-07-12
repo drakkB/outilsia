@@ -1,10 +1,12 @@
 mod board_observer;
 mod capability_router;
+mod evidence_ledger;
 mod local_capability_bridge;
 mod workstack_composer;
 
 use board_observer::observe_planka_board;
 use capability_router::route_workstack_capabilities;
+use evidence_ledger::{append_evidence_entry, clear_evidence_ledger, get_evidence_ledger};
 use local_capability_bridge::{
     get_local_capability_bridge_status, start_local_capability_bridge, stop_local_capability_bridge,
 };
@@ -5141,6 +5143,9 @@ pub fn run() {
             observe_planka_board,
             compile_work_card,
             route_workstack_capabilities,
+            append_evidence_entry,
+            get_evidence_ledger,
+            clear_evidence_ledger,
             start_local_capability_bridge,
             get_local_capability_bridge_status,
             stop_local_capability_bridge,

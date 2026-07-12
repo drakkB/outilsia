@@ -441,6 +441,37 @@
           </div>
         </article>
 
+        <article class="panel evidence-ledger-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Evidence Ledger</h2>
+            <span id="evidenceLedgerState">chargement local</span>
+          </div>
+          <div class="evidence-ledger-intro">
+            <strong>Journal local de preuves chaînées</strong>
+            <span id="evidenceLedgerPrivacy">Chaque ajout est volontaire. Le Ledger conserve schéma, métriques et empreintes, jamais la description du board, le prompt, la réponse brute, un jeton ou un fichier projet.</span>
+          </div>
+          <div class="evidence-ledger-controls">
+            <label>
+              <span class="field-label">Étape à enregistrer</span>
+              <select id="evidenceLedgerSource" aria-describedby="evidenceLedgerPrivacy">
+                <option value="board_observed">Board observé</option>
+                <option value="workstack_compiled">Workstack compilée</option>
+                <option value="capability_routing_proposed">Routage proposé</option>
+              </select>
+            </label>
+          </div>
+          <div id="evidenceLedgerBox" class="evidence-ledger-box empty">
+            Aucune preuve enregistrée. Observe un board, compile une Workstack ou propose un routage, puis choisis explicitement l'étape à ajouter.
+          </div>
+          <div class="row-actions">
+            <button id="appendEvidenceBtn" type="button" disabled>Ajouter la preuve</button>
+            <button id="refreshEvidenceLedgerBtn" type="button" disabled>Vérifier la chaîne</button>
+            <button id="copyEvidenceLedgerBtn" type="button" disabled>Copier JSON</button>
+            <button id="downloadEvidenceLedgerBtn" type="button" disabled>Télécharger</button>
+            <button id="clearEvidenceLedgerBtn" type="button" disabled>Réinitialiser</button>
+          </div>
+        </article>
+
         <article class="panel field-test-panel advanced-panel">
           <div class="panel-title">
             <h2>Test terrain</h2>

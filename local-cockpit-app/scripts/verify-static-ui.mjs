@@ -5,11 +5,12 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
-const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs"]
+const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
 const privateWorkloadCatalog = readFileSync(resolve(root, "src/private-workload-packs.js"), "utf8");
+const workstackNotice = readFileSync(resolve(root, "NOTICE-UTILISATION-WORKSTACK.md"), "utf8");
 
 const htmlIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]));
 const jsIds = new Set([...js.matchAll(/\$\("([^"]+)"\)/g)].map((match) => match[1]));
@@ -155,6 +156,20 @@ const requiredFeatureText = [
   ["rust capability router no credentials", rust, "\"credentials_read\": false"],
   ["rust capability router independent verifier", rust, "independent_verifier_enforced"],
   ["css capability router", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".capability-router-box"],
+  ["html evidence ledger", html, "evidenceLedgerBox"],
+  ["html evidence source", html, "evidenceLedgerSource"],
+  ["js evidence append schema", js, "outilsia.evidence_append_request.v1"],
+  ["js evidence ledger schema", js, "outilsia.evidence_ledger.v1"],
+  ["rust evidence entry schema", rust, "outilsia.evidence_entry.v1"],
+  ["rust evidence append only", rust, "append_only_between_resets"],
+  ["rust evidence no raw source", rust, "raw_source_documents_stored\": false"],
+  ["rust evidence no execution", rust, "\"started\": false"],
+  ["css evidence ledger", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".evidence-ledger-box"],
+  ["notice Board Observer", workstackNotice, "Board Observer"],
+  ["notice Evidence Ledger", workstackNotice, "Ce que prouve l'Evidence Ledger"],
+  ["notice ForgeBench", workstackNotice, "Rôle futur de ForgeBench"],
+  ["notice Workstack Arena", workstackNotice, "Workstack Arena"],
+  ["notice Strategy Arena boundary", workstackNotice, "OutilsIA ne génère pas de stratégie financière"],
   ["js install safety schema", js, "outilsia.install_safety_preflight.v1"],
   ["js install safety before pull", js, "runInstallSafetyPreflight(clean)"],
   ["js install safety path privacy", js, "excludes_ollama_storage_path: true"],

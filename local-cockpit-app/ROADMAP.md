@@ -219,6 +219,15 @@ Capability Router v0 implémenté dans les sources le 12 juillet 2026, sans publ
 - [x] Garder le panneau dans le mode Détails et fournir JSON, résumé et preuve visuelle desktop/mobile.
 - [ ] Ajouter un consentement d'exécution séparé seulement après ForgeBench, Evidence Ledger et isolation par worktree.
 
+Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans publication : le fichier local `evidence-ledger-v1.json` accepte volontairement les preuves Board Observer, Workstack Composer et Capability Router après validation de leur contrat. Chaque entrée contient uniquement auteur composant, claims bornés, métriques, empreinte source et empreinte précédente. La chaîne complète est revalidée à chaque lecture et écriture, les doublons sont refusés, une rotation de secours protège le remplacement du fichier et aucun contenu brut n'est persisté. Le Ledger ne transforme pas une empreinte en preuve d'identité ou de qualité et ne lance aucune exécution.
+
+- [x] Chaîner les entrées `outilsia.evidence_entry.v1` et signer le document `outilsia.evidence_ledger.v1`.
+- [x] Refuser Workstack modifiée, Router exécutable, worker identique au vérificateur et identifiants non bornés.
+- [x] Tester écriture/lecture réelle, restauration vérifiée, corruption, doublon et absence de contenu brut.
+- [x] Ajouter les actions explicites Ajouter, Vérifier, Copier, Télécharger et Réinitialiser dans le mode Détails.
+- [x] Maintenir la notice canonique `NOTICE-UTILISATION-WORKSTACK.md` et vérifier ses responsabilités en CI.
+- [ ] Ajouter `isolated_run_evidence`, `independent_verification` et `human_decision` seulement avec ForgeBench et Workstack Arena.
+
 - Séparer quatre responsabilités : Composer définit la chaîne, Workstack Arena exécute, ForgeBench évalue et Evidence Ledger conserve la preuve.
 - Créer le benchmark maison `Signal Maze v1` avec règles déterministes, starter scellé, tests visibles/cachés et captures desktop/Android.
 - Mesurer séparément résultat, vitesse, efficacité et coût ; toujours publier les valeurs brutes, les sous-scores et le caractère estimé ou inconnu d'une donnée.

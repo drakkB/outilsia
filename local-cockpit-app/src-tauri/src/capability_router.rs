@@ -670,6 +670,83 @@ fn route_capabilities(
         .map_err(|error| format!("Resultat Capability Router invalide: {error}"))
 }
 
+pub(crate) fn validate_capability_router_result(result: &Value) -> Result<(), String> {
+    if result.get("schema").and_then(Value::as_str) != Some(RESULT_SCHEMA)
+        || result.get("dry_run").and_then(Value::as_bool) != Some(true)
+        || result.get("execution_started").and_then(Value::as_bool) != Some(false)
+        || result.get("credentials_read").and_then(Value::as_bool) != Some(false)
+        || result.get("repository_scanned").and_then(Value::as_bool) != Some(false)
+        || result.get("repository_modified").and_then(Value::as_bool) != Some(false)
+        || result.get("network_called").and_then(Value::as_bool) != Some(false)
+    {
+        return Err("Contrat Capability Router non conforme au mode simulation.".to_string());
+    }
+    let policy = result.get("policy").unwrap_or(&Value::Null);
+    for key in [
+        "start_agents",
+        "create_worktrees",
+        "write_board",
+        "modify_repository",
+        "spend_api_credit",
+        "publish",
+        "merge",
+    ] {
+        if policy.get(key).and_then(Value::as_bool) != Some(false) {
+            return Err("Politique Capability Router non conforme.".to_string());
+        }
+    }
+    if policy
+        .get("human_approval_required_before_execution")
+        .and_then(Value::as_bool)
+        != Some(true)
+    {
+        return Err("Gate humaine Capability Router absente.".to_string());
+    }
+    let assignments = result
+        .pointer("/routing/assignments")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "Affectations Capability Router absentes.".to_string())?;
+    if assignments.iter().any(|assignment| {
+        assignment
+            .get("task_execution_started")
+            .and_then(Value::as_bool)
+            != Some(false)
+    }) {
+        return Err("Une affectation Capability Router a demarre une execution.".to_string());
+    }
+    let worker = assignments
+        .iter()
+        .find(|assignment| assignment.get("role").and_then(Value::as_str) == Some("worker"));
+    let verifier = assignments.iter().find(|assignment| {
+        assignment.get("role").and_then(Value::as_str) == Some("independent_verifier")
+    });
+    if worker.is_some()
+        && verifier.is_some()
+        && worker
+            .and_then(|value| value.get("candidate_id"))
+            .and_then(Value::as_str)
+            == verifier
+                .and_then(|value| value.get("candidate_id"))
+                .and_then(Value::as_str)
+    {
+        return Err("Le worker et le verificateur doivent rester distincts.".to_string());
+    }
+    let expected = result
+        .pointer("/integrity/digest")
+        .and_then(Value::as_str)
+        .filter(|value| value.len() == 64)
+        .ok_or_else(|| "Empreinte Capability Router absente.".to_string())?;
+    let mut unsigned = result.clone();
+    unsigned
+        .as_object_mut()
+        .ok_or_else(|| "Document Capability Router invalide.".to_string())?
+        .remove("integrity");
+    if canonical_sha256(&unsigned) != expected {
+        return Err("Empreinte Capability Router incoherente.".to_string());
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub(crate) async fn route_workstack_capabilities(
     request: RouteWorkstackCapabilitiesRequest,
@@ -845,6 +922,12 @@ mod tests {
         assert!(!serialized.contains("secret"));
         assert!(serialized.contains("\"execution_started\":false"));
         assert!(serialized.contains("\"credentials_read\":false"));
+        let value = serde_json::to_value(&result).expect("router value");
+        validate_capability_router_result(&value).expect("valid router result");
+
+        let mut tampered = value;
+        tampered["routing"]["assignments"][0]["task_execution_started"] = json!(true);
+        assert!(validate_capability_router_result(&tampered).is_err());
     }
 
     #[test]

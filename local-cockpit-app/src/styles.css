@@ -1652,7 +1652,8 @@ h2 {
 .board-observer-panel { grid-column: span 12; order: 25; }
 .workstack-composer-panel { grid-column: span 12; order: 25; }
 .capability-router-panel { grid-column: span 12; order: 26; }
-.field-test-panel { grid-column: span 12; order: 27; }
+.evidence-ledger-panel { grid-column: span 12; order: 27; }
+.field-test-panel { grid-column: span 12; order: 28; }
 .models-panel { grid-column: span 6; order: 25; }
 .commands-panel { grid-column: span 6; order: 26; }
 .account-panel { grid-column: span 6; order: 30; }
@@ -2723,6 +2724,71 @@ dd {
 
 .capability-candidate.unavailable {
   opacity: 0.65;
+}
+
+.evidence-ledger-intro,
+.evidence-ledger-box {
+  background: rgba(16, 18, 20, 0.94);
+  border: 1px solid rgba(229, 184, 92, 0.25);
+  border-radius: 8px;
+}
+
+.evidence-ledger-intro {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 10px;
+}
+
+.evidence-ledger-intro span,
+.evidence-ledger-summary span,
+.evidence-ledger-entry span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.evidence-ledger-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 340px);
+  margin-bottom: 10px;
+}
+
+.evidence-ledger-box {
+  display: grid;
+  gap: 10px;
+  line-height: 1.4;
+  min-height: 120px;
+  padding: 10px;
+}
+
+.evidence-ledger-summary {
+  border-bottom: 1px solid rgba(139, 163, 174, 0.16);
+  display: grid;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+
+.evidence-ledger-list {
+  display: grid;
+}
+
+.evidence-ledger-entry {
+  align-items: start;
+  border-top: 1px solid rgba(139, 163, 174, 0.14);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 240px minmax(0, 1fr) auto;
+  padding: 7px 0;
+}
+
+.evidence-ledger-entry:first-child {
+  border-top: 0;
+}
+
+.evidence-ledger-entry small {
+  color: var(--muted-2);
+  text-align: right;
 }
 
 .board-observer-card button {
@@ -4548,6 +4614,7 @@ dd {
   .board-observer-panel,
   .workstack-composer-panel,
   .capability-router-panel,
+  .evidence-ledger-panel,
   .field-test-panel,
   .operation-panel,
   .readiness-panel,
@@ -4753,9 +4820,18 @@ dd {
     grid-template-columns: 1fr;
   }
 
+  .evidence-ledger-controls,
+  .evidence-ledger-entry {
+    grid-template-columns: 1fr;
+  }
+
   .workstack-stage small,
   .capability-candidate small,
   .capability-assignment small {
+    text-align: left;
+  }
+
+  .evidence-ledger-entry small {
     text-align: left;
   }
 

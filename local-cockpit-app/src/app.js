@@ -57,6 +57,7 @@ const state = {
   workstackComposer: null,
   workstackSelectedCard: null,
   capabilityRouter: null,
+  evidenceLedger: null,
   installSafetyPreflight: null,
   localSnapshots: [],
   installingModels: {},
@@ -97,6 +98,9 @@ const WORKSTACK_COMPILE_REQUEST_SCHEMA = "outilsia.workstack_compile_request.v1"
 const WORKSTACK_COMPILE_RESULT_SCHEMA = "outilsia.workstack_compile_result.v1";
 const CAPABILITY_ROUTER_REQUEST_SCHEMA = "outilsia.capability_router_request.v1";
 const CAPABILITY_ROUTER_RESULT_SCHEMA = "outilsia.capability_router_result.v1";
+const EVIDENCE_APPEND_REQUEST_SCHEMA = "outilsia.evidence_append_request.v1";
+const EVIDENCE_APPEND_RESULT_SCHEMA = "outilsia.evidence_append_result.v1";
+const EVIDENCE_LEDGER_SCHEMA = "outilsia.evidence_ledger.v1";
 const INSTALL_SAFETY_PREFLIGHT_SCHEMA = "outilsia.install_safety_preflight.v1";
 const INSTALL_SAFETY_MIN_RESERVE_GB = 3;
 const MODEL_AUTOPILOT_PROTOCOL = "outilsia.autopilot.v1";
@@ -442,6 +446,14 @@ const els = {
   copyCapabilityRouterJsonBtn: $("copyCapabilityRouterJsonBtn"),
   copyCapabilityRouterMarkdownBtn: $("copyCapabilityRouterMarkdownBtn"),
   clearCapabilityRouterBtn: $("clearCapabilityRouterBtn"),
+  evidenceLedgerState: $("evidenceLedgerState"),
+  evidenceLedgerSource: $("evidenceLedgerSource"),
+  evidenceLedgerBox: $("evidenceLedgerBox"),
+  appendEvidenceBtn: $("appendEvidenceBtn"),
+  refreshEvidenceLedgerBtn: $("refreshEvidenceLedgerBtn"),
+  copyEvidenceLedgerBtn: $("copyEvidenceLedgerBtn"),
+  downloadEvidenceLedgerBtn: $("downloadEvidenceLedgerBtn"),
+  clearEvidenceLedgerBtn: $("clearEvidenceLedgerBtn"),
   fieldTestState: $("fieldTestState"),
   fieldTestProfileSelect: $("fieldTestProfileSelect"),
   fieldTestBox: $("fieldTestBox"),
@@ -598,6 +610,8 @@ let workstackComposerBusy = false;
 let workstackComposerError = "";
 let capabilityRouterBusy = false;
 let capabilityRouterError = "";
+let evidenceLedgerBusy = false;
+let evidenceLedgerError = "";
 const privateWorkloadSelections = new Set();
 let recipeAutoSaveTimer = null;
 const UI_MODE_STORAGE_KEY = "outilsia-local-cockpit-ui-mode";
@@ -10431,6 +10445,7 @@ async function observePlankaBoard() {
     boardObserverBusy = false;
     if (els.boardObserverApiKey) els.boardObserverApiKey.value = "";
     renderBoardObserverPanel();
+    renderEvidenceLedgerPanel();
   }
 }
 
@@ -10452,6 +10467,7 @@ function clearBoardObserver() {
   if (els.boardObserverApiKey) els.boardObserverApiKey.value = "";
   clearWorkstackComposer(true);
   renderBoardObserverPanel();
+  renderEvidenceLedgerPanel();
   setStatus("Board Observer effacé", "ok");
 }
 
@@ -10651,6 +10667,7 @@ async function compileSelectedWorkstack() {
     if (els.workstackLocalContext) els.workstackLocalContext.value = "";
     renderWorkstackComposerPanel();
     renderCapabilityRouterPanel();
+    renderEvidenceLedgerPanel();
   }
 }
 
@@ -10683,6 +10700,7 @@ function clearWorkstackComposer(silent = false) {
   if (els.workstackLocalContext) els.workstackLocalContext.value = "";
   if (els.workstackPriority) els.workstackPriority.value = "balanced";
   renderWorkstackComposerPanel();
+  renderEvidenceLedgerPanel();
   if (!silent) setStatus("Workstack Composer effacé", "ok");
 }
 
@@ -10863,6 +10881,7 @@ async function routeWorkstackCapabilities() {
   } finally {
     capabilityRouterBusy = false;
     renderCapabilityRouterPanel();
+    renderEvidenceLedgerPanel();
   }
 }
 
@@ -10892,7 +10911,253 @@ function clearCapabilityRouter(silent = false) {
   capabilityRouterError = "";
   if (els.capabilityRouterObjective) els.capabilityRouterObjective.value = "general";
   renderCapabilityRouterPanel();
+  renderEvidenceLedgerPanel();
   if (!silent) setStatus("Capability Router effacé", "ok");
+}
+
+function evidenceEventLabel(value) {
+  return ({
+    board_observed: "Board observé",
+    workstack_compiled: "Workstack compilée",
+    capability_routing_proposed: "Routage proposé"
+  })[value] || value;
+}
+
+function evidenceActorLabel(value) {
+  return ({
+    board_observer: "Board Observer",
+    workstack_composer: "Workstack Composer",
+    capability_router: "Capability Router"
+  })[value] || value;
+}
+
+function evidenceSourceDocument(eventType) {
+  if (eventType === "board_observed") return state.boardObserver || null;
+  if (eventType === "workstack_compiled") return state.workstackComposer?.plan || null;
+  if (eventType === "capability_routing_proposed") return state.capabilityRouter || null;
+  return null;
+}
+
+function evidenceAvailableTypes() {
+  return ["capability_routing_proposed", "workstack_compiled", "board_observed"]
+    .filter((eventType) => Boolean(evidenceSourceDocument(eventType)));
+}
+
+function syncEvidenceSourceControl() {
+  if (!els.evidenceLedgerSource) return "";
+  const available = evidenceAvailableTypes();
+  for (const option of els.evidenceLedgerSource.options) {
+    option.disabled = !available.includes(option.value);
+  }
+  if (!available.includes(els.evidenceLedgerSource.value)) {
+    els.evidenceLedgerSource.value = available[0] || "board_observed";
+  }
+  return available.includes(els.evidenceLedgerSource.value) ? els.evidenceLedgerSource.value : "";
+}
+
+function evidenceLedgerMarkdown(ledger = state.evidenceLedger) {
+  if (!ledger) return "";
+  const entries = Array.isArray(ledger.entries) ? ledger.entries : [];
+  return [
+    `# Evidence Ledger ${ledger.ledger_id || "non initialisé"}`,
+    "",
+    `- Chaîne valide : ${ledger.verification?.chain_valid ? "oui" : "non"}`,
+    `- Preuves vérifiées : ${ledger.verification?.entries_verified ?? entries.length}`,
+    `- Contenu brut stocké : non`,
+    `- Exécution autorisée par ce journal : non`,
+    "",
+    "## Entrées",
+    ...(entries.length
+      ? entries.map((entry) => [
+        `${entry.sequence}. ${evidenceEventLabel(entry.event_type)}`,
+        `   - Auteur : ${evidenceActorLabel(entry.actor?.id || "inconnu")}`,
+        `   - Niveau : ${entry.evidence?.proof_level || "inconnu"}`,
+        `   - Source SHA-256 : ${entry.evidence?.source_document_sha256 || "absente"}`,
+        `   - Entrée SHA-256 : ${entry.integrity?.digest || "absente"}`,
+        `   - Décision humaine : ${entry.human_decision?.status || "non enregistrée"}`
+      ].join("\n"))
+      : ["Aucune entrée."]),
+    "",
+    `Tête SHA-256 : ${ledger.head_digest || "aucune"}`
+  ].join("\n");
+}
+
+function renderEvidenceLedgerPanel() {
+  if (!els.evidenceLedgerBox) return;
+  const selectedType = syncEvidenceSourceControl();
+  const sourceReady = Boolean(selectedType && evidenceSourceDocument(selectedType));
+  const ledger = state.evidenceLedger;
+  const entries = Array.isArray(ledger?.entries) ? ledger.entries : [];
+  const chainValid = ledger?.verification?.chain_valid === true;
+  const nativeOrTest = Boolean(invoke || ledger?.test_mode);
+  els.appendEvidenceBtn.disabled = !invoke || evidenceLedgerBusy || !sourceReady;
+  els.refreshEvidenceLedgerBtn.disabled = !invoke || evidenceLedgerBusy;
+  els.copyEvidenceLedgerBtn.disabled = !ledger || !chainValid;
+  els.downloadEvidenceLedgerBtn.disabled = !ledger || !chainValid;
+  els.clearEvidenceLedgerBtn.disabled = !invoke || evidenceLedgerBusy || entries.length === 0;
+
+  if (!nativeOrTest) {
+    els.evidenceLedgerState.textContent = "app native requise";
+    els.evidenceLedgerBox.className = "evidence-ledger-box empty";
+    els.evidenceLedgerBox.textContent = "Le journal persistant est disponible uniquement dans l'application Windows/Linux.";
+    return;
+  }
+  if (evidenceLedgerBusy) {
+    els.evidenceLedgerState.textContent = "vérification locale";
+    els.evidenceLedgerBox.className = "evidence-ledger-box empty";
+    els.evidenceLedgerBox.textContent = "Validation des contrats, empreintes et maillons. Aucun contenu brut n'est écrit.";
+    return;
+  }
+  if (evidenceLedgerError) {
+    els.evidenceLedgerState.textContent = "chaîne refusée";
+    els.evidenceLedgerBox.className = "evidence-ledger-box empty";
+    els.evidenceLedgerBox.innerHTML = `<strong>Evidence Ledger non fiable</strong><span>${escapeHtml(evidenceLedgerError)}</span>`;
+    return;
+  }
+  if (!ledger) {
+    els.evidenceLedgerState.textContent = "non chargé";
+    els.evidenceLedgerBox.className = "evidence-ledger-box empty";
+    els.evidenceLedgerBox.textContent = "Charge le journal local avant d'ajouter une preuve.";
+    return;
+  }
+  if (!entries.length) {
+    els.evidenceLedgerState.textContent = "0 preuve · chaîne valide";
+    els.evidenceLedgerBox.className = "evidence-ledger-box empty";
+    els.evidenceLedgerBox.textContent = sourceReady
+      ? `${evidenceEventLabel(selectedType)} est disponible. L'ajout restera volontaire et ne conservera que ses métriques et empreintes.`
+      : "Aucune preuve enregistrée. Observe un board, compile une Workstack ou propose un routage.";
+    return;
+  }
+  const rows = [...entries].reverse().map((entry) => {
+    const digest = entry.integrity?.digest || "";
+    const date = new Date(Number(entry.recorded_at_ms || Date.now())).toLocaleString("fr-FR");
+    return `
+      <div class="evidence-ledger-entry">
+        <strong>${escapeHtml(`${entry.sequence}. ${evidenceEventLabel(entry.event_type || "preuve")}`)}</strong>
+        <span>${escapeHtml(evidenceActorLabel(entry.actor?.id || "inconnu"))} · ${escapeHtml(date)}</span>
+        <small>SHA-256 ${escapeHtml(digest ? `${digest.slice(0, 12)}…${digest.slice(-8)}` : "absente")}</small>
+      </div>
+    `;
+  }).join("");
+  const head = ledger.head_digest || "";
+  els.evidenceLedgerState.textContent = `${entries.length} preuve${entries.length > 1 ? "s" : ""} · ${chainValid ? "chaîne valide" : "chaîne invalide"}`;
+  els.evidenceLedgerBox.className = "evidence-ledger-box";
+  els.evidenceLedgerBox.innerHTML = `
+    <div class="evidence-ledger-summary">
+      <strong>${escapeHtml(ledger.ledger_id || "Evidence Ledger")}</strong>
+      <span>${entries.length} entrée(s) vérifiée(s) · ajouts chaînés uniquement entre deux réinitialisations</span>
+      <span>Aucun contenu brut · tête SHA-256 ${escapeHtml(head ? `${head.slice(0, 14)}…${head.slice(-8)}` : "aucune")}</span>
+    </div>
+    <div class="evidence-ledger-list">${rows}</div>
+  `;
+}
+
+async function loadEvidenceLedger(silent = false) {
+  if (!invoke || evidenceLedgerBusy) return null;
+  evidenceLedgerBusy = true;
+  evidenceLedgerError = "";
+  if (!silent) setStatus("Vérification Evidence Ledger...");
+  renderEvidenceLedgerPanel();
+  try {
+    const ledger = await invoke("get_evidence_ledger");
+    if (ledger?.schema !== EVIDENCE_LEDGER_SCHEMA || ledger?.verification?.chain_valid !== true) {
+      throw new Error("chaîne locale non conforme");
+    }
+    state.evidenceLedger = ledger;
+    if (!silent) setStatus(`Evidence Ledger vérifié : ${(ledger.entries || []).length} preuve(s)`, "ok");
+    return ledger;
+  } catch (error) {
+    state.evidenceLedger = null;
+    evidenceLedgerError = String(error || "Journal local illisible");
+    if (!silent) setStatus(`Evidence Ledger : ${evidenceLedgerError}`, "error");
+    return null;
+  } finally {
+    evidenceLedgerBusy = false;
+    renderEvidenceLedgerPanel();
+  }
+}
+
+async function appendSelectedEvidence() {
+  if (!invoke || evidenceLedgerBusy) return null;
+  const eventType = syncEvidenceSourceControl();
+  const sourceDocument = evidenceSourceDocument(eventType);
+  if (!eventType || !sourceDocument) {
+    setStatus("Aucune étape disponible à enregistrer", "warn");
+    return null;
+  }
+  evidenceLedgerBusy = true;
+  evidenceLedgerError = "";
+  renderEvidenceLedgerPanel();
+  setStatus(`Validation de la preuve : ${evidenceEventLabel(eventType)}...`);
+  try {
+    const result = await invoke("append_evidence_entry", {
+      request: {
+        schema: EVIDENCE_APPEND_REQUEST_SCHEMA,
+        event_type: eventType,
+        source_document: sourceDocument
+      }
+    });
+    if (result?.schema !== EVIDENCE_APPEND_RESULT_SCHEMA || result?.ledger?.verification?.chain_valid !== true) {
+      throw new Error("réponse native Evidence Ledger incomplète");
+    }
+    state.evidenceLedger = result.ledger;
+    setStatus(result.appended ? `${evidenceEventLabel(eventType)} ajouté au Ledger` : "Cette preuve est déjà dans le Ledger", result.appended ? "ok" : "warn");
+    return result;
+  } catch (error) {
+    evidenceLedgerError = String(error || "Ajout impossible");
+    setStatus(`Evidence Ledger : ${evidenceLedgerError}`, "error");
+    return null;
+  } finally {
+    evidenceLedgerBusy = false;
+    renderEvidenceLedgerPanel();
+  }
+}
+
+async function copyEvidenceLedger() {
+  if (!state.evidenceLedger) return;
+  try {
+    await navigator.clipboard.writeText(`${JSON.stringify(state.evidenceLedger, null, 2)}\n`);
+    setStatus("Evidence Ledger copié", "ok");
+  } catch (error) {
+    setStatus(`Copie Evidence Ledger impossible : ${error}`, "error");
+  }
+}
+
+function downloadEvidenceLedger() {
+  const ledger = state.evidenceLedger;
+  if (!ledger) return;
+  const blob = new Blob([`${JSON.stringify(ledger, null, 2)}\n`], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${ledger.ledger_id || "outilsia-evidence-ledger"}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  setStatus("Evidence Ledger téléchargé", "ok");
+}
+
+async function clearEvidenceLedger() {
+  if (!invoke || evidenceLedgerBusy) return;
+  if (!window.confirm("Réinitialiser le journal de preuves local ? Le fichier exporté restera votre seule copie.")) return;
+  evidenceLedgerBusy = true;
+  evidenceLedgerError = "";
+  renderEvidenceLedgerPanel();
+  try {
+    const ledger = await invoke("clear_evidence_ledger");
+    if (ledger?.schema !== EVIDENCE_LEDGER_SCHEMA || ledger?.verification?.chain_valid !== true) {
+      throw new Error("réinitialisation native incomplète");
+    }
+    state.evidenceLedger = ledger;
+    setStatus("Evidence Ledger réinitialisé", "ok");
+  } catch (error) {
+    evidenceLedgerError = String(error || "Réinitialisation impossible");
+    setStatus(`Evidence Ledger : ${evidenceLedgerError}`, "error");
+  } finally {
+    evidenceLedgerBusy = false;
+    renderEvidenceLedgerPanel();
+  }
 }
 
 async function copyStrategyBridgeJson() {
@@ -15856,6 +16121,70 @@ function installTestHarness() {
         panel: els.capabilityRouterBox?.textContent || ""
       };
     },
+    applyEvidenceLedgerState() {
+      this.applyCapabilityRouterState();
+      state.evidenceLedger = {
+        schema: EVIDENCE_LEDGER_SCHEMA,
+        contract_version: "2026-07-12",
+        ledger_id: "ledger-demo-signal-maze",
+        created_at_ms: Date.now() - 3000,
+        updated_at_ms: Date.now(),
+        head_digest: "f".repeat(64),
+        test_mode: true,
+        entries: [
+          {
+            schema: "outilsia.evidence_entry.v1",
+            sequence: 1,
+            recorded_at_ms: Date.now() - 3000,
+            event_type: "board_observed",
+            actor: { kind: "outilsia_component", id: "board_observer" },
+            evidence: { proof_level: "remote_response_digest", source_document_sha256: "a".repeat(64) },
+            execution: { started: false },
+            human_decision: { status: "not_recorded" },
+            privacy: { raw_source_stored: false },
+            previous_digest: null,
+            integrity: { digest: "d".repeat(64) }
+          },
+          {
+            schema: "outilsia.evidence_entry.v1",
+            sequence: 2,
+            recorded_at_ms: Date.now() - 2000,
+            event_type: "workstack_compiled",
+            actor: { kind: "outilsia_component", id: "workstack_composer" },
+            evidence: { proof_level: "signed_local_plan", source_document_sha256: "b".repeat(64) },
+            execution: { started: false },
+            human_decision: { status: "not_recorded" },
+            privacy: { raw_source_stored: false },
+            previous_digest: "d".repeat(64),
+            integrity: { digest: "e".repeat(64) }
+          },
+          {
+            schema: "outilsia.evidence_entry.v1",
+            sequence: 3,
+            recorded_at_ms: Date.now() - 1000,
+            event_type: "capability_routing_proposed",
+            actor: { kind: "outilsia_component", id: "capability_router" },
+            evidence: { proof_level: "signed_dry_run_proposal", source_document_sha256: "c".repeat(64) },
+            execution: { started: false },
+            human_decision: { status: "not_recorded" },
+            privacy: { raw_source_stored: false },
+            previous_digest: "e".repeat(64),
+            integrity: { digest: "f".repeat(64) }
+          }
+        ],
+        verification: { chain_valid: true, entries_verified: 3, last_verified_at_ms: Date.now() },
+        policy: { local_only: true, append_only_between_resets: true, raw_source_documents_stored: false },
+        integrity: { digest: "1".repeat(64) }
+      };
+      evidenceLedgerError = "";
+      if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "capability_routing_proposed";
+      renderEvidenceLedgerPanel();
+      return {
+        ledger: state.evidenceLedger,
+        panel: els.evidenceLedgerBox?.textContent || "",
+        markdown: evidenceLedgerMarkdown()
+      };
+    },
     invalidateLocalCapabilityBridgeState() {
       invalidateCapabilityPassport();
       renderCapabilityPassportPanel();
@@ -16835,7 +17164,14 @@ els.capabilityRouterObjective?.addEventListener("change", () => {
   state.capabilityRouter = null;
   capabilityRouterError = "";
   renderCapabilityRouterPanel();
+  renderEvidenceLedgerPanel();
 });
+els.appendEvidenceBtn?.addEventListener("click", appendSelectedEvidence);
+els.refreshEvidenceLedgerBtn?.addEventListener("click", () => loadEvidenceLedger(false));
+els.copyEvidenceLedgerBtn?.addEventListener("click", copyEvidenceLedger);
+els.downloadEvidenceLedgerBtn?.addEventListener("click", downloadEvidenceLedger);
+els.clearEvidenceLedgerBtn?.addEventListener("click", clearEvidenceLedger);
+els.evidenceLedgerSource?.addEventListener("change", renderEvidenceLedgerPanel);
 els.copyFieldTestBtn.addEventListener("click", copyFieldTestMarkdown);
 els.copyFieldTestJsonBtn?.addEventListener("click", copyFieldTestJson);
 els.downloadFieldTestJsonBtn?.addEventListener("click", downloadFieldTestJson);
@@ -17158,6 +17494,7 @@ renderLocalCapabilityBridgePanel();
 renderBoardObserverPanel();
 renderWorkstackComposerPanel();
 renderCapabilityRouterPanel();
+renderEvidenceLedgerPanel();
 renderPreparePanel();
 renderReadinessPanel();
 renderPrimaryAction();
@@ -17165,6 +17502,7 @@ installTestHarness();
 refreshAuthState();
 
 if (invoke) {
+  void loadEvidenceLedger(true);
   void refreshLocalCapabilityBridgeStatus(true);
   window.setInterval(() => {
     if (state.localCapabilityBridge) void refreshLocalCapabilityBridgeStatus(true);
