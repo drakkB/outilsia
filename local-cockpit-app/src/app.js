@@ -8432,7 +8432,8 @@ function persistedPrivateWorkloadRun(run) {
         passed: Boolean(check.passed),
         weight: Number(check.weight || 0)
       })),
-      error: item.error || ""
+      error_code: item.success ? "" : item.timed_out ? "timeout" : "local_execution_failed",
+      error: item.success ? "" : item.timed_out ? "Délai local dépassé" : "Échec local ; détails bruts non conservés"
     })),
     winner: run.winner ? {
       model: run.winner.model,
@@ -14022,6 +14023,24 @@ function installTestHarness() {
       state.capabilityPassport = passport;
       renderCapabilityPassportPanel();
       const passportVerified = await verifyCapabilityPassportIntegrity(passport);
+      const sanitizedFailure = persistedPrivateWorkloadRun({
+        schema: "outilsia.private_workload_run.v1",
+        protocol: PRIVATE_WORKLOAD_PROTOCOL,
+        catalog_version: PRIVATE_WORKLOAD_CATALOG.version,
+        id: "private-workload-failure-sanitizer",
+        created_at_ms: Date.now(),
+        machine_key: state.scan.machine_key || "",
+        pack: "custom",
+        custom: true,
+        prompt_digest: await sha256Hex(descriptor.prompt),
+        results: [{
+          model: "qwen3:0.6b",
+          success: false,
+          timed_out: false,
+          error: `${secretPrompt} ${goodOutput}`,
+          checks: []
+        }]
+      });
       return {
         secretPrompt,
         requiredTerms,
@@ -14034,6 +14053,7 @@ function installTestHarness() {
         memory,
         passport,
         passportVerified,
+        sanitizedFailure,
         pdf: premiumReportHtml(report),
         panel: els.privateWorkloadBox?.textContent || ""
       };

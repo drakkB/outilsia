@@ -115,6 +115,8 @@ def main():
         assert item["output_persisted"] is False
         assert re.fullmatch(r"[0-9a-f]{64}", item["output_digest"])
         assert "output_preview" not in item
+    assert result["sanitizedFailure"]["results"][0]["error_code"] == "local_execution_failed"
+    assert result["sanitizedFailure"]["results"][0]["error"] == "Échec local ; détails bruts non conservés"
 
     summary = result["summary"]
     assert summary["privacy"]["local_only"] is True
@@ -144,6 +146,7 @@ def main():
             "passport": result["passport"],
             "pdf": result["pdf"],
             "panel": result["panel"],
+            "sanitized_failure": result["sanitizedFailure"],
         },
         ensure_ascii=False,
     ).lower()
