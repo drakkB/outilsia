@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -35,8 +36,8 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         raise AssertionError(f"{label}: experiment schema mismatch")
     if experiment["protocol"]["starter"]["status"] != "sealed":
         raise AssertionError(f"{label}: starter not sealed")
-    if experiment["protocol"]["hidden_suite"]["status"] != "not_provisioned":
-        raise AssertionError(f"{label}: public fixture pretends to have hidden tests")
+    if experiment["protocol"]["hidden_suite"]["status"] != "locally_sealed":
+        raise AssertionError(f"{label}: local hidden suite receipt is missing")
     if experiment["readiness"]["scientific_ready"] is not False:
         raise AssertionError(f"{label}: scientific readiness must stay blocked")
     if experiment["measurements"]["scores_computed"] is not False or experiment["measurements"]["winner_declared"] is not False:
@@ -46,6 +47,12 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         raise AssertionError(f"{label}: candidate stacks do not share one protocol")
     if len(experiment["candidate_stacks"]) != 3:
         raise AssertionError(f"{label}: expected three initial stacks")
+    receipt = proof["vault"]["receipt"]
+    if receipt["hidden_seeds_total"] != 5 or receipt["security"]["worker_access_blocked"] is not False:
+        raise AssertionError(f"{label}: hidden suite receipt overclaims isolation")
+    receipt_json = json.dumps(receipt, sort_keys=True)
+    if '"hidden_seeds":' in receipt_json or "seed-boundary-cases" in receipt_json:
+        raise AssertionError(f"{label}: hidden suite contents leaked to UI")
     if page.locator("#copyForgeBenchJsonBtn").is_disabled() or page.locator("#copyForgeBenchProtocolBtn").is_disabled():
         raise AssertionError(f"{label}: compiled preflight cannot be exported")
     if page.locator("#evidenceLedgerSource").input_value() != "forgebench_experiment_compiled":
@@ -62,7 +69,10 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "50%",
         "20%",
         "15%",
-        "tests cachés non scellés",
+        "Suite cachée locale",
+        "scellée localement",
+        "stockage local non chiffré",
+        "Suite privée scellée localement, mais non isolée des workers",
         "Aucun agent lancé",
         "aucun score calculé",
         "aucun vainqueur déclaré",
@@ -100,7 +110,7 @@ def main() -> None:
         browser.close()
     print(
         f"forgebench_ui_ok desktop={desktop} mobile={mobile} "
-        "starter=sealed hidden=absent scores=false winner=false execution=false"
+        "starter=sealed hidden=locally-sealed-not-isolated scores=false winner=false execution=false"
     )
 
 

@@ -1,9 +1,11 @@
 use crate::capability_router::validate_capability_router_result;
+use crate::forgebench_vault::{hidden_suite_receipt, validate_hidden_suite_receipt};
 use crate::workstack_composer::{canonical_sha256, validate_workstack_plan};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::AppHandle;
 
 const REQUEST_SCHEMA: &str = "outilsia.forgebench_compile_request.v1";
 const RESULT_SCHEMA: &str = "outilsia.forgebench_compile_result.v1";
@@ -287,6 +289,50 @@ fn validate_protocol(protocol: &Value) -> Result<(), String> {
                 return Err("Suite cachee ForgeBench non scellee.".to_string());
             }
         }
+        "locally_sealed" => {
+            let suite_id = protocol
+                .pointer("/hidden_suite/suite_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let hidden_seeds_total = protocol
+                .pointer("/hidden_suite/hidden_seeds_total")
+                .and_then(Value::as_u64)
+                .unwrap_or_default();
+            if !suite_id.starts_with("hs-")
+                || suite_id.len() > 64
+                || !(3..=16).contains(&hidden_seeds_total)
+                || protocol
+                    .pointer("/hidden_suite/checks_total")
+                    .and_then(Value::as_u64)
+                    != Some(5)
+                || !protocol
+                    .pointer("/hidden_suite/receipt_digest")
+                    .and_then(Value::as_str)
+                    .is_some_and(is_sha256)
+                || !protocol
+                    .pointer("/hidden_suite/digest")
+                    .and_then(Value::as_str)
+                    .is_some_and(is_sha256)
+                || protocol
+                    .pointer("/hidden_suite/contents_embedded")
+                    .and_then(Value::as_bool)
+                    != Some(false)
+                || protocol
+                    .pointer("/hidden_suite/encrypted_at_rest")
+                    .and_then(Value::as_bool)
+                    != Some(false)
+                || protocol
+                    .pointer("/hidden_suite/worker_access_blocked")
+                    .and_then(Value::as_bool)
+                    != Some(false)
+                || protocol
+                    .pointer("/hidden_suite/evaluator_isolated")
+                    .and_then(Value::as_bool)
+                    != Some(false)
+            {
+                return Err("Suite cachee locale ForgeBench incoherente.".to_string());
+            }
+        }
         _ => return Err("Statut de suite cachee ForgeBench invalide.".to_string()),
     }
     Ok(())
@@ -524,7 +570,29 @@ fn validate_workstack_router_pair(workstack: &Value, router: &Value) -> Result<(
     Ok(())
 }
 
-fn compile_experiment(request: &CompileForgeBenchRequest) -> Result<Value, String> {
+fn protocol_hidden_suite(spec: &Value, receipt: Option<&Value>) -> Result<Value, String> {
+    let Some(receipt) = receipt else {
+        return Ok(spec.get("hidden_suite").cloned().unwrap_or(Value::Null));
+    };
+    validate_hidden_suite_receipt(receipt)?;
+    Ok(json!({
+        "status": "locally_sealed",
+        "suite_id": receipt.get("suite_id").cloned().unwrap_or(Value::Null),
+        "hidden_seeds_total": receipt.get("hidden_seeds_total").cloned().unwrap_or(Value::Null),
+        "checks_total": receipt.get("private_checks_total").cloned().unwrap_or(Value::Null),
+        "digest": receipt.get("suite_digest").cloned().unwrap_or(Value::Null),
+        "receipt_digest": receipt.pointer("/integrity/digest").cloned().unwrap_or(Value::Null),
+        "contents_embedded": false,
+        "encrypted_at_rest": false,
+        "worker_access_blocked": false,
+        "evaluator_isolated": false
+    }))
+}
+
+fn compile_experiment(
+    request: &CompileForgeBenchRequest,
+    hidden_receipt: Option<&Value>,
+) -> Result<Value, String> {
     if request.schema != REQUEST_SCHEMA || request.benchmark_id != SIGNAL_MAZE_ID {
         return Err("Contrat de compilation ForgeBench invalide.".to_string());
     }
@@ -545,6 +613,7 @@ fn compile_experiment(request: &CompileForgeBenchRequest) -> Result<Value, Strin
         .take(seed_count)
         .cloned()
         .collect::<Vec<_>>();
+    let hidden_suite = protocol_hidden_suite(&spec, hidden_receipt)?;
     let protocol = json!({
         "schema": "outilsia.forgebench_protocol.v1",
         "benchmark_id": SIGNAL_MAZE_ID,
@@ -556,7 +625,7 @@ fn compile_experiment(request: &CompileForgeBenchRequest) -> Result<Value, Strin
         "budgets": spec.get("budgets").cloned().unwrap_or(Value::Null),
         "permissions": spec.get("permissions").cloned().unwrap_or(Value::Null),
         "visible_checks": spec.get("visible_checks").cloned().unwrap_or(Value::Null),
-        "hidden_suite": spec.get("hidden_suite").cloned().unwrap_or(Value::Null),
+        "hidden_suite": hidden_suite,
         "score_policy": spec.get("score_policy").cloned().unwrap_or(Value::Null),
         "fairness": spec.get("fairness").cloned().unwrap_or(Value::Null)
     });
@@ -582,9 +651,12 @@ fn compile_experiment(request: &CompileForgeBenchRequest) -> Result<Value, Strin
         .all(|stack| stack.get("available").and_then(Value::as_bool) == Some(true));
     let enough_candidates = candidate_stacks.len() >= 2;
     let starter_sealed = spec.pointer("/starter/status").and_then(Value::as_str) == Some("sealed");
-    let hidden_suite_sealed = spec.pointer("/hidden_suite/status").and_then(Value::as_str)
-        == Some("sealed")
-        && spec
+    let hidden_suite_status = protocol
+        .pointer("/hidden_suite/status")
+        .and_then(Value::as_str)
+        .unwrap_or("not_provisioned");
+    let hidden_suite_sealed = hidden_suite_status == "sealed"
+        && protocol
             .pointer("/hidden_suite/digest")
             .and_then(Value::as_str)
             .is_some_and(is_sha256);
@@ -613,7 +685,11 @@ fn compile_experiment(request: &CompileForgeBenchRequest) -> Result<Value, Strin
         blockers.push("starter_not_sealed");
     }
     if claim_level == "scientific" && !hidden_suite_sealed {
-        blockers.push("hidden_suite_not_provisioned");
+        blockers.push(if hidden_suite_status == "locally_sealed" {
+            "hidden_suite_not_isolated"
+        } else {
+            "hidden_suite_not_provisioned"
+        });
     }
     if claim_level == "scientific" && !enough_scientific_seeds {
         blockers.push("three_seeds_required_for_scientific_claim");
@@ -629,7 +705,8 @@ fn compile_experiment(request: &CompileForgeBenchRequest) -> Result<Value, Strin
         "router_sha256": request.capability_routing.pointer("/integrity/digest"),
         "claim_level": claim_level,
         "candidate_stack_keys": stack_keys,
-        "seeds": seeds
+        "seeds": seeds,
+        "hidden_suite_digest": protocol.pointer("/hidden_suite/digest")
     });
     let mut experiment = json!({
         "schema": EXPERIMENT_SCHEMA,
@@ -662,7 +739,13 @@ fn compile_experiment(request: &CompileForgeBenchRequest) -> Result<Value, Strin
             "scientific_ready": scientific_ready,
             "selected_claim_ready": selected_claim_ready,
             "blockers": blockers,
-            "warnings": if hidden_suite_sealed { json!([]) } else { json!(["scientific_claim_unavailable_until_hidden_suite_is_sealed"]) }
+            "warnings": if hidden_suite_sealed {
+                json!([])
+            } else if hidden_suite_status == "locally_sealed" {
+                json!(["local_hidden_suite_not_worker_isolated"])
+            } else {
+                json!(["scientific_claim_unavailable_until_hidden_suite_is_sealed"])
+            }
         },
         "measurements": {
             "runs_recorded": 0,
@@ -987,8 +1070,11 @@ pub(crate) fn validate_forgebench_result(result: &Value) -> Result<(), String> {
     Ok(())
 }
 
-fn compile_result(request: &CompileForgeBenchRequest) -> Result<ForgeBenchCompileResult, String> {
-    let experiment = compile_experiment(request)?;
+fn compile_result_with_receipt(
+    request: &CompileForgeBenchRequest,
+    hidden_receipt: Option<&Value>,
+) -> Result<ForgeBenchCompileResult, String> {
+    let experiment = compile_experiment(request, hidden_receipt)?;
     let mut result = json!({
         "schema": RESULT_SCHEMA,
         "contract_version": CONTRACT_VERSION,
@@ -1026,11 +1112,18 @@ fn compile_result(request: &CompileForgeBenchRequest) -> Result<ForgeBenchCompil
     serde_json::from_value(result).map_err(|error| format!("Resultat ForgeBench invalide: {error}"))
 }
 
+#[cfg(test)]
+fn compile_result(request: &CompileForgeBenchRequest) -> Result<ForgeBenchCompileResult, String> {
+    compile_result_with_receipt(request, None)
+}
+
 #[tauri::command]
 pub(crate) fn compile_forgebench_experiment(
+    app: AppHandle,
     request: CompileForgeBenchRequest,
 ) -> Result<ForgeBenchCompileResult, String> {
-    compile_result(&request)
+    let receipt = hidden_suite_receipt(&app)?;
+    compile_result_with_receipt(&request, receipt.as_ref())
 }
 
 #[cfg(test)]
@@ -1183,6 +1276,28 @@ mod tests {
             result.experiment["readiness"]["selected_claim_ready"],
             false
         );
+    }
+
+    #[test]
+    fn local_hidden_suite_is_committed_without_exposing_seeds_or_unlocking_science() {
+        let receipt = crate::forgebench_vault::test_hidden_suite_receipt();
+        let result = compile_result_with_receipt(
+            &request("scientific", 3, &["codex-solo", "claude-solo"]),
+            Some(&receipt),
+        )
+        .expect("local hidden suite preflight");
+        let hidden = &result.experiment["protocol"]["hidden_suite"];
+        assert_eq!(hidden["status"], "locally_sealed");
+        assert_eq!(hidden["hidden_seeds_total"], 5);
+        assert_eq!(hidden["worker_access_blocked"], false);
+        assert_eq!(result.experiment["readiness"]["scientific_ready"], false);
+        assert!(result.experiment["readiness"]["blockers"]
+            .as_array()
+            .expect("blockers")
+            .contains(&json!("hidden_suite_not_isolated")));
+        let serialized = serde_json::to_string(&result).expect("result JSON");
+        assert!(!serialized.contains("\"hidden_seeds\":"));
+        assert!(!serialized.contains("seed-boundary-cases"));
     }
 
     #[test]

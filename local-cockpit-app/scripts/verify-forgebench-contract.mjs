@@ -51,7 +51,9 @@ if (bundleDigest !== manifest.bundle_sha256 || bundleDigest !== benchmark.starte
   throw new Error("starter bundle digest mismatch");
 }
 
-const rust = readFileSync(resolve(root, "src-tauri", "src", "forgebench.rs"), "utf8");
+const rust = ["forgebench.rs", "forgebench_vault.rs"]
+  .map((name) => readFileSync(resolve(root, "src-tauri", "src", name), "utf8"))
+  .join("\n");
 const js = readFileSync(resolve(root, "src", "app.js"), "utf8");
 for (const needle of [
   '"execution_started": false',
@@ -62,6 +64,10 @@ for (const needle of [
   '"api_spend_eur": 0',
   "hidden_suite_not_provisioned",
   "same_protocol_digest_for_every_stack",
+  '"hidden_seeds_returned": false',
+  '"worker_access_blocked": false',
+  '"encrypted_at_rest": false',
+  "forgebench-hidden-suite-v1.json",
 ]) {
   if (!rust.includes(needle)) throw new Error(`missing Rust ForgeBench guard: ${needle}`);
 }

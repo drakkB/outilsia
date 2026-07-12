@@ -87,6 +87,8 @@ La notice utilisateur canonique est [NOTICE-UTILISATION-WORKSTACK.md](NOTICE-UTI
 
 ForgeBench v0 prépare désormais `Signal Maze v1` en mode Détails : starter public scellé, trois seeds, mêmes règles et budgets pour chaque stack, score futur explicite et readiness exploratoire/scientifique séparée. Ce préflight n'exécute aucun agent et les tests cachés restent volontairement absents tant qu'une suite privée n'a pas été scellée.
 
+Le Hidden Suite Vault peut générer localement cinq seeds privés et remettre uniquement un reçu signé à ForgeBench. Le fichier n'est pas chiffré au repos et aucun niveau scientifique n'est débloqué avant la future isolation des workers et de l'évaluateur.
+
 Contrôles dédiés :
 
 ```bash

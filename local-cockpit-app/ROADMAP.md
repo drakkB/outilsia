@@ -233,7 +233,9 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Compiler un préflight signé qui valide Workstack, Router, disponibilité des stacks, équité du protocole et absence d'exécution.
 - [x] Afficher séparément readiness exploratoire et scientifique, sans inventer les tests cachés encore absents.
 - [x] Conserver volontairement le préflight ForgeBench dans l'Evidence Ledger sans contenu brut.
-- [ ] Provisionner une suite de tests cachés privée, la sceller et construire l'exécuteur isolé avant toute affirmation scientifique.
+- [x] Générer et sceller localement une suite privée avec seeds aléatoires, manifeste interne, reçu sans contenu, stockage atomique et permissions utilisateur.
+- [x] Garder `scientific_ready=false` tant que le vault n'est ni chiffré ni inaccessible aux futurs workers.
+- [ ] Construire une sandbox worker et un évaluateur isolé capables de consommer la suite sans la révéler avant toute affirmation scientifique.
 - Mesurer séparément résultat, vitesse, efficacité et coût ; toujours publier les valeurs brutes, les sous-scores et le caractère estimé ou inconnu d'une donnée.
 - Utiliser comme score équilibré initial `50 % résultat + 20 % efficacité + 15 % vitesse + 15 % coût`, sans masquer les podiums par dimension ni la frontière de Pareto.
 - Comparer d'abord trois stacks : Codex CLI seul, Claude Code seul et Hermes planification -> Codex construction -> Claude audit.

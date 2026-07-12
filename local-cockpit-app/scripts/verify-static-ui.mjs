@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
-const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "evidence_ledger.rs"]
+const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
@@ -164,10 +164,15 @@ const requiredFeatureText = [
   ["rust ForgeBench experiment schema", rust, "outilsia.forgebench_experiment.v1"],
   ["rust ForgeBench no execution", rust, '"agents_started": false'],
   ["rust ForgeBench no early winner", rust, '"winner_declared": false'],
+  ["rust ForgeBench hidden suite receipt", rust, "outilsia.forgebench_hidden_suite_receipt.v1"],
+  ["rust ForgeBench hidden seeds not returned", rust, '"hidden_seeds_returned": false'],
+  ["rust ForgeBench worker isolation honest", rust, '"worker_access_blocked": false'],
+  ["rust ForgeBench vault local", rust, "forgebench-hidden-suite-v1.json"],
   ["ForgeBench Signal Maze schema", forgeBenchContract, "outilsia.forgebench_benchmark.v1"],
   ["ForgeBench explicit hidden suite absence", forgeBenchContract, '"status": "not_provisioned"'],
   ["ForgeBench score policy", forgeBenchContract, '"result": 50, "efficiency": 20, "speed": 15, "cost": 15'],
   ["css ForgeBench", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".forgebench-box"],
+  ["html ForgeBench hidden suite", html, "forgeBenchVaultBox"],
   ["html evidence ledger", html, "evidenceLedgerBox"],
   ["html evidence source", html, "evidenceLedgerSource"],
   ["js evidence append schema", js, "outilsia.evidence_append_request.v1"],

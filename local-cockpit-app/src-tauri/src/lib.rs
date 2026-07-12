@@ -2,6 +2,7 @@ mod board_observer;
 mod capability_router;
 mod evidence_ledger;
 mod forgebench;
+mod forgebench_vault;
 mod local_capability_bridge;
 mod workstack_composer;
 
@@ -9,6 +10,9 @@ use board_observer::observe_planka_board;
 use capability_router::route_workstack_capabilities;
 use evidence_ledger::{append_evidence_entry, clear_evidence_ledger, get_evidence_ledger};
 use forgebench::compile_forgebench_experiment;
+use forgebench_vault::{
+    clear_forgebench_hidden_suite, get_forgebench_hidden_suite_status, seal_forgebench_hidden_suite,
+};
 use local_capability_bridge::{
     get_local_capability_bridge_status, start_local_capability_bridge, stop_local_capability_bridge,
 };
@@ -5149,6 +5153,9 @@ pub fn run() {
             get_evidence_ledger,
             clear_evidence_ledger,
             compile_forgebench_experiment,
+            seal_forgebench_hidden_suite,
+            get_forgebench_hidden_suite_status,
+            clear_forgebench_hidden_suite,
             start_local_capability_bridge,
             get_local_capability_bridge_status,
             stop_local_capability_bridge,

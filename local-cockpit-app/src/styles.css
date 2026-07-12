@@ -2792,6 +2792,41 @@ dd {
   overflow-wrap: anywhere;
 }
 
+.forgebench-vault {
+  background: rgba(13, 20, 24, 0.82);
+  border: 1px solid rgba(229, 184, 92, 0.22);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px;
+}
+
+.forgebench-vault-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.forgebench-vault-heading span,
+.forgebench-vault-box span,
+.forgebench-vault-box small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.forgebench-vault-box {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.forgebench-vault-box span,
+.forgebench-vault-box small {
+  overflow-wrap: anywhere;
+}
+
 .forgebench-box {
   display: grid;
   gap: 10px;

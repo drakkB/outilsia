@@ -11,7 +11,7 @@ Périmètre : OutilsIA Local Cockpit, mode **Détails**
 | Workstack Composer | Transformer une carte prête en plan borné avec rôles, budget, permissions et gate humaine. | Aucune exécution, création de worktree, fusion ou publication. |
 | Capability Router | Détecter les CLI et modèles locaux disponibles, puis proposer un planificateur, un exécutant et un vérificateur distinct. | Ne lit pas les jetons, ne vérifie pas les quotas et ne transmet pas la mission aux agents. |
 | Evidence Ledger | Conserver une trace locale chaînée des étapes validées et de leurs empreintes. | Ne stocke ni description brute, prompt, réponse de modèle, credential ou fichier projet. Il ne prouve pas à lui seul la qualité du résultat. |
-| ForgeBench | Préparer un protocole équitable `Signal Maze v1`, lier les stacks détectées au même starter, aux mêmes seeds, budgets et permissions, puis signaler ce qui bloque une comparaison. | Le v0 ne lance aucun agent, test caché ou worktree, ne calcule aucun score et ne déclare aucun vainqueur. |
+| ForgeBench | Préparer un protocole équitable `Signal Maze v1`, sceller localement des seeds privés, puis lier les stacks détectées au même starter, aux mêmes budgets et permissions. | Le v0 ne lance aucun agent, test caché ou worktree, ne calcule aucun score et ne déclare aucun vainqueur. Le vault local n'est pas encore une sandbox. |
 | Workstack Arena | **Prévu après ForgeBench.** Exécuter une Workstack approuvée dans des espaces isolés et remettre le résultat en revue humaine. | Aucune exécution implicite, aucun partage de worktree entre workers et aucune fusion automatique. |
 | MemoryForge / Obsidian | Conserver les décisions, bilans et connaissances durables du projet. | Ne reçoit pas tous les logs, prompts ou sorties brutes du Ledger. |
 | Strategy Arena | Exploiter les capacités IA locales préparées par OutilsIA pour les workflows quant, puis compiler et backtester. | OutilsIA ne génère pas de stratégie financière et ne lance pas de backtest. |
@@ -26,11 +26,12 @@ Périmètre : OutilsIA Local Cockpit, mode **Détails**
 6. Vérifier les blocages, les permissions et la gate humaine.
 7. Dans **Capability Router**, choisir le type de mission puis cliquer sur **Détecter et proposer**.
 8. Contrôler les exécutants détectés, les versions et l'indépendance du vérificateur.
-9. Dans **ForgeBench Lab**, choisir le niveau de preuve, le nombre de seeds et au moins deux stacks candidates.
-10. Cliquer sur **Préparer l'expérience**, puis vérifier que chaque stack reçoit la même empreinte de protocole.
-11. Lire séparément les readiness exploratoire et scientifique. Les tests cachés n'étant pas encore scellés, le niveau scientifique reste bloqué.
-12. Dans **Evidence Ledger**, sélectionner chaque étape disponible, y compris le préflight ForgeBench, puis cliquer sur **Ajouter la preuve**.
-13. Exporter le JSON du Ledger avant une réinitialisation ou un transfert de machine.
+9. Dans **ForgeBench Lab**, utiliser facultativement **Sceller 5 seeds privés**. Le reçu ne contient ni seed, ni identifiant de check privé, ni chemin du vault.
+10. Choisir le niveau de preuve, le nombre de seeds publics et au moins deux stacks candidates.
+11. Cliquer sur **Préparer l'expérience**, puis vérifier que chaque stack reçoit la même empreinte de protocole.
+12. Lire séparément les readiness exploratoire et scientifique. Une suite locale scellée reste non scientifique tant que les workers ne sont pas isolés du dossier applicatif et que l'évaluateur n'est pas indépendant.
+13. Dans **Evidence Ledger**, sélectionner chaque étape disponible, y compris le préflight ForgeBench, puis cliquer sur **Ajouter la preuve**.
+14. Exporter le JSON du Ledger avant une réinitialisation ou un transfert de machine.
 
 Le parcours s'arrête ici. Aucun agent n'est lancé dans cette version.
 
@@ -84,7 +85,9 @@ ForgeBench v0 compile `outilsia.forgebench_experiment.v1`. Chaque stack sélecti
 - un évaluateur indépendant ;
 - une empreinte de protocole identique et exportable.
 
-Le starter public de `Signal Maze v1` est scellé par un manifeste de fichiers et une empreinte SHA-256. Les tests cachés ne sont pas dans le dépôt public et ne sont pas encore provisionnés : ForgeBench l'indique comme un blocage, au lieu de simuler une preuve scientifique.
+Le starter public de `Signal Maze v1` est scellé par un manifeste de fichiers et une empreinte SHA-256. Le vault peut maintenant générer cinq seeds privés et cinq familles de checks dans `forgebench-hidden-suite-v1.json`, sous le dossier applicatif Tauri. L'interface reçoit seulement un reçu signé avec identifiant, compteurs et empreinte.
+
+Le vault utilise les permissions du compte système mais **n'est pas chiffré au repos**. Aucun agent n'étant encore lancé, les données restent hors des Workstacks v0 ; toutefois un futur worker ne sera considéré comme aveugle à la suite qu'après mise en place d'une vraie sandbox et d'un évaluateur isolé. Jusque-là, `scientific_ready` reste faux.
 
 Le score équilibré futur reste explicite : `50 % résultat + 20 % efficacité + 15 % vitesse + 15 % coût`. Un coût inconnu n'est jamais transformé en zéro. Le score composite, les podiums par dimension, la frontière de Pareto et un éventuel vainqueur restent absents tant que des runs complets et comparables n'existent pas.
 
@@ -115,6 +118,8 @@ Le fichier persistant se trouve dans le dossier applicatif Tauri sous le nom `ev
 - `outilsia.capability_routing.v1`
 - `outilsia.forgebench_benchmark.v1`
 - `outilsia.forgebench_score_policy.v1`
+- `outilsia.forgebench_hidden_suite.v1`
+- `outilsia.forgebench_hidden_suite_receipt.v1`
 - `outilsia.forgebench_experiment.v1`
 - `outilsia.forgebench_compile_result.v1`
 - `outilsia.evidence_entry.v1`

@@ -58,6 +58,7 @@ const state = {
   workstackSelectedCard: null,
   capabilityRouter: null,
   forgeBench: null,
+  forgeBenchHiddenSuite: null,
   evidenceLedger: null,
   installSafetyPreflight: null,
   localSnapshots: [],
@@ -102,6 +103,10 @@ const CAPABILITY_ROUTER_RESULT_SCHEMA = "outilsia.capability_router_result.v1";
 const FORGEBENCH_COMPILE_REQUEST_SCHEMA = "outilsia.forgebench_compile_request.v1";
 const FORGEBENCH_COMPILE_RESULT_SCHEMA = "outilsia.forgebench_compile_result.v1";
 const FORGEBENCH_EXPERIMENT_SCHEMA = "outilsia.forgebench_experiment.v1";
+const FORGEBENCH_HIDDEN_SUITE_SEAL_REQUEST_SCHEMA = "outilsia.forgebench_hidden_suite_seal_request.v1";
+const FORGEBENCH_HIDDEN_SUITE_SEAL_RESULT_SCHEMA = "outilsia.forgebench_hidden_suite_seal_result.v1";
+const FORGEBENCH_HIDDEN_SUITE_STATUS_SCHEMA = "outilsia.forgebench_hidden_suite_status.v1";
+const FORGEBENCH_HIDDEN_SUITE_RECEIPT_SCHEMA = "outilsia.forgebench_hidden_suite_receipt.v1";
 const EVIDENCE_APPEND_REQUEST_SCHEMA = "outilsia.evidence_append_request.v1";
 const EVIDENCE_APPEND_RESULT_SCHEMA = "outilsia.evidence_append_result.v1";
 const EVIDENCE_LEDGER_SCHEMA = "outilsia.evidence_ledger.v1";
@@ -460,6 +465,11 @@ const els = {
   copyForgeBenchJsonBtn: $("copyForgeBenchJsonBtn"),
   copyForgeBenchProtocolBtn: $("copyForgeBenchProtocolBtn"),
   clearForgeBenchBtn: $("clearForgeBenchBtn"),
+  forgeBenchVaultState: $("forgeBenchVaultState"),
+  forgeBenchVaultBox: $("forgeBenchVaultBox"),
+  sealForgeBenchVaultBtn: $("sealForgeBenchVaultBtn"),
+  refreshForgeBenchVaultBtn: $("refreshForgeBenchVaultBtn"),
+  clearForgeBenchVaultBtn: $("clearForgeBenchVaultBtn"),
   evidenceLedgerState: $("evidenceLedgerState"),
   evidenceLedgerSource: $("evidenceLedgerSource"),
   evidenceLedgerBox: $("evidenceLedgerBox"),
@@ -626,6 +636,8 @@ let capabilityRouterBusy = false;
 let capabilityRouterError = "";
 let forgeBenchBusy = false;
 let forgeBenchError = "";
+let forgeBenchVaultBusy = false;
+let forgeBenchVaultError = "";
 let evidenceLedgerBusy = false;
 let evidenceLedgerError = "";
 const privateWorkloadSelections = new Set();
@@ -10959,6 +10971,7 @@ function forgeBenchBlockerLabel(value) {
     missing_independent_verifier: "évaluateur indépendant indisponible",
     starter_not_sealed: "starter non scellé",
     hidden_suite_not_provisioned: "tests cachés non scellés",
+    hidden_suite_not_isolated: "suite cachée locale non isolée des workers",
     three_seeds_required_for_scientific_claim: "trois seeds requis pour une affirmation scientifique"
   })[value] || value;
 }
@@ -10969,6 +10982,165 @@ function forgeBenchRoleLabel(value) {
     worker: "Exécutant",
     independent_verifier: "Évaluateur indépendant"
   })[value] || value;
+}
+
+function forgeBenchVaultReceipt(status = state.forgeBenchHiddenSuite) {
+  const receipt = status?.exists ? status.receipt : null;
+  if (
+    receipt?.schema !== FORGEBENCH_HIDDEN_SUITE_RECEIPT_SCHEMA
+    || receipt?.privacy?.suite_contents_returned !== false
+    || receipt?.privacy?.hidden_seeds_returned !== false
+    || receipt?.security?.encrypted_at_rest !== false
+    || receipt?.security?.worker_access_blocked !== false
+    || receipt?.readiness?.scientific_eligible !== false
+    || !/^[a-f0-9]{64}$/i.test(receipt?.suite_digest || "")
+  ) return null;
+  return receipt;
+}
+
+function renderForgeBenchVaultPanel() {
+  if (!els.forgeBenchVaultBox) return;
+  const status = state.forgeBenchHiddenSuite;
+  const receipt = forgeBenchVaultReceipt(status);
+  const nativeOrTest = Boolean(invoke || status?.test_mode);
+  els.sealForgeBenchVaultBtn.disabled = !invoke || forgeBenchVaultBusy;
+  els.refreshForgeBenchVaultBtn.disabled = !invoke || forgeBenchVaultBusy;
+  els.clearForgeBenchVaultBtn.disabled = !invoke || forgeBenchVaultBusy || !receipt;
+  els.sealForgeBenchVaultBtn.textContent = receipt ? "Remplacer la suite" : "Sceller 5 seeds privés";
+
+  if (!nativeOrTest) {
+    els.forgeBenchVaultState.textContent = "app native requise";
+    els.forgeBenchVaultBox.className = "forgebench-vault-box empty";
+    els.forgeBenchVaultBox.textContent = "Le vault local est disponible uniquement dans l'application Windows/Linux.";
+    return;
+  }
+  if (forgeBenchVaultBusy) {
+    els.forgeBenchVaultState.textContent = "opération locale";
+    els.forgeBenchVaultBox.className = "forgebench-vault-box empty";
+    els.forgeBenchVaultBox.textContent = "Génération ou vérification locale. Aucun seed privé n'est renvoyé à l'interface.";
+    return;
+  }
+  if (forgeBenchVaultError) {
+    els.forgeBenchVaultState.textContent = "vault refusé";
+    els.forgeBenchVaultBox.className = "forgebench-vault-box empty";
+    els.forgeBenchVaultBox.innerHTML = `<strong>Suite cachée non fiable</strong><span>${escapeHtml(forgeBenchVaultError)}</span>`;
+    return;
+  }
+  if (!receipt) {
+    els.forgeBenchVaultState.textContent = "non scellée";
+    els.forgeBenchVaultBox.className = "forgebench-vault-box empty";
+    els.forgeBenchVaultBox.textContent = "Génère cinq seeds privés dans les données locales de l'application. Le reçu expose seulement leur nombre et une empreinte.";
+    return;
+  }
+  const digest = receipt.suite_digest || "";
+  els.forgeBenchVaultState.textContent = "scellée localement";
+  els.forgeBenchVaultBox.className = "forgebench-vault-box";
+  els.forgeBenchVaultBox.innerHTML = `
+    <strong>${escapeHtml(receipt.suite_id || "Suite cachée")}</strong>
+    <span>${escapeHtml(receipt.hidden_seeds_total || 0)} seeds privés · ${escapeHtml(receipt.private_checks_total || 0)} familles de checks · SHA-256 ${escapeHtml(digest ? `${digest.slice(0, 12)}…${digest.slice(-8)}` : "absente")}</span>
+    <small>Contenu non renvoyé · stockage local non chiffré · isolation worker encore absente</small>
+  `;
+}
+
+async function loadForgeBenchVault(silent = false) {
+  if (!invoke || forgeBenchVaultBusy) return null;
+  forgeBenchVaultBusy = true;
+  forgeBenchVaultError = "";
+  if (!silent) setStatus("Vérification de la suite cachée locale...");
+  renderForgeBenchVaultPanel();
+  try {
+    const status = await invoke("get_forgebench_hidden_suite_status");
+    if (status?.schema !== FORGEBENCH_HIDDEN_SUITE_STATUS_SCHEMA || status?.contents_returned !== false || status?.vault_path_returned !== false) {
+      throw new Error("statut natif Hidden Suite non conforme");
+    }
+    if (status.exists && !forgeBenchVaultReceipt(status)) throw new Error("reçu Hidden Suite invalide");
+    const compiledReceiptDigest = state.forgeBench?.experiment?.protocol?.hidden_suite?.receipt_digest || null;
+    const currentReceiptDigest = status?.receipt?.integrity?.digest || null;
+    if (state.forgeBench && compiledReceiptDigest !== currentReceiptDigest) {
+      state.forgeBench = null;
+      forgeBenchError = "";
+    }
+    state.forgeBenchHiddenSuite = status;
+    if (!silent) setStatus(status.exists ? "Suite cachée locale vérifiée" : "Aucune suite cachée locale", status.exists ? "ok" : "warn");
+    return status;
+  } catch (error) {
+    state.forgeBenchHiddenSuite = null;
+    forgeBenchVaultError = String(error || "Vault local illisible");
+    if (!silent) setStatus(`Hidden Suite : ${forgeBenchVaultError}`, "error");
+    return null;
+  } finally {
+    forgeBenchVaultBusy = false;
+    renderForgeBenchVaultPanel();
+    renderForgeBenchPanel();
+    renderEvidenceLedgerPanel();
+  }
+}
+
+async function sealForgeBenchVault() {
+  if (!invoke || forgeBenchVaultBusy) return null;
+  const replace = Boolean(forgeBenchVaultReceipt());
+  if (replace && !window.confirm("Remplacer la suite cachée locale ? Les expériences liées à son ancienne empreinte devront être recréées.")) return null;
+  forgeBenchVaultBusy = true;
+  forgeBenchVaultError = "";
+  renderForgeBenchVaultPanel();
+  setStatus(replace ? "Remplacement de la suite cachée..." : "Scellement de la suite cachée...");
+  try {
+    const result = await invoke("seal_forgebench_hidden_suite", {
+      request: {
+        schema: FORGEBENCH_HIDDEN_SUITE_SEAL_REQUEST_SCHEMA,
+        benchmark_id: "signal-maze-v1",
+        hidden_seed_count: 5,
+        replace_existing: replace
+      }
+    });
+    if (result?.schema !== FORGEBENCH_HIDDEN_SUITE_SEAL_RESULT_SCHEMA || result?.contents_returned !== false || result?.receipt?.schema !== FORGEBENCH_HIDDEN_SUITE_RECEIPT_SCHEMA) {
+      throw new Error("réponse native de scellement non conforme");
+    }
+    state.forgeBenchHiddenSuite = {
+      schema: FORGEBENCH_HIDDEN_SUITE_STATUS_SCHEMA,
+      exists: true,
+      receipt: result.receipt,
+      contents_returned: false,
+      vault_path_returned: false
+    };
+    state.forgeBench = null;
+    forgeBenchError = "";
+    setStatus(result.replaced ? "Suite cachée remplacée" : "Suite cachée scellée localement", "ok");
+    return result;
+  } catch (error) {
+    forgeBenchVaultError = String(error || "Scellement impossible");
+    setStatus(`Hidden Suite : ${forgeBenchVaultError}`, "error");
+    return null;
+  } finally {
+    forgeBenchVaultBusy = false;
+    renderForgeBenchVaultPanel();
+    renderForgeBenchPanel();
+    renderEvidenceLedgerPanel();
+  }
+}
+
+async function clearForgeBenchVault() {
+  if (!invoke || forgeBenchVaultBusy || !forgeBenchVaultReceipt()) return;
+  if (!window.confirm("Effacer la suite cachée locale ? Cette empreinte ne pourra plus être utilisée pour reproduire ses cas privés.")) return;
+  forgeBenchVaultBusy = true;
+  forgeBenchVaultError = "";
+  renderForgeBenchVaultPanel();
+  try {
+    const status = await invoke("clear_forgebench_hidden_suite");
+    if (status?.schema !== FORGEBENCH_HIDDEN_SUITE_STATUS_SCHEMA || status?.exists !== false) throw new Error("suppression native incomplète");
+    state.forgeBenchHiddenSuite = status;
+    state.forgeBench = null;
+    forgeBenchError = "";
+    setStatus("Suite cachée locale effacée", "ok");
+  } catch (error) {
+    forgeBenchVaultError = String(error || "Suppression impossible");
+    setStatus(`Hidden Suite : ${forgeBenchVaultError}`, "error");
+  } finally {
+    forgeBenchVaultBusy = false;
+    renderForgeBenchVaultPanel();
+    renderForgeBenchPanel();
+    renderEvidenceLedgerPanel();
+  }
 }
 
 function forgeBenchMarkdown(result = state.forgeBench) {
@@ -10987,6 +11159,7 @@ function forgeBenchMarkdown(result = state.forgeBench) {
     `- Seeds identiques : ${(protocol.seeds || []).join(", ") || "aucune"}`,
     `- Starter scellé : ${protocol.starter?.status === "sealed" ? "oui" : "non"}`,
     `- Tests cachés scellés : ${protocol.hidden_suite?.status === "sealed" ? "oui" : "non"}`,
+    `- Suite privée locale : ${protocol.hidden_suite?.status === "locally_sealed" ? "scellée mais non isolée" : "absente"}`,
     `- Préflight exploratoire : ${readiness.exploratory_ready ? "prêt" : "bloqué"}`,
     `- Préflight scientifique : ${readiness.scientific_ready ? "prêt" : "bloqué"}`,
     blockers.length ? `- Blocages : ${blockers.map(forgeBenchBlockerLabel).join(" ; ")}` : "- Blocages : aucun",
@@ -11085,7 +11258,11 @@ function renderForgeBenchPanel() {
     </div>
     <div class="forgebench-score-policy">${scoreCards}</div>
     ${blockers.length ? `<div class="forgebench-warning">Bloqué : ${escapeHtml(blockers.map(forgeBenchBlockerLabel).join(" · "))}</div>` : ""}
-    ${protocol.hidden_suite?.status !== "sealed" ? '<div class="forgebench-warning">Niveau scientifique : tests cachés non scellés, aucune conclusion scientifique autorisée.</div>' : ""}
+    ${protocol.hidden_suite?.status === "locally_sealed"
+      ? '<div class="forgebench-warning">Suite privée scellée localement, mais non isolée des workers : aucune conclusion scientifique autorisée.</div>'
+      : protocol.hidden_suite?.status !== "sealed"
+        ? '<div class="forgebench-warning">Niveau scientifique : tests cachés non scellés, aucune conclusion scientifique autorisée.</div>'
+        : ""}
     <div class="forgebench-stack-list">${stackRows}</div>
     <div class="forgebench-truth">Aucun agent lancé · aucun score calculé · aucun vainqueur déclaré · coût inconnu ≠ zéro</div>
   `;
@@ -16383,6 +16560,25 @@ function installTestHarness() {
       if (els.forgeBenchSeedCount) els.forgeBenchSeedCount.value = "3";
       for (const input of els.forgeBenchStacks?.querySelectorAll('input[name="forgeBenchStack"]') || []) input.checked = true;
       const protocolDigest = "e".repeat(64);
+      state.forgeBenchHiddenSuite = {
+        schema: FORGEBENCH_HIDDEN_SUITE_STATUS_SCHEMA,
+        exists: true,
+        contents_returned: false,
+        vault_path_returned: false,
+        test_mode: true,
+        receipt: {
+          schema: FORGEBENCH_HIDDEN_SUITE_RECEIPT_SCHEMA,
+          suite_id: "hs-demo-signal-maze",
+          benchmark: { id: "signal-maze-v1", version: "1.0.0-exploratory" },
+          hidden_seeds_total: 5,
+          private_checks_total: 5,
+          suite_digest: "7".repeat(64),
+          privacy: { hidden_seeds_returned: false, private_check_ids_returned: false, suite_contents_returned: false, vault_path_returned: false },
+          security: { encrypted_at_rest: false, os_user_permissions_only: true, worker_access_blocked: false, evaluator_isolated: false },
+          readiness: { locally_sealed: true, scientific_eligible: false, blockers: ["worker_sandbox_not_implemented", "isolated_evaluator_not_implemented"] },
+          integrity: { digest: "8".repeat(64) }
+        }
+      };
       const binding = (role, candidateId, label) => ({
         role,
         candidate: { candidate_id: candidateId, label, environment: "test", version: "1.0.0", auth_status: "not_inspected", quota_verified: false },
@@ -16416,7 +16612,7 @@ function installTestHarness() {
             benchmark_version: "1.0.0-exploratory",
             starter: { status: "sealed", files_total: 3, bundle_sha256: "c".repeat(64) },
             seeds: [17011, 17029, 17047],
-            hidden_suite: { status: "not_provisioned", contents_embedded: false, checks_total: 0, digest: null },
+            hidden_suite: { status: "locally_sealed", suite_id: "hs-demo-signal-maze", hidden_seeds_total: 5, checks_total: 5, digest: "7".repeat(64), receipt_digest: "8".repeat(64), contents_embedded: false, encrypted_at_rest: false, worker_access_blocked: false, evaluator_isolated: false },
             score_policy: { schema: "outilsia.forgebench_score_policy.v1", weights_percent: { result: 50, efficiency: 20, speed: 15, cost: 15 }, unknown_cost_is_zero: false },
             fairness: { same_starter: true, same_rules: true, same_seeds: true, same_budgets: true }
           },
@@ -16426,7 +16622,7 @@ function installTestHarness() {
             { key: "claude-solo", label: "Claude Code seul", available: true, bindings: [binding("worker", "claude-code:test", "Claude Code"), binding("independent_verifier", "forgebench:deterministic-evaluator", "Évaluateur déterministe ForgeBench")], blockers: [], protocol_digest: protocolDigest, execution_started: false, scores_computed: false },
             { key: "hermes-codex-claude", label: "Hermes planifie, Codex construit, Claude vérifie", available: false, bindings: [binding("planner", null, ""), binding("worker", "codex-cli:test", "Codex CLI"), binding("independent_verifier", "claude-code:test", "Claude Code")], blockers: ["missing_planner"], protocol_digest: protocolDigest, execution_started: false, scores_computed: false }
           ],
-          readiness: { protocol_ready: false, exploratory_ready: false, scientific_ready: false, selected_claim_ready: false, blockers: ["selected_stack_unavailable"], warnings: ["scientific_claim_unavailable_until_hidden_suite_is_sealed"] },
+          readiness: { protocol_ready: false, exploratory_ready: false, scientific_ready: false, selected_claim_ready: false, blockers: ["selected_stack_unavailable"], warnings: ["local_hidden_suite_not_worker_isolated"] },
           measurements: { runs_recorded: 0, dimensions_measured: [], scores_computed: false, winner_declared: false, cost_status: "not_measured_not_zero" },
           execution: { started: false, agents_started: false, worktrees_created: false, repository_modified: false, api_spend_eur: 0 },
           privacy: { raw_workstack_included: false, raw_task_context_included: false, credentials_included: false, hidden_test_contents_included: false },
@@ -16435,11 +16631,14 @@ function installTestHarness() {
         integrity: { digest: "1".repeat(64) }
       };
       forgeBenchError = "";
+      forgeBenchVaultError = "";
       if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "forgebench_experiment_compiled";
+      renderForgeBenchVaultPanel();
       renderForgeBenchPanel();
       renderEvidenceLedgerPanel();
       return {
         result: state.forgeBench,
+        vault: state.forgeBenchHiddenSuite,
         panel: els.forgeBenchBox?.textContent || "",
         markdown: forgeBenchMarkdown()
       };
@@ -17494,6 +17693,9 @@ els.compileForgeBenchBtn?.addEventListener("click", compileForgeBenchExperiment)
 els.copyForgeBenchJsonBtn?.addEventListener("click", copyForgeBenchJson);
 els.copyForgeBenchProtocolBtn?.addEventListener("click", copyForgeBenchProtocol);
 els.clearForgeBenchBtn?.addEventListener("click", () => clearForgeBench(false));
+els.sealForgeBenchVaultBtn?.addEventListener("click", sealForgeBenchVault);
+els.refreshForgeBenchVaultBtn?.addEventListener("click", () => loadForgeBenchVault(false));
+els.clearForgeBenchVaultBtn?.addEventListener("click", clearForgeBenchVault);
 for (const input of [els.forgeBenchBenchmark, els.forgeBenchClaimLevel, els.forgeBenchSeedCount]) {
   input?.addEventListener("change", () => {
     state.forgeBench = null;
@@ -17836,6 +18038,7 @@ renderLocalCapabilityBridgePanel();
 renderBoardObserverPanel();
 renderWorkstackComposerPanel();
 renderCapabilityRouterPanel();
+renderForgeBenchVaultPanel();
 renderForgeBenchPanel();
 renderEvidenceLedgerPanel();
 renderPreparePanel();
@@ -17845,6 +18048,7 @@ installTestHarness();
 refreshAuthState();
 
 if (invoke) {
+  void loadForgeBenchVault(true);
   void loadEvidenceLedger(true);
   void refreshLocalCapabilityBridgeStatus(true);
   window.setInterval(() => {

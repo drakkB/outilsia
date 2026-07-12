@@ -478,6 +478,20 @@
             <label><input type="checkbox" name="forgeBenchStack" value="claude-solo" checked> <span>Claude Code seul</span></label>
             <label><input type="checkbox" name="forgeBenchStack" value="hermes-codex-claude" checked> <span>Hermes → Codex → Claude</span></label>
           </fieldset>
+          <div class="forgebench-vault">
+            <div class="forgebench-vault-heading">
+              <strong>Suite cachée locale</strong>
+              <span id="forgeBenchVaultState">non scellée</span>
+            </div>
+            <div id="forgeBenchVaultBox" class="forgebench-vault-box empty">
+              Génère cinq seeds privés dans les données locales de l'application. Le reçu expose seulement leur nombre et une empreinte.
+            </div>
+            <div class="row-actions">
+              <button id="sealForgeBenchVaultBtn" type="button" disabled>Sceller 5 seeds privés</button>
+              <button id="refreshForgeBenchVaultBtn" type="button" disabled>Vérifier</button>
+              <button id="clearForgeBenchVaultBtn" type="button" disabled>Effacer</button>
+            </div>
+          </div>
           <div id="forgeBenchBox" class="forgebench-box empty">
             Compile d'abord une Workstack puis un routage complet. ForgeBench préparera l'expérience sans l'exécuter.
           </div>
