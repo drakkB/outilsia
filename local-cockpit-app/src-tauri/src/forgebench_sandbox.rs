@@ -28,20 +28,20 @@ const MAX_SEEDS: usize = 3;
 const MAX_WORKSPACES: usize = MAX_STACKS * MAX_SEEDS;
 const STARTER_BUNDLE_SHA256: &str =
     "4d88bea3831044755d3d504fb6cd9a470647f8734d4a67265c2b3c3621f06e53";
-const STARTER_FILES: [(&str, &[u8], &str); 3] = [
+const STARTER_FILES: [(&str, &str, &str); 3] = [
     (
         "game.js",
-        include_bytes!("../../forgebench/signal-maze-v1/starter/game.js"),
+        include_str!("../../forgebench/signal-maze-v1/starter/game.js"),
         "f465727840cab52a6a6d4ca80072d037819b007ccac942fbdcb805fd3cb77f17",
     ),
     (
         "index.html",
-        include_bytes!("../../forgebench/signal-maze-v1/starter/index.html"),
+        include_str!("../../forgebench/signal-maze-v1/starter/index.html"),
         "a7db8d231f042a215f0081f53c4868021540d0e4cd38a8798287800de7f5ec26",
     ),
     (
         "styles.css",
-        include_bytes!("../../forgebench/signal-maze-v1/starter/styles.css"),
+        include_str!("../../forgebench/signal-maze-v1/starter/styles.css"),
         "4bd5c943830754a6ad38f006ed0c2b39abc66936f4ca245bc560822e3602e57a",
     ),
 ];
@@ -109,6 +109,13 @@ fn sha256_bytes(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+fn canonical_text_bytes(source: &str) -> Vec<u8> {
+    source
+        .replace("\r\n", "\n")
+        .replace('\r', "\n")
+        .into_bytes()
+}
+
 fn sign_document(document: &mut Value) -> Result<(), String> {
     document
         .as_object_mut()
@@ -143,8 +150,9 @@ fn verify_integrity(document: &Value, label: &str) -> Result<String, String> {
 
 fn starter_bundle_digest() -> Result<String, String> {
     let mut lines = Vec::with_capacity(STARTER_FILES.len());
-    for (name, bytes, expected) in STARTER_FILES {
-        let digest = sha256_bytes(bytes);
+    for (name, source, expected) in STARTER_FILES {
+        let bytes = canonical_text_bytes(source);
+        let digest = sha256_bytes(&bytes);
         if digest != expected {
             return Err(format!("Starter ForgeBench embarque altere: {name}."));
         }
@@ -603,8 +611,8 @@ fn create_batch(
             let sandbox_id = format!("fbs-{}", &canonical_sha256(&sandbox_seed)[..24]);
             let workspace = workspaces_dir.join(&sandbox_id);
             create_private_directory(&workspace)?;
-            for (name, bytes, _) in STARTER_FILES {
-                write_private_file(&workspace.join(name), bytes)?;
+            for (name, source, _) in STARTER_FILES {
+                write_private_file(&workspace.join(name), &canonical_text_bytes(source))?;
             }
             let contract = run_contract(input, &sandbox_id, stack_key, *seed)?;
             write_json_file(&workspace.join(RUN_CONTRACT_FILE), &contract)?;
@@ -1062,5 +1070,6 @@ mod tests {
     #[test]
     fn embedded_starter_matches_the_public_manifest_digest() {
         assert_eq!(starter_bundle_digest().unwrap(), STARTER_BUNDLE_SHA256);
+        assert_eq!(canonical_text_bytes("a\r\nb\rc\n"), b"a\nb\nc\n");
     }
 }
