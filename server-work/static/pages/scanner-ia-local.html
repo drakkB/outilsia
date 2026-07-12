@@ -182,6 +182,25 @@
       </div>
     </section>
 
+    <section class="px-4 py-10" id="forgebench-workspaces-stacks-ia">
+      <div class="max-w-6xl mx-auto card p-5 md:p-7" style="border-color:rgba(94,193,225,.38);background:rgba(15,23,42,.94);">
+        <span class="pill">ForgeBench Workspaces v0 · candidat source</span>
+        <h2 class="text-3xl md:text-4xl font-black mt-4">Préparer le même mini-projet pour Codex, Claude et une stack Hermes, sans mélanger leurs espaces</h2>
+        <p class="muted mt-3 text-lg">ForgeBench compile un protocole Signal Maze identique, puis matérialise un workspace neuf pour chaque stack et chaque seed public. Le starter embarqué est revérifié par SHA-256 et chaque reçu reste lié à l'expérience exacte.</p>
+        <div class="grid md:grid-cols-4 gap-3 mt-6">
+          <article class="card p-4"><strong class="cyan">Matrice équitable</strong><p class="mini mt-2">Un espace distinct par combinaison stack × seed, avec les mêmes règles, budgets et tests visibles.</p></article>
+          <article class="card p-4"><strong class="cyan">Starter vérifié</strong><p class="mini mt-2">Un fichier ajouté, supprimé ou modifié invalide la vérification du workspace.</p></article>
+          <article class="card p-4"><strong class="cyan">Reçu sans chemin</strong><p class="mini mt-2">Le reçu expose compteurs et empreintes, jamais chemin personnel, credential ou seed caché.</p></article>
+          <article class="card p-4"><strong class="cyan">Limite explicite</strong><p class="mini mt-2">Aucun worker ou shell lancé ; processus, réseau et accès au vault ne sont pas encore isolés.</p></article>
+        </div>
+        <p class="mini mt-5">Fonction présente dans les sources après le build public actuel. Elle prépare les workspaces mais ne constitue ni une exécution agentique, ni une preuve scientifique, ni un vainqueur ForgeBench.</p>
+        <div class="flex flex-wrap gap-3 mt-6">
+          <a class="btn btn-primary" href="/telecharger-scanner-ia-local">Voir la bêta Windows/Linux actuelle</a>
+          <a class="btn btn-secondary" href="/comment-nous-testons">Lire la méthode de test</a>
+        </div>
+      </div>
+    </section>
+
     <section class="px-4 py-10" id="model-autopilot-reglages-ollama">
       <div class="max-w-6xl mx-auto card p-5 md:p-7" style="border-color:rgba(34,197,94,.38);background:linear-gradient(135deg,rgba(34,197,94,.10),rgba(15,23,42,.94),rgba(103,232,249,.07));">
         <span class="pill">Model Autopilot v1</span>

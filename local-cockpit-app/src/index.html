@@ -492,6 +492,20 @@
               <button id="clearForgeBenchVaultBtn" type="button" disabled>Effacer</button>
             </div>
           </div>
+          <div class="forgebench-sandbox">
+            <div class="forgebench-sandbox-heading">
+              <strong>Espaces worker frais</strong>
+              <span id="forgeBenchSandboxState">non préparés</span>
+            </div>
+            <div id="forgeBenchSandboxBox" class="forgebench-sandbox-box empty">
+              Après le préflight, matérialise un starter vérifié par stack et seed. Aucun worker ou shell n'est lancé.
+            </div>
+            <div class="row-actions">
+              <button id="prepareForgeBenchSandboxBtn" type="button" disabled>Préparer les espaces</button>
+              <button id="refreshForgeBenchSandboxBtn" type="button" disabled>Vérifier</button>
+              <button id="clearForgeBenchSandboxBtn" type="button" disabled>Effacer</button>
+            </div>
+          </div>
           <div id="forgeBenchBox" class="forgebench-box empty">
             Compile d'abord une Workstack puis un routage complet. ForgeBench préparera l'expérience sans l'exécuter.
           </div>

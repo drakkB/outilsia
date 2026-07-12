@@ -11,7 +11,7 @@ Périmètre : OutilsIA Local Cockpit, mode **Détails**
 | Workstack Composer | Transformer une carte prête en plan borné avec rôles, budget, permissions et gate humaine. | Aucune exécution, création de worktree, fusion ou publication. |
 | Capability Router | Détecter les CLI et modèles locaux disponibles, puis proposer un planificateur, un exécutant et un vérificateur distinct. | Ne lit pas les jetons, ne vérifie pas les quotas et ne transmet pas la mission aux agents. |
 | Evidence Ledger | Conserver une trace locale chaînée des étapes validées et de leurs empreintes. | Ne stocke ni description brute, prompt, réponse de modèle, credential ou fichier projet. Il ne prouve pas à lui seul la qualité du résultat. |
-| ForgeBench | Préparer un protocole équitable `Signal Maze v1`, sceller localement des seeds privés, puis lier les stacks détectées au même starter, aux mêmes budgets et permissions. | Le v0 ne lance aucun agent, test caché ou worktree, ne calcule aucun score et ne déclare aucun vainqueur. Le vault local n'est pas encore une sandbox. |
+| ForgeBench | Préparer un protocole équitable `Signal Maze v1`, sceller localement des seeds privés, puis matérialiser un espace worker frais et vérifié par stack et seed public. | Le v0 ne lance aucun agent, shell ou test caché, ne calcule aucun score et ne déclare aucun vainqueur. Les workspaces ne constituent pas encore une isolation de processus ou de réseau. |
 | Workstack Arena | **Prévu après ForgeBench.** Exécuter une Workstack approuvée dans des espaces isolés et remettre le résultat en revue humaine. | Aucune exécution implicite, aucun partage de worktree entre workers et aucune fusion automatique. |
 | MemoryForge / Obsidian | Conserver les décisions, bilans et connaissances durables du projet. | Ne reçoit pas tous les logs, prompts ou sorties brutes du Ledger. |
 | Strategy Arena | Exploiter les capacités IA locales préparées par OutilsIA pour les workflows quant, puis compiler et backtester. | OutilsIA ne génère pas de stratégie financière et ne lance pas de backtest. |
@@ -30,8 +30,10 @@ Périmètre : OutilsIA Local Cockpit, mode **Détails**
 10. Choisir le niveau de preuve, le nombre de seeds publics et au moins deux stacks candidates.
 11. Cliquer sur **Préparer l'expérience**, puis vérifier que chaque stack reçoit la même empreinte de protocole.
 12. Lire séparément les readiness exploratoire et scientifique. Une suite locale scellée reste non scientifique tant que les workers ne sont pas isolés du dossier applicatif et que l'évaluateur n'est pas indépendant.
-13. Dans **Evidence Ledger**, sélectionner chaque étape disponible, y compris le préflight ForgeBench, puis cliquer sur **Ajouter la preuve**.
-14. Exporter le JSON du Ledger avant une réinitialisation ou un transfert de machine.
+13. Dans **Espaces worker frais**, cliquer sur **Préparer les espaces**. OutilsIA crée un workspace distinct pour chaque combinaison stack × seed public, hors du dépôt source, et revérifie le starter embarqué.
+14. Contrôler le reçu : nombre de workspaces, empreinte du starter et mention explicite qu'aucun worker, processus isolé ou réseau isolé n'a été lancé.
+15. Dans **Evidence Ledger**, sélectionner chaque étape disponible, y compris le préflight ForgeBench, puis cliquer sur **Ajouter la preuve**.
+16. Exporter le JSON du Ledger avant une réinitialisation ou un transfert de machine.
 
 Le parcours s'arrête ici. Aucun agent n'est lancé dans cette version.
 
@@ -69,9 +71,10 @@ Le Ledger **ne prouve pas** :
 2. `signed_local_plan` : Workstack locale signée et non exécutable.
 3. `signed_dry_run_proposal` : proposition de routage signée, sans lancement d'agent.
 4. `signed_benchmark_preflight` : expérience ForgeBench signée, mêmes règles pour chaque stack et aucune exécution commencée.
-5. `isolated_run_evidence` : **prévu**, résultat d'une exécution isolée avec versions, durée et coût.
-6. `independent_verification` : **prévu**, critères relancés par un vérificateur différent du worker.
-7. `human_decision` : **prévu**, acceptation, rejet ou demande de correction par le propriétaire humain.
+5. `signed_workspace_batch` : batch local signé, starter vérifié et espace frais par stack × seed, sans exécution ni isolation OS revendiquée.
+6. `isolated_run_evidence` : **prévu**, résultat d'une exécution isolée avec versions, durée et coût.
+7. `independent_verification` : **prévu**, critères relancés par un vérificateur différent du worker.
+8. `human_decision` : **prévu**, acceptation, rejet ou demande de correction par le propriétaire humain.
 
 ## Ce que prépare ForgeBench
 
@@ -87,7 +90,15 @@ ForgeBench v0 compile `outilsia.forgebench_experiment.v1`. Chaque stack sélecti
 
 Le starter public de `Signal Maze v1` est scellé par un manifeste de fichiers et une empreinte SHA-256. Le vault peut maintenant générer cinq seeds privés et cinq familles de checks dans `forgebench-hidden-suite-v1.json`, sous le dossier applicatif Tauri. L'interface reçoit seulement un reçu signé avec identifiant, compteurs et empreinte.
 
-Le vault utilise les permissions du compte système mais **n'est pas chiffré au repos**. Aucun agent n'étant encore lancé, les données restent hors des Workstacks v0 ; toutefois un futur worker ne sera considéré comme aveugle à la suite qu'après mise en place d'une vraie sandbox et d'un évaluateur isolé. Jusque-là, `scientific_ready` reste faux.
+Le vault utilise les permissions du compte système mais **n'est pas chiffré au repos**. Aucun agent n'étant encore lancé, les données restent hors des Workstacks v0 ; toutefois un futur worker ne sera considéré comme aveugle à la suite qu'après mise en place d'une vraie sandbox d'exécution et d'un évaluateur isolé. Jusque-là, `scientific_ready` reste faux.
+
+### Espaces worker frais
+
+Après un préflight prêt, ForgeBench peut matérialiser un batch sous le dossier applicatif Tauri. Il contient un workspace distinct pour chaque stack disponible et chaque seed public sélectionné. Chaque workspace reçoit uniquement les trois fichiers du starter public et un contrat de run public signé. Le manifeste interne relie chaque espace à l'empreinte exacte de l'expérience et du protocole.
+
+Le reçu `outilsia.forgebench_worker_sandbox_receipt.v1` expose seulement les compteurs et empreintes. Il ne renvoie aucun chemin local, seed caché, credential ou chemin du dépôt source. Une vérification relit chaque workspace, refuse un fichier supplémentaire ou un lien symbolique, recalcule le starter et le contrat public, puis compare l'empreinte du batch.
+
+Ce palier prouve la **préparation de workspaces frais**, pas l'exécution isolée. Le processus worker n'est pas lancé, le réseau n'est pas isolé et un processus du même compte système pourrait encore atteindre le vault. `worker_execution_ready` et `scientific_eligible` restent donc faux.
 
 Le score équilibré futur reste explicite : `50 % résultat + 20 % efficacité + 15 % vitesse + 15 % coût`. Un coût inconnu n'est jamais transformé en zéro. Le score composite, les podiums par dimension, la frontière de Pareto et un éventuel vainqueur restent absents tant que des runs complets et comparables n'existent pas.
 
@@ -120,6 +131,9 @@ Le fichier persistant se trouve dans le dossier applicatif Tauri sous le nom `ev
 - `outilsia.forgebench_score_policy.v1`
 - `outilsia.forgebench_hidden_suite.v1`
 - `outilsia.forgebench_hidden_suite_receipt.v1`
+- `outilsia.forgebench_worker_run_contract.v1`
+- `outilsia.forgebench_worker_sandbox_receipt.v1`
+- `outilsia.forgebench_worker_sandbox_status.v1`
 - `outilsia.forgebench_experiment.v1`
 - `outilsia.forgebench_compile_result.v1`
 - `outilsia.evidence_entry.v1`

@@ -89,12 +89,15 @@ ForgeBench v0 prépare désormais `Signal Maze v1` en mode Détails : starter pu
 
 Le Hidden Suite Vault peut générer localement cinq seeds privés et remettre uniquement un reçu signé à ForgeBench. Le fichier n'est pas chiffré au repos et aucun niveau scientifique n'est débloqué avant la future isolation des workers et de l'évaluateur.
 
+Le module **Espaces worker frais** matérialise désormais un workspace neuf par stack et seed public, hors dépôt source. Les trois fichiers du starter embarqué et le contrat public de run sont revérifiés à chaque lecture ; le reçu ne contient aucun chemin. Cette étape ne lance aucun CLI et n'isole encore ni processus, ni réseau, ni accès au vault : `worker_execution_ready=false` et `scientific_eligible=false` restent obligatoires.
+
 Contrôles dédiés :
 
 ```bash
 npm run verify:board-observer
 npm run verify:workstack-composer
 npm run verify:capability-router
+npm run verify:forgebench
 npm run verify:evidence-ledger
 ```
 

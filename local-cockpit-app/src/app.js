@@ -59,6 +59,7 @@ const state = {
   capabilityRouter: null,
   forgeBench: null,
   forgeBenchHiddenSuite: null,
+  forgeBenchWorkerSandbox: null,
   evidenceLedger: null,
   installSafetyPreflight: null,
   localSnapshots: [],
@@ -107,6 +108,10 @@ const FORGEBENCH_HIDDEN_SUITE_SEAL_REQUEST_SCHEMA = "outilsia.forgebench_hidden_
 const FORGEBENCH_HIDDEN_SUITE_SEAL_RESULT_SCHEMA = "outilsia.forgebench_hidden_suite_seal_result.v1";
 const FORGEBENCH_HIDDEN_SUITE_STATUS_SCHEMA = "outilsia.forgebench_hidden_suite_status.v1";
 const FORGEBENCH_HIDDEN_SUITE_RECEIPT_SCHEMA = "outilsia.forgebench_hidden_suite_receipt.v1";
+const FORGEBENCH_WORKER_SANDBOX_PREPARE_REQUEST_SCHEMA = "outilsia.forgebench_worker_sandbox_prepare_request.v1";
+const FORGEBENCH_WORKER_SANDBOX_PREPARE_RESULT_SCHEMA = "outilsia.forgebench_worker_sandbox_prepare_result.v1";
+const FORGEBENCH_WORKER_SANDBOX_STATUS_SCHEMA = "outilsia.forgebench_worker_sandbox_status.v1";
+const FORGEBENCH_WORKER_SANDBOX_RECEIPT_SCHEMA = "outilsia.forgebench_worker_sandbox_receipt.v1";
 const EVIDENCE_APPEND_REQUEST_SCHEMA = "outilsia.evidence_append_request.v1";
 const EVIDENCE_APPEND_RESULT_SCHEMA = "outilsia.evidence_append_result.v1";
 const EVIDENCE_LEDGER_SCHEMA = "outilsia.evidence_ledger.v1";
@@ -470,6 +475,11 @@ const els = {
   sealForgeBenchVaultBtn: $("sealForgeBenchVaultBtn"),
   refreshForgeBenchVaultBtn: $("refreshForgeBenchVaultBtn"),
   clearForgeBenchVaultBtn: $("clearForgeBenchVaultBtn"),
+  forgeBenchSandboxState: $("forgeBenchSandboxState"),
+  forgeBenchSandboxBox: $("forgeBenchSandboxBox"),
+  prepareForgeBenchSandboxBtn: $("prepareForgeBenchSandboxBtn"),
+  refreshForgeBenchSandboxBtn: $("refreshForgeBenchSandboxBtn"),
+  clearForgeBenchSandboxBtn: $("clearForgeBenchSandboxBtn"),
   evidenceLedgerState: $("evidenceLedgerState"),
   evidenceLedgerSource: $("evidenceLedgerSource"),
   evidenceLedgerBox: $("evidenceLedgerBox"),
@@ -638,6 +648,8 @@ let forgeBenchBusy = false;
 let forgeBenchError = "";
 let forgeBenchVaultBusy = false;
 let forgeBenchVaultError = "";
+let forgeBenchSandboxBusy = false;
+let forgeBenchSandboxError = "";
 let evidenceLedgerBusy = false;
 let evidenceLedgerError = "";
 const privateWorkloadSelections = new Set();
@@ -11072,6 +11084,7 @@ async function loadForgeBenchVault(silent = false) {
     forgeBenchVaultBusy = false;
     renderForgeBenchVaultPanel();
     renderForgeBenchPanel();
+    renderForgeBenchSandboxPanel();
     renderEvidenceLedgerPanel();
   }
 }
@@ -11115,6 +11128,7 @@ async function sealForgeBenchVault() {
     forgeBenchVaultBusy = false;
     renderForgeBenchVaultPanel();
     renderForgeBenchPanel();
+    renderForgeBenchSandboxPanel();
     renderEvidenceLedgerPanel();
   }
 }
@@ -11139,7 +11153,206 @@ async function clearForgeBenchVault() {
     forgeBenchVaultBusy = false;
     renderForgeBenchVaultPanel();
     renderForgeBenchPanel();
+    renderForgeBenchSandboxPanel();
     renderEvidenceLedgerPanel();
+  }
+}
+
+function forgeBenchSandboxReceipt(status = state.forgeBenchWorkerSandbox) {
+  const receipt = status?.receipt;
+  const digest = receipt?.integrity?.digest;
+  const workspaces = Number(receipt?.workspaces_total || 0);
+  const stacks = Number(receipt?.candidate_stacks_total || 0);
+  const seeds = Number(receipt?.public_seeds_total || 0);
+  if (
+    receipt?.schema !== FORGEBENCH_WORKER_SANDBOX_RECEIPT_SCHEMA
+    || !/^fbsb-[a-z0-9_-]{8,64}$/.test(String(receipt?.batch_id || ""))
+    || !/^[a-f0-9]{64}$/i.test(String(receipt?.experiment_digest || ""))
+    || !/^[a-f0-9]{64}$/i.test(String(receipt?.protocol_digest || ""))
+    || !/^[a-f0-9]{64}$/i.test(String(receipt?.starter_bundle_sha256 || ""))
+    || !/^[a-f0-9]{64}$/i.test(String(receipt?.batch_digest || ""))
+    || !/^[a-f0-9]{64}$/i.test(String(digest || ""))
+    || stacks < 2 || stacks > 3 || seeds < 1 || seeds > 3 || workspaces !== stacks * seeds
+    || receipt?.paths_returned !== false
+    || receipt?.security?.fresh_workspace_per_run !== true
+    || receipt?.security?.workspace_outside_source_repository !== true
+    || receipt?.security?.starter_digest_verified !== true
+    || receipt?.security?.hidden_suite_material_copied !== false
+    || receipt?.security?.credentials_copied !== false
+    || receipt?.security?.source_repository_mounted !== false
+    || receipt?.security?.process_isolation_enforced !== false
+    || receipt?.security?.network_isolation_enforced !== false
+    || receipt?.security?.hidden_suite_access_blocked !== false
+    || receipt?.execution?.worker_started !== false
+    || receipt?.execution?.command_executed !== false
+    || receipt?.readiness?.workspace_batch_prepared !== true
+    || receipt?.readiness?.worker_execution_ready !== false
+    || receipt?.readiness?.scientific_eligible !== false
+  ) return null;
+  const blockers = Array.isArray(receipt?.readiness?.blockers) ? receipt.readiness.blockers : [];
+  for (const blocker of [
+    "worker_process_not_started",
+    "process_isolation_not_enforced",
+    "network_isolation_not_enforced",
+    "hidden_suite_not_worker_inaccessible",
+    "isolated_evaluator_not_implemented"
+  ]) {
+    if (!blockers.includes(blocker)) return null;
+  }
+  return receipt;
+}
+
+function forgeBenchSandboxMatchesExperiment(receipt = forgeBenchSandboxReceipt()) {
+  const experiment = state.forgeBench?.experiment;
+  return Boolean(
+    receipt
+    && experiment
+    && receipt.experiment_id === experiment.experiment_id
+    && receipt.experiment_digest === experiment.integrity?.digest
+    && receipt.protocol_digest === experiment.protocol_digest
+  );
+}
+
+function renderForgeBenchSandboxPanel() {
+  if (!els.forgeBenchSandboxBox) return;
+  const receipt = forgeBenchSandboxReceipt();
+  const experiment = state.forgeBench?.experiment;
+  const canPrepare = experiment?.readiness?.protocol_ready === true;
+  const canClear = Boolean(receipt || forgeBenchSandboxError || state.forgeBenchWorkerSandbox?.exists);
+  els.prepareForgeBenchSandboxBtn.disabled = !invoke || forgeBenchSandboxBusy || !canPrepare;
+  els.refreshForgeBenchSandboxBtn.disabled = !invoke || forgeBenchSandboxBusy;
+  els.clearForgeBenchSandboxBtn.disabled = !invoke || forgeBenchSandboxBusy || !canClear;
+  if (!invoke && !state.forgeBenchWorkerSandbox?.test_mode) {
+    els.forgeBenchSandboxState.textContent = "app native requise";
+    els.forgeBenchSandboxBox.className = "forgebench-sandbox-box empty";
+    els.forgeBenchSandboxBox.textContent = "La matérialisation des workspaces est disponible uniquement dans l'application Windows/Linux.";
+    return;
+  }
+  if (forgeBenchSandboxBusy) {
+    els.forgeBenchSandboxState.textContent = "préparation locale";
+    els.forgeBenchSandboxBox.className = "forgebench-sandbox-box empty";
+    els.forgeBenchSandboxBox.textContent = "Copie et vérification du starter public. Aucun worker, shell, réseau ou test caché n'est lancé.";
+    return;
+  }
+  if (forgeBenchSandboxError) {
+    els.forgeBenchSandboxState.textContent = "sandbox refusé";
+    els.forgeBenchSandboxBox.className = "forgebench-sandbox-box empty";
+    els.forgeBenchSandboxBox.innerHTML = `<strong>Espaces non fiables</strong><span>${escapeHtml(forgeBenchSandboxError)}</span>`;
+    return;
+  }
+  if (!receipt) {
+    els.forgeBenchSandboxState.textContent = canPrepare ? "prêts à matérialiser" : "préflight requis";
+    els.forgeBenchSandboxBox.className = "forgebench-sandbox-box empty";
+    els.forgeBenchSandboxBox.textContent = canPrepare
+      ? "Crée un espace neuf par stack et seed public, hors du dépôt source, avec le starter embarqué vérifié."
+      : "Prépare d'abord une expérience ForgeBench dont le protocole est prêt.";
+    return;
+  }
+  const current = forgeBenchSandboxMatchesExperiment(receipt);
+  const digest = receipt.integrity?.digest || "";
+  els.forgeBenchSandboxState.textContent = current ? "workspaces vérifiés" : "batch ancien";
+  els.forgeBenchSandboxBox.className = `forgebench-sandbox-box${current ? "" : " empty"}`;
+  els.forgeBenchSandboxBox.innerHTML = `
+    <strong>${escapeHtml(receipt.workspaces_total)} espaces frais ${current ? "liés au préflight" : "à remplacer"}</strong>
+    <span>${escapeHtml(receipt.candidate_stacks_total)} stacks × ${escapeHtml(receipt.public_seeds_total)} seeds publics · starter SHA-256 vérifié</span>
+    <small>Aucun chemin exposé · aucun worker lancé · processus, réseau et accès au vault non isolés · SHA-256 ${escapeHtml(digest ? `${digest.slice(0, 12)}…${digest.slice(-8)}` : "absente")}</small>
+  `;
+}
+
+async function loadForgeBenchSandbox(silent = false) {
+  if (!invoke || forgeBenchSandboxBusy) return null;
+  forgeBenchSandboxBusy = true;
+  forgeBenchSandboxError = "";
+  if (!silent) setStatus("Vérification des workspaces ForgeBench...");
+  renderForgeBenchSandboxPanel();
+  try {
+    const status = await invoke("get_forgebench_worker_sandbox_status");
+    if (
+      status?.schema !== FORGEBENCH_WORKER_SANDBOX_STATUS_SCHEMA
+      || status?.paths_returned !== false
+      || status?.hidden_suite_contents_returned !== false
+      || status?.worker_started !== false
+      || status?.command_executed !== false
+    ) throw new Error("statut natif du sandbox non conforme");
+    if (status.exists && !forgeBenchSandboxReceipt(status)) throw new Error("reçu de sandbox invalide");
+    state.forgeBenchWorkerSandbox = status;
+    if (!silent) setStatus(status.exists ? "Workspaces ForgeBench vérifiés" : "Aucun workspace ForgeBench", status.exists ? "ok" : "warn");
+    return status;
+  } catch (error) {
+    state.forgeBenchWorkerSandbox = null;
+    forgeBenchSandboxError = String(error || "Sandbox ForgeBench illisible");
+    if (!silent) setStatus(`Sandbox ForgeBench : ${forgeBenchSandboxError}`, "error");
+    return null;
+  } finally {
+    forgeBenchSandboxBusy = false;
+    renderForgeBenchSandboxPanel();
+  }
+}
+
+async function prepareForgeBenchSandbox() {
+  const experiment = state.forgeBench?.experiment;
+  if (!invoke || forgeBenchSandboxBusy || experiment?.readiness?.protocol_ready !== true) return null;
+  const replace = Boolean(forgeBenchSandboxReceipt());
+  if (replace && !window.confirm("Remplacer le batch de workspaces ForgeBench ? Les espaces actuels seront supprimés.")) return null;
+  forgeBenchSandboxBusy = true;
+  forgeBenchSandboxError = "";
+  renderForgeBenchSandboxPanel();
+  setStatus(replace ? "Remplacement des workspaces ForgeBench..." : "Préparation des workspaces ForgeBench...");
+  try {
+    const result = await invoke("prepare_forgebench_worker_sandbox", {
+      request: {
+        schema: FORGEBENCH_WORKER_SANDBOX_PREPARE_REQUEST_SCHEMA,
+        forgebench_result: state.forgeBench,
+        replace_existing: replace
+      }
+    });
+    if (
+      result?.schema !== FORGEBENCH_WORKER_SANDBOX_PREPARE_RESULT_SCHEMA
+      || result?.prepared !== true
+      || result?.worker_started !== false
+      || result?.command_executed !== false
+      || result?.paths_returned !== false
+    ) throw new Error("réponse native de préparation non conforme");
+    const status = {
+      schema: FORGEBENCH_WORKER_SANDBOX_STATUS_SCHEMA,
+      exists: true,
+      receipt: result.receipt,
+      paths_returned: false,
+      hidden_suite_contents_returned: false,
+      worker_started: false,
+      command_executed: false
+    };
+    if (!forgeBenchSandboxReceipt(status)) throw new Error("reçu natif du sandbox invalide");
+    state.forgeBenchWorkerSandbox = status;
+    setStatus(result.replaced ? "Workspaces ForgeBench remplacés" : "Workspaces ForgeBench préparés", "ok");
+    return result;
+  } catch (error) {
+    forgeBenchSandboxError = String(error || "Préparation du sandbox impossible");
+    setStatus(`Sandbox ForgeBench : ${forgeBenchSandboxError}`, "error");
+    return null;
+  } finally {
+    forgeBenchSandboxBusy = false;
+    renderForgeBenchSandboxPanel();
+  }
+}
+
+async function clearForgeBenchSandbox() {
+  if (!invoke || forgeBenchSandboxBusy || (!forgeBenchSandboxReceipt() && !forgeBenchSandboxError && !state.forgeBenchWorkerSandbox?.exists)) return;
+  if (!window.confirm("Effacer tous les workspaces ForgeBench préparés ?")) return;
+  forgeBenchSandboxBusy = true;
+  forgeBenchSandboxError = "";
+  renderForgeBenchSandboxPanel();
+  try {
+    const status = await invoke("clear_forgebench_worker_sandbox");
+    if (status?.schema !== FORGEBENCH_WORKER_SANDBOX_STATUS_SCHEMA || status?.exists !== false) throw new Error("suppression native incomplète");
+    state.forgeBenchWorkerSandbox = status;
+    setStatus("Workspaces ForgeBench effacés", "ok");
+  } catch (error) {
+    forgeBenchSandboxError = String(error || "Suppression impossible");
+    setStatus(`Sandbox ForgeBench : ${forgeBenchSandboxError}`, "error");
+  } finally {
+    forgeBenchSandboxBusy = false;
+    renderForgeBenchSandboxPanel();
   }
 }
 
@@ -11162,6 +11375,8 @@ function forgeBenchMarkdown(result = state.forgeBench) {
     `- Suite privée locale : ${protocol.hidden_suite?.status === "locally_sealed" ? "scellée mais non isolée" : "absente"}`,
     `- Préflight exploratoire : ${readiness.exploratory_ready ? "prêt" : "bloqué"}`,
     `- Préflight scientifique : ${readiness.scientific_ready ? "prêt" : "bloqué"}`,
+    `- Workspaces frais : ${forgeBenchSandboxMatchesExperiment() ? `${forgeBenchSandboxReceipt()?.workspaces_total || 0} préparés, sans exécution` : "non préparés pour ce préflight"}`,
+    `- Isolation processus/réseau : non`,
     blockers.length ? `- Blocages : ${blockers.map(forgeBenchBlockerLabel).join(" ; ")}` : "- Blocages : aucun",
     `- Score : résultat ${weights.result || 0}% · efficacité ${weights.efficiency || 0}% · vitesse ${weights.speed || 0}% · coût ${weights.cost || 0}%`,
     `- Coût inconnu traité comme zéro : non`,
@@ -11307,6 +11522,7 @@ async function compileForgeBenchExperiment() {
   } finally {
     forgeBenchBusy = false;
     renderForgeBenchPanel();
+    renderForgeBenchSandboxPanel();
     renderEvidenceLedgerPanel();
   }
 }
@@ -11341,6 +11557,7 @@ function clearForgeBench(silent = false) {
     for (const input of els.forgeBenchStacks?.querySelectorAll('input[name="forgeBenchStack"]') || []) input.checked = true;
   }
   renderForgeBenchPanel();
+  renderForgeBenchSandboxPanel();
   renderEvidenceLedgerPanel();
   if (!silent) setStatus("ForgeBench effacé", "ok");
 }
@@ -16620,9 +16837,9 @@ function installTestHarness() {
           candidate_stacks: [
             { key: "codex-solo", label: "Codex CLI seul", available: true, bindings: [binding("worker", "codex-cli:test", "Codex CLI"), binding("independent_verifier", "forgebench:deterministic-evaluator", "Évaluateur déterministe ForgeBench")], blockers: [], protocol_digest: protocolDigest, execution_started: false, scores_computed: false },
             { key: "claude-solo", label: "Claude Code seul", available: true, bindings: [binding("worker", "claude-code:test", "Claude Code"), binding("independent_verifier", "forgebench:deterministic-evaluator", "Évaluateur déterministe ForgeBench")], blockers: [], protocol_digest: protocolDigest, execution_started: false, scores_computed: false },
-            { key: "hermes-codex-claude", label: "Hermes planifie, Codex construit, Claude vérifie", available: false, bindings: [binding("planner", null, ""), binding("worker", "codex-cli:test", "Codex CLI"), binding("independent_verifier", "claude-code:test", "Claude Code")], blockers: ["missing_planner"], protocol_digest: protocolDigest, execution_started: false, scores_computed: false }
+            { key: "hermes-codex-claude", label: "Hermes planifie, Codex construit, Claude vérifie", available: true, bindings: [binding("planner", "hermes-agent:test", "Hermes Agent"), binding("worker", "codex-cli:test", "Codex CLI"), binding("independent_verifier", "claude-code:test", "Claude Code")], blockers: [], protocol_digest: protocolDigest, execution_started: false, scores_computed: false }
           ],
-          readiness: { protocol_ready: false, exploratory_ready: false, scientific_ready: false, selected_claim_ready: false, blockers: ["selected_stack_unavailable"], warnings: ["local_hidden_suite_not_worker_isolated"] },
+          readiness: { protocol_ready: true, exploratory_ready: true, scientific_ready: false, selected_claim_ready: true, blockers: [], warnings: ["local_hidden_suite_not_worker_isolated"] },
           measurements: { runs_recorded: 0, dimensions_measured: [], scores_computed: false, winner_declared: false, cost_status: "not_measured_not_zero" },
           execution: { started: false, agents_started: false, worktrees_created: false, repository_modified: false, api_spend_eur: 0 },
           privacy: { raw_workstack_included: false, raw_task_context_included: false, credentials_included: false, hidden_test_contents_included: false },
@@ -16630,15 +16847,60 @@ function installTestHarness() {
         },
         integrity: { digest: "1".repeat(64) }
       };
+      state.forgeBenchWorkerSandbox = {
+        schema: FORGEBENCH_WORKER_SANDBOX_STATUS_SCHEMA,
+        exists: true,
+        paths_returned: false,
+        hidden_suite_contents_returned: false,
+        worker_started: false,
+        command_executed: false,
+        test_mode: true,
+        receipt: {
+          schema: FORGEBENCH_WORKER_SANDBOX_RECEIPT_SCHEMA,
+          batch_id: "fbsb-demo-signal-maze",
+          benchmark_id: "signal-maze-v1",
+          experiment_id: "fb-demo-signal-maze",
+          experiment_digest: "f".repeat(64),
+          protocol_digest: protocolDigest,
+          candidate_stacks_total: 3,
+          public_seeds_total: 3,
+          workspaces_total: 9,
+          starter_bundle_sha256: "c".repeat(64),
+          batch_digest: "2".repeat(64),
+          paths_returned: false,
+          security: {
+            fresh_workspace_per_run: true,
+            workspace_outside_source_repository: true,
+            starter_digest_verified: true,
+            hidden_suite_material_copied: false,
+            credentials_copied: false,
+            source_repository_mounted: false,
+            process_isolation_enforced: false,
+            network_isolation_enforced: false,
+            hidden_suite_access_blocked: false
+          },
+          execution: { worker_started: false, command_executed: false, network_called: false, repository_modified: false, api_spend_eur: 0 },
+          readiness: {
+            workspace_batch_prepared: true,
+            worker_execution_ready: false,
+            scientific_eligible: false,
+            blockers: ["worker_process_not_started", "process_isolation_not_enforced", "network_isolation_not_enforced", "hidden_suite_not_worker_inaccessible", "isolated_evaluator_not_implemented"]
+          },
+          integrity: { digest: "3".repeat(64) }
+        }
+      };
       forgeBenchError = "";
       forgeBenchVaultError = "";
+      forgeBenchSandboxError = "";
       if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "forgebench_experiment_compiled";
       renderForgeBenchVaultPanel();
       renderForgeBenchPanel();
+      renderForgeBenchSandboxPanel();
       renderEvidenceLedgerPanel();
       return {
         result: state.forgeBench,
         vault: state.forgeBenchHiddenSuite,
+        sandbox: state.forgeBenchWorkerSandbox,
         panel: els.forgeBenchBox?.textContent || "",
         markdown: forgeBenchMarkdown()
       };
@@ -17696,11 +17958,15 @@ els.clearForgeBenchBtn?.addEventListener("click", () => clearForgeBench(false));
 els.sealForgeBenchVaultBtn?.addEventListener("click", sealForgeBenchVault);
 els.refreshForgeBenchVaultBtn?.addEventListener("click", () => loadForgeBenchVault(false));
 els.clearForgeBenchVaultBtn?.addEventListener("click", clearForgeBenchVault);
+els.prepareForgeBenchSandboxBtn?.addEventListener("click", prepareForgeBenchSandbox);
+els.refreshForgeBenchSandboxBtn?.addEventListener("click", () => loadForgeBenchSandbox(false));
+els.clearForgeBenchSandboxBtn?.addEventListener("click", clearForgeBenchSandbox);
 for (const input of [els.forgeBenchBenchmark, els.forgeBenchClaimLevel, els.forgeBenchSeedCount]) {
   input?.addEventListener("change", () => {
     state.forgeBench = null;
     forgeBenchError = "";
     renderForgeBenchPanel();
+    renderForgeBenchSandboxPanel();
     renderEvidenceLedgerPanel();
   });
 }
@@ -17708,6 +17974,7 @@ els.forgeBenchStacks?.addEventListener("change", () => {
   state.forgeBench = null;
   forgeBenchError = "";
   renderForgeBenchPanel();
+  renderForgeBenchSandboxPanel();
   renderEvidenceLedgerPanel();
 });
 els.appendEvidenceBtn?.addEventListener("click", appendSelectedEvidence);
@@ -18040,6 +18307,7 @@ renderWorkstackComposerPanel();
 renderCapabilityRouterPanel();
 renderForgeBenchVaultPanel();
 renderForgeBenchPanel();
+renderForgeBenchSandboxPanel();
 renderEvidenceLedgerPanel();
 renderPreparePanel();
 renderReadinessPanel();
@@ -18049,6 +18317,7 @@ refreshAuthState();
 
 if (invoke) {
   void loadForgeBenchVault(true);
+  void loadForgeBenchSandbox(true);
   void loadEvidenceLedger(true);
   void refreshLocalCapabilityBridgeStatus(true);
   window.setInterval(() => {

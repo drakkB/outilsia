@@ -4,10 +4,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
+const repoRoot = resolve(root, "..");
 const benchmarkPath = resolve(root, "forgebench", "signal-maze-v1.json");
 const manifestPath = resolve(root, "forgebench", "signal-maze-v1", "starter-manifest.json");
 const benchmark = JSON.parse(readFileSync(benchmarkPath, "utf8"));
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+const hub = readFileSync(resolve(repoRoot, "server-work", "static", "pages", "scanner-ia-local.html"), "utf8");
+const download = readFileSync(resolve(repoRoot, "server-work", "static", "pages", "telecharger-scanner-ia-local.html"), "utf8");
+const llms = readFileSync(resolve(repoRoot, "server-work", "static", "llms.txt"), "utf8");
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
 if (benchmark.schema !== "outilsia.forgebench_benchmark.v1" || benchmark.id !== "signal-maze-v1") {
@@ -51,7 +55,7 @@ if (bundleDigest !== manifest.bundle_sha256 || bundleDigest !== benchmark.starte
   throw new Error("starter bundle digest mismatch");
 }
 
-const rust = ["forgebench.rs", "forgebench_vault.rs"]
+const rust = ["forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri", "src", name), "utf8"))
   .join("\n");
 const js = readFileSync(resolve(root, "src", "app.js"), "utf8");
@@ -68,6 +72,15 @@ for (const needle of [
   '"worker_access_blocked": false',
   '"encrypted_at_rest": false',
   "forgebench-hidden-suite-v1.json",
+  '"fresh_workspace_per_run": true',
+  '"workspace_outside_source_repository": true',
+  '"starter_digest_verified": true',
+  '"hidden_suite_material_copied": false',
+  '"process_isolation_enforced": false',
+  '"network_isolation_enforced": false',
+  '"hidden_suite_access_blocked": false',
+  '"worker_execution_ready": false',
+  "forgebench-worker-sandboxes-v1",
 ]) {
   if (!rust.includes(needle)) throw new Error(`missing Rust ForgeBench guard: ${needle}`);
 }
@@ -76,8 +89,20 @@ for (const needle of [
   "aucun score calculé",
   "aucun vainqueur déclaré",
   "coût inconnu ≠ zéro",
+  "Aucun chemin exposé",
+  "aucun worker lancé",
+  "processus, réseau et accès au vault non isolés",
 ]) {
   if (!js.includes(needle)) throw new Error(`missing UI truth label: ${needle}`);
 }
+for (const [label, text, needles] of [
+  ["hub", hub, ["forgebench-workspaces-stacks-ia", "ForgeBench Workspaces v0 · candidat source", "Aucun worker ou shell lancé", "accès au vault ne sont pas encore isolés"]],
+  ["download", download, ["forgebench-workspaces-stacks-ia", "ForgeBench Workspaces v0 · candidat source", "Pas encore une sandbox OS", "ne débloque ni exécution automatique, ni score, ni conclusion scientifique"]],
+  ["llms", llms, ["ForgeBench Workspaces v0 (source candidate, not in the current public build)", "No worker or shell is launched", "not isolated execution, scientific evidence, scoring or a winner"]],
+]) {
+  for (const needle of needles) {
+    if (!text.includes(needle)) throw new Error(`missing ForgeBench SEO/GEO truth on ${label}: ${needle}`);
+  }
+}
 
-console.log(`forgebench_contract_ok benchmark=${benchmark.id} seeds=${benchmark.determinism.default_seeds.length} starter=${bundleDigest} hidden=absent execution=false`);
+console.log(`forgebench_contract_ok benchmark=${benchmark.id} seeds=${benchmark.determinism.default_seeds.length} starter=${bundleDigest} hidden=absent workspaces=fresh-not-executed isolation=false seo=hub-download-llms execution=false`);

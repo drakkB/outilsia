@@ -53,6 +53,26 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     receipt_json = json.dumps(receipt, sort_keys=True)
     if '"hidden_seeds":' in receipt_json or "seed-boundary-cases" in receipt_json:
         raise AssertionError(f"{label}: hidden suite contents leaked to UI")
+    sandbox = proof["sandbox"]["receipt"]
+    if sandbox["schema"] != "outilsia.forgebench_worker_sandbox_receipt.v1":
+        raise AssertionError(f"{label}: sandbox receipt schema mismatch")
+    if sandbox["workspaces_total"] != 9 or sandbox["candidate_stacks_total"] != 3 or sandbox["public_seeds_total"] != 3:
+        raise AssertionError(f"{label}: sandbox workspace matrix mismatch")
+    if sandbox["experiment_digest"] != experiment["integrity"]["digest"] or sandbox["protocol_digest"] != experiment["protocol_digest"]:
+        raise AssertionError(f"{label}: sandbox is not bound to the current experiment")
+    if sandbox["security"]["fresh_workspace_per_run"] is not True or sandbox["security"]["starter_digest_verified"] is not True:
+        raise AssertionError(f"{label}: fresh verified workspaces are missing")
+    for key in ["process_isolation_enforced", "network_isolation_enforced", "hidden_suite_access_blocked"]:
+        if sandbox["security"][key] is not False:
+            raise AssertionError(f"{label}: sandbox overclaims {key}")
+    if sandbox["execution"]["worker_started"] is not False or sandbox["execution"]["command_executed"] is not False:
+        raise AssertionError(f"{label}: sandbox fixture claims execution")
+    if sandbox["readiness"]["worker_execution_ready"] is not False or sandbox["readiness"]["scientific_eligible"] is not False:
+        raise AssertionError(f"{label}: workspace preparation unlocked execution or science")
+    sandbox_json = json.dumps(sandbox, sort_keys=True)
+    for forbidden in ["workspace_relative", "hidden_seeds", "/home/", "C:\\Users\\"]:
+        if forbidden in sandbox_json:
+            raise AssertionError(f"{label}: sandbox receipt leaked {forbidden!r}")
     if page.locator("#copyForgeBenchJsonBtn").is_disabled() or page.locator("#copyForgeBenchProtocolBtn").is_disabled():
         raise AssertionError(f"{label}: compiled preflight cannot be exported")
     if page.locator("#evidenceLedgerSource").input_value() != "forgebench_experiment_compiled":
@@ -73,6 +93,13 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "scellée localement",
         "stockage local non chiffré",
         "Suite privée scellée localement, mais non isolée des workers",
+        "Espaces worker frais",
+        "workspaces vérifiés",
+        "9 espaces frais liés au préflight",
+        "starter SHA-256 vérifié",
+        "Aucun chemin exposé",
+        "aucun worker lancé",
+        "processus, réseau et accès au vault non isolés",
         "Aucun agent lancé",
         "aucun score calculé",
         "aucun vainqueur déclaré",
@@ -110,7 +137,7 @@ def main() -> None:
         browser.close()
     print(
         f"forgebench_ui_ok desktop={desktop} mobile={mobile} "
-        "starter=sealed hidden=locally-sealed-not-isolated scores=false winner=false execution=false"
+        "starter=sealed hidden=locally-sealed-not-isolated workspaces=9 isolation=false scores=false winner=false execution=false"
     )
 
 

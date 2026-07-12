@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
-const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "evidence_ledger.rs"]
+const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
@@ -168,11 +168,19 @@ const requiredFeatureText = [
   ["rust ForgeBench hidden seeds not returned", rust, '"hidden_seeds_returned": false'],
   ["rust ForgeBench worker isolation honest", rust, '"worker_access_blocked": false'],
   ["rust ForgeBench vault local", rust, "forgebench-hidden-suite-v1.json"],
+  ["rust ForgeBench sandbox receipt", rust, "outilsia.forgebench_worker_sandbox_receipt.v1"],
+  ["rust ForgeBench fresh workspaces", rust, '"fresh_workspace_per_run": true'],
+  ["rust ForgeBench sandbox no worker", rust, '"worker_started": false'],
+  ["rust ForgeBench sandbox no process overclaim", rust, '"process_isolation_enforced": false'],
+  ["rust ForgeBench sandbox no network overclaim", rust, '"network_isolation_enforced": false'],
+  ["rust ForgeBench sandbox no hidden material", rust, '"hidden_suite_material_copied": false'],
   ["ForgeBench Signal Maze schema", forgeBenchContract, "outilsia.forgebench_benchmark.v1"],
   ["ForgeBench explicit hidden suite absence", forgeBenchContract, '"status": "not_provisioned"'],
   ["ForgeBench score policy", forgeBenchContract, '"result": 50, "efficiency": 20, "speed": 15, "cost": 15'],
   ["css ForgeBench", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".forgebench-box"],
   ["html ForgeBench hidden suite", html, "forgeBenchVaultBox"],
+  ["html ForgeBench worker sandbox", html, "forgeBenchSandboxBox"],
+  ["css ForgeBench worker sandbox", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".forgebench-sandbox"],
   ["html evidence ledger", html, "evidenceLedgerBox"],
   ["html evidence source", html, "evidenceLedgerSource"],
   ["js evidence append schema", js, "outilsia.evidence_append_request.v1"],
@@ -185,6 +193,7 @@ const requiredFeatureText = [
   ["notice Board Observer", workstackNotice, "Board Observer"],
   ["notice Evidence Ledger", workstackNotice, "Ce que prouve l'Evidence Ledger"],
   ["notice ForgeBench", workstackNotice, "Ce que prépare ForgeBench"],
+  ["notice ForgeBench workspaces", workstackNotice, "Espaces worker frais"],
   ["notice Workstack Arena", workstackNotice, "Workstack Arena"],
   ["notice Strategy Arena boundary", workstackNotice, "OutilsIA ne génère pas de stratégie financière"],
   ["js install safety schema", js, "outilsia.install_safety_preflight.v1"],
