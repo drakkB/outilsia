@@ -29,19 +29,20 @@ function jsonLdDocuments(html, label) {
 
 for (const [label, html] of [["hub", hub], ["download", download]]) {
   for (const token of [
-    "Runtime &amp; Driver Intelligence v1",
+    "Runtime &amp; Driver Intelligence v1 · candidat source",
+    "candidat source postérieur au build public actuel",
     "CUDA toolkit 12.x maximum",
     "Strix Halo",
     "DirectML n'est pas présenté comme backend Ollama",
-    "installé silencieusement"
+    "silencieu"
   ]) {
     if (!html.includes(token)) fail(`${label}: missing ${token}`);
   }
   const documents = jsonLdDocuments(html, label);
-  const software = documents.find((item) => item?.["@type"] === "SoftwareApplication");
   const faq = documents.find((item) => item?.["@type"] === "FAQPage");
-  if (!software || !String(software.description || "").includes("Runtime & Driver Intelligence")) {
-    fail(`${label}: SoftwareApplication must mention Runtime & Driver Intelligence`);
+  const software = documents.find((item) => item?.["@type"] === "SoftwareApplication");
+  if (!software || String(software.description || "").includes("Runtime & Driver Intelligence")) {
+    fail(`${label}: current SoftwareApplication must not claim the source-candidate runtime feature`);
   }
   if (!faq || !Array.isArray(faq.mainEntity)) fail(`${label}: FAQPage missing`);
   const visibleHtml = html.replace(/<script[\s\S]*?<\/script>/gi, "");
@@ -51,7 +52,7 @@ for (const [label, html] of [["hub", hub], ["download", download]]) {
 }
 
 for (const token of [
-  "Runtime & Driver Intelligence v1",
+  "Runtime & Driver Intelligence v1 (source candidate, not in the current public build)",
   "CUDA toolkit 12.x maximum",
   "Strix Halo",
   "DirectML is not presented as an Ollama backend",

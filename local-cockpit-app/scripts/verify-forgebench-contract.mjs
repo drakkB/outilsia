@@ -96,8 +96,8 @@ for (const needle of [
   if (!js.includes(needle)) throw new Error(`missing UI truth label: ${needle}`);
 }
 for (const [label, text, needles] of [
-  ["hub", hub, ["forgebench-workspaces-stacks-ia", "ForgeBench Workspaces v0 · candidat source", "Aucun worker ou shell lancé", "accès au vault ne sont pas encore isolés"]],
-  ["download", download, ["forgebench-workspaces-stacks-ia", "ForgeBench Workspaces v0 · candidat source", "Pas encore une sandbox OS", "ne débloque ni exécution automatique, ni score, ni conclusion scientifique"]],
+  ["hub", hub, ["forgebench-workspaces-stacks-ia", "ForgeBench Workspaces v0 · candidat source", "Aucun worker ou shell lancé", "accès au vault ne sont pas encore isolés", "ForgeBench peut-il déjà lancer Codex, Claude Code et Hermes automatiquement ?"]],
+  ["download", download, ["forgebench-workspaces-stacks-ia", "ForgeBench Workspaces v0 · candidat source", "Pas encore une sandbox OS", "ne débloque ni exécution automatique, ni score, ni conclusion scientifique", "ForgeBench peut-il déjà lancer Codex, Claude Code et Hermes automatiquement ?"]],
   ["llms", llms, ["ForgeBench Workspaces v0 (source candidate, not in the current public build)", "No worker or shell is launched", "not isolated execution, scientific evidence, scoring or a winner"]],
 ]) {
   for (const needle of needles) {

@@ -295,6 +295,8 @@ def check_download_page(base_url: str) -> dict[str, object]:
     )
     runtime_driver_ok = (
         "Runtime &amp; Driver Intelligence v1" in text
+        and "Runtime &amp; Driver Intelligence v1 · candidat source" in text
+        and "candidat source postérieur au build public actuel" in text
         and "CUDA toolkit 12.x maximum" in text
         and "Strix Halo" in text
         and "DirectML n'est pas présenté comme backend Ollama" in text
@@ -302,7 +304,8 @@ def check_download_page(base_url: str) -> dict[str, object]:
     )
     private_workload_ok = (
         "Private Workload Packs v1" in text
-        and "2 à 3 modèles" in text
+        and "Private Workload Packs v1 · candidat source" in text
+        and ("2 à 3 modèles" in text or "2 ou 3 modèles" in text)
         and "60 secondes maximum par modèle" in text
         and "réponses brutes exclues" in text
         and "ne compte jamais comme validation physique" in text
@@ -389,6 +392,8 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
     )
     runtime_driver_ok = (
         "Runtime &amp; Driver Intelligence v1" in text
+        and "Runtime &amp; Driver Intelligence v1 · candidat source" in text
+        and "candidat source postérieur au build public actuel" in text
         and "CUDA toolkit 12.x maximum" in text
         and "Strix Halo" in text
         and "DirectML n'est pas présenté comme backend Ollama" in text
@@ -396,6 +401,7 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
     )
     private_workload_ok = (
         "Private Workload Packs v1" in text
+        and "Private Workload Packs v1 · candidat source" in text
         and "2 à 3 modèles" in text
         and "60 secondes maximum par modèle" in text
         and "réponses brutes" in text
@@ -453,6 +459,16 @@ def check_release_manifest(base_url: str) -> dict[str, object]:
     runtime_driver_feature_ok = "runtime_driver_intelligence_v1" in features
     private_workload_note_ok = any("Private Workload Packs v1" in str(note) for note in notes)
     private_workload_feature_ok = "private_workload_packs_v1" in features
+    runtime_driver_claim_consistent = runtime_driver_note_ok == runtime_driver_feature_ok
+    private_workload_claim_consistent = private_workload_note_ok == private_workload_feature_ok
+    source_candidate_features_absent = not any(
+        (
+            runtime_driver_note_ok,
+            runtime_driver_feature_ok,
+            private_workload_note_ok,
+            private_workload_feature_ok,
+        )
+    )
     provenance = release.get("build_provenance") if isinstance(release.get("build_provenance"), dict) else {}
     build_id_matches = str(provenance.get("build_id") or "") == str(release.get("build_id") or "")
     return {
@@ -466,8 +482,11 @@ def check_release_manifest(base_url: str) -> dict[str, object]:
         "hardware_truth_feature_ok": hardware_truth_feature_ok,
         "runtime_driver_note_ok": runtime_driver_note_ok,
         "runtime_driver_feature_ok": runtime_driver_feature_ok,
+        "runtime_driver_claim_consistent": runtime_driver_claim_consistent,
         "private_workload_note_ok": private_workload_note_ok,
         "private_workload_feature_ok": private_workload_feature_ok,
+        "private_workload_claim_consistent": private_workload_claim_consistent,
+        "source_candidate_features_absent": source_candidate_features_absent,
         "build_id_matches": build_id_matches,
         "merged_release_ok": provenance.get("merged_release") is True,
         "ok": result.get("status") == 200
@@ -477,10 +496,9 @@ def check_release_manifest(base_url: str) -> dict[str, object]:
         and digital_twin_feature_ok
         and hardware_truth_note_ok
         and hardware_truth_feature_ok
-        and runtime_driver_note_ok
-        and runtime_driver_feature_ok
-        and private_workload_note_ok
-        and private_workload_feature_ok
+        and runtime_driver_claim_consistent
+        and private_workload_claim_consistent
+        and source_candidate_features_absent
         and build_id_matches
         and provenance.get("merged_release") is True,
     }
@@ -528,14 +546,14 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
         and "never count as physical field evidence" in text
     )
     runtime_driver_ok = (
-        "Runtime & Driver Intelligence v1" in text
+        "Runtime & Driver Intelligence v1 (source candidate, not in the current public build)" in text
         and "CUDA toolkit 12.x maximum" in text
         and "Strix Halo" in text
         and "DirectML is not presented as an Ollama backend" in text
         and "installs no graphics driver automatically" in text
     )
     private_workload_ok = (
-        "Private Workload Packs v1" in text
+        "Private Workload Packs v1 (source candidate, not in the current public build)" in text
         and "2 or 3 already-installed Ollama models" in text
         and "60-second limit per model" in text
         and "zero downloads or cloud uploads" in text
@@ -704,7 +722,7 @@ def write_markdown(report: dict[str, object], path: Path) -> None:
     )
     manifest = report["release_manifest"]
     lines.append(
-        f"- `release.json` status={manifest['status']} build={manifest['build_id']} files={manifest['file_count']} platforms={manifest['platforms']} digital_twin_feature={manifest['digital_twin_feature_ok']} digital_twin_note={manifest['digital_twin_note_ok']} hardware_truth_feature={manifest['hardware_truth_feature_ok']} hardware_truth_note={manifest['hardware_truth_note_ok']} runtime_driver_feature={manifest['runtime_driver_feature_ok']} runtime_driver_note={manifest['runtime_driver_note_ok']} provenance_match={manifest['build_id_matches']} merged={manifest['merged_release_ok']}"
+        f"- `release.json` status={manifest['status']} build={manifest['build_id']} files={manifest['file_count']} platforms={manifest['platforms']} digital_twin_feature={manifest['digital_twin_feature_ok']} digital_twin_note={manifest['digital_twin_note_ok']} hardware_truth_feature={manifest['hardware_truth_feature_ok']} hardware_truth_note={manifest['hardware_truth_note_ok']} runtime_driver_published={manifest['runtime_driver_feature_ok']} private_workload_published={manifest['private_workload_feature_ok']} source_candidates_absent={manifest['source_candidate_features_absent']} provenance_match={manifest['build_id_matches']} merged={manifest['merged_release_ok']}"
     )
     llms = report["llms_txt"]
     lines.append(
