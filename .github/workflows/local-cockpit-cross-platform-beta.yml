@@ -60,8 +60,12 @@ jobs:
       - name: Lint Rust core
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 
-      - name: Verify UI
-        run: npm run verify:ui
+      - name: Verify UI and source contracts
+        run: |
+          node --check src/app.js
+          npm run verify:ui
+          npm run verify:private-workload-catalog
+          npm run verify:private-workload-seo
 
       - name: Build Tauri Windows beta
         run: npm run build:beta
@@ -128,6 +132,13 @@ jobs:
 
       - name: Lint Rust core
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Verify UI and source contracts
+        run: |
+          node --check src/app.js
+          npm run verify:ui
+          npm run verify:private-workload-catalog
+          npm run verify:private-workload-seo
 
       - name: Build Linux beta package
         run: npm run build:beta:linux

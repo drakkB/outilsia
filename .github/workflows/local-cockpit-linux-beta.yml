@@ -61,6 +61,13 @@ jobs:
       - name: Lint Rust core
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 
+      - name: Verify UI and source contracts
+        run: |
+          node --check src/app.js
+          npm run verify:ui
+          npm run verify:private-workload-catalog
+          npm run verify:private-workload-seo
+
       - name: Resolve public build id
         env:
           REQUESTED_BUILD_ID: ${{ github.event.inputs.build_id }}

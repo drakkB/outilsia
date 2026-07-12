@@ -257,6 +257,42 @@
           </div>
         </article>
 
+        <article class="panel private-workload-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Tests privés</h2>
+            <span id="privateWorkloadState">local uniquement</span>
+          </div>
+          <div class="private-workload-privacy">
+            <strong>Aucun contenu envoyé au cloud</strong>
+            <span>Mêmes consignes pour chaque modèle · modèles déjà installés · prompts et réponses bruts exclus du Passport.</span>
+          </div>
+          <label class="field-label" for="privateWorkloadPackSelect">Pack de travail</label>
+          <select id="privateWorkloadPackSelect"></select>
+          <div id="privateWorkloadCustomFields" class="private-workload-custom hidden">
+            <label class="field-label" for="privateWorkloadCustomPrompt">Consigne métier locale</label>
+            <textarea id="privateWorkloadCustomPrompt" spellcheck="true" placeholder="Décris la tâche à comparer. Cette consigne n'est pas conservée après le run."></textarea>
+            <label class="field-label" for="privateWorkloadRequiredTerms">Termes obligatoires</label>
+            <input id="privateWorkloadRequiredTerms" type="text" autocomplete="off" placeholder="exemple : référence client, prochaine action">
+          </div>
+          <div class="private-workload-budget" aria-label="Budget Tests privés">
+            <div><span>Modèles</span><strong>2–3</strong></div>
+            <div><span>Durée max</span><strong>60 s / modèle</strong></div>
+            <div><span>Téléchargement</span><strong>0</strong></div>
+            <div><span>Persistance brute</span><strong>0</strong></div>
+          </div>
+          <div id="privateWorkloadModelList" class="private-workload-models empty">
+            Scanne la machine pour sélectionner deux modèles Ollama déjà installés.
+          </div>
+          <div id="privateWorkloadBox" class="private-workload-box empty">
+            Choisis un pack et deux modèles installés. OutilsIA appliquera exactement la même tâche et des critères déterministes.
+          </div>
+          <div class="row-actions">
+            <button id="runPrivateWorkloadBtn" type="button" disabled>Lancer le pack</button>
+            <button id="copyPrivateWorkloadBtn" type="button" disabled>Copier la preuve</button>
+            <button id="clearPrivateWorkloadBtn" type="button" disabled>Vider le run</button>
+          </div>
+        </article>
+
         <article class="panel strategy-bridge-panel advanced-panel">
           <div class="panel-title">
             <h2>Pont Strategy Arena</h2>
@@ -689,6 +725,7 @@
     <div id="printReportRoot" class="print-report-root" aria-hidden="true"></div>
 
     <script src="./runtime-driver-matrix.js"></script>
+    <script src="./private-workload-packs.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

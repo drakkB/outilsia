@@ -51,6 +51,8 @@ jobs:
         run: |
           node --check src/app.js
           npm run verify:ui
+          npm run verify:private-workload-catalog
+          npm run verify:private-workload-seo
 
       - name: Build fresh Windows beta
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-windows-beta.ps1 -SkipInstall -DesktopFolder "OutilsIA-Local-Cockpit-Beta-Windows"

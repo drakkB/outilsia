@@ -1,6 +1,6 @@
 # OutilsIA Local Cockpit - Roadmap produit
 
-Mise à jour : 2026-07-11
+Mise à jour : 2026-07-12
 
 ## Cap produit
 
@@ -34,9 +34,9 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Publier le build Windows/Linux contenant Hardware Truth v1 avant les essais physiques.
 - [ ] Confirmer l'offload réel sur les machines physiques de la campagne terrain.
 
-## Chantier actif - Runtime & Driver Intelligence v1
+## Candidat validé - Runtime & Driver Intelligence v1
 
-État source au 11 juillet 2026 : implémenté et testé localement, pas encore publié dans le build public `291439601671`. Le site et le manifeste public ne doivent annoncer cette capacité qu'après build Windows/Linux, gates vertes et vérification des artefacts.
+État au 12 juillet 2026 : source commit `8f29b5e`, run GitHub Actions `29152574120` terminé avec succès et candidat cross-platform `291525741201` produit. Le build public reste `291439601671` et ne revendique pas encore cette capacité. La publication et la communication live attendent la décision de release, la synchronisation des pages et la vérification des artefacts/SHA-256 ; le terrain reste `0/5`.
 
 - [x] Créer une matrice canonique versionnée, datée et sourcée pour NVIDIA, AMD, Intel, Apple et CPU.
 - [x] Séparer pilote détecté, API signalée, support Ollama documenté et preuve réelle `/api/ps`.
@@ -50,7 +50,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Corriger le parcours CPU-only : aucun bouton « corriger le pilote » sans accélérateur attendu et preuve suffisante.
 - [x] Garder l'action pilote manuelle et consentie : page officielle uniquement, aucune élévation ou installation silencieuse.
 - [x] Ajouter fixtures Pascal, RTX, Radeon, Strix Halo Windows/Linux, Intel Arc et CPU-only, plus tests Rust Windows natifs.
-- [ ] Valider le build Linux dans CI et le build Windows complet avec les nouvelles sondes.
+- [x] Valider le build Linux dans CI et le build Windows complet avec les nouvelles sondes.
 - [ ] Vérifier physiquement GTX 1080 Ti, AMD/Strix Halo et Intel Arc ; les fixtures ne constituent pas une preuve terrain.
 - [ ] Publier Windows/Linux et annoncer la fonction sur le site uniquement après toutes les gates et SHA-256 verts.
 - [ ] Envisager plus tard un installateur de pilote borné seulement si URL artefact, signature/hash, préflight, consentement, restauration et rollback sont tous prouvés ; sinon conserver le mode manuel officiel.
@@ -85,6 +85,21 @@ Premier jalon publié au 10 juillet 2026 dans le build public `291204755461` : c
 - Permettre un pack local Code, Français, Obsidian, résumé ou métier.
 - Exécuter exactement les mêmes tâches sur les candidats sans envoyer les fichiers au cloud.
 - Distinguer critères déterministes et éventuel jugement local optionnel.
+
+Premier jalon source v1 terminé le 12 juillet 2026. La fonction reste dans le mode Détails et n'est pas encore incluse dans le build public `291439601671`.
+
+- [x] Créer cinq packs versionnés : Code, Français, résumé, Mémoire / Obsidian et métier personnalisé.
+- [x] Limiter une campagne à une tâche, 2 à 3 modèles déjà installés, 60 secondes par modèle et zéro téléchargement.
+- [x] Appliquer exactement la même consigne et les mêmes critères déterministes à chaque candidat.
+- [x] Éviter les doubles candidatures par alias Ollama d'un même modèle.
+- [x] Persister uniquement scores, checks, métriques et empreintes SHA-256 ; ne jamais persister la consigne personnalisée ou les réponses brutes.
+- [x] Propager une preuve bornée au rapport, PDF, MemoryForge et AI Capability Passport 1.1.0 sans contenu privé brut.
+- [x] Ajouter une recette Playwright desktop/mobile qui injecte un marqueur secret et échoue s'il apparaît dans un export.
+- [x] Documenter la fonction dans les sources du hub, de la page téléchargement, de `llms.txt` et du monitoring SEO/GEO.
+- [ ] Construire le candidat Windows/Linux avec Private Workload Packs v1 et vérifier les artefacts/SHA-256.
+- [ ] Publier la fonction et les pages uniquement dans une release cohérente ; ne pas la présenter comme preuve terrain physique.
+- [ ] Confirmer les packs sur les machines physiques et ajuster seulement les critères qui échouent réellement.
+- [ ] Étudier un jugement local optionnel plus tard ; la v1 reste déterministe et n'appelle aucun juge cloud.
 
 ## Phase 4 - Flight Recorder
 

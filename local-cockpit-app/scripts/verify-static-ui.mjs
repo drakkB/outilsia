@@ -7,6 +7,7 @@ const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
 const rust = readFileSync(resolve(root, "src-tauri/src/lib.rs"), "utf8");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
+const privateWorkloadCatalog = readFileSync(resolve(root, "src/private-workload-packs.js"), "utf8");
 
 const htmlIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]));
 const jsIds = new Set([...js.matchAll(/\$\("([^"]+)"\)/g)].map((match) => match[1]));
@@ -108,6 +109,14 @@ const requiredFeatureText = [
   ["js hardware doctor v2", js, "outilsia.hardware_doctor.v2"],
   ["rust ollama runtime evidence", rust, "runtime_gpu_offload_percent"],
   ["css capability passport", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".capability-passport-box"],
+  ["html private workload catalog", html, "private-workload-packs.js"],
+  ["html private workload panel", html, "privateWorkloadBox"],
+  ["html private workload run button", html, "runPrivateWorkloadBtn"],
+  ["generated private workload schema", privateWorkloadCatalog, "outilsia.private_workload_pack_catalog.v1"],
+  ["js private workload protocol", js, "outilsia.private_workload_pack.v1"],
+  ["js private workload evaluator", js, "evaluatePrivateWorkloadPack"],
+  ["js private workload privacy", js, "raw_content_in_passport: false"],
+  ["css private workload", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".private-workload-box"],
 ];
 
 const missingFeature = requiredFeatureText.filter(([, text, needle]) => !text.includes(needle));

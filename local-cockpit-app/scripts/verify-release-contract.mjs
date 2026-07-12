@@ -108,11 +108,17 @@ try {
   if (release.build_provenance.ci === true && !/^\d{11,14}$/.test(String(release.build_id))) {
     fail("CI release.build_id must be an 11-14 digit GitHub run identifier");
   }
-  if (!Array.isArray(release.features) || !release.features.includes("upgrade_digital_twin_v1")) {
-    fail("release.features must include upgrade_digital_twin_v1");
+  const requiredFeatures = ["upgrade_digital_twin_v1", "runtime_driver_intelligence_v1", "private_workload_packs_v1"];
+  if (!Array.isArray(release.features)) fail("release.features must be an array");
+  for (const feature of requiredFeatures) {
+    if (!release.features.includes(feature)) fail(`release.features must include ${feature}`);
   }
-  if (!Array.isArray(release.release_notes) || !release.release_notes.some((note) => String(note).includes("Upgrade Digital Twin v1"))) {
-    fail("release.release_notes must advertise Upgrade Digital Twin v1");
+  const requiredNotes = ["Upgrade Digital Twin v1", "Runtime & Driver Intelligence v1", "Private Workload Packs v1"];
+  if (!Array.isArray(release.release_notes)) fail("release.release_notes must be an array");
+  for (const label of requiredNotes) {
+    if (!release.release_notes.some((note) => String(note).includes(label))) {
+      fail(`release.release_notes must advertise ${label}`);
+    }
   }
   if (!release.primary_download?.name) fail("Missing primary_download.name");
   if (!Array.isArray(release.files) || !release.files.length) fail("release.files must be non-empty");

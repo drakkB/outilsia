@@ -1,0 +1,278 @@
+{
+  "schema": "outilsia.private_workload_pack_catalog.v1",
+  "version": "2026-07-12.1",
+  "updated_at": "2026-07-12",
+  "policy": {
+    "local_only": true,
+    "cloud_upload": false,
+    "installed_models_only": true,
+    "downloads_per_run": 0,
+    "max_models_per_run": 3,
+    "min_models_per_run": 2,
+    "tasks_per_run": 1,
+    "timeout_seconds_per_model": 60,
+    "deterministic_checks_only": true,
+    "local_judgment_optional": false,
+    "persist_raw_custom_prompt": false,
+    "persist_raw_model_output": false,
+    "include_raw_content_in_passport": false
+  },
+  "response_keys": [
+    "answer",
+    "evidence",
+    "action"
+  ],
+  "packs": [
+    {
+      "key": "code",
+      "label": "Code",
+      "description": "Corriger une erreur simple et prouver le résultat sans exécuter le code.",
+      "prompt": "Test privé OutilsIA - Code. Corrige cette fonction JavaScript : function add(a,b){return a-b;} La fonction corrigée doit retourner a + b et add(4,5) doit valoir 9. Réponds uniquement avec un objet JSON sur une ligne, sans Markdown, avec exactement les clés answer, evidence, action. answer contient le code corrigé ; evidence explique brièvement le résultat 9 ; action contient une vérification concrète.",
+      "checks": [
+        {
+          "key": "format",
+          "label": "JSON conforme",
+          "rule": "exact_json_keys",
+          "weight": 20
+        },
+        {
+          "key": "correction",
+          "label": "Opérateur corrigé",
+          "rule": "regex",
+          "field": "answer",
+          "pattern": "return\\s+a\\s*\\+\\s*b",
+          "flags": "i",
+          "weight": 30
+        },
+        {
+          "key": "result",
+          "label": "Résultat 9",
+          "rule": "regex",
+          "field": "*",
+          "pattern": "(^|[^0-9])9([^0-9]|$)",
+          "flags": "i",
+          "weight": 20
+        },
+        {
+          "key": "explanation",
+          "label": "Explication utile",
+          "rule": "includes_any",
+          "field": "evidence",
+          "terms": [
+            "addition",
+            "somme",
+            "corrige"
+          ],
+          "weight": 15
+        },
+        {
+          "key": "action",
+          "label": "Action vérifiable",
+          "rule": "includes_any",
+          "field": "action",
+          "terms": [
+            "tester",
+            "verifier",
+            "executer"
+          ],
+          "weight": 15
+        }
+      ]
+    },
+    {
+      "key": "french",
+      "label": "Français",
+      "description": "Mesurer une correction naturelle et une justification grammaticale courte.",
+      "prompt": "Test privé OutilsIA - Français. Corrige naturellement : mon ia local repond bien en francais. Réponds uniquement avec un objet JSON sur une ligne, sans Markdown, avec exactement les clés answer, evidence, action. answer contient la phrase corrigée ; evidence nomme au moins une correction ; action propose une relecture concrète.",
+      "checks": [
+        {
+          "key": "format",
+          "label": "JSON conforme",
+          "rule": "exact_json_keys",
+          "weight": 20
+        },
+        {
+          "key": "correction",
+          "label": "Phrase française",
+          "rule": "includes_all",
+          "field": "answer",
+          "terms": [
+            "mon ia locale",
+            "repond",
+            "francais"
+          ],
+          "weight": 35
+        },
+        {
+          "key": "explanation",
+          "label": "Correction expliquée",
+          "rule": "includes_any",
+          "field": "evidence",
+          "terms": [
+            "accord",
+            "accent",
+            "locale",
+            "grammaire"
+          ],
+          "weight": 25
+        },
+        {
+          "key": "action",
+          "label": "Relecture proposée",
+          "rule": "includes_any",
+          "field": "action",
+          "terms": [
+            "relire",
+            "verifier",
+            "comparer"
+          ],
+          "weight": 20
+        }
+      ]
+    },
+    {
+      "key": "summary",
+      "label": "Résumé",
+      "description": "Conserver quatre faits techniques sans transformer une recommandation en achat.",
+      "prompt": "Test privé OutilsIA - Résumé. Résume ces faits sans rien inventer : la machine possède 16 Go de VRAM et 64 Go de RAM ; qwen3:8b a été mesuré à 42 tok/s ; aucun achat n'est nécessaire avant un second benchmark. Réponds uniquement avec un objet JSON sur une ligne, sans Markdown, avec exactement les clés answer, evidence, action. answer donne le verdict court ; evidence conserve les quatre faits ; action propose la comparaison suivante.",
+      "checks": [
+        {
+          "key": "format",
+          "label": "JSON conforme",
+          "rule": "exact_json_keys",
+          "weight": 20
+        },
+        {
+          "key": "facts",
+          "label": "Faits conservés",
+          "rule": "includes_all",
+          "field": "*",
+          "terms": [
+            "16 go",
+            "64 go",
+            "qwen3:8b",
+            "42 tok/s"
+          ],
+          "weight": 50
+        },
+        {
+          "key": "no_purchase",
+          "label": "Achat non forcé",
+          "rule": "includes_any",
+          "field": "*",
+          "terms": [
+            "aucun achat",
+            "pas d'achat",
+            "ne rien acheter"
+          ],
+          "weight": 15
+        },
+        {
+          "key": "action",
+          "label": "Comparaison suivante",
+          "rule": "includes_any",
+          "field": "action",
+          "terms": [
+            "benchmark",
+            "comparer",
+            "tester"
+          ],
+          "weight": 15
+        }
+      ]
+    },
+    {
+      "key": "memory",
+      "label": "Mémoire / Obsidian",
+      "description": "Vérifier rappel exact, structure de note et prochaine action.",
+      "prompt": "Test privé OutilsIA - Mémoire Obsidian. Mémorise les codes OBSIDIAN-84 et MEMORY-21. La décision est de garder hermes3:8b pour la mémoire projet. Réponds uniquement avec un objet JSON sur une ligne, sans Markdown, avec exactement les clés answer, evidence, action. answer contient une note avec un titre et des tags ; evidence restitue les deux codes et la décision ; action contient les mots prochaine action et benchmark.",
+      "checks": [
+        {
+          "key": "format",
+          "label": "JSON conforme",
+          "rule": "exact_json_keys",
+          "weight": 20
+        },
+        {
+          "key": "memory",
+          "label": "Codes rappelés",
+          "rule": "includes_all",
+          "field": "*",
+          "terms": [
+            "obsidian-84",
+            "memory-21"
+          ],
+          "weight": 30
+        },
+        {
+          "key": "structure",
+          "label": "Note structurée",
+          "rule": "includes_any",
+          "field": "answer",
+          "terms": [
+            "titre",
+            "tags",
+            "#obsidian"
+          ],
+          "weight": 15
+        },
+        {
+          "key": "decision",
+          "label": "Décision conservée",
+          "rule": "includes_all",
+          "field": "evidence",
+          "terms": [
+            "hermes3:8b",
+            "memoire"
+          ],
+          "weight": 20
+        },
+        {
+          "key": "action",
+          "label": "Prochaine action",
+          "rule": "includes_all",
+          "field": "action",
+          "terms": [
+            "prochaine action",
+            "benchmark"
+          ],
+          "weight": 15
+        }
+      ]
+    },
+    {
+      "key": "custom",
+      "label": "Métier personnalisé",
+      "description": "Comparer une consigne locale sans conserver son contenu brut.",
+      "prompt_template": "Test privé OutilsIA - Métier personnalisé. Traite la demande ci-dessous sans inventer de données. Demande : {{CUSTOM_PROMPT}} Réponds uniquement avec un objet JSON sur une ligne, sans Markdown, avec exactement les clés answer, evidence, action. answer répond à la demande ; evidence justifie brièvement ; action propose une vérification concrète. Les termes obligatoires sont : {{REQUIRED_TERMS}}.",
+      "checks": [
+        {
+          "key": "format",
+          "label": "JSON conforme",
+          "rule": "exact_json_keys",
+          "weight": 25
+        },
+        {
+          "key": "required_terms",
+          "label": "Termes obligatoires",
+          "rule": "dynamic_required_terms",
+          "field": "*",
+          "weight": 60
+        },
+        {
+          "key": "action",
+          "label": "Action vérifiable",
+          "rule": "includes_any",
+          "field": "action",
+          "terms": [
+            "verifier",
+            "tester",
+            "comparer",
+            "valider"
+          ],
+          "weight": 15
+        }
+      ]
+    }
+  ]
+}

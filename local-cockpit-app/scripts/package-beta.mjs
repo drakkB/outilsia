@@ -192,11 +192,13 @@ const release = {
     "hardware_truth_v1",
     "hardware_doctor_v2",
     "runtime_driver_intelligence_v1",
+    "private_workload_packs_v1",
     "ai_capability_passport_v1",
     "model_autopilot_v1",
     "flight_recorder_v1",
   ],
   release_notes: [
+    "Private Workload Packs v1 : comparer 2 à 3 modèles déjà installés sur Code, Français, résumé, mémoire/Obsidian ou tâche métier ; zéro téléchargement, zéro cloud et aucun prompt ou résultat brut conservé dans le rapport, MemoryForge ou le Passport.",
     "Upgrade Digital Twin v1 : simuler localement RAM, GPU/VRAM, SSD, alimentation et boîtier, conserver les inconnues physiques, comparer les scénarios et pouvoir conclure « N'achetez rien pour l'instant ».",
     "Hardware Truth v1 : une sonde GPU muette reste inconnue au lieu de devenir CPU-only/0 Go ; la fréquence et le nombre de modules RAM sont publiés sans inventer un mode single, dual ou quad-channel.",
     "Hardware Doctor 2.0 : signaux RAM/GPU/driver/PCIe/ReBAR/thermiques clairement sourcés, mesures instantanées étiquetées et inconnues conservées comme inconnues.",

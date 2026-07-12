@@ -63,8 +63,12 @@ function writeRelease(root, files, buildId) {
         repository: "",
       },
     },
-    features: ["upgrade_digital_twin_v1"],
-    release_notes: ["Upgrade Digital Twin v1 merge test"],
+    features: ["upgrade_digital_twin_v1", "runtime_driver_intelligence_v1", "private_workload_packs_v1"],
+    release_notes: [
+      "Upgrade Digital Twin v1 merge test",
+      "Runtime & Driver Intelligence v1 merge test",
+      "Private Workload Packs v1 merge test"
+    ],
     primary_download: primary,
     downloads_by_platform: downloadsByPlatform,
     files: releaseFiles,

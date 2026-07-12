@@ -300,6 +300,13 @@ def check_download_page(base_url: str) -> dict[str, object]:
         and "DirectML n'est pas présenté comme backend Ollama" in text
         and "aucune installation silencieuse" in text
     )
+    private_workload_ok = (
+        "Private Workload Packs v1" in text
+        and "2 à 3 modèles" in text
+        and "60 secondes maximum par modèle" in text
+        and "réponses brutes exclues" in text
+        and "ne compte jamais comme validation physique" in text
+    )
     return {
         "status": result.get("status"),
         "title_signal_ok": "Scanner PC IA locale" in text,
@@ -316,6 +323,7 @@ def check_download_page(base_url: str) -> dict[str, object]:
         "flight_recorder_ok": flight_recorder_ok,
         "digital_twin_ok": digital_twin_ok,
         "runtime_driver_ok": runtime_driver_ok,
+        "private_workload_ok": private_workload_ok,
         **faq,
         "ok": result.get("status") == 200
         and "Scanner PC IA locale" in text
@@ -331,6 +339,7 @@ def check_download_page(base_url: str) -> dict[str, object]:
         and flight_recorder_ok
         and digital_twin_ok
         and runtime_driver_ok
+        and private_workload_ok
         and faq["faq_visible_ok"],
     }
 
@@ -385,6 +394,13 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         and "DirectML n'est pas présenté comme backend Ollama" in text
         and "Aucun pilote n'est téléchargé" in text
     )
+    private_workload_ok = (
+        "Private Workload Packs v1" in text
+        and "2 à 3 modèles" in text
+        and "60 secondes maximum par modèle" in text
+        and "réponses brutes" in text
+        and "ne compte jamais comme validation physique" in text
+    )
     return {
         "status": result.get("status"),
         "canonical_ok": canonical == absolute(base_url, "/scanner-ia-local"),
@@ -399,6 +415,7 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         "flight_recorder_ok": flight_recorder_ok,
         "digital_twin_ok": digital_twin_ok,
         "runtime_driver_ok": runtime_driver_ok,
+        "private_workload_ok": private_workload_ok,
         **faq,
         "ok": result.get("status") == 200
         and canonical == absolute(base_url, "/scanner-ia-local")
@@ -413,6 +430,7 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         and flight_recorder_ok
         and digital_twin_ok
         and runtime_driver_ok
+        and private_workload_ok
         and faq["faq_visible_ok"],
     }
 
@@ -433,6 +451,8 @@ def check_release_manifest(base_url: str) -> dict[str, object]:
     hardware_truth_feature_ok = "hardware_truth_v1" in features
     runtime_driver_note_ok = any("Runtime & Driver Intelligence v1" in str(note) for note in notes)
     runtime_driver_feature_ok = "runtime_driver_intelligence_v1" in features
+    private_workload_note_ok = any("Private Workload Packs v1" in str(note) for note in notes)
+    private_workload_feature_ok = "private_workload_packs_v1" in features
     provenance = release.get("build_provenance") if isinstance(release.get("build_provenance"), dict) else {}
     build_id_matches = str(provenance.get("build_id") or "") == str(release.get("build_id") or "")
     return {
@@ -446,6 +466,8 @@ def check_release_manifest(base_url: str) -> dict[str, object]:
         "hardware_truth_feature_ok": hardware_truth_feature_ok,
         "runtime_driver_note_ok": runtime_driver_note_ok,
         "runtime_driver_feature_ok": runtime_driver_feature_ok,
+        "private_workload_note_ok": private_workload_note_ok,
+        "private_workload_feature_ok": private_workload_feature_ok,
         "build_id_matches": build_id_matches,
         "merged_release_ok": provenance.get("merged_release") is True,
         "ok": result.get("status") == 200
@@ -457,6 +479,8 @@ def check_release_manifest(base_url: str) -> dict[str, object]:
         and hardware_truth_feature_ok
         and runtime_driver_note_ok
         and runtime_driver_feature_ok
+        and private_workload_note_ok
+        and private_workload_feature_ok
         and build_id_matches
         and provenance.get("merged_release") is True,
     }
@@ -510,6 +534,14 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
         and "DirectML is not presented as an Ollama backend" in text
         and "installs no graphics driver automatically" in text
     )
+    private_workload_ok = (
+        "Private Workload Packs v1" in text
+        and "2 or 3 already-installed Ollama models" in text
+        and "60-second limit per model" in text
+        and "zero downloads or cloud uploads" in text
+        and "never the raw custom prompt or model outputs" in text
+        and "not a physical field-validation proof" in text
+    )
     return {
         "status": result.get("status"),
         "hub_ok": "https://outilsia.fr/scanner-ia-local" in text,
@@ -524,6 +556,7 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
         "flight_recorder_ok": flight_recorder_ok,
         "digital_twin_ok": digital_twin_ok,
         "runtime_driver_ok": runtime_driver_ok,
+        "private_workload_ok": private_workload_ok,
         "ok": result.get("status") == 200
         and "https://outilsia.fr/scanner-ia-local" in text
         and "https://outilsia.fr/telecharger-scanner-ia-local" in text
@@ -536,7 +569,8 @@ def check_llms_txt(base_url: str) -> dict[str, object]:
         and hardware_truth_ok
         and flight_recorder_ok
         and digital_twin_ok
-        and runtime_driver_ok,
+        and runtime_driver_ok
+        and private_workload_ok,
     }
 
 

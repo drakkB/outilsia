@@ -67,6 +67,16 @@ npm run verify:runtime-driver-intelligence
 
 La source canonique est `server-work/static/data/runtime-driver-matrix.json`. Le fichier `src/runtime-driver-matrix.js` est généré par `npm run sync:runtime-driver-matrix` et la gate refuse toute dérive. Une API signalée par le pilote ne constitue jamais une preuve d'offload ; seule la mesure Ollama `/api/ps` peut prouver CPU, hybride ou GPU. La v1 ouvre uniquement les pages officielles NVIDIA, AMD ou Intel après un clic explicite et n'installe aucun pilote automatiquement.
 
+Contrat Private Workload Packs :
+
+```bash
+npm run verify:private-workload-catalog
+npm run verify:private-workload-packs
+npm run verify:private-workload-seo
+```
+
+La source canonique est `server-work/static/data/private-workload-packs.json`. Le fichier `src/private-workload-packs.js` est généré par `npm run sync:private-workload-packs`. Une campagne compare une seule tâche sur deux ou trois modèles Ollama déjà installés, avec 60 secondes maximum par modèle et zéro téléchargement. Seuls scores, checks, métriques et SHA-256 sont persistés ; les consignes personnalisées et réponses brutes sont exclues du stockage, du rapport, du PDF, de MemoryForge et du Capability Passport 1.1.0.
+
 Ce controle ouvre l'interface avec Playwright, verifie l'absence de debordement horizontal, la lisibilite des boutons et la grille desktop, puis genere les captures dans `.artifacts/visual-ui/`.
 
 Si `cargo` n'est pas dans le `PATH` mais que rustup existe, utiliser :

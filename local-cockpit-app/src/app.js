@@ -15,6 +15,27 @@ const RUNTIME_DRIVER_MATRIX = globalThis.__OUTILSIA_RUNTIME_DRIVER_MATRIX__ || {
   backends: {},
   vendors: {}
 };
+const PRIVATE_WORKLOAD_CATALOG = globalThis.__OUTILSIA_PRIVATE_WORKLOAD_PACKS__ || {
+  schema: "outilsia.private_workload_pack_catalog.v1",
+  version: "offline-fallback",
+  updated_at: "",
+  policy: {
+    local_only: true,
+    cloud_upload: false,
+    installed_models_only: true,
+    downloads_per_run: 0,
+    min_models_per_run: 2,
+    max_models_per_run: 3,
+    tasks_per_run: 1,
+    timeout_seconds_per_model: 60,
+    deterministic_checks_only: true,
+    persist_raw_custom_prompt: false,
+    persist_raw_model_output: false,
+    include_raw_content_in_passport: false
+  },
+  response_keys: ["answer", "evidence", "action"],
+  packs: []
+};
 
 const state = {
   scan: null,
@@ -28,6 +49,7 @@ const state = {
   appBuildInfo: null,
   recommendationRun: null,
   modelAutopilotRun: null,
+  privateWorkloadRun: null,
   upgradeDigitalTwinRun: null,
   capabilityPassport: null,
   localSnapshots: [],
@@ -45,6 +67,7 @@ const HERMES_AGENT_WATCH = {
 
 const BENCHMARK_HISTORY_KEY = "outilsia.localCockpit.benchmarkHistory.v1";
 const ARENA_RUN_KEY = "outilsia.localCockpit.lastArenaRun.v1";
+const PRIVATE_WORKLOAD_RUNS_KEY = "outilsia.localCockpit.privateWorkloadRuns.v1";
 const RECOMMENDATION_RUN_KEY = "outilsia.localCockpit.recommendationRun.v2";
 const MODEL_AUTOPILOT_PROFILES_KEY = "outilsia.localCockpit.modelAutopilotProfiles.v1";
 const FLIGHT_RECORDER_STORE_KEY = "outilsia.localCockpit.flightRecorder.v1";
@@ -57,6 +80,8 @@ const UPGRADE_DIGITAL_TWIN_STORE_KEY = "outilsia.localCockpit.upgradeDigitalTwin
 const MAX_BENCHMARK_HISTORY = 80;
 const MAX_PROMPT_LIBRARY = 40;
 const MAX_CHAT_HISTORY = 60;
+const MAX_PRIVATE_WORKLOAD_RUNS = 12;
+const PRIVATE_WORKLOAD_PROTOCOL = "outilsia.private_workload_pack.v1";
 const MODEL_AUTOPILOT_PROTOCOL = "outilsia.autopilot.v1";
 const FLIGHT_RECORDER_PROTOCOL = "outilsia.flight_recorder.v1";
 const UPGRADE_DIGITAL_TWIN_PROTOCOL = "outilsia.upgrade_digital_twin.v1";
@@ -350,6 +375,16 @@ const els = {
   runArenaBtn: $("runArenaBtn"),
   copyArenaBtn: $("copyArenaBtn"),
   clearArenaRunBtn: $("clearArenaRunBtn"),
+  privateWorkloadState: $("privateWorkloadState"),
+  privateWorkloadPackSelect: $("privateWorkloadPackSelect"),
+  privateWorkloadCustomFields: $("privateWorkloadCustomFields"),
+  privateWorkloadCustomPrompt: $("privateWorkloadCustomPrompt"),
+  privateWorkloadRequiredTerms: $("privateWorkloadRequiredTerms"),
+  privateWorkloadModelList: $("privateWorkloadModelList"),
+  privateWorkloadBox: $("privateWorkloadBox"),
+  runPrivateWorkloadBtn: $("runPrivateWorkloadBtn"),
+  copyPrivateWorkloadBtn: $("copyPrivateWorkloadBtn"),
+  clearPrivateWorkloadBtn: $("clearPrivateWorkloadBtn"),
   strategyBridgeState: $("strategyBridgeState"),
   strategyBridgeBox: $("strategyBridgeBox"),
   copyStrategyBridgeJsonBtn: $("copyStrategyBridgeJsonBtn"),
@@ -509,6 +544,8 @@ let activeInstallModel = "";
 let operationLive = false;
 let primaryAnalysisBusy = false;
 let recommendationEngineBusy = false;
+let privateWorkloadBusy = false;
+const privateWorkloadSelections = new Set();
 let recipeAutoSaveTimer = null;
 const UI_MODE_STORAGE_KEY = "outilsia-local-cockpit-ui-mode";
 const readinessProof = {
@@ -3446,6 +3483,7 @@ function renderScan(scan) {
   renderPreparePanel();
   renderReadinessPanel();
   renderArenaPanel();
+  renderPrivateWorkloadPanel();
   renderStrategyBridgePanel();
   renderFieldTestPanel();
   renderFlightRecorder();
@@ -3529,6 +3567,7 @@ function renderCompatibility(payload) {
   renderPreparePanel();
   renderReadinessPanel();
   renderArenaPanel();
+  renderPrivateWorkloadPanel();
   renderStrategyBridgePanel();
   renderFieldTestPanel();
   renderFlightRecorder();
@@ -5773,6 +5812,7 @@ function readinessReport() {
       }))
     } : null,
     recommendation_engine: recommendationEngine,
+    private_workload_pack: privateWorkloadPackSummary(),
     models,
     upgrades,
     buying_links: buyingLinks,
@@ -5849,6 +5889,10 @@ function readinessMarkdown(report = readinessReport()) {
       : "- Recommendation Engine v2: non lancé.",
     ...(report.recommendation_engine?.results || []).map((item) => `- Candidat ${item.model}: score ${item.recommendation_score}/100 · preuves ${item.checks || "0/7"} · ${item.tokens_per_second} tok/s · ${item.elapsed_ms} ms · ${item.resources?.vram_required_q4_gb ? `${item.resources.vram_required_q4_gb} Go VRAM Q4 estimés` : "VRAM à confirmer"} · ${item.resources?.storage_label || "stockage à confirmer"}`),
     ...(report.recommendation_engine?.limits || []).map((item) => `- Limite Recommendation Engine: ${item}`),
+    report.private_workload_pack?.winner
+      ? `- Tests privés (${report.private_workload_pack.pack}): gagnant ${report.private_workload_pack.winner.model} · ${report.private_workload_pack.winner.score}/100 · confiance ${report.private_workload_pack.confidence} · aucun contenu brut exporté`
+      : "- Tests privés: non lancés.",
+    ...(report.private_workload_pack?.results || []).map((item) => `- Preuve privée ${item.model}: ${item.score}/100 · ${item.checks} checks · sortie SHA-256 ${item.output_digest}`),
     report.recommended_model ? `- Modèle sérieux suivant: ${report.recommended_model.title} - ${report.recommended_model.fit || "à comparer après le modèle test"}` : "",
     "",
     "## Simulation d'upgrade - aucune preuve physique",
@@ -5983,6 +6027,7 @@ function premiumReportHtml(report = readinessReport()) {
   } : legacyUpgradeImpact;
   const benchmark = report.benchmark || null;
   const recommendation = report.recommendation_engine || null;
+  const privateWorkload = report.private_workload_pack || null;
   const models = (report.models || []).slice(0, 5);
   const links = digitalTwinRun ? [] : (report.buying_links || []).slice(0, 4);
   const arenaRoles = [
@@ -6031,6 +6076,7 @@ function premiumReportHtml(report = readinessReport()) {
     report.promptForge ? `PromptForge : ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100` : "PromptForge non utilisé",
     report.arena?.compromise ? `Arena : ${readinessArenaLabel(report)}` : "Arena locale à comparer",
     recommendation?.winner ? `Recommendation Engine : ${recommendation.verdict} (${recommendation.winner.score}/100)` : "Recommendation Engine v2 à lancer",
+    privateWorkload?.winner ? `Tests privés : ${privateWorkload.winner.model} (${privateWorkload.winner.score}/100 · ${privateWorkload.pack})` : "Tests privés à lancer dans Détails",
     flightRecorder?.comparison ? `Flight Recorder : ${flightRecorder.comparison.headline} · confiance ${flightRecorder.comparison.confidence}` : "Flight Recorder : aucune référence locale",
     report.capability_passport ? `Capability Passport : SHA-256 ${report.capability_passport.digest}` : "AI Capability Passport à générer dans Détails",
     model.ref ? `Modèle suivant : ${model.ref}` : "Modèle suivant à déterminer"
@@ -6255,6 +6301,12 @@ function premiumReportHtml(report = readinessReport()) {
           <p>${escapeHtml(recommendation?.winner ? `${recommendation.profile_label} · score ${recommendation.winner.score}/100 · confiance ${recommendation.confidence} · ${recommendation.winner.tokens_per_second} tok/s · ${recommendation.winner.elapsed_ms} ms` : "Deux modèles compatibles sont soumis aux mêmes preuves objectives et à un test propre à l'usage choisi.")}</p>
           <p>${escapeHtml(recommendation?.winner?.resources ? `Ressources estimées : ${recommendation.winner.resources.vram_required_q4_gb || "?"} Go VRAM Q4 · ${recommendation.winner.resources.machine_ram_gb || "?"} Go RAM disponibles · ${recommendation.winner.resources.storage_label || "stockage à confirmer"}.` : "Les besoins VRAM, la RAM disponible et le stockage sont affichés sans inventer une mesure système absente.")}</p>
           <p>${escapeHtml(recommendation?.limits?.join(" ") || "La décision reste limitée au protocole court et doit être confirmée sur les tâches longues de l'utilisateur.")}</p>
+        </div>
+        <div class="pdf-card pdf-card-wide">
+          <span>Tests privés</span>
+          <strong>${escapeHtml(privateWorkload?.winner ? `${privateWorkload.winner.model} · ${privateWorkload.winner.score}/100` : "Pack local à lancer")}</strong>
+          <p>${escapeHtml(privateWorkload?.winner ? `Pack ${privateWorkload.pack} · confiance ${privateWorkload.confidence} · ${privateWorkload.model_count} modèles soumis à la même tâche.` : "Code, Français, résumé, mémoire/Obsidian ou tâche métier personnalisée, uniquement sur des modèles déjà installés.")}</p>
+          <p>La consigne et les réponses brutes ne sont ni placées dans ce PDF, ni envoyées au cloud. Seuls scores, checks et empreintes SHA-256 sont exportés.</p>
         </div>
         <div class="pdf-card pdf-card-wide">
           <span>Upgrade utile</span>
@@ -6575,6 +6627,7 @@ function memoryVaultIndex(report = readinessReport()) {
     "- `01-Modeles-compatibles.md`: modèles recommandés et compatibles.",
     "- `02-Modeles-installes.md`: modèles Ollama déjà présents localement.",
     "- `03-Benchmarks.md`: mesures locales, erreurs et lecture Arena.",
+    "- `10-Journal-cockpit.md`: journal complet, dont les preuves privées sans contenu brut.",
     "- `HERMES.md`: rôle Hermes Agent, limites et actions confirmées.",
     "",
     "## Prochaine action",
@@ -6597,7 +6650,7 @@ function memoryVaultManifest(report = readinessReport()) {
     ["07-Rapport-partageable.md", "résumé court prêt à copier ou partager"],
     ["08-Fiches-modeles.md", "forces, usages et limites des modèles"],
     ["09-Catalogues-OutilsIA.md", "versions des catalogues modèles/upgrades"],
-    ["10-Journal-cockpit.md", "journal complet MemoryForge généré par l'app"],
+    ["10-Journal-cockpit.md", "journal complet MemoryForge et preuves privées sans contenu brut"],
     ["MEMORY.md", "mémoire principale exploitable par Obsidian ou un agent local"],
     ["HERMES.md", "règles Hermes Agent et garde-fous d'action"]
   ];
@@ -6701,6 +6754,10 @@ function cockpitMemoryMarkdown() {
   if (arena?.results?.length) {
     sections.push(arenaRunMarkdown(arena));
   }
+  const privateWorkload = privateWorkloadMarkdown();
+  if (privateWorkload) {
+    sections.push(privateWorkload);
+  }
   const prompt = currentPromptForgeResult();
   if (prompt) {
     sections.push(promptForgeMarkdown(prompt));
@@ -6738,6 +6795,7 @@ function renderReadinessPanel() {
       <span>${report.recommended_model ? `2e modèle : ${escapeHtml(report.recommended_model.ref)} · ${report.recommended_model.installed ? "installé" : "à installer"}` : "Deuxième modèle recommandé non déterminé."}</span>
       <span>${report.arena?.compromise ? `Arena : rapide ${escapeHtml(report.arena.fastest || "n/a")} · assistant ${escapeHtml(report.arena.assistant || "n/a")} · compromis ${escapeHtml(report.arena.compromise)} (${escapeHtml(report.arena.compromise_score)}/100)` : "Arena locale non encore lancée."}</span>
       <span>${report.recommendation_engine?.winner ? `Recommandation mesurée : ${escapeHtml(report.recommendation_engine.verdict)} · ${escapeHtml(report.recommendation_engine.winner.score)}/100 · confiance ${escapeHtml(report.recommendation_engine.confidence)}` : "Recommendation Engine v2 non encore lancé."}</span>
+      ${report.private_workload_pack?.winner ? `<span>Test privé : ${escapeHtml(report.private_workload_pack.winner.model)} · ${escapeHtml(report.private_workload_pack.winner.score)}/100 · pack ${escapeHtml(report.private_workload_pack.pack)} · contenu brut non conservé.</span>` : ""}
       <span>${report.model_autopilot?.active ? `Profil Ollama : ${escapeHtml(report.model_autopilot.active.label)} · ${escapeHtml(modelAutopilotTuningLabel(report.model_autopilot.active.tuning))}` : report.model_autopilot?.recommended ? `Autopilot : ${escapeHtml(report.model_autopilot.recommended.label)} recommandé, à appliquer dans Détails.` : "Model Autopilot non encore mesuré."}</span>
       <span>${report.flight_recorder?.comparison ? `Flight Recorder : ${escapeHtml(report.flight_recorder.comparison.headline)} · confiance ${escapeHtml(report.flight_recorder.comparison.confidence)}` : "Flight Recorder : aucune référence locale."}</span>
       <span>${report.upgrade_digital_twin ? `Upgrade Digital Twin : ${escapeHtml(report.upgrade_digital_twin.decision.label)} · ${escapeHtml(report.upgrade_digital_twin.compatibility.status)} · confiance ${escapeHtml(report.upgrade_digital_twin.compatibility.confidence)}` : "Upgrade Digital Twin : aucun scénario calculé."}</span>
@@ -8266,6 +8324,581 @@ async function runAutomaticArena() {
   setStatus(winner ? `Arena terminée: ${winner.model} gagne` : "Arena terminée sans gagnant", winner ? "ok" : "warn");
 }
 
+function privateWorkloadPolicy() {
+  return PRIVATE_WORKLOAD_CATALOG.policy || {};
+}
+
+function privateWorkloadPacks() {
+  return Array.isArray(PRIVATE_WORKLOAD_CATALOG.packs) ? PRIVATE_WORKLOAD_CATALOG.packs : [];
+}
+
+function privateWorkloadPack(key = "") {
+  const packs = privateWorkloadPacks();
+  return packs.find((item) => item.key === key) || packs[0] || null;
+}
+
+function privateWorkloadPackKey() {
+  return els.privateWorkloadPackSelect?.value || privateWorkloadPacks()[0]?.key || "";
+}
+
+function privateWorkloadTerms(value = els.privateWorkloadRequiredTerms?.value || "") {
+  return [...new Set(String(value || "")
+    .split(/[,;\n]/)
+    .map((item) => normalizeArenaAnswer(item))
+    .filter(Boolean))]
+    .slice(0, 8);
+}
+
+function privateWorkloadInstalledModels(limit = 6) {
+  const installed = (state.scan?.installed_models || [])
+    .map((model) => normalizeOllamaRef(modelLabel(model)))
+    .filter(Boolean);
+  const preferred = arenaInstalledCandidates(3)
+    .map((model) => normalizeOllamaRef(actionableOllamaRef(model)))
+    .map((candidate) => installed.find((ref) => sameOllamaModel(ref, candidate)) || "")
+    .filter(Boolean);
+  const result = [];
+  for (const value of [...preferred, ...installed]) {
+    const ref = normalizeOllamaRef(value);
+    if (!ref || result.some((existing) => sameOllamaModel(existing, ref))) continue;
+    result.push(ref);
+  }
+  return result.slice(0, limit);
+}
+
+function syncPrivateWorkloadSelections(models = privateWorkloadInstalledModels()) {
+  const allowed = new Set(models);
+  for (const ref of [...privateWorkloadSelections]) {
+    if (!allowed.has(ref)) privateWorkloadSelections.delete(ref);
+  }
+  const policy = privateWorkloadPolicy();
+  const minimum = Number(policy.min_models_per_run || 2);
+  const maximum = Number(policy.max_models_per_run || 3);
+  for (const ref of models) {
+    if (privateWorkloadSelections.size >= minimum) break;
+    privateWorkloadSelections.add(ref);
+  }
+  while (privateWorkloadSelections.size > maximum) {
+    privateWorkloadSelections.delete([...privateWorkloadSelections].at(-1));
+  }
+}
+
+function privateWorkloadSelectedModels() {
+  const installed = new Set(privateWorkloadInstalledModels());
+  return [...privateWorkloadSelections].filter((ref) => installed.has(ref));
+}
+
+function readPrivateWorkloadRuns() {
+  try {
+    const parsed = JSON.parse(window.localStorage?.getItem(PRIVATE_WORKLOAD_RUNS_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistedPrivateWorkloadRun(run) {
+  if (!run) return null;
+  return {
+    schema: run.schema,
+    protocol: run.protocol,
+    catalog_version: run.catalog_version,
+    id: run.id,
+    created_at_ms: run.created_at_ms,
+    machine_key: run.machine_key,
+    pack: run.pack,
+    custom: Boolean(run.custom),
+    prompt_digest: run.prompt_digest,
+    prompt_length: Number(run.prompt_length || 0),
+    prompt_persisted: false,
+    required_term_count: Number(run.required_term_count || 0),
+    model_count: Number(run.model_count || 0),
+    results: (run.results || []).map((item) => ({
+      model: item.model,
+      runtime: item.runtime || "",
+      success: Boolean(item.success),
+      timed_out: Boolean(item.timed_out),
+      elapsed_ms: Number(item.elapsed_ms || 0),
+      tokens_per_second: Number(item.tokens_per_second || 0),
+      score: Number(item.score || 0),
+      passed_count: Number(item.passed_count || 0),
+      total_count: Number(item.total_count || 0),
+      valid_json: Boolean(item.valid_json),
+      output_digest: item.output_digest || "",
+      output_persisted: false,
+      checks: (item.checks || []).map((check) => ({
+        key: check.key,
+        label: check.label,
+        passed: Boolean(check.passed),
+        weight: Number(check.weight || 0)
+      })),
+      error: item.error || ""
+    })),
+    winner: run.winner ? {
+      model: run.winner.model,
+      score: Number(run.winner.score || 0),
+      tokens_per_second: Number(run.winner.tokens_per_second || 0)
+    } : null,
+    confidence: run.confidence || "faible",
+    privacy: {
+      local_only: true,
+      cloud_upload: false,
+      prompt_persisted: false,
+      output_persisted: false,
+      raw_content_in_passport: false
+    }
+  };
+}
+
+function writePrivateWorkloadRun(run) {
+  const persisted = persistedPrivateWorkloadRun(run);
+  if (!persisted) return;
+  const history = readPrivateWorkloadRuns().filter((item) => item.id !== persisted.id);
+  window.localStorage?.setItem(PRIVATE_WORKLOAD_RUNS_KEY, JSON.stringify([persisted, ...history].slice(0, MAX_PRIVATE_WORKLOAD_RUNS)));
+  state.privateWorkloadRun = persisted;
+}
+
+function privateWorkloadFieldValue(parsed, field = "*") {
+  if (!parsed) return "";
+  if (field === "*") return Object.values(parsed).map((value) => String(value ?? "")).join(" ");
+  return String(parsed[field] ?? "");
+}
+
+function privateWorkloadCheckPassed(check, parsed, requiredTerms = []) {
+  const responseKeys = PRIVATE_WORKLOAD_CATALOG.response_keys || ["answer", "evidence", "action"];
+  if (check.rule === "exact_json_keys") {
+    return Boolean(parsed)
+      && Object.keys(parsed).length === responseKeys.length
+      && responseKeys.every((key) => Object.prototype.hasOwnProperty.call(parsed, key))
+      && responseKeys.every((key) => typeof parsed[key] === "string");
+  }
+  if (!parsed) return false;
+  const raw = privateWorkloadFieldValue(parsed, check.field);
+  const normalized = normalizeArenaAnswer(raw);
+  if (check.rule === "regex") {
+    try {
+      return new RegExp(check.pattern || "", String(check.flags || "").replace(/[^gimsuy]/g, "")).test(raw);
+    } catch {
+      return false;
+    }
+  }
+  if (check.rule === "includes_all") {
+    return (check.terms || []).every((term) => normalized.includes(normalizeArenaAnswer(term)));
+  }
+  if (check.rule === "includes_any") {
+    return (check.terms || []).some((term) => normalized.includes(normalizeArenaAnswer(term)));
+  }
+  if (check.rule === "dynamic_required_terms") {
+    return requiredTerms.length > 0 && requiredTerms.every((term) => normalized.includes(normalizeArenaAnswer(term)));
+  }
+  return false;
+}
+
+function evaluatePrivateWorkloadPack(output, packKey = privateWorkloadPackKey(), requiredTerms = []) {
+  const pack = privateWorkloadPack(packKey);
+  if (!pack) {
+    return {
+      protocol: PRIVATE_WORKLOAD_PROTOCOL,
+      pack: packKey,
+      score: 0,
+      passed_count: 0,
+      total_count: 0,
+      valid_json: false,
+      checks: [],
+      summary: "Pack privé introuvable"
+    };
+  }
+  const parsed = parseArenaObjectiveJson(output);
+  const checks = (pack.checks || []).map((check) => ({
+    key: check.key,
+    label: check.label,
+    passed: privateWorkloadCheckPassed(check, parsed, requiredTerms),
+    weight: Number(check.weight || 0)
+  }));
+  const score = checks.reduce((total, check) => total + (check.passed ? check.weight : 0), 0);
+  const passedCount = checks.filter((check) => check.passed).length;
+  return {
+    protocol: PRIVATE_WORKLOAD_PROTOCOL,
+    catalog_version: PRIVATE_WORKLOAD_CATALOG.version,
+    pack: pack.key,
+    pack_label: pack.label,
+    score,
+    passed_count: passedCount,
+    total_count: checks.length,
+    valid_json: Boolean(checks.find((check) => check.key === "format")?.passed),
+    checks,
+    summary: `${passedCount}/${checks.length} preuves déterministes validées`
+  };
+}
+
+function demoPrivateWorkloadOutput(packKey, requiredTerms = []) {
+  if (packKey === "code") {
+    return JSON.stringify({
+      answer: "function add(a,b){return a + b;}",
+      evidence: "L'addition de 4 et 5 produit la somme 9 après correction.",
+      action: "Tester add(4,5) dans JavaScript."
+    });
+  }
+  if (packKey === "french") {
+    return JSON.stringify({
+      answer: "Mon IA locale répond bien en français.",
+      evidence: "Accord de locale et accents sur répond et français.",
+      action: "Relire puis comparer la phrase corrigée."
+    });
+  }
+  if (packKey === "summary") {
+    return JSON.stringify({
+      answer: "La machine est déjà solide et aucun achat n'est requis avant comparaison.",
+      evidence: "16 Go de VRAM, 64 Go de RAM, qwen3:8b mesuré à 42 tok/s.",
+      action: "Lancer un second benchmark puis comparer."
+    });
+  }
+  if (packKey === "memory") {
+    return JSON.stringify({
+      answer: "Titre : Mémoire projet\nTags : #obsidian #local-ai",
+      evidence: "OBSIDIAN-84 · MEMORY-21 · garder hermes3:8b pour la mémoire projet.",
+      action: "Prochaine action : lancer un benchmark."
+    });
+  }
+  return JSON.stringify({
+    answer: requiredTerms.join(" "),
+    evidence: "Réponse construite uniquement depuis la consigne locale.",
+    action: "Vérifier puis valider le résultat."
+  });
+}
+
+function privateWorkloadDescriptor() {
+  const pack = privateWorkloadPack(privateWorkloadPackKey());
+  if (!pack) throw new Error("Aucun pack privé disponible");
+  if (pack.key !== "custom") {
+    return { pack, prompt: pack.prompt, requiredTerms: [], custom: false };
+  }
+  const customPrompt = String(els.privateWorkloadCustomPrompt?.value || "").trim();
+  const requiredTerms = privateWorkloadTerms();
+  if (customPrompt.length < 20) throw new Error("La consigne métier doit contenir au moins 20 caractères");
+  if (!requiredTerms.length) throw new Error("Ajoute au moins un terme obligatoire pour une preuve déterministe");
+  const prompt = String(pack.prompt_template || "")
+    .replace("{{CUSTOM_PROMPT}}", customPrompt)
+    .replace("{{REQUIRED_TERMS}}", requiredTerms.join(", "));
+  return { pack, prompt, requiredTerms, custom: true };
+}
+
+function privateWorkloadWinner(results = []) {
+  return results
+    .filter((item) => item.success)
+    .slice()
+    .sort((a, b) => Number(b.score || 0) - Number(a.score || 0)
+      || Number(b.tokens_per_second || 0) - Number(a.tokens_per_second || 0))[0] || null;
+}
+
+function privateWorkloadConfidence(results = [], winner = privateWorkloadWinner(results)) {
+  const successful = results.filter((item) => item.success).sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+  if (!winner || successful.length < 2) return "faible";
+  const gap = Number(successful[0].score || 0) - Number(successful[1].score || 0);
+  if (successful.every((item) => item.valid_json) && gap >= 15) return "élevée";
+  return gap >= 5 ? "moyenne" : "faible";
+}
+
+function privateWorkloadPackSummary(run = state.privateWorkloadRun || readPrivateWorkloadRuns()[0] || null) {
+  if (!run?.results?.length) return null;
+  return {
+    schema: run.schema,
+    protocol: run.protocol,
+    catalog_version: run.catalog_version,
+    created_at_ms: Number(run.created_at_ms || 0),
+    pack: run.pack,
+    custom: Boolean(run.custom),
+    prompt_digest: run.prompt_digest || "",
+    prompt_persisted: false,
+    model_count: Number(run.model_count || run.results.length || 0),
+    winner: run.winner || null,
+    confidence: run.confidence || "faible",
+    results: run.results.map((item) => ({
+      model: item.model,
+      success: Boolean(item.success),
+      score: Number(item.score || 0),
+      checks: `${Number(item.passed_count || 0)}/${Number(item.total_count || 0)}`,
+      tokens_per_second: Number(item.tokens_per_second || 0),
+      output_digest: item.output_digest || "",
+      output_persisted: false
+    })),
+    privacy: {
+      local_only: true,
+      cloud_upload: false,
+      raw_content_included: false
+    }
+  };
+}
+
+function privateWorkloadMarkdown(run = state.privateWorkloadRun || readPrivateWorkloadRuns()[0] || null) {
+  const summary = privateWorkloadPackSummary(run);
+  if (!summary) return "";
+  const pack = privateWorkloadPack(summary.pack);
+  return [
+    "# Tests privés OutilsIA",
+    "",
+    `- Date: ${new Date(summary.created_at_ms || Date.now()).toISOString()}`,
+    `- Protocole: ${summary.protocol}`,
+    `- Catalogue: ${summary.catalog_version}`,
+    `- Pack: ${pack?.label || summary.pack}${summary.custom ? " (personnalisé)" : ""}`,
+    `- Empreinte de la consigne: SHA-256 ${summary.prompt_digest}`,
+    "- Consigne brute conservée: non",
+    "- Réponses brutes conservées: non",
+    "- Envoi cloud: non",
+    `- Confiance du classement: ${summary.confidence}`,
+    summary.winner ? `- Modèle gagnant: ${summary.winner.model} (${summary.winner.score}/100)` : "- Modèle gagnant: aucun",
+    "",
+    "## Résultats",
+    "",
+    ...summary.results.map((item) => `- ${item.model}: ${item.success ? `${item.score}/100 · ${item.checks} checks · ${item.tokens_per_second} tok/s` : "échec"} · sortie SHA-256 ${item.output_digest || "absente"}`),
+    "",
+    "## Limites",
+    "",
+    "- Le score vérifie des critères déterministes bornés ; il ne mesure pas toute la qualité du modèle.",
+    "- Aucun raisonnement interne ou contenu privé brut n'est exporté dans cette preuve.",
+    "- Le résultat décrit cette machine, ce runtime, ce pack et ce moment précis."
+  ].join("\n");
+}
+
+function renderPrivateWorkloadPanel() {
+  if (!els.privateWorkloadBox || !els.privateWorkloadPackSelect) return;
+  const packs = privateWorkloadPacks();
+  const selectedKey = privateWorkloadPackKey() || packs[0]?.key || "";
+  const options = packs.map((pack) => `<option value="${escapeHtml(pack.key)}"${pack.key === selectedKey ? " selected" : ""}>${escapeHtml(pack.label)} · ${escapeHtml(pack.description)}</option>`).join("");
+  if (els.privateWorkloadPackSelect.innerHTML !== options) {
+    els.privateWorkloadPackSelect.innerHTML = options;
+    els.privateWorkloadPackSelect.value = selectedKey;
+  }
+  const custom = selectedKey === "custom";
+  els.privateWorkloadCustomFields?.classList.toggle("hidden", !custom);
+  const models = privateWorkloadInstalledModels();
+  syncPrivateWorkloadSelections(models);
+  if (!models.length) {
+    els.privateWorkloadModelList.className = "private-workload-models empty";
+    els.privateWorkloadModelList.textContent = "Aucun modèle Ollama installé n'est disponible pour un test privé.";
+  } else {
+    els.privateWorkloadModelList.className = "private-workload-models";
+    els.privateWorkloadModelList.innerHTML = models.map((ref) => {
+      const benchmark = successfulBenchmarkFor(ref);
+      return `
+        <label class="private-workload-model">
+          <input type="checkbox" data-private-workload-model="${escapeHtml(ref)}"${privateWorkloadSelections.has(ref) ? " checked" : ""}>
+          <span>
+            <strong>${escapeHtml(ref)}</strong>
+            <span>${benchmark?.success ? `${escapeHtml(benchmark.estimated_tokens_per_second)} tok/s déjà mesurés` : "installé · pas encore mesuré"}</span>
+          </span>
+        </label>
+      `;
+    }).join("");
+  }
+  const run = state.privateWorkloadRun || readPrivateWorkloadRuns()[0] || null;
+  const summary = privateWorkloadPackSummary(run);
+  if (!summary) {
+    const pack = privateWorkloadPack(selectedKey);
+    els.privateWorkloadState.textContent = "local uniquement";
+    els.privateWorkloadBox.className = "private-workload-box empty";
+    els.privateWorkloadBox.textContent = pack
+      ? `${pack.label} : ${pack.description} Sélectionne 2 ou 3 modèles installés.`
+      : "Catalogue de tests privés indisponible.";
+  } else {
+    const runPack = privateWorkloadPack(summary.pack);
+    els.privateWorkloadState.textContent = summary.winner ? `${summary.winner.model} · ${summary.winner.score}/100` : "aucun gagnant";
+    els.privateWorkloadBox.className = "private-workload-box";
+    els.privateWorkloadBox.innerHTML = `
+      <div class="private-workload-summary">
+        <strong>${escapeHtml(runPack?.label || summary.pack)} · classement local</strong>
+        <span>${summary.winner ? `Gagnant : ${escapeHtml(summary.winner.model)} · ${escapeHtml(summary.winner.score)}/100 · confiance ${escapeHtml(summary.confidence)}` : "Aucun modèle n'a produit une preuve exploitable."}</span>
+        <span>SHA-256 consigne : ${escapeHtml(shortHash(summary.prompt_digest))} · contenu brut non conservé</span>
+      </div>
+      <div class="private-workload-results">
+        ${(run.results || []).map((item) => `
+          <div class="private-workload-result${summary.winner?.model === item.model ? " winner" : ""}">
+            <strong>${escapeHtml(item.model)} · ${escapeHtml(item.score)}/100</strong>
+            <span>${item.success ? `${escapeHtml(item.passed_count)}/${escapeHtml(item.total_count)} checks · ${escapeHtml(item.tokens_per_second)} tok/s · ${escapeHtml(item.elapsed_ms)} ms` : escapeHtml(item.error || "échec")}</span>
+            <div class="private-workload-checks">
+              ${(item.checks || []).map((check) => `<small class="${check.passed ? "ok" : ""}">${escapeHtml(check.label)} ${check.passed ? "OK" : "NON"}</small>`).join("")}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+  const policy = privateWorkloadPolicy();
+  const selectedCount = privateWorkloadSelectedModels().length;
+  const customReady = !custom
+    || (String(els.privateWorkloadCustomPrompt?.value || "").trim().length >= 20 && privateWorkloadTerms().length > 0);
+  els.runPrivateWorkloadBtn.disabled = privateWorkloadBusy
+    || !state.scan
+    || !hasUsableOllamaRuntime(state.scan)
+    || selectedCount < Number(policy.min_models_per_run || 2)
+    || selectedCount > Number(policy.max_models_per_run || 3)
+    || !customReady;
+  els.copyPrivateWorkloadBtn.disabled = !summary;
+  els.clearPrivateWorkloadBtn.disabled = !summary;
+}
+
+function renderPrivateWorkloadProgress(models, results = [], activeRef = "") {
+  const pack = privateWorkloadPack(privateWorkloadPackKey());
+  els.privateWorkloadState.textContent = "run en cours";
+  els.privateWorkloadBox.className = "private-workload-box";
+  els.privateWorkloadBox.innerHTML = `
+    <div class="private-workload-summary">
+      <strong>${escapeHtml(pack?.label || "Pack privé")} · ${escapeHtml(results.length)}/${escapeHtml(models.length)} modèle(s)</strong>
+      <span>Même consigne, mêmes critères, aucune persistance brute.</span>
+    </div>
+    <div class="private-workload-results">
+      ${models.map((ref) => {
+        const result = results.find((item) => item.model === ref);
+        const label = result ? (result.success ? `${result.score}/100` : "échec") : ref === activeRef ? "test en cours" : "en attente";
+        return `<div class="private-workload-result"><strong>${escapeHtml(ref)}</strong><span>${escapeHtml(label)}</span></div>`;
+      }).join("")}
+    </div>
+  `;
+}
+
+async function runPrivateWorkloadPack() {
+  if (!state.scan || !hasUsableOllamaRuntime(state.scan)) {
+    setStatus("Scan et Ollama requis avant un test privé", "warn");
+    return null;
+  }
+  if (privateWorkloadBusy) {
+    setStatus("Un test privé est déjà en cours", "warn");
+    return null;
+  }
+  const policy = privateWorkloadPolicy();
+  const models = privateWorkloadSelectedModels();
+  const minimum = Number(policy.min_models_per_run || 2);
+  const maximum = Number(policy.max_models_per_run || 3);
+  if (models.length < minimum || models.length > maximum) {
+    setStatus(`Sélectionne entre ${minimum} et ${maximum} modèles installés`, "warn");
+    return null;
+  }
+  let descriptor;
+  try {
+    descriptor = privateWorkloadDescriptor();
+  } catch (error) {
+    setStatus(String(error.message || error), "warn");
+    renderPrivateWorkloadPanel();
+    return null;
+  }
+  if (!window.confirm(`Lancer ${descriptor.pack.label} sur ${models.length} modèles déjà installés ? Aucun téléchargement ni envoi cloud.`)) {
+    return null;
+  }
+  privateWorkloadBusy = true;
+  renderPrivateWorkloadPanel();
+  resetOperationConsole(`Tests privés · ${descriptor.pack.label}`);
+  setStatus(`Pack privé ${descriptor.pack.label} en cours...`);
+  appendOperationLine(`Modèles : ${models.join(", ")} · téléchargement 0 · cloud 0`, "info");
+  const promptDigest = await sha256Hex(descriptor.prompt);
+  const measuredResults = [];
+  try {
+    for (const ref of models) {
+      renderPrivateWorkloadProgress(models, measuredResults, ref);
+      appendOperationLine(`Test privé ${descriptor.pack.key} : ${ref}`, "cmd");
+      try {
+        const result = invoke
+          ? await invoke("benchmark_ollama", {
+              request: {
+                model: ref,
+                prompt: descriptor.prompt,
+                timeout_seconds: Number(policy.timeout_seconds_per_model || 60),
+                protocol: PRIVATE_WORKLOAD_PROTOCOL,
+                ...ollamaRuntimePayload(ref)
+              }
+            })
+          : { ...demoBenchmark(ref), output_preview: demoPrivateWorkloadOutput(descriptor.pack.key, descriptor.requiredTerms) };
+        const proof = evaluatePrivateWorkloadPack(result.output_preview, descriptor.pack.key, descriptor.requiredTerms);
+        const outputDigest = await sha256Hex(String(result.output_preview || ""));
+        const measured = {
+          model: ref,
+          runtime: defaultOllamaRuntime(ref),
+          success: Boolean(result.success),
+          timed_out: Boolean(result.timed_out),
+          elapsed_ms: Number(result.elapsed_ms || 0),
+          tokens_per_second: Number(result.estimated_tokens_per_second || 0),
+          score: result.success ? proof.score : 0,
+          passed_count: result.success ? proof.passed_count : 0,
+          total_count: proof.total_count,
+          valid_json: result.success && proof.valid_json,
+          checks: result.success ? proof.checks : proof.checks.map((check) => ({ ...check, passed: false })),
+          output_digest: outputDigest,
+          error: result.success ? "" : friendlyOllamaError(result.error || "Le modèle n'a pas répondu")
+        };
+        measuredResults.push(measured);
+        appendOperationLine(`${ref}: ${measured.success ? `${measured.score}/100 · ${measured.passed_count}/${measured.total_count} checks` : measured.error}`, measured.success ? "ok" : "erreur");
+      } catch (error) {
+        measuredResults.push({
+          model: ref,
+          runtime: defaultOllamaRuntime(ref),
+          success: false,
+          timed_out: false,
+          elapsed_ms: 0,
+          tokens_per_second: 0,
+          score: 0,
+          passed_count: 0,
+          total_count: descriptor.pack.checks?.length || 0,
+          valid_json: false,
+          checks: (descriptor.pack.checks || []).map((check) => ({ key: check.key, label: check.label, passed: false, weight: check.weight })),
+          output_digest: await sha256Hex(""),
+          error: friendlyOllamaError(error)
+        });
+        appendOperationLine(`${ref}: ${friendlyOllamaError(error)}`, "erreur");
+      }
+    }
+    const winner = privateWorkloadWinner(measuredResults);
+    const run = {
+      schema: "outilsia.private_workload_run.v1",
+      protocol: PRIVATE_WORKLOAD_PROTOCOL,
+      catalog_version: PRIVATE_WORKLOAD_CATALOG.version,
+      id: `private-workload-${Date.now()}`,
+      created_at_ms: Date.now(),
+      machine_key: state.scan.machine_key || "",
+      pack: descriptor.pack.key,
+      custom: descriptor.custom,
+      prompt_digest: promptDigest,
+      prompt_length: descriptor.prompt.length,
+      required_term_count: descriptor.requiredTerms.length,
+      model_count: models.length,
+      results: measuredResults,
+      winner,
+      confidence: privateWorkloadConfidence(measuredResults, winner)
+    };
+    writePrivateWorkloadRun(run);
+    state.capabilityPassport = null;
+    renderCapabilityPassportPanel();
+    renderReadinessPanel();
+    renderPrivateWorkloadPanel();
+    finishOperationMonitor(winner ? "Tests privés terminés" : "Tests privés sans gagnant");
+    setStatus(winner ? `Tests privés : ${winner.model} gagne ${winner.score}/100` : "Tests privés terminés sans gagnant", winner ? "ok" : "warn");
+    return state.privateWorkloadRun;
+  } finally {
+    privateWorkloadBusy = false;
+    renderPrivateWorkloadPanel();
+  }
+}
+
+async function copyPrivateWorkloadProof() {
+  const markdown = privateWorkloadMarkdown();
+  if (!markdown) {
+    setStatus("Aucune preuve de test privé à copier", "warn");
+    return;
+  }
+  await navigator.clipboard.writeText(markdown);
+  setStatus("Preuve privée copiée sans contenu brut", "ok");
+}
+
+function clearPrivateWorkloadRuns() {
+  if (!readPrivateWorkloadRuns().length) return;
+  if (!window.confirm("Vider l'historique local des tests privés ?")) return;
+  window.localStorage?.removeItem(PRIVATE_WORKLOAD_RUNS_KEY);
+  state.privateWorkloadRun = null;
+  state.capabilityPassport = null;
+  renderCapabilityPassportPanel();
+  renderReadinessPanel();
+  renderPrivateWorkloadPanel();
+  setStatus("Historique local des tests privés vidé", "ok");
+}
+
 async function runRecommendationEngine(profileKey = readUsageProfileKey()) {
   const profile = USAGE_PROFILES[profileKey] || USAGE_PROFILES.polyvalent;
   if (!state.scan) {
@@ -8778,6 +9411,7 @@ function capabilityPassportSourceRevision() {
     canonicalJson(modelAutopilotSnapshot() || {}),
     canonicalJson(flightRecorderSummary() || {}),
     canonicalJson(digitalTwinSummary() || {}),
+    canonicalJson(privateWorkloadPackSummary() || {}),
     recommendation.created_at_ms || recommendation.id || "",
     arena.created_at_ms || arena.id || "",
     (state.scan?.installed_models || []).map(modelLabel).sort().join(","),
@@ -8833,7 +9467,7 @@ function capabilityPassportDocument() {
   const storageSource = scan.storage_free_gb == null ? "not_detected" : "scan";
   return {
     schema: "outilsia.ai_capability_passport.v1",
-    passport_version: "1.0.1",
+    passport_version: "1.1.0",
     generated_at: new Date().toISOString(),
     source_revision: capabilityPassportSourceRevision(),
     issuer: {
@@ -8883,6 +9517,7 @@ function capabilityPassportDocument() {
       model_autopilot_v1: Boolean(report.model_autopilot?.active || report.model_autopilot?.recommended),
       flight_recorder_v1: Boolean(report.flight_recorder?.reference),
       upgrade_digital_twin_v1: Boolean(report.upgrade_digital_twin),
+      private_workload_packs_v1: true,
       local_arena: Boolean(report.arena),
       strategy_arena_profile_export: true
     },
@@ -8913,6 +9548,7 @@ function capabilityPassportDocument() {
     model_autopilot: report.model_autopilot,
     flight_recorder: report.flight_recorder,
     upgrade_digital_twin: report.upgrade_digital_twin,
+    private_workload_pack: report.private_workload_pack,
     arena: report.arena,
     strategy_arena_handoff: {
       schema: bridge.schema,
@@ -8925,6 +9561,8 @@ function capabilityPassportDocument() {
       local_generation: true,
       excludes_account_tokens: true,
       excludes_prompt_and_model_outputs: true,
+      excludes_private_workload_prompts: true,
+      excludes_private_workload_outputs: true,
       excludes_personal_files: true,
       machine_key_is_local_pseudonymous_identifier: true
     },
@@ -8935,6 +9573,7 @@ function capabilityPassportDocument() {
       "Model Autopilot compare des réglages d'exécution sur le même modèle ; il ne mesure pas une nouvelle quantification et n'améliore pas les poids du modèle.",
       "Flight Recorder compare des mesures locales liées à une référence explicite ; ses causes possibles restent des hypothèses et ne constituent pas une preuve terrain physique.",
       "Upgrade Digital Twin simule des scénarios ; alimentation, connecteurs, dimensions, slots et QVL doivent être vérifiés physiquement avant achat.",
+      "Tests privés compare des sorties avec des critères déterministes bornés ; les prompts et réponses bruts ne sont pas inclus dans le Passport.",
       "L'empreinte SHA-256 détecte une modification du document ; elle ne prouve ni l'identité du PC ni celle du propriétaire.",
       "Ce passeport ne constitue pas une validation de stratégie financière ni un résultat de backtest."
     ]
@@ -10989,6 +11628,7 @@ async function runBenchmark(options = {}) {
     renderPreparePanel();
     renderReadinessPanel();
     renderArenaPanel();
+    renderPrivateWorkloadPanel();
     renderStrategyBridgePanel();
     renderFieldTestPanel();
     renderModelAutopilot();
@@ -13287,6 +13927,13 @@ function installTestHarness() {
     modelAutopilotCandidates,
     scoreModelAutopilotResults,
     modelAutopilotSnapshot,
+    privateWorkloadPolicy,
+    privateWorkloadPacks,
+    privateWorkloadPack,
+    privateWorkloadInstalledModels,
+    evaluatePrivateWorkloadPack,
+    privateWorkloadPackSummary,
+    privateWorkloadMarkdown,
     flightRecorderCapture,
     compareFlightRecorderCaptures,
     flightRecorderSummary,
@@ -13303,6 +13950,94 @@ function installTestHarness() {
     restorePreviousUpgradeDigitalTwinScenario,
     applyModelAutopilotRecommendation,
     rollbackModelAutopilotProfile,
+    async applyPrivateWorkloadPackState() {
+      const secretPrompt = "Prépare la décision privée DOSSIER-PRIVATE-7788 sans envoyer son contenu.";
+      const requiredTerms = ["dossier-private-7788", "validation-locale"];
+      window.localStorage?.removeItem(PRIVATE_WORKLOAD_RUNS_KEY);
+      state.privateWorkloadRun = null;
+      this.applyDemoState();
+      els.privateWorkloadPackSelect.value = "custom";
+      els.privateWorkloadCustomPrompt.value = secretPrompt;
+      els.privateWorkloadRequiredTerms.value = requiredTerms.join(", ");
+      syncPrivateWorkloadSelections();
+
+      const descriptor = privateWorkloadDescriptor();
+      const goodOutput = JSON.stringify({
+        answer: "DOSSIER-PRIVATE-7788 est traité en validation-locale.",
+        evidence: "Les deux termes obligatoires sont présents dans la réponse locale.",
+        action: "Vérifier le résultat puis comparer les modèles."
+      });
+      const partialOutput = JSON.stringify({
+        answer: "DOSSIER-PRIVATE-7788 est traité localement.",
+        evidence: "Un terme obligatoire manque volontairement.",
+        action: "Relire le résultat."
+      });
+      const samples = [
+        { model: "qwen3:0.6b", output: goodOutput, tokens_per_second: 37.5, elapsed_ms: 1200 },
+        { model: "hermes3:8b", output: partialOutput, tokens_per_second: 28.4, elapsed_ms: 2500 }
+      ];
+      const results = [];
+      for (const sample of samples) {
+        const proof = evaluatePrivateWorkloadPack(sample.output, descriptor.pack.key, descriptor.requiredTerms);
+        results.push({
+          model: sample.model,
+          runtime: "native",
+          success: true,
+          timed_out: false,
+          elapsed_ms: sample.elapsed_ms,
+          tokens_per_second: sample.tokens_per_second,
+          score: proof.score,
+          passed_count: proof.passed_count,
+          total_count: proof.total_count,
+          valid_json: proof.valid_json,
+          checks: proof.checks,
+          output_digest: await sha256Hex(sample.output),
+          error: ""
+        });
+      }
+      const winner = privateWorkloadWinner(results);
+      writePrivateWorkloadRun({
+        schema: "outilsia.private_workload_run.v1",
+        protocol: PRIVATE_WORKLOAD_PROTOCOL,
+        catalog_version: PRIVATE_WORKLOAD_CATALOG.version,
+        id: "private-workload-test-harness",
+        created_at_ms: Date.now(),
+        machine_key: state.scan.machine_key || "",
+        pack: descriptor.pack.key,
+        custom: true,
+        prompt_digest: await sha256Hex(descriptor.prompt),
+        prompt_length: descriptor.prompt.length,
+        required_term_count: descriptor.requiredTerms.length,
+        model_count: results.length,
+        results,
+        winner,
+        confidence: privateWorkloadConfidence(results, winner)
+      });
+      state.capabilityPassport = null;
+      renderPrivateWorkloadPanel();
+      renderReadinessPanel();
+      const report = readinessReport();
+      const memory = cockpitMemoryMarkdown();
+      const passport = await buildCapabilityPassport();
+      state.capabilityPassport = passport;
+      renderCapabilityPassportPanel();
+      const passportVerified = await verifyCapabilityPassportIntegrity(passport);
+      return {
+        secretPrompt,
+        requiredTerms,
+        catalog: PRIVATE_WORKLOAD_CATALOG,
+        run: state.privateWorkloadRun,
+        stored: JSON.parse(window.localStorage?.getItem(PRIVATE_WORKLOAD_RUNS_KEY) || "[]"),
+        summary: privateWorkloadPackSummary(),
+        markdown: privateWorkloadMarkdown(),
+        report,
+        memory,
+        passport,
+        passportVerified,
+        pdf: premiumReportHtml(report),
+        panel: els.privateWorkloadBox?.textContent || ""
+      };
+    },
     applyRuntimeDriverIntelligenceState() {
       const makeScan = ({
         name,
@@ -14476,6 +15211,26 @@ els.clearPromptLibraryBtn.addEventListener("click", clearPromptLibrary);
 els.runArenaBtn.addEventListener("click", runAutomaticArena);
 els.copyArenaBtn.addEventListener("click", copyArenaReport);
 els.clearArenaRunBtn.addEventListener("click", clearArenaRun);
+els.runPrivateWorkloadBtn?.addEventListener("click", runPrivateWorkloadPack);
+els.copyPrivateWorkloadBtn?.addEventListener("click", copyPrivateWorkloadProof);
+els.clearPrivateWorkloadBtn?.addEventListener("click", clearPrivateWorkloadRuns);
+els.privateWorkloadPackSelect?.addEventListener("change", renderPrivateWorkloadPanel);
+els.privateWorkloadCustomPrompt?.addEventListener("input", renderPrivateWorkloadPanel);
+els.privateWorkloadRequiredTerms?.addEventListener("input", renderPrivateWorkloadPanel);
+els.privateWorkloadModelList?.addEventListener("change", (event) => {
+  const input = event.target?.closest?.("[data-private-workload-model]");
+  if (!input) return;
+  const ref = normalizeOllamaRef(input.getAttribute("data-private-workload-model") || "");
+  const maximum = Number(privateWorkloadPolicy().max_models_per_run || 3);
+  if (input.checked && privateWorkloadSelections.size >= maximum) {
+    input.checked = false;
+    setStatus(`Maximum ${maximum} modèles par test privé`, "warn");
+    return;
+  }
+  if (input.checked) privateWorkloadSelections.add(ref);
+  else privateWorkloadSelections.delete(ref);
+  renderPrivateWorkloadPanel();
+});
 els.operationJumpBtn.addEventListener("click", revealOperationConsole);
 els.cancelOperationBtn.addEventListener("click", () => cancelActiveInstall());
 els.cancelOperationPanelBtn.addEventListener("click", () => cancelActiveInstall());
@@ -14799,6 +15554,7 @@ renderModelAutopilot();
 renderFlightRecorder();
 renderPromptLibrary();
 renderChatHistory();
+renderPrivateWorkloadPanel();
 renderPreparePanel();
 renderReadinessPanel();
 renderPrimaryAction();

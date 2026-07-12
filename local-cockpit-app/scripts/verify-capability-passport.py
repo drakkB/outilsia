@@ -30,7 +30,7 @@ def main():
     serialized = json.dumps(passport, ensure_ascii=False)
 
     assert passport["schema"] == "outilsia.ai_capability_passport.v1", passport["schema"]
-    assert passport["passport_version"] == "1.0.1", passport["passport_version"]
+    assert passport["passport_version"] == "1.1.0", passport["passport_version"]
     assert result["verified"] is True, result
     assert result["tamperedVerified"] is False, result
     assert result["staleSummary"] is None, result["staleSummary"]
@@ -45,6 +45,7 @@ def main():
     assert runtime_driver["api_signal"]["is_runtime_proof"] is False
     assert runtime_driver["actual_execution"]["is_proven"] is True
     assert passport["capabilities"]["runtime_driver_intelligence_v1"] is True
+    assert passport["capabilities"]["private_workload_packs_v1"] is True
     evidence = passport["runtime_readiness"]["evidence"]
     assert evidence["status"] == "gpu-proven", evidence
     assert evidence["source"] == "ollama_api_ps", evidence
@@ -60,6 +61,8 @@ def main():
     assert result["unknownField"]["ram_gb"] is None
     assert result["unknownField"]["vram_gb"] is None
     assert passport["privacy"]["excludes_prompt_and_model_outputs"] is True
+    assert passport["privacy"]["excludes_private_workload_prompts"] is True
+    assert passport["privacy"]["excludes_private_workload_outputs"] is True
     assert "Pourquoi la VRAM" not in serialized
     assert "La VRAM stocke les poids" not in serialized
     assert "desktop_token" not in serialized

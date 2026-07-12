@@ -67,8 +67,12 @@ function writeRelease(root, files, buildId) {
         repository: "",
       },
     },
-    features: ["upgrade_digital_twin_v1"],
-    release_notes: ["Upgrade Digital Twin v1 publish cross-platform test"],
+    features: ["upgrade_digital_twin_v1", "runtime_driver_intelligence_v1", "private_workload_packs_v1"],
+    release_notes: [
+      "Upgrade Digital Twin v1 publish cross-platform test",
+      "Runtime & Driver Intelligence v1 publish cross-platform test",
+      "Private Workload Packs v1 publish cross-platform test"
+    ],
     freshness: {
       stale: false,
       allow_stale: false,
