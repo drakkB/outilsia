@@ -85,6 +85,8 @@ La passerelle locale est désactivée par défaut et disponible uniquement dans 
 
 La notice utilisateur canonique est [NOTICE-UTILISATION-WORKSTACK.md](NOTICE-UTILISATION-WORKSTACK.md). Elle distingue Board Observer, Workstack Composer, Capability Router, Evidence Ledger, ForgeBench, Workstack Arena, MemoryForge et Strategy Arena. Toute évolution de l'orchestration doit mettre cette notice à jour dans le même commit.
 
+ForgeBench v0 prépare désormais `Signal Maze v1` en mode Détails : starter public scellé, trois seeds, mêmes règles et budgets pour chaque stack, score futur explicite et readiness exploratoire/scientifique séparée. Ce préflight n'exécute aucun agent et les tests cachés restent volontairement absents tant qu'une suite privée n'a pas été scellée.
+
 Contrôles dédiés :
 
 ```bash

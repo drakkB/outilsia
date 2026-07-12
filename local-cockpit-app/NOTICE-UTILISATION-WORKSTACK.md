@@ -11,7 +11,7 @@ Périmètre : OutilsIA Local Cockpit, mode **Détails**
 | Workstack Composer | Transformer une carte prête en plan borné avec rôles, budget, permissions et gate humaine. | Aucune exécution, création de worktree, fusion ou publication. |
 | Capability Router | Détecter les CLI et modèles locaux disponibles, puis proposer un planificateur, un exécutant et un vérificateur distinct. | Ne lit pas les jetons, ne vérifie pas les quotas et ne transmet pas la mission aux agents. |
 | Evidence Ledger | Conserver une trace locale chaînée des étapes validées et de leurs empreintes. | Ne stocke ni description brute, prompt, réponse de modèle, credential ou fichier projet. Il ne prouve pas à lui seul la qualité du résultat. |
-| ForgeBench | **Prévu.** Soumettre plusieurs stacks au même benchmark reproductible et mesurer résultat, vitesse, efficacité et coût. | Ne doit jamais modifier les règles, retirer des tests ou confondre estimation et mesure. |
+| ForgeBench | Préparer un protocole équitable `Signal Maze v1`, lier les stacks détectées au même starter, aux mêmes seeds, budgets et permissions, puis signaler ce qui bloque une comparaison. | Le v0 ne lance aucun agent, test caché ou worktree, ne calcule aucun score et ne déclare aucun vainqueur. |
 | Workstack Arena | **Prévu après ForgeBench.** Exécuter une Workstack approuvée dans des espaces isolés et remettre le résultat en revue humaine. | Aucune exécution implicite, aucun partage de worktree entre workers et aucune fusion automatique. |
 | MemoryForge / Obsidian | Conserver les décisions, bilans et connaissances durables du projet. | Ne reçoit pas tous les logs, prompts ou sorties brutes du Ledger. |
 | Strategy Arena | Exploiter les capacités IA locales préparées par OutilsIA pour les workflows quant, puis compiler et backtester. | OutilsIA ne génère pas de stratégie financière et ne lance pas de backtest. |
@@ -26,8 +26,11 @@ Périmètre : OutilsIA Local Cockpit, mode **Détails**
 6. Vérifier les blocages, les permissions et la gate humaine.
 7. Dans **Capability Router**, choisir le type de mission puis cliquer sur **Détecter et proposer**.
 8. Contrôler les exécutants détectés, les versions et l'indépendance du vérificateur.
-9. Dans **Evidence Ledger**, sélectionner chaque étape disponible et cliquer sur **Ajouter la preuve**.
-10. Exporter le JSON du Ledger avant une réinitialisation ou un transfert de machine.
+9. Dans **ForgeBench Lab**, choisir le niveau de preuve, le nombre de seeds et au moins deux stacks candidates.
+10. Cliquer sur **Préparer l'expérience**, puis vérifier que chaque stack reçoit la même empreinte de protocole.
+11. Lire séparément les readiness exploratoire et scientifique. Les tests cachés n'étant pas encore scellés, le niveau scientifique reste bloqué.
+12. Dans **Evidence Ledger**, sélectionner chaque étape disponible, y compris le préflight ForgeBench, puis cliquer sur **Ajouter la preuve**.
+13. Exporter le JSON du Ledger avant une réinitialisation ou un transfert de machine.
 
 Le parcours s'arrête ici. Aucun agent n'est lancé dans cette version.
 
@@ -64,23 +67,26 @@ Le Ledger **ne prouve pas** :
 1. `remote_response_digest` : réponse externe observée et condensée, sans contenu brut conservé.
 2. `signed_local_plan` : Workstack locale signée et non exécutable.
 3. `signed_dry_run_proposal` : proposition de routage signée, sans lancement d'agent.
-4. `isolated_run_evidence` : **prévu**, résultat d'une exécution isolée avec versions, durée et coût.
-5. `independent_verification` : **prévu**, critères relancés par un vérificateur différent du worker.
-6. `human_decision` : **prévu**, acceptation, rejet ou demande de correction par le propriétaire humain.
+4. `signed_benchmark_preflight` : expérience ForgeBench signée, mêmes règles pour chaque stack et aucune exécution commencée.
+5. `isolated_run_evidence` : **prévu**, résultat d'une exécution isolée avec versions, durée et coût.
+6. `independent_verification` : **prévu**, critères relancés par un vérificateur différent du worker.
+7. `human_decision` : **prévu**, acceptation, rejet ou demande de correction par le propriétaire humain.
 
-## Rôle futur de ForgeBench
+## Ce que prépare ForgeBench
 
-ForgeBench ne choisira pas un vainqueur sur une impression. Chaque stack recevra :
+ForgeBench v0 compile `outilsia.forgebench_experiment.v1`. Chaque stack sélectionnée reçoit :
 
 - la même mission et les mêmes contraintes ;
 - un environnement propre ;
-- des tests visibles et cachés ;
+- les mêmes tests visibles ;
 - au moins trois seeds pour une affirmation scientifique ;
-- des mesures séparées de résultat, vitesse, efficacité et coût ;
+- une politique future de mesures séparées de résultat, vitesse, efficacité et coût ;
 - un évaluateur indépendant ;
-- une entrée Evidence Ledger pour chaque étape et décision.
+- une empreinte de protocole identique et exportable.
 
-Le premier benchmark prévu est `Signal Maze v1`. Le score équilibré initial restera explicite : `50 % résultat + 20 % efficacité + 15 % vitesse + 15 % coût`. Les valeurs brutes et les podiums par dimension resteront visibles.
+Le starter public de `Signal Maze v1` est scellé par un manifeste de fichiers et une empreinte SHA-256. Les tests cachés ne sont pas dans le dépôt public et ne sont pas encore provisionnés : ForgeBench l'indique comme un blocage, au lieu de simuler une preuve scientifique.
+
+Le score équilibré futur reste explicite : `50 % résultat + 20 % efficacité + 15 % vitesse + 15 % coût`. Un coût inconnu n'est jamais transformé en zéro. Le score composite, les podiums par dimension, la frontière de Pareto et un éventuel vainqueur restent absents tant que des runs complets et comparables n'existent pas.
 
 ## Confidentialité et coûts
 
@@ -88,7 +94,7 @@ Le premier benchmark prévu est `Signal Maze v1`. Le score équilibré initial r
 - Le Capability Router exécute uniquement des commandes locales de version bornées.
 - Le statut d'authentification et les quotas des CLI restent `not_inspected`.
 - Les modèles Ollama proviennent du scan local déjà effectué.
-- Aucun appel API payant n'est déclenché par Composer, Router ou Ledger.
+- Aucun appel API payant n'est déclenché par Composer, Router, ForgeBench ou Ledger.
 - Un futur passage à l'exécution exigera un consentement distinct et un budget explicite.
 
 ## Export et réinitialisation
@@ -107,6 +113,10 @@ Le fichier persistant se trouve dans le dossier applicatif Tauri sous le nom `ev
 - `outilsia.workstack.v1`
 - `outilsia.capability_router_result.v1`
 - `outilsia.capability_routing.v1`
+- `outilsia.forgebench_benchmark.v1`
+- `outilsia.forgebench_score_policy.v1`
+- `outilsia.forgebench_experiment.v1`
+- `outilsia.forgebench_compile_result.v1`
 - `outilsia.evidence_entry.v1`
 - `outilsia.evidence_ledger.v1`
 

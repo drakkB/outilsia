@@ -441,6 +441,54 @@
           </div>
         </article>
 
+        <article class="panel forgebench-panel advanced-panel">
+          <div class="panel-title">
+            <h2>ForgeBench Lab</h2>
+            <span id="forgeBenchState">routage requis</span>
+          </div>
+          <div class="forgebench-intro">
+            <strong>Comparer des stacks sur un protocole identique</strong>
+            <span id="forgeBenchPrivacy">Préflight uniquement : starter scellé, mêmes règles, seeds et budgets. Aucun agent, worktree, appel payant, score ou vainqueur n'est lancé ou inventé.</span>
+          </div>
+          <div class="forgebench-controls">
+            <label>
+              <span class="field-label">Benchmark</span>
+              <select id="forgeBenchBenchmark" aria-describedby="forgeBenchPrivacy">
+                <option value="signal-maze-v1">Signal Maze v1</option>
+              </select>
+            </label>
+            <label>
+              <span class="field-label">Niveau de preuve</span>
+              <select id="forgeBenchClaimLevel" aria-describedby="forgeBenchPrivacy">
+                <option value="exploratory">Exploratoire</option>
+                <option value="scientific">Scientifique</option>
+              </select>
+            </label>
+            <label>
+              <span class="field-label">Seeds identiques</span>
+              <select id="forgeBenchSeedCount" aria-describedby="forgeBenchPrivacy">
+                <option value="1">1 seed</option>
+                <option value="3" selected>3 seeds</option>
+              </select>
+            </label>
+          </div>
+          <fieldset id="forgeBenchStacks" class="forgebench-stacks" aria-describedby="forgeBenchPrivacy">
+            <legend>Stacks candidates</legend>
+            <label><input type="checkbox" name="forgeBenchStack" value="codex-solo" checked> <span>Codex CLI seul</span></label>
+            <label><input type="checkbox" name="forgeBenchStack" value="claude-solo" checked> <span>Claude Code seul</span></label>
+            <label><input type="checkbox" name="forgeBenchStack" value="hermes-codex-claude" checked> <span>Hermes → Codex → Claude</span></label>
+          </fieldset>
+          <div id="forgeBenchBox" class="forgebench-box empty">
+            Compile d'abord une Workstack puis un routage complet. ForgeBench préparera l'expérience sans l'exécuter.
+          </div>
+          <div class="row-actions">
+            <button id="compileForgeBenchBtn" type="button" disabled>Préparer l'expérience</button>
+            <button id="copyForgeBenchJsonBtn" type="button" disabled>Copier JSON</button>
+            <button id="copyForgeBenchProtocolBtn" type="button" disabled>Copier protocole</button>
+            <button id="clearForgeBenchBtn" type="button" disabled>Effacer</button>
+          </div>
+        </article>
+
         <article class="panel evidence-ledger-panel advanced-panel">
           <div class="panel-title">
             <h2>Evidence Ledger</h2>
@@ -457,11 +505,12 @@
                 <option value="board_observed">Board observé</option>
                 <option value="workstack_compiled">Workstack compilée</option>
                 <option value="capability_routing_proposed">Routage proposé</option>
+                <option value="forgebench_experiment_compiled">Expérience ForgeBench préparée</option>
               </select>
             </label>
           </div>
           <div id="evidenceLedgerBox" class="evidence-ledger-box empty">
-            Aucune preuve enregistrée. Observe un board, compile une Workstack ou propose un routage, puis choisis explicitement l'étape à ajouter.
+            Aucune preuve enregistrée. Observe un board, compile une Workstack, propose un routage ou prépare ForgeBench, puis choisis explicitement l'étape à ajouter.
           </div>
           <div class="row-actions">
             <button id="appendEvidenceBtn" type="button" disabled>Ajouter la preuve</button>

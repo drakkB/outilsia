@@ -5,11 +5,12 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
-const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "evidence_ledger.rs"]
+const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
 const privateWorkloadCatalog = readFileSync(resolve(root, "src/private-workload-packs.js"), "utf8");
+const forgeBenchContract = readFileSync(resolve(root, "forgebench/signal-maze-v1.json"), "utf8");
 const workstackNotice = readFileSync(resolve(root, "NOTICE-UTILISATION-WORKSTACK.md"), "utf8");
 
 const htmlIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]));
@@ -156,6 +157,17 @@ const requiredFeatureText = [
   ["rust capability router no credentials", rust, "\"credentials_read\": false"],
   ["rust capability router independent verifier", rust, "independent_verifier_enforced"],
   ["css capability router", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".capability-router-box"],
+  ["html ForgeBench panel", html, "forgeBenchBox"],
+  ["html ForgeBench stack selector", html, "forgeBenchStacks"],
+  ["js ForgeBench request schema", js, "outilsia.forgebench_compile_request.v1"],
+  ["js ForgeBench result schema", js, "outilsia.forgebench_compile_result.v1"],
+  ["rust ForgeBench experiment schema", rust, "outilsia.forgebench_experiment.v1"],
+  ["rust ForgeBench no execution", rust, '"agents_started": false'],
+  ["rust ForgeBench no early winner", rust, '"winner_declared": false'],
+  ["ForgeBench Signal Maze schema", forgeBenchContract, "outilsia.forgebench_benchmark.v1"],
+  ["ForgeBench explicit hidden suite absence", forgeBenchContract, '"status": "not_provisioned"'],
+  ["ForgeBench score policy", forgeBenchContract, '"result": 50, "efficiency": 20, "speed": 15, "cost": 15'],
+  ["css ForgeBench", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".forgebench-box"],
   ["html evidence ledger", html, "evidenceLedgerBox"],
   ["html evidence source", html, "evidenceLedgerSource"],
   ["js evidence append schema", js, "outilsia.evidence_append_request.v1"],
@@ -167,7 +179,7 @@ const requiredFeatureText = [
   ["css evidence ledger", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".evidence-ledger-box"],
   ["notice Board Observer", workstackNotice, "Board Observer"],
   ["notice Evidence Ledger", workstackNotice, "Ce que prouve l'Evidence Ledger"],
-  ["notice ForgeBench", workstackNotice, "Rôle futur de ForgeBench"],
+  ["notice ForgeBench", workstackNotice, "Ce que prépare ForgeBench"],
   ["notice Workstack Arena", workstackNotice, "Workstack Arena"],
   ["notice Strategy Arena boundary", workstackNotice, "OutilsIA ne génère pas de stratégie financière"],
   ["js install safety schema", js, "outilsia.install_safety_preflight.v1"],

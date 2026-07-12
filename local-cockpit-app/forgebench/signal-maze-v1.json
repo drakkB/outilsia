@@ -1,0 +1,84 @@
+{
+  "schema": "outilsia.forgebench_benchmark.v1",
+  "id": "signal-maze-v1",
+  "version": "1.0.0-exploratory",
+  "status": "exploratory_protocol",
+  "track": "greenfield_browser_game",
+  "title": "Signal Maze v1",
+  "public_task": {
+    "objective": "Construire un mini-jeu web deterministe dans lequel le joueur relie trois sources de signal a leurs recepteurs correspondants.",
+    "rules": [
+      "Le plateau est une grille 9 x 9 generee depuis un seed entier.",
+      "Trois paires source-recepteur utilisent trois couleurs distinctes.",
+      "Un chemin ne traverse ni un obstacle ni un autre chemin.",
+      "Une partie est gagnee lorsque les trois paires sont reliees.",
+      "Nouvelle partie et Reinitialiser restaurent un etat deterministe.",
+      "Clavier, souris et tactile doivent rester jouables sans dependance reseau."
+    ]
+  },
+  "determinism": {
+    "seed_contract": "integer-seed-v1",
+    "default_seeds": [17011, 17029, 17047],
+    "same_seed_same_board_required": true
+  },
+  "starter": {
+    "status": "sealed",
+    "manifest": "signal-maze-v1/starter-manifest.json",
+    "files_total": 3,
+    "bundle_sha256": "4d88bea3831044755d3d504fb6cd9a470647f8734d4a67265c2b3c3621f06e53"
+  },
+  "visible_checks": [
+    {"id": "load-no-error", "dimension": "result", "description": "La page charge sans erreur JavaScript."},
+    {"id": "seed-repeatability", "dimension": "result", "description": "Un meme seed produit exactement le meme plateau."},
+    {"id": "rules-win-reset", "dimension": "result", "description": "Les regles, la victoire et la reinitialisation sont observables."},
+    {"id": "desktop-fit", "dimension": "result", "description": "Le jeu tient dans un viewport 1440 x 900 sans debordement horizontal."},
+    {"id": "android-fit", "dimension": "result", "description": "Le jeu tient dans un viewport 390 x 844 et accepte le tactile."},
+    {"id": "offline-runtime", "dimension": "efficiency", "description": "Aucune ressource externe n'est requise apres ouverture."}
+  ],
+  "hidden_suite": {
+    "status": "not_provisioned",
+    "contents_embedded": false,
+    "checks_total": 0,
+    "digest": null
+  },
+  "viewports": [
+    {"id": "desktop", "width": 1440, "height": 900},
+    {"id": "android_portrait", "width": 390, "height": 844},
+    {"id": "android_landscape", "width": 844, "height": 390}
+  ],
+  "budgets": {
+    "max_duration_seconds_per_run": 1800,
+    "max_attempts_per_run": 1,
+    "max_api_cost_eur_per_run": 0,
+    "network_access": false
+  },
+  "permissions": {
+    "starter_write": true,
+    "benchmark_contract_write": false,
+    "visible_tests_write": false,
+    "hidden_tests_read": false,
+    "publish": false,
+    "merge": false,
+    "human_approval_required": true
+  },
+  "score_policy": {
+    "schema": "outilsia.forgebench_score_policy.v1",
+    "weights_percent": {"result": 50, "efficiency": 20, "speed": 15, "cost": 15},
+    "raw_dimensions_required": true,
+    "unknown_cost_is_zero": false,
+    "composite_requires_all_dimensions": true,
+    "dimension_podiums_required": true,
+    "pareto_frontier_required": true,
+    "winner_before_complete_runs": false
+  },
+  "fairness": {
+    "fresh_workspace_per_run": true,
+    "same_starter": true,
+    "same_rules": true,
+    "same_seeds": true,
+    "same_budgets": true,
+    "same_permissions": true,
+    "deterministic_evaluator": true,
+    "unlogged_human_help_invalidates_run": true
+  }
+}

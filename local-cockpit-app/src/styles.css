@@ -1652,8 +1652,9 @@ h2 {
 .board-observer-panel { grid-column: span 12; order: 25; }
 .workstack-composer-panel { grid-column: span 12; order: 25; }
 .capability-router-panel { grid-column: span 12; order: 26; }
-.evidence-ledger-panel { grid-column: span 12; order: 27; }
-.field-test-panel { grid-column: span 12; order: 28; }
+.forgebench-panel { grid-column: span 12; order: 27; }
+.evidence-ledger-panel { grid-column: span 12; order: 28; }
+.field-test-panel { grid-column: span 12; order: 29; }
 .models-panel { grid-column: span 6; order: 25; }
 .commands-panel { grid-column: span 6; order: 26; }
 .account-panel { grid-column: span 6; order: 30; }
@@ -2724,6 +2725,152 @@ dd {
 
 .capability-candidate.unavailable {
   opacity: 0.65;
+}
+
+.forgebench-intro,
+.forgebench-box {
+  background: rgba(9, 17, 20, 0.94);
+  border: 1px solid rgba(94, 193, 225, 0.28);
+  border-radius: 8px;
+}
+
+.forgebench-intro {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 10px;
+}
+
+.forgebench-intro span,
+.forgebench-summary span,
+.forgebench-stack span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.forgebench-controls {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 10px;
+}
+
+.forgebench-stacks {
+  border: 1px solid rgba(139, 163, 174, 0.2);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0 0 10px;
+  min-width: 0;
+  padding: 10px;
+  width: 100%;
+}
+
+.forgebench-stacks legend {
+  color: var(--muted);
+  font-size: 11px;
+  padding: 0 4px;
+}
+
+.forgebench-stacks label {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+  min-width: 0;
+}
+
+.forgebench-stacks input {
+  flex: 0 0 auto;
+  height: 16px;
+  margin: 0;
+  width: 16px;
+}
+
+.forgebench-stacks span {
+  overflow-wrap: anywhere;
+}
+
+.forgebench-box {
+  display: grid;
+  gap: 10px;
+  line-height: 1.4;
+  min-height: 150px;
+  padding: 10px;
+}
+
+.forgebench-summary {
+  border-bottom: 1px solid rgba(139, 163, 174, 0.16);
+  display: grid;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+
+.forgebench-score-policy {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.forgebench-score-policy > div {
+  background: rgba(5, 11, 14, 0.55);
+  border: 1px solid rgba(139, 163, 174, 0.16);
+  border-radius: 6px;
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+}
+
+.forgebench-score-policy strong {
+  color: var(--cyan);
+  font-size: 17px;
+}
+
+.forgebench-score-policy span,
+.forgebench-warning,
+.forgebench-truth {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.forgebench-warning {
+  color: var(--gold);
+}
+
+.forgebench-truth {
+  border-top: 1px solid rgba(139, 163, 174, 0.16);
+  padding-top: 8px;
+}
+
+.forgebench-stack-list {
+  display: grid;
+}
+
+.forgebench-stack {
+  align-items: start;
+  border-top: 1px solid rgba(139, 163, 174, 0.14);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 250px minmax(0, 1fr) auto;
+  padding: 7px 0;
+}
+
+.forgebench-stack:first-child {
+  border-top: 0;
+}
+
+.forgebench-stack small {
+  color: var(--muted-2);
+  text-align: right;
+}
+
+.forgebench-stack.available small {
+  color: var(--ok);
+}
+
+.forgebench-stack.unavailable {
+  opacity: 0.72;
 }
 
 .evidence-ledger-intro,
@@ -4614,6 +4761,7 @@ dd {
   .board-observer-panel,
   .workstack-composer-panel,
   .capability-router-panel,
+  .forgebench-panel,
   .evidence-ledger-panel,
   .field-test-panel,
   .operation-panel,
@@ -4816,7 +4964,10 @@ dd {
   .workstack-stage,
   .capability-router-controls,
   .capability-candidate,
-  .capability-assignment {
+  .capability-assignment,
+  .forgebench-controls,
+  .forgebench-stacks,
+  .forgebench-stack {
     grid-template-columns: 1fr;
   }
 
@@ -4827,8 +4978,13 @@ dd {
 
   .workstack-stage small,
   .capability-candidate small,
-  .capability-assignment small {
+  .capability-assignment small,
+  .forgebench-stack small {
     text-align: left;
+  }
+
+  .forgebench-score-policy {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .evidence-ledger-entry small {

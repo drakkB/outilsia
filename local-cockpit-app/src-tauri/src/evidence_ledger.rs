@@ -1,4 +1,5 @@
 use crate::capability_router::validate_capability_router_result;
+use crate::forgebench::validate_forgebench_result;
 use crate::workstack_composer::{canonical_sha256, validate_workstack_plan};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -482,6 +483,57 @@ fn source_contract(event_type: &str, source: &Value) -> Result<Value, String> {
                 }
             }))
         }
+        "forgebench_experiment_compiled" => {
+            validate_forgebench_result(source)?;
+            let workstack_id =
+                workstack_id_claim(source, "/experiment/workstack_ref/workstack_id")?;
+            let claim_level = required_enum_claim(
+                source,
+                "/experiment/claim_level",
+                &["exploratory", "scientific"],
+                "Niveau de preuve ForgeBench",
+            )?;
+            let experiment_id = source
+                .pointer("/experiment/experiment_id")
+                .and_then(Value::as_str)
+                .filter(|value| {
+                    value.starts_with("fb-")
+                        && value.len() <= 64
+                        && value
+                            .bytes()
+                            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+                })
+                .ok_or_else(|| {
+                    "Identifiant ForgeBench invalide pour Evidence Ledger.".to_string()
+                })?;
+            let stacks = source
+                .pointer("/experiment/candidate_stacks")
+                .and_then(Value::as_array)
+                .ok_or_else(|| "Stacks ForgeBench absentes pour Evidence Ledger.".to_string())?;
+            let seeds = source
+                .pointer("/experiment/protocol/seeds")
+                .and_then(Value::as_array)
+                .ok_or_else(|| "Seeds ForgeBench absents pour Evidence Ledger.".to_string())?;
+            Ok(json!({
+                "actor": {"kind": "outilsia_component", "id": "forgebench"},
+                "workstack_id": workstack_id,
+                "proof_level": "signed_benchmark_preflight",
+                "source_integrity_sha256": source.pointer("/integrity/digest").cloned().unwrap_or(Value::Null),
+                "claims": {
+                    "experiment_id": experiment_id,
+                    "benchmark_id": source.pointer("/experiment/benchmark/id").cloned().unwrap_or(Value::Null),
+                    "benchmark_version": source.pointer("/experiment/benchmark/version").cloned().unwrap_or(Value::Null),
+                    "claim_level": claim_level,
+                    "candidate_stacks_total": stacks.len(),
+                    "seeds_total": seeds.len(),
+                    "protocol_ready": source.pointer("/experiment/readiness/protocol_ready").cloned().unwrap_or(json!(false)),
+                    "exploratory_ready": source.pointer("/experiment/readiness/exploratory_ready").cloned().unwrap_or(json!(false)),
+                    "scientific_ready": source.pointer("/experiment/readiness/scientific_ready").cloned().unwrap_or(json!(false)),
+                    "scores_computed": false,
+                    "winner_declared": false
+                }
+            }))
+        }
         _ => Err("Type de preuve Evidence Ledger inconnu.".to_string()),
     }
 }
@@ -717,6 +769,97 @@ mod tests {
         result
     }
 
+    fn forgebench_source() -> Value {
+        let protocol = json!({
+            "schema": "outilsia.forgebench_protocol.v1",
+            "benchmark_id": "signal-maze-v1",
+            "starter": {"status": "sealed", "bundle_sha256": "a".repeat(64)},
+            "seeds": [17011, 17029, 17047],
+            "visible_checks": [1, 2, 3, 4, 5],
+            "hidden_suite": {"status": "not_provisioned", "contents_embedded": false, "digest": Value::Null},
+            "score_policy": {
+                "schema": "outilsia.forgebench_score_policy.v1",
+                "weights_percent": {"result": 50, "efficiency": 20, "speed": 15, "cost": 15},
+                "unknown_cost_is_zero": false,
+                "composite_requires_all_dimensions": true,
+                "raw_dimensions_required": true,
+                "dimension_podiums_required": true,
+                "pareto_frontier_required": true,
+                "winner_before_complete_runs": false
+            },
+            "permissions": {
+                "benchmark_contract_write": false,
+                "visible_tests_write": false,
+                "hidden_tests_read": false,
+                "publish": false,
+                "merge": false
+            }
+        });
+        let protocol_digest = canonical_sha256(&protocol);
+        let mut experiment = json!({
+            "schema": "outilsia.forgebench_experiment.v1",
+            "experiment_id": "fb-ledger-test",
+            "benchmark": {"id": "signal-maze-v1", "version": "1.0.0-exploratory", "spec_sha256": "b".repeat(64), "public_task_included": false},
+            "workstack_ref": {"workstack_id": "ws-ledger-test", "ready": true},
+            "capability_routing_ref": {"status": "proposal_complete"},
+            "claim_level": "exploratory",
+            "protocol": protocol,
+            "protocol_digest": protocol_digest,
+            "candidate_stacks": [
+                {
+                    "key": "codex-solo", "available": true, "blockers": [], "protocol_digest": protocol_digest, "execution_started": false, "scores_computed": false,
+                    "bindings": [
+                        {"role": "worker", "candidate": {"candidate_id": "codex-cli:test"}, "execution_started": false},
+                        {"role": "independent_verifier", "candidate": {"candidate_id": "forgebench:deterministic-evaluator"}, "execution_started": false}
+                    ]
+                },
+                {
+                    "key": "claude-solo", "available": true, "blockers": [], "protocol_digest": protocol_digest, "execution_started": false, "scores_computed": false,
+                    "bindings": [
+                        {"role": "worker", "candidate": {"candidate_id": "claude-code:test"}, "execution_started": false},
+                        {"role": "independent_verifier", "candidate": {"candidate_id": "forgebench:deterministic-evaluator"}, "execution_started": false}
+                    ]
+                }
+            ],
+            "readiness": {"protocol_ready": true, "exploratory_ready": true, "scientific_ready": false, "selected_claim_ready": true},
+            "measurements": {"runs_recorded": 0, "scores_computed": false, "dimension_podiums_computed": false, "pareto_frontier_computed": false, "winner_declared": false, "cost_status": "not_measured_not_zero"},
+            "fairness": {"same_protocol_digest_for_every_stack": true, "fresh_workspace_per_run_required": true, "independent_evaluator_required": true, "human_help_must_be_logged": true, "rules_or_tests_modified": false},
+            "execution": {"started": false, "agents_started": false, "worktrees_created": false, "repository_modified": false, "api_spend_eur": 0},
+            "privacy": {"raw_workstack_included": false, "raw_task_context_included": false, "credentials_included": false, "hidden_test_contents_included": false}
+        });
+        sign_document(&mut experiment).expect("signed ForgeBench experiment");
+        let mut result = json!({
+            "schema": "outilsia.forgebench_compile_result.v1",
+            "prepare_only": true,
+            "execution_started": false,
+            "agents_started": false,
+            "worktrees_created": false,
+            "repository_modified": false,
+            "network_called": false,
+            "api_spend_eur": 0,
+            "experiment": experiment,
+            "policy": {
+                "compile_protocol_only": true,
+                "start_agents": false,
+                "create_worktrees": false,
+                "modify_repository": false,
+                "write_board": false,
+                "spend_api_credit": false,
+                "publish": false,
+                "merge": false,
+                "human_approval_required_before_execution": true
+            },
+            "privacy": {
+                "raw_workstack_returned": false,
+                "raw_task_context_returned": false,
+                "credentials_read": false,
+                "hidden_test_contents_returned": false
+            }
+        });
+        sign_document(&mut result).expect("signed ForgeBench result");
+        result
+    }
+
     #[test]
     fn empty_ledger_is_valid_and_contains_no_entry() {
         let ledger = empty_ledger().expect("empty ledger");
@@ -750,6 +893,29 @@ mod tests {
         verify_ledger(&ledger).expect("verified chain");
         assert_eq!(ledger["entries"].as_array().map(Vec::len), Some(3));
         assert_eq!(ledger["verification"]["entries_verified"], 3);
+    }
+
+    #[test]
+    fn appends_a_forgebench_preflight_without_scores_or_raw_content() {
+        let (ledger, appended) = append_to_ledger(
+            empty_ledger().expect("empty"),
+            "forgebench_experiment_compiled",
+            &forgebench_source(),
+            4_000,
+        )
+        .expect("ForgeBench entry");
+        assert!(appended);
+        verify_ledger(&ledger).expect("verified ForgeBench ledger");
+        let entry = &ledger["entries"][0];
+        assert_eq!(
+            entry["evidence"]["proof_level"],
+            "signed_benchmark_preflight"
+        );
+        assert_eq!(entry["evidence"]["claims"]["scores_computed"], false);
+        assert_eq!(entry["evidence"]["claims"]["winner_declared"], false);
+        let serialized = serde_json::to_string(&ledger).expect("ledger JSON");
+        assert!(!serialized.contains("\"candidate_stacks\":"));
+        assert!(!serialized.contains("\"hidden_suite\":"));
     }
 
     #[test]
