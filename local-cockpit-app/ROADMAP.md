@@ -36,7 +36,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 
 ## Candidat validé - Runtime & Driver Intelligence v1
 
-État au 12 juillet 2026 : Runtime & Driver Intelligence est inclus avec Tests privés et Local Capability Bridge dans le candidat cross-platform `291887472771`, commit `6b5187e`, run GitHub Actions `29188747277` terminé avec succès. Le build public reste `291439601671` et ne revendique pas encore ces capacités. Les cinq artefacts candidats et leurs SHA-256 ont été vérifiés hors production ; le terrain reste `0/5`.
+État au 12 juillet 2026 : Runtime & Driver Intelligence est inclus avec Tests privés, Local Capability Bridge et Install Safety Preflight dans le candidat cross-platform le plus récent `291904395671`, commit `655281d`, run GitHub Actions `29190439567` terminé avec succès. Le build public reste `291439601671` et ne revendique pas encore ces capacités. Les cinq artefacts candidats et leurs SHA-256 ont été vérifiés hors production ; le terrain reste `0/5`.
 
 - [x] Créer une matrice canonique versionnée, datée et sourcée pour NVIDIA, AMD, Intel, Apple et CPU.
 - [x] Séparer pilote détecté, API signalée, support Ollama documenté et preuve réelle `/api/ps`.
@@ -55,9 +55,11 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [ ] Publier Windows/Linux et annoncer la fonction sur le site uniquement après toutes les gates et SHA-256 verts.
 - [ ] Envisager plus tard un installateur de pilote borné seulement si URL artefact, signature/hash, préflight, consentement, restauration et rollback sont tous prouvés ; sinon conserver le mode manuel officiel.
 
-## Candidat en cours - Install Safety Preflight v1
+## Candidat validé - Install Safety Preflight v1
 
 Objectif au 12 juillet 2026 : vérifier le runtime et le volume réellement ciblés avant tout `ollama pull`, sans exposer le chemin personnel du dossier de modèles et sans confondre stockage Windows, WSL et Linux.
+
+État au 12 juillet 2026 : le candidat Windows/Linux `291904395671`, commit `655281d`, run cross-platform `29190439567`, contient les cinq artefacts attendus. Les workflows autonomes Windows `29190387884` et Linux `29190387879` sont verts ; contrat, tailles et SHA-256 sont vérifiés. Les installateurs Windows restent `NotSigned`. La fonction n'est pas déployée en production et ne constitue pas encore une preuve physique native/WSL.
 
 - [x] Sonder le volume du dossier Ollama natif par défaut ou personnalisé sans exporter son chemin.
 - [x] Sonder séparément le stockage de la distribution WSL par défaut.
@@ -66,7 +68,7 @@ Objectif au 12 juillet 2026 : vérifier le runtime et le volume réellement cibl
 - [x] Demander confirmation quand la taille ou le volume restent inconnus.
 - [x] Propager un résumé borné au rapport et au AI Capability Passport 1.3.0.
 - [x] Ajouter tests Rust, recette Playwright et contrôle anti-fuite de chemin.
-- [ ] Construire et vérifier un candidat Windows/Linux avant toute revendication publique.
+- [x] Construire et vérifier un candidat Windows/Linux avant toute revendication publique.
 - [ ] Confirmer les sondes native et WSL sur les machines physiques.
 
 ## Phase 1 - Preuve terrain fiable
