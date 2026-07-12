@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
-const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs"]
+const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
@@ -136,6 +136,15 @@ const requiredFeatureText = [
   ["rust board observer bounded response", rust, ".chunk()"],
   ["rust board observer no key persistence", rust, "credential_persisted: false"],
   ["css board observer", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".board-observer-box"],
+  ["html workstack composer", html, "workstackComposerBox"],
+  ["html workstack context", html, "workstackLocalContext"],
+  ["js workstack request schema", js, "outilsia.workstack_compile_request.v1"],
+  ["js workstack result schema", js, "outilsia.workstack_compile_result.v1"],
+  ["rust workstack schema", rust, "outilsia.workstack.v1"],
+  ["rust workstack plan only", rust, "start_agents\": false"],
+  ["rust workstack no raw context", rust, "raw_context_included\": false"],
+  ["rust workstack human gate", rust, "human_gate_non_delegable\": true"],
+  ["css workstack composer", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".workstack-composer-box"],
   ["js install safety schema", js, "outilsia.install_safety_preflight.v1"],
   ["js install safety before pull", js, "runInstallSafetyPreflight(clean)"],
   ["js install safety path privacy", js, "excludes_ollama_storage_path: true"],

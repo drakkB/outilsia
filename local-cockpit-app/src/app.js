@@ -54,6 +54,8 @@ const state = {
   capabilityPassport: null,
   localCapabilityBridge: null,
   boardObserver: null,
+  workstackComposer: null,
+  workstackSelectedCard: null,
   installSafetyPreflight: null,
   localSnapshots: [],
   installingModels: {},
@@ -90,6 +92,8 @@ const LOCAL_CAPABILITY_BRIDGE_CONTRACT_VERSION = "2026-07-12";
 const LOCAL_CAPABILITY_BRIDGE_TTL_SECONDS = 15 * 60;
 const BOARD_OBSERVER_REQUEST_SCHEMA = "outilsia.board_observer_request.v1";
 const BOARD_OBSERVER_RESULT_SCHEMA = "outilsia.board_observer_result.v1";
+const WORKSTACK_COMPILE_REQUEST_SCHEMA = "outilsia.workstack_compile_request.v1";
+const WORKSTACK_COMPILE_RESULT_SCHEMA = "outilsia.workstack_compile_result.v1";
 const INSTALL_SAFETY_PREFLIGHT_SCHEMA = "outilsia.install_safety_preflight.v1";
 const INSTALL_SAFETY_MIN_RESERVE_GB = 3;
 const MODEL_AUTOPILOT_PROTOCOL = "outilsia.autopilot.v1";
@@ -419,6 +423,15 @@ const els = {
   observeBoardBtn: $("observeBoardBtn"),
   copyBoardSnapshotBtn: $("copyBoardSnapshotBtn"),
   clearBoardObserverBtn: $("clearBoardObserverBtn"),
+  workstackComposerState: $("workstackComposerState"),
+  workstackSelectedCard: $("workstackSelectedCard"),
+  workstackPriority: $("workstackPriority"),
+  workstackLocalContext: $("workstackLocalContext"),
+  workstackComposerBox: $("workstackComposerBox"),
+  compileWorkstackBtn: $("compileWorkstackBtn"),
+  copyWorkstackJsonBtn: $("copyWorkstackJsonBtn"),
+  copyWorkstackMarkdownBtn: $("copyWorkstackMarkdownBtn"),
+  clearWorkstackBtn: $("clearWorkstackBtn"),
   fieldTestState: $("fieldTestState"),
   fieldTestProfileSelect: $("fieldTestProfileSelect"),
   fieldTestBox: $("fieldTestBox"),
@@ -571,6 +584,8 @@ let recommendationEngineBusy = false;
 let privateWorkloadBusy = false;
 let boardObserverBusy = false;
 let boardObserverError = "";
+let workstackComposerBusy = false;
+let workstackComposerError = "";
 const privateWorkloadSelections = new Set();
 let recipeAutoSaveTimer = null;
 const UI_MODE_STORAGE_KEY = "outilsia-local-cockpit-ui-mode";
@@ -10336,7 +10351,7 @@ function renderBoardObserverPanel() {
       const status = card?.contract?.status === "complete"
         ? "contrat complet"
         : `manque : ${missing.map(boardObserverMissingLabel).join(", ") || "contrat"}`;
-      return `<div class="board-observer-card"><div><strong>${escapeHtml(card?.name || "Carte sans titre")}</strong><span>${escapeHtml(card?.source_key || "")}</span></div><small>${escapeHtml(status)}</small></div>`;
+      return `<div class="board-observer-card"><div><strong>${escapeHtml(card?.name || "Carte sans titre")}</strong><span>${escapeHtml(card?.source_key || "")}</span></div><div class="board-observer-card-actions"><small>${escapeHtml(status)}</small><button type="button" data-compose-board-card="${escapeHtml(card?.source_key || "")}">Préparer</button></div></div>`;
     }).join("")
     : `<span>Aucune carte n'est actuellement dans une colonne Ready for Agent reconnue.</span>`;
   const warningRow = warnings.length
@@ -10372,6 +10387,7 @@ async function observePlankaBoard() {
   boardObserverBusy = true;
   boardObserverError = "";
   state.boardObserver = null;
+  clearWorkstackComposer(true);
   renderBoardObserverPanel();
   setStatus("Lecture du board Planka en cours...");
   try {
@@ -10419,8 +10435,236 @@ function clearBoardObserver() {
   if (els.boardObserverUrl) els.boardObserverUrl.value = "";
   if (els.boardObserverBoardId) els.boardObserverBoardId.value = "";
   if (els.boardObserverApiKey) els.boardObserverApiKey.value = "";
+  clearWorkstackComposer(true);
   renderBoardObserverPanel();
   setStatus("Board Observer effacé", "ok");
+}
+
+function workstackPriorityLabel(value) {
+  return ({
+    balanced: "Équilibrée",
+    quality: "Qualité",
+    speed: "Vitesse",
+    cost: "Coût",
+    privacy: "Confidentialité"
+  })[value] || value;
+}
+
+function workstackBlockerLabel(value) {
+  return ({
+    context: "contexte manquant",
+    acceptance_checks: "critères d'acceptation manquants",
+    permission_boundary: "limites d'autorisation manquantes",
+    card_not_ready_for_agent: "carte hors de Ready for Agent"
+  })[value] || value;
+}
+
+function workstackRoleLabel(value) {
+  return ({
+    human_owner: "Propriétaire humain",
+    planner: "Planificateur",
+    worker: "Exécutant",
+    independent_verifier: "Vérificateur indépendant"
+  })[value] || value;
+}
+
+function workstackActionLabel(value) {
+  return ({
+    confirm_scope: "Confirmer le périmètre",
+    produce_bounded_plan: "Produire un plan borné",
+    produce_isolated_patch_or_artifact: "Produire dans un espace isolé",
+    rerun_acceptance_checks: "Relancer les critères d'acceptation",
+    approve_merge_or_delivery: "Approuver la fusion ou la livraison"
+  })[value] || value;
+}
+
+function workstackStatusLabel(value) {
+  return ({
+    required: "requis",
+    not_started: "non démarré"
+  })[value] || value;
+}
+
+function selectWorkstackCard(sourceKey) {
+  const cards = Array.isArray(state.boardObserver?.snapshot?.cards)
+    ? state.boardObserver.snapshot.cards
+    : [];
+  const card = cards.find((item) => item?.source_key === sourceKey);
+  if (!card) {
+    setStatus("Carte du board introuvable", "warn");
+    return;
+  }
+  state.workstackSelectedCard = JSON.parse(JSON.stringify(card));
+  state.workstackComposer = null;
+  workstackComposerError = "";
+  if (els.workstackLocalContext) els.workstackLocalContext.value = "";
+  renderWorkstackComposerPanel();
+  els.workstackComposerBox?.scrollIntoView({ behavior: "smooth", block: "center" });
+  setStatus(`Carte préparée : ${card.name || sourceKey}`, "ok");
+}
+
+function workstackMarkdown(result = state.workstackComposer) {
+  const plan = result?.plan;
+  if (!plan) return "";
+  const stages = Array.isArray(plan.stages) ? plan.stages : [];
+  const blockers = Array.isArray(plan.readiness?.blockers) ? plan.readiness.blockers : [];
+  return [
+    `# Workstack ${plan.workstack_id || "draft"}`,
+    "",
+    `- Objectif : ${plan.objective?.title || "non renseigné"}`,
+    `- Source : ${plan.source?.source_key || "inconnue"}`,
+    `- Statut : ${plan.status || "inconnu"}`,
+    `- Priorité : ${workstackPriorityLabel(plan.routing?.priority || "balanced")}`,
+    `- Exécution : désactivée`,
+    `- Contexte brut exporté : non`,
+    `- Gate humaine : obligatoire`,
+    blockers.length ? `- Blocages : ${blockers.map(workstackBlockerLabel).join(" ; ")}` : "- Blocages : aucun",
+    "",
+    "## Étapes",
+    ...stages.map((stage, index) => `${index + 1}. ${workstackRoleLabel(stage.role)} · ${workstackActionLabel(stage.action)} · ${workstackStatusLabel(stage.status)}`),
+    "",
+    `SHA-256 : ${plan.integrity?.digest || "non disponible"}`
+  ].join("\n");
+}
+
+function renderWorkstackComposerPanel() {
+  if (!els.workstackComposerBox) return;
+  const card = state.workstackSelectedCard;
+  const result = state.workstackComposer;
+  const plan = result?.plan;
+  els.compileWorkstackBtn.disabled = !invoke || workstackComposerBusy || !card;
+  els.copyWorkstackJsonBtn.disabled = !plan;
+  els.copyWorkstackMarkdownBtn.disabled = !plan;
+  els.clearWorkstackBtn.disabled = workstackComposerBusy || (!card && !plan && !workstackComposerError);
+
+  if (!card) {
+    els.workstackComposerState.textContent = "aucune carte";
+    els.workstackSelectedCard.className = "workstack-selected-card empty";
+    els.workstackSelectedCard.textContent = "Choisis “Préparer” sur une carte Ready for Agent du Board Observer.";
+    els.workstackComposerBox.className = "workstack-composer-box empty";
+    els.workstackComposerBox.textContent = "Le plan restera bloqué si les critères d'acceptation ou les limites d'autorisation manquent dans la carte.";
+    return;
+  }
+
+  const cardMissing = Array.isArray(card.contract?.missing) ? card.contract.missing : [];
+  els.workstackSelectedCard.className = "workstack-selected-card";
+  els.workstackSelectedCard.innerHTML = `
+    <strong>${escapeHtml(card.name || "Carte sans titre")}</strong>
+    <span>${escapeHtml(card.source_key || "")} · ${escapeHtml(card.contract?.status === "complete" ? "contrat complet" : `incomplet : ${cardMissing.map(boardObserverMissingLabel).join(", ") || "à vérifier"}`)}</span>
+  `;
+
+  if (!invoke && !result?.test_mode) {
+    els.workstackComposerState.textContent = "app native requise";
+    els.workstackComposerBox.className = "workstack-composer-box empty";
+    els.workstackComposerBox.textContent = "La compilation signée est disponible uniquement dans l'application Windows/Linux.";
+    return;
+  }
+  if (workstackComposerBusy) {
+    els.workstackComposerState.textContent = "compilation";
+    els.workstackComposerBox.className = "workstack-composer-box empty";
+    els.workstackComposerBox.textContent = "Compilation du plan local. Aucun agent, worktree, appel cloud ou changement de board n'est lancé.";
+    return;
+  }
+  if (workstackComposerError) {
+    els.workstackComposerState.textContent = "plan refusé";
+    els.workstackComposerBox.className = "workstack-composer-box empty";
+    els.workstackComposerBox.innerHTML = `<strong>Workstack non compilée</strong><span>${escapeHtml(workstackComposerError)}</span>`;
+    return;
+  }
+  if (!plan) {
+    els.workstackComposerState.textContent = "prêt à compiler";
+    els.workstackComposerBox.className = "workstack-composer-box empty";
+    els.workstackComposerBox.textContent = "Choisis une priorité puis compile. Le contexte optionnel sera remplacé par son empreinte SHA-256 dans le plan.";
+    return;
+  }
+
+  const stages = Array.isArray(plan.stages) ? plan.stages : [];
+  const blockers = Array.isArray(plan.readiness?.blockers) ? plan.readiness.blockers : [];
+  const stageRows = stages.map((stage, index) => `
+    <div class="workstack-stage">
+      <strong>${escapeHtml(`${index + 1}. ${workstackRoleLabel(stage.role || "rôle")}`)}</strong>
+      <span>${escapeHtml(workstackActionLabel(stage.action || "action non définie"))}</span>
+      <small>${escapeHtml(stage.enabled ? workstackStatusLabel(stage.status || "actif") : "désactivé")}</small>
+    </div>
+  `).join("");
+  const digest = plan.integrity?.digest || "";
+  els.workstackComposerState.textContent = plan.readiness?.ready ? "prêt pour validation" : "bloqué";
+  els.workstackComposerBox.className = "workstack-composer-box";
+  els.workstackComposerBox.innerHTML = `
+    <div class="workstack-summary">
+      <strong>${escapeHtml(plan.workstack_id || "Workstack draft")}</strong>
+      <span>${escapeHtml(workstackPriorityLabel(plan.routing?.priority || "balanced"))} · plan uniquement · gate humaine obligatoire</span>
+      <span>SHA-256 ${escapeHtml(digest ? `${digest.slice(0, 14)}…${digest.slice(-8)}` : "non disponible")}</span>
+    </div>
+    ${blockers.length ? `<div class="workstack-blockers">Bloqué : ${escapeHtml(blockers.map(workstackBlockerLabel).join(" · "))}</div>` : `<div class="workstack-blockers">Aucun blocage contractuel. L'exécution reste désactivée.</div>`}
+    <div class="workstack-stage-list">${stageRows}</div>
+  `;
+}
+
+async function compileSelectedWorkstack() {
+  if (!invoke || workstackComposerBusy || !state.workstackSelectedCard) return null;
+  const localContext = els.workstackLocalContext?.value || "";
+  workstackComposerBusy = true;
+  workstackComposerError = "";
+  state.workstackComposer = null;
+  renderWorkstackComposerPanel();
+  setStatus("Compilation du plan Workstack...");
+  try {
+    const result = await invoke("compile_work_card", {
+      request: {
+        schema: WORKSTACK_COMPILE_REQUEST_SCHEMA,
+        card: state.workstackSelectedCard,
+        local_context: localContext,
+        priority: els.workstackPriority?.value || "balanced"
+      }
+    });
+    if (result?.schema !== WORKSTACK_COMPILE_RESULT_SCHEMA || result?.execution_started || !result?.plan) {
+      throw new Error("réponse native incomplète");
+    }
+    state.workstackComposer = result;
+    setStatus(result.plan.readiness?.ready ? "Plan Workstack prêt pour validation humaine" : "Plan compilé mais bloqué", result.plan.readiness?.ready ? "ok" : "warn");
+    return result;
+  } catch (error) {
+    state.workstackComposer = null;
+    workstackComposerError = String(error || "Compilation impossible");
+    setStatus(`Workstack Composer : ${workstackComposerError}`, "error");
+    return null;
+  } finally {
+    workstackComposerBusy = false;
+    if (els.workstackLocalContext) els.workstackLocalContext.value = "";
+    renderWorkstackComposerPanel();
+  }
+}
+
+async function copyWorkstackJson() {
+  if (!state.workstackComposer) return;
+  try {
+    await navigator.clipboard.writeText(`${JSON.stringify(state.workstackComposer, null, 2)}\n`);
+    setStatus("Plan Workstack copié, sans contexte brut", "ok");
+  } catch (error) {
+    setStatus(`Copie Workstack impossible : ${error}`, "error");
+  }
+}
+
+async function copyWorkstackSummary() {
+  const markdown = workstackMarkdown();
+  if (!markdown) return;
+  try {
+    await navigator.clipboard.writeText(`${markdown}\n`);
+    setStatus("Résumé Workstack copié", "ok");
+  } catch (error) {
+    setStatus(`Copie du résumé impossible : ${error}`, "error");
+  }
+}
+
+function clearWorkstackComposer(silent = false) {
+  state.workstackSelectedCard = null;
+  state.workstackComposer = null;
+  workstackComposerError = "";
+  if (els.workstackLocalContext) els.workstackLocalContext.value = "";
+  if (els.workstackPriority) els.workstackPriority.value = "balanced";
+  renderWorkstackComposerPanel();
+  if (!silent) setStatus("Workstack Composer effacé", "ok");
 }
 
 async function copyStrategyBridgeJson() {
@@ -15217,6 +15461,7 @@ function installTestHarness() {
       };
     },
     applyBoardObserverState() {
+      clearWorkstackComposer(true);
       state.boardObserver = {
         schema: BOARD_OBSERVER_RESULT_SCHEMA,
         contract_version: "2026-07-12",
@@ -15244,13 +15489,27 @@ function installTestHarness() {
               source_key: "planka:card-ready-1",
               work_state: "ready_for_agent",
               name: "Construire Signal Maze v1",
-              contract: { status: "complete", missing: [], execution_allowed: false }
+              contract: {
+                status: "complete",
+                missing: [],
+                context_present: true,
+                acceptance_checks_total: 3,
+                permission_boundaries: ["safe_to_execute"],
+                execution_allowed: false
+              }
             },
             {
               source_key: "planka:card-ready-2",
               work_state: "ready_for_agent",
               name: "Auditer le rendu Android",
-              contract: { status: "incomplete", missing: ["permission_boundary"], execution_allowed: false }
+              contract: {
+                status: "incomplete",
+                missing: ["permission_boundary"],
+                context_present: true,
+                acceptance_checks_total: 2,
+                permission_boundaries: [],
+                execution_allowed: false
+              }
             }
           ],
           warnings: ["incomplete_card_contracts"],
@@ -15272,6 +15531,54 @@ function installTestHarness() {
         result: state.boardObserver,
         panel: els.boardObserverBox?.textContent || "",
         apiKeyValue: els.boardObserverApiKey?.value || ""
+      };
+    },
+    applyWorkstackComposerState() {
+      this.applyBoardObserverState();
+      selectWorkstackCard("planka:card-ready-1");
+      state.workstackComposer = {
+        schema: WORKSTACK_COMPILE_RESULT_SCHEMA,
+        contract_version: "2026-07-12",
+        compiler: "outilsia-workstack-composer-v0",
+        execution_started: false,
+        raw_context_returned: false,
+        test_mode: true,
+        plan: {
+          schema: "outilsia.workstack.v1",
+          contract_version: "2026-07-12",
+          workstack_id: "ws-demo-signal-maze",
+          status: "ready_for_human_review",
+          execution_enabled: false,
+          source: { type: "board_card", source_key: "planka:card-ready-1", adapter: "planka" },
+          objective: {
+            title: "Construire Signal Maze v1",
+            context_mode: "local_digest",
+            context_digest: "b".repeat(64),
+            raw_context_included: false,
+            acceptance_checks_total: 3,
+            permission_boundaries: ["safe_to_execute"]
+          },
+          readiness: { ready: true, blockers: [], human_review_required: true },
+          routing: { priority: "balanced", worker_assignment: "unassigned", brand_locked: false },
+          stages: [
+            { id: "scope", role: "human_owner", action: "confirm_scope", enabled: true, status: "required" },
+            { id: "plan", role: "planner", action: "produce_bounded_plan", enabled: false, status: "not_started" },
+            { id: "execute", role: "worker", action: "produce_isolated_patch_or_artifact", enabled: false, status: "not_started" },
+            { id: "verify", role: "independent_verifier", action: "rerun_acceptance_checks", enabled: false, status: "not_started" },
+            { id: "approve", role: "human_owner", action: "approve_merge_or_delivery", enabled: false, status: "not_started" }
+          ],
+          policy: { plan_only: true, start_agents: false, create_worktrees: false, write_board: false, publish: false, merge: false },
+          privacy: { raw_context_included: false, credentials_included: false, persisted: false },
+          integrity: { algorithm: "SHA-256", digest: "c".repeat(64) }
+        }
+      };
+      workstackComposerError = "";
+      if (els.workstackLocalContext) els.workstackLocalContext.value = "";
+      renderWorkstackComposerPanel();
+      return {
+        result: state.workstackComposer,
+        panel: els.workstackComposerBox?.textContent || "",
+        contextValue: els.workstackLocalContext?.value || ""
       };
     },
     invalidateLocalCapabilityBridgeState() {
@@ -16233,6 +16540,17 @@ els.boardObserverApiKey?.addEventListener("keydown", (event) => {
   event.preventDefault();
   void observePlankaBoard();
 });
+els.compileWorkstackBtn?.addEventListener("click", compileSelectedWorkstack);
+els.copyWorkstackJsonBtn?.addEventListener("click", copyWorkstackJson);
+els.copyWorkstackMarkdownBtn?.addEventListener("click", copyWorkstackSummary);
+els.clearWorkstackBtn?.addEventListener("click", () => clearWorkstackComposer(false));
+for (const input of [els.workstackPriority, els.workstackLocalContext]) {
+  input?.addEventListener("input", () => {
+    state.workstackComposer = null;
+    workstackComposerError = "";
+    renderWorkstackComposerPanel();
+  });
+}
 els.copyFieldTestBtn.addEventListener("click", copyFieldTestMarkdown);
 els.copyFieldTestJsonBtn?.addEventListener("click", copyFieldTestJson);
 els.downloadFieldTestJsonBtn?.addEventListener("click", downloadFieldTestJson);
@@ -16245,6 +16563,11 @@ els.downloadBtn.addEventListener("click", downloadMarkdown);
 els.vaultBtn.addEventListener("click", exportVault);
 els.openVaultBtn.addEventListener("click", openVault);
 document.addEventListener("click", async (event) => {
+  const composeCard = event.target?.closest?.("[data-compose-board-card]")?.getAttribute?.("data-compose-board-card") || "";
+  if (composeCard) {
+    selectWorkstackCard(composeCard);
+    return;
+  }
   const link = event.target?.closest?.("a[href]");
   const linkUrl = link?.getAttribute?.("data-open-url") || link?.getAttribute?.("href") || "";
   if (link && (linkUrl.startsWith("https://outilsia.fr") || linkUrl.startsWith("/"))) {
@@ -16548,6 +16871,7 @@ renderChatHistory();
 renderPrivateWorkloadPanel();
 renderLocalCapabilityBridgePanel();
 renderBoardObserverPanel();
+renderWorkstackComposerPanel();
 renderPreparePanel();
 renderReadinessPanel();
 renderPrimaryAction();

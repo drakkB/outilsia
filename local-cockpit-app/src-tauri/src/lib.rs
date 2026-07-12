@@ -1,5 +1,6 @@
 mod board_observer;
 mod local_capability_bridge;
+mod workstack_composer;
 
 use board_observer::observe_planka_board;
 use local_capability_bridge::{
@@ -19,6 +20,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env, fs};
 use sysinfo::{Disks, System};
 use tauri::{AppHandle, Emitter, Manager, State};
+use workstack_composer::compile_work_card;
 
 const OUTILSIA_ENDPOINT: &str = "https://outilsia.fr";
 const DETECTION_COMMAND_TIMEOUT: Duration = Duration::from_secs(12);
@@ -5135,6 +5137,7 @@ pub fn run() {
             install_ollama_runtime,
             install_wsl_runtime,
             observe_planka_board,
+            compile_work_card,
             start_local_capability_bridge,
             get_local_capability_bridge_status,
             stop_local_capability_bridge,

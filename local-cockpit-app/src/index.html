@@ -370,6 +370,45 @@
           </div>
         </article>
 
+        <article class="panel workstack-composer-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Workstack Composer</h2>
+            <span id="workstackComposerState">aucune carte</span>
+          </div>
+          <div class="workstack-composer-intro">
+            <strong>Compiler un plan, jamais lancer un agent</strong>
+            <span id="workstackComposerPrivacy">Le contexte optionnel reste local, sert uniquement à calculer une empreinte puis disparaît du formulaire. Le plan exporté contient des rôles, des limites et une gate humaine, pas le texte brut.</span>
+          </div>
+          <div id="workstackSelectedCard" class="workstack-selected-card empty">
+            Choisis “Préparer” sur une carte Ready for Agent du Board Observer.
+          </div>
+          <div class="workstack-composer-controls">
+            <label>
+              <span class="field-label">Priorité de sélection</span>
+              <select id="workstackPriority" aria-describedby="workstackComposerPrivacy">
+                <option value="balanced">Équilibrée</option>
+                <option value="quality">Qualité</option>
+                <option value="speed">Vitesse</option>
+                <option value="cost">Coût</option>
+                <option value="privacy">Confidentialité</option>
+              </select>
+            </label>
+            <label>
+              <span class="field-label">Contexte local optionnel</span>
+              <textarea id="workstackLocalContext" autocomplete="off" spellcheck="true" placeholder="Ajoute seulement le contexte nécessaire. Il ne sera ni sauvegardé ni inclus dans le JSON." aria-describedby="workstackComposerPrivacy"></textarea>
+            </label>
+          </div>
+          <div id="workstackComposerBox" class="workstack-composer-box empty">
+            Le plan restera bloqué si les critères d'acceptation ou les limites d'autorisation manquent dans la carte.
+          </div>
+          <div class="row-actions">
+            <button id="compileWorkstackBtn" type="button" disabled>Compiler le plan</button>
+            <button id="copyWorkstackJsonBtn" type="button" disabled>Copier JSON</button>
+            <button id="copyWorkstackMarkdownBtn" type="button" disabled>Copier résumé</button>
+            <button id="clearWorkstackBtn" type="button" disabled>Effacer</button>
+          </div>
+        </article>
+
         <article class="panel field-test-panel advanced-panel">
           <div class="panel-title">
             <h2>Test terrain</h2>

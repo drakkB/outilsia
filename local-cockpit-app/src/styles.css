@@ -1650,6 +1650,7 @@ h2 {
 .capability-passport-panel { grid-column: span 12; order: 24; }
 .local-capability-bridge-panel { grid-column: span 12; order: 25; }
 .board-observer-panel { grid-column: span 12; order: 25; }
+.workstack-composer-panel { grid-column: span 12; order: 25; }
 .field-test-panel { grid-column: span 12; order: 26; }
 .models-panel { grid-column: span 6; order: 25; }
 .commands-panel { grid-column: span 6; order: 26; }
@@ -2062,6 +2063,7 @@ dd {
 .capability-passport-box,
 .local-capability-bridge-box,
 .board-observer-box,
+.workstack-composer-box,
 .field-test-box {
   display: grid;
   gap: 7px;
@@ -2136,6 +2138,7 @@ dd {
 .capability-passport-box.empty,
 .local-capability-bridge-box.empty,
 .board-observer-box.empty,
+.workstack-composer-box.empty,
 .field-test-box.empty {
   align-items: center;
   color: var(--muted);
@@ -2534,9 +2537,103 @@ dd {
   text-align: right;
 }
 
+.board-observer-card-actions {
+  display: grid;
+  gap: 5px;
+  justify-items: end;
+}
+
 .board-observer-warning {
   color: var(--gold);
   font-size: 11px;
+}
+
+.workstack-composer-intro,
+.workstack-selected-card,
+.workstack-composer-box {
+  background:
+    linear-gradient(135deg, rgba(20, 24, 38, 0.96), rgba(10, 17, 22, 0.92));
+  border: 1px solid rgba(164, 152, 255, 0.24);
+  border-radius: 8px;
+}
+
+.workstack-composer-intro,
+.workstack-selected-card {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 10px;
+}
+
+.workstack-composer-intro span,
+.workstack-selected-card span,
+.workstack-summary span,
+.workstack-stage span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.workstack-selected-card.empty {
+  color: var(--muted);
+}
+
+.workstack-composer-controls {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(190px, 0.35fr) minmax(0, 1fr);
+  margin-bottom: 10px;
+}
+
+.workstack-composer-controls textarea {
+  min-height: 86px;
+}
+
+.workstack-composer-box {
+  display: grid;
+  gap: 10px;
+  line-height: 1.4;
+  min-height: 118px;
+  padding: 10px;
+}
+
+.workstack-summary {
+  border-bottom: 1px solid rgba(139, 163, 174, 0.16);
+  display: grid;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+
+.workstack-stage-list {
+  display: grid;
+}
+
+.workstack-stage {
+  align-items: start;
+  border-top: 1px solid rgba(139, 163, 174, 0.14);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 220px minmax(0, 1fr) auto;
+  padding: 7px 0;
+}
+
+.workstack-stage:first-child {
+  border-top: 0;
+}
+
+.workstack-stage small {
+  color: var(--muted-2);
+  text-align: right;
+}
+
+.workstack-blockers {
+  color: var(--gold);
+  font-size: 11px;
+}
+
+.board-observer-card button {
+  font-size: 10px;
+  min-height: 30px;
 }
 
 .local-bridge-summary,
@@ -4355,6 +4452,7 @@ dd {
   .capability-passport-panel,
   .local-capability-bridge-panel,
   .board-observer-panel,
+  .workstack-composer-panel,
   .field-test-panel,
   .operation-panel,
   .readiness-panel,
@@ -4545,6 +4643,19 @@ dd {
   }
 
   .board-observer-card small {
+    text-align: left;
+  }
+
+  .board-observer-card-actions {
+    justify-items: start;
+  }
+
+  .workstack-composer-controls,
+  .workstack-stage {
+    grid-template-columns: 1fr;
+  }
+
+  .workstack-stage small {
     text-align: left;
   }
 

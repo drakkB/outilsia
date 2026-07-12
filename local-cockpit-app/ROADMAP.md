@@ -208,6 +208,8 @@ Noyau et panneau Détails Board Observer v0 implémentés le 12 juillet 2026, sa
 
 ### Workstack Arena et ForgeBench
 
+Workstack Composer v0 implémenté dans les sources le 12 juillet 2026 : une carte normalisée produit un plan `outilsia.workstack.v1` déterministe et signé, avec priorité, rôles, budget, blocages et gate humaine. Le contexte optionnel est remplacé par son empreinte ; aucune exécution, création de worktree, écriture board, fusion ou publication n'est disponible.
+
 - Séparer quatre responsabilités : Composer définit la chaîne, Workstack Arena exécute, ForgeBench évalue et Evidence Ledger conserve la preuve.
 - Créer le benchmark maison `Signal Maze v1` avec règles déterministes, starter scellé, tests visibles/cachés et captures desktop/Android.
 - Mesurer séparément résultat, vitesse, efficacité et coût ; toujours publier les valeurs brutes, les sous-scores et le caractère estimé ou inconnu d'une donnée.
