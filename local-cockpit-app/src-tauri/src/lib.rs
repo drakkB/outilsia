@@ -1,3 +1,8 @@
+mod local_capability_bridge;
+
+use local_capability_bridge::{
+    get_local_capability_bridge_status, start_local_capability_bridge, stop_local_capability_bridge,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{hash_map::DefaultHasher, HashMap};
@@ -4932,6 +4937,9 @@ pub fn run() {
             delete_ollama_model,
             install_ollama_runtime,
             install_wsl_runtime,
+            start_local_capability_bridge,
+            get_local_capability_bridge_status,
+            stop_local_capability_bridge,
             generate_memoryforge,
             export_obsidian_vault,
             open_obsidian_vault

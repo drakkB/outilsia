@@ -64,8 +64,18 @@ const release = {
       repository: ""
     }
   },
-  features: ["upgrade_digital_twin_v1"],
-  release_notes: ["Upgrade Digital Twin v1 linux verifier test"],
+  features: [
+    "upgrade_digital_twin_v1",
+    "runtime_driver_intelligence_v1",
+    "private_workload_packs_v1",
+    "local_capability_bridge_v1"
+  ],
+  release_notes: [
+    "Upgrade Digital Twin v1 linux verifier test",
+    "Runtime & Driver Intelligence v1 linux verifier test",
+    "Private Workload Packs v1 linux verifier test",
+    "Local Capability Bridge v1 linux verifier test"
+  ],
   primary_download: file,
   downloads_by_platform: { linux: [file] },
   files: [file],

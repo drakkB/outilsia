@@ -52,6 +52,7 @@ const state = {
   privateWorkloadRun: null,
   upgradeDigitalTwinRun: null,
   capabilityPassport: null,
+  localCapabilityBridge: null,
   localSnapshots: [],
   installingModels: {},
   optimisticInstalledModels: []
@@ -82,6 +83,9 @@ const MAX_PROMPT_LIBRARY = 40;
 const MAX_CHAT_HISTORY = 60;
 const MAX_PRIVATE_WORKLOAD_RUNS = 12;
 const PRIVATE_WORKLOAD_PROTOCOL = "outilsia.private_workload_pack.v1";
+const LOCAL_CAPABILITY_BRIDGE_SCHEMA = "outilsia.local_capability_bridge.v1";
+const LOCAL_CAPABILITY_BRIDGE_CONTRACT_VERSION = "2026-07-12";
+const LOCAL_CAPABILITY_BRIDGE_TTL_SECONDS = 15 * 60;
 const MODEL_AUTOPILOT_PROTOCOL = "outilsia.autopilot.v1";
 const FLIGHT_RECORDER_PROTOCOL = "outilsia.flight_recorder.v1";
 const UPGRADE_DIGITAL_TWIN_PROTOCOL = "outilsia.upgrade_digital_twin.v1";
@@ -395,6 +399,12 @@ const els = {
   generateCapabilityPassportBtn: $("generateCapabilityPassportBtn"),
   copyCapabilityPassportBtn: $("copyCapabilityPassportBtn"),
   downloadCapabilityPassportBtn: $("downloadCapabilityPassportBtn"),
+  localCapabilityBridgeState: $("localCapabilityBridgeState"),
+  localCapabilityBridgeBox: $("localCapabilityBridgeBox"),
+  startLocalCapabilityBridgeBtn: $("startLocalCapabilityBridgeBtn"),
+  copyLocalCapabilityBridgeBtn: $("copyLocalCapabilityBridgeBtn"),
+  refreshLocalCapabilityBridgeBtn: $("refreshLocalCapabilityBridgeBtn"),
+  stopLocalCapabilityBridgeBtn: $("stopLocalCapabilityBridgeBtn"),
   fieldTestState: $("fieldTestState"),
   fieldTestProfileSelect: $("fieldTestProfileSelect"),
   fieldTestBox: $("fieldTestBox"),
@@ -3429,7 +3439,7 @@ function useUsageProfilePack(target = "benchmark") {
 }
 
 function renderScan(scan) {
-  state.capabilityPassport = null;
+  invalidateCapabilityPassport();
   state.modelAutopilotRun = null;
   state.upgradeDigitalTwinRun = null;
   state.scan = scan;
@@ -4528,7 +4538,7 @@ function setUpgradeSimTarget(key) {
     applyDigitalTwinDraftToControls({ ...digitalTwinDraftFromControls(), ram_target_gb: 64 });
   }
   state.upgradeDigitalTwinRun = buildUpgradeDigitalTwin();
-  state.capabilityPassport = null;
+  invalidateCapabilityPassport();
   const compatibility = state.compatibility?.compatibility || state.compatibility || {};
   renderUpgradeImpact(
     compatibility,
@@ -4746,7 +4756,7 @@ async function copyUpgradeImpact() {
 }
 
 function refreshDigitalTwinDependents() {
-  state.capabilityPassport = null;
+  invalidateCapabilityPassport();
   const compatibility = state.compatibility?.compatibility || state.compatibility || {};
   const effectiveUpgrades = compatibilityUpgradesForCurrentDecision(compatibility);
   const models = extractModels(compatibility);
@@ -5748,6 +5758,7 @@ function readinessReport() {
     upgrade_digital_twin: upgradeDigitalTwin,
     purchases_suppressed_by_digital_twin: digitalTwinSuppressesPurchases(),
     capability_passport: capabilityPassportSummary(),
+    local_capability_bridge: localCapabilityBridgeSummary(),
     model_autopilot: modelAutopilotSnapshot(),
     usage_profile: {
       key: usage.key,
@@ -5832,6 +5843,7 @@ function readinessMarkdown(report = readinessReport()) {
     `- Potentiel matériel: ${report.score === null ? "non calculé" : `${report.score}/100`}`,
     `- État du runtime: ${report.runtime_readiness?.label || "non vérifié"} - ${report.runtime_readiness?.detail || ""}`,
     `- AI Capability Passport: ${report.capability_passport ? `SHA-256 ${report.capability_passport.digest}` : "non généré ou à régénérer"}`,
+    `- Passerelle locale: ${report.local_capability_bridge?.running ? `active en lecture seule jusqu'à ${new Date(report.local_capability_bridge.expires_at_ms).toISOString()}` : "désactivée par défaut"}`,
     `- Machine: ${report.machine.name}`,
     `- CPU: ${report.machine.cpu}`,
     `- RAM: ${report.machine.ram}`,
@@ -5974,6 +5986,7 @@ function readinessSummaryText(report = readinessReport()) {
     `Flight Recorder: ${report.flight_recorder?.comparison ? `${report.flight_recorder.comparison.headline} (confiance ${report.flight_recorder.comparison.confidence})` : "aucune référence"}`,
     `Upgrade Digital Twin: ${report.upgrade_digital_twin ? `${report.upgrade_digital_twin.decision.label} (${report.upgrade_digital_twin.compatibility.status}, confiance ${report.upgrade_digital_twin.compatibility.confidence})` : "aucun scénario"}`,
     `AI Capability Passport: ${report.capability_passport ? `SHA-256 ${report.capability_passport.digest}` : "non généré"}`,
+    `Passerelle locale: ${report.local_capability_bridge?.running ? "active · 127.0.0.1 · lecture seule" : "désactivée"}`,
     `Upgrade utile: ${upgrade}`,
     `Prochaine action: ${report.next[0] || "sauvegarder le rapport"}`
   ];
@@ -6079,6 +6092,7 @@ function premiumReportHtml(report = readinessReport()) {
     privateWorkload?.winner ? `Tests privés : ${privateWorkload.winner.model} (${privateWorkload.winner.score}/100 · ${privateWorkload.pack})` : "Tests privés à lancer dans Détails",
     flightRecorder?.comparison ? `Flight Recorder : ${flightRecorder.comparison.headline} · confiance ${flightRecorder.comparison.confidence}` : "Flight Recorder : aucune référence locale",
     report.capability_passport ? `Capability Passport : SHA-256 ${report.capability_passport.digest}` : "AI Capability Passport à générer dans Détails",
+    report.local_capability_bridge?.running ? "Passerelle locale : active sur 127.0.0.1 · lecture seule" : "Passerelle locale : désactivée par défaut",
     model.ref ? `Modèle suivant : ${model.ref}` : "Modèle suivant à déterminer"
   ];
   const installNow = model.ref || report.test_model || "qwen3:0.6b";
@@ -6749,6 +6763,7 @@ function cockpitMemoryMarkdown() {
   sections.push(memoryDecisionCard());
   sections.push(readinessMarkdown());
   sections.push(capabilityPassportMarkdown());
+  sections.push(localCapabilityBridgeMarkdown());
   if (digitalTwinSummary()) sections.push(digitalTwinMarkdown());
   const arena = readLastArenaRun();
   if (arena?.results?.length) {
@@ -6800,6 +6815,7 @@ function renderReadinessPanel() {
       <span>${report.flight_recorder?.comparison ? `Flight Recorder : ${escapeHtml(report.flight_recorder.comparison.headline)} · confiance ${escapeHtml(report.flight_recorder.comparison.confidence)}` : "Flight Recorder : aucune référence locale."}</span>
       <span>${report.upgrade_digital_twin ? `Upgrade Digital Twin : ${escapeHtml(report.upgrade_digital_twin.decision.label)} · ${escapeHtml(report.upgrade_digital_twin.compatibility.status)} · confiance ${escapeHtml(report.upgrade_digital_twin.compatibility.confidence)}` : "Upgrade Digital Twin : aucun scénario calculé."}</span>
       <span>${report.capability_passport ? `Passport : SHA-256 ${escapeHtml(`${report.capability_passport.digest.slice(0, 16)}…`)}` : "AI Capability Passport disponible dans Détails après génération."}</span>
+      <span>${report.local_capability_bridge?.running ? `Passerelle locale : active sur 127.0.0.1 · lecture seule · expiration automatique.` : "Passerelle locale : désactivée par défaut dans Détails."}</span>
       <span>${report.upgrades[0] ? `Upgrade utile : ${escapeHtml(report.upgrades[0].title)}` : "Aucun achat prioritaire pour l'instant."}</span>
       <span>${report.account_ready ? "Compte prêt : rapport partageable disponible après synchronisation." : "Connecte le compte pour sauvegarder et partager ce rapport."}</span>
     </div>
@@ -8865,7 +8881,7 @@ async function runPrivateWorkloadPack() {
       confidence: privateWorkloadConfidence(measuredResults, winner)
     };
     writePrivateWorkloadRun(run);
-    state.capabilityPassport = null;
+    invalidateCapabilityPassport();
     renderCapabilityPassportPanel();
     renderReadinessPanel();
     renderPrivateWorkloadPanel();
@@ -8893,7 +8909,7 @@ function clearPrivateWorkloadRuns() {
   if (!window.confirm("Vider l'historique local des tests privés ?")) return;
   window.localStorage?.removeItem(PRIVATE_WORKLOAD_RUNS_KEY);
   state.privateWorkloadRun = null;
-  state.capabilityPassport = null;
+  invalidateCapabilityPassport();
   renderCapabilityPassportPanel();
   renderReadinessPanel();
   renderPrivateWorkloadPanel();
@@ -9136,6 +9152,7 @@ function strategyArenaReadiness() {
         expose_flight_recorder_summary_read_only: Boolean(flightRecorderSummary()),
         expose_upgrade_digital_twin_summary_read_only: Boolean(digitalTwinSummary()),
         expose_runtime_driver_intelligence_read_only: Boolean(runtimeDriver),
+        expose_local_capability_bridge_read_only: true,
         expose_runtime_command_prefix: true,
         install_or_delete_models_inside_strategy_arena: false,
         run_backtests_inside_outilsia: false
@@ -9246,6 +9263,7 @@ function strategyArenaReadiness() {
     flight_recorder: flightRecorderSummary(),
     upgrade_digital_twin: digitalTwinSummary(),
     capability_passport: capabilityPassportSummary(),
+    local_capability_bridge: localCapabilityBridgeSummary(),
     recommended_roles: {
       fastest: winners?.fastest?.model || "",
       assistant: winners?.assistant?.model || "",
@@ -9289,6 +9307,7 @@ function renderStrategyBridgePanel() {
       ${profile.model_autopilot?.active ? `<span>Profil Ollama : ${escapeHtml(profile.model_autopilot.active.label)} · ${escapeHtml(modelAutopilotTuningLabel(profile.model_autopilot.active.tuning))}</span>` : ""}
       ${profile.flight_recorder?.comparison ? `<span>Flight Recorder : ${escapeHtml(profile.flight_recorder.comparison.headline)} · lecture seule</span>` : ""}
       ${profile.upgrade_digital_twin ? `<span>Upgrade Digital Twin : ${escapeHtml(profile.upgrade_digital_twin.decision.label)} · lecture seule</span>` : ""}
+      <span>Passerelle locale : ${profile.local_capability_bridge?.running ? "active sur 127.0.0.1" : "désactivée"} · lecture seule</span>
     </div>
     <div class="bridge-rules">
       <span>OutilsIA prépare les modèles locaux.</span>
@@ -9320,6 +9339,7 @@ function strategyBridgeMarkdown() {
     `- Fichier attendu: ${profile.handoff_manifest?.file_name || profile.import_file}`,
     `- Résumé: ${profile.bridge_summary}`,
     `- AI Capability Passport: ${profile.capability_passport ? `${profile.capability_passport.schema} · SHA-256 ${profile.capability_passport.digest}` : "non généré"}`,
+    `- Passerelle locale: ${profile.local_capability_bridge?.running ? "active sur 127.0.0.1 · lecture seule" : "désactivée par défaut"}`,
     `- Model Autopilot: ${profile.model_autopilot?.active ? `${profile.model_autopilot.active.label} · ${modelAutopilotTuningLabel(profile.model_autopilot.active.tuning)}` : "profil Ollama par défaut"}`,
     `- Flight Recorder: ${profile.flight_recorder?.comparison ? `${profile.flight_recorder.comparison.headline} · confiance ${profile.flight_recorder.comparison.confidence} · lecture seule` : "aucune référence"}`,
     `- Upgrade Digital Twin: ${profile.upgrade_digital_twin ? `${profile.upgrade_digital_twin.decision.label} · compatibilité ${profile.upgrade_digital_twin.compatibility.status} · lecture seule` : "aucun scénario"}`,
@@ -9468,7 +9488,7 @@ function capabilityPassportDocument() {
   const storageSource = scan.storage_free_gb == null ? "not_detected" : "scan";
   return {
     schema: "outilsia.ai_capability_passport.v1",
-    passport_version: "1.1.0",
+    passport_version: "1.2.0",
     generated_at: new Date().toISOString(),
     source_revision: capabilityPassportSourceRevision(),
     issuer: {
@@ -9519,6 +9539,7 @@ function capabilityPassportDocument() {
       flight_recorder_v1: Boolean(report.flight_recorder?.reference),
       upgrade_digital_twin_v1: Boolean(report.upgrade_digital_twin),
       private_workload_packs_v1: true,
+      local_capability_bridge_v1: true,
       local_arena: Boolean(report.arena),
       strategy_arena_profile_export: true
     },
@@ -9558,6 +9579,13 @@ function capabilityPassportDocument() {
       recommended_roles: bridge.recommended_roles,
       boundary: bridge.separation_rules
     },
+    interoperability: {
+      local_capability_bridge: localCapabilityBridgePolicy(),
+      default_state: "disabled",
+      consent_required: true,
+      snapshot_only: true,
+      mutating_commands_exposed: false
+    },
     privacy: {
       local_generation: true,
       excludes_account_tokens: true,
@@ -9575,6 +9603,7 @@ function capabilityPassportDocument() {
       "Flight Recorder compare des mesures locales liées à une référence explicite ; ses causes possibles restent des hypothèses et ne constituent pas une preuve terrain physique.",
       "Upgrade Digital Twin simule des scénarios ; alimentation, connecteurs, dimensions, slots et QVL doivent être vérifiés physiquement avant achat.",
       "Tests privés compare des sorties avec des critères déterministes bornés ; les prompts et réponses bruts ne sont pas inclus dans le Passport.",
+      "La passerelle locale est désactivée par défaut, liée à 127.0.0.1, bornée dans le temps et strictement en lecture seule ; son jeton éphémère n'est pas inclus dans ce Passport.",
       "L'empreinte SHA-256 détecte une modification du document ; elle ne prouve ni l'identité du PC ni celle du propriétaire.",
       "Ce passeport ne constitue pas une validation de stratégie financière ni un résultat de backtest."
     ]
@@ -9604,6 +9633,7 @@ async function buildCapabilityPassport() {
 
 function renderCapabilityPassportPanel() {
   if (!els.capabilityPassportBox) return;
+  queueMicrotask(renderLocalCapabilityBridgePanel);
   const passport = capabilityPassportIsCurrent() ? state.capabilityPassport : null;
   els.generateCapabilityPassportBtn.disabled = !state.scan;
   els.copyCapabilityPassportBtn.disabled = !passport;
@@ -9653,7 +9683,7 @@ async function generateCapabilityPassport() {
     setStatus("AI Capability Passport généré et vérifié", "ok");
     return state.capabilityPassport;
   } catch (error) {
-    state.capabilityPassport = null;
+    invalidateCapabilityPassport();
     renderCapabilityPassportPanel();
     setStatus(`Passeport impossible : ${error}`, "error");
     return null;
@@ -9701,6 +9731,322 @@ function capabilityPassportMarkdown(passport = state.capabilityPassport) {
     `- Upgrade Digital Twin: ${passport.upgrade_digital_twin?.decision?.label || "aucun scénario"}`,
     "- Portée: intégrité du document uniquement, pas signature d'identité."
   ].join("\n");
+}
+
+function invalidateCapabilityPassport() {
+  const bridgeWasRunning = localCapabilityBridgeIsRunning();
+  state.capabilityPassport = null;
+  state.localCapabilityBridge = null;
+  if (bridgeWasRunning && invoke) {
+    void invoke("stop_local_capability_bridge").catch(() => {});
+  }
+}
+
+function localCapabilityBridgePolicy() {
+  return {
+    schema: LOCAL_CAPABILITY_BRIDGE_SCHEMA,
+    contract_version: LOCAL_CAPABILITY_BRIDGE_CONTRACT_VERSION,
+    enabled_by_default: false,
+    bind: "127.0.0.1",
+    read_only: true,
+    authentication: "ephemeral_bearer_token",
+    ttl_seconds: LOCAL_CAPABILITY_BRIDGE_TTL_SECONDS,
+    max_ttl_seconds: 30 * 60,
+    token_persisted: false,
+    allowed_origins: [
+      "https://strategyarena.io",
+      "https://www.strategyarena.io",
+      "http://localhost:<port>",
+      "http://127.0.0.1:<port>"
+    ],
+    endpoints: [
+      "/v1/health",
+      "/v1/capabilities",
+      "/v1/passport",
+      "/v1/models",
+      "/v1/strategy-arena"
+    ]
+  };
+}
+
+function localCapabilityBridgeIsRunning(runtime = state.localCapabilityBridge) {
+  return Boolean(runtime?.running && Number(runtime.expires_at_ms || 0) > Date.now());
+}
+
+function localCapabilityBridgeSummary(runtime = state.localCapabilityBridge) {
+  const policy = localCapabilityBridgePolicy();
+  const running = localCapabilityBridgeIsRunning(runtime);
+  return {
+    schema: policy.schema,
+    contract_version: policy.contract_version,
+    supported: Boolean(invoke),
+    enabled_by_default: false,
+    running,
+    bind: policy.bind,
+    base_url: running ? runtime.base_url || "" : "",
+    expires_at_ms: running ? Number(runtime.expires_at_ms || 0) : 0,
+    read_only: true,
+    token_persisted: false,
+    token_exposed_in_summary: false,
+    snapshot_passport_digest: running ? runtime.passport_digest || "" : "",
+    endpoints: policy.endpoints
+  };
+}
+
+function localCapabilityBridgeMarkdown(runtime = state.localCapabilityBridge) {
+  const summary = localCapabilityBridgeSummary(runtime);
+  return [
+    "## Passerelle locale OutilsIA",
+    "",
+    `- Schéma: ${summary.schema}`,
+    `- État: ${summary.running ? "active" : "désactivée"}`,
+    "- Liaison: 127.0.0.1 uniquement",
+    "- Accès: lecture seule avec jeton Bearer éphémère",
+    "- Durée: 15 minutes par défaut, 30 minutes maximum",
+    "- Jeton stocké sur disque: non",
+    "- Prompt ou réponse brute exposé: non",
+    "- Installation/suppression de modèle: non",
+    "- Benchmark, backtest ou trading: non",
+    summary.running && summary.snapshot_passport_digest
+      ? `- Passport servi: SHA-256 ${summary.snapshot_passport_digest}`
+      : "- Passport servi: aucun instantané actif"
+  ].join("\n");
+}
+
+function localCapabilityBridgePayload() {
+  if (!capabilityPassportIsCurrent()) throw new Error("AI Capability Passport à jour requis");
+  const passport = state.capabilityPassport;
+  const report = readinessReport();
+  const strategy = strategyArenaReadiness();
+  const winner = report.recommendation_engine?.winner || null;
+  return {
+    schema: LOCAL_CAPABILITY_BRIDGE_SCHEMA,
+    contract_version: LOCAL_CAPABILITY_BRIDGE_CONTRACT_VERSION,
+    generated_at: new Date().toISOString(),
+    read_only: true,
+    producer: {
+      name: "OutilsIA Local Cockpit",
+      role: "local_ai_capability_provider",
+      app_version: passport.binding?.app_version || "",
+      build_id: passport.binding?.build_id || ""
+    },
+    permissions: {
+      read_capabilities: true,
+      install_models: false,
+      delete_models: false,
+      run_benchmark: false,
+      run_chat: false,
+      access_personal_files: false,
+      run_backtests: false,
+      execute_trades: false,
+      write_configuration: false
+    },
+    privacy: {
+      local_only: true,
+      ephemeral: true,
+      raw_prompts_included: false,
+      raw_model_outputs_included: false,
+      account_tokens_included: false,
+      token_persisted: false
+    },
+    passport,
+    installed_models: passport.installed_models || [],
+    benchmark_proofs: passport.benchmark_proofs || [],
+    recommendation: {
+      usage_profile: report.usage_profile?.key || "",
+      recommended_model: winner?.model || report.recommended_model?.ref || strategy.recommended_model || "",
+      confidence: report.recommendation_engine?.confidence || "",
+      source: winner ? "recommendation_engine_v2" : "outilsia_compatibility"
+    },
+    strategy_arena: {
+      schema: strategy.schema,
+      status: strategy.status,
+      read_only: true,
+      recommended_model: strategy.recommended_model,
+      recommended_roles: strategy.recommended_roles,
+      import_label: strategy.handoff_manifest?.import_label || "Modèles locaux disponibles via OutilsIA",
+      mode: strategy.strategy_arena_import?.mode || "Local Quant Mode",
+      boundary: strategy.separation_rules
+    }
+  };
+}
+
+function localCapabilityBridgePairingDocument() {
+  const runtime = state.localCapabilityBridge;
+  if (!localCapabilityBridgeIsRunning(runtime) || !runtime?.token) {
+    throw new Error("La connexion locale doit être redémarrée pour obtenir un nouveau jeton");
+  }
+  return {
+    schema: "outilsia.local_capability_bridge_connection.v1",
+    contract_version: LOCAL_CAPABILITY_BRIDGE_CONTRACT_VERSION,
+    base_url: runtime.base_url,
+    expires_at_ms: Number(runtime.expires_at_ms || 0),
+    authorization: {
+      scheme: "Bearer",
+      token: runtime.token,
+      header: `Authorization: Bearer ${runtime.token}`
+    },
+    endpoints: runtime.endpoints || localCapabilityBridgePolicy().endpoints,
+    permissions: {
+      read_only: true,
+      model_management: false,
+      benchmark_execution: false,
+      file_access: false,
+      backtests: false,
+      trading_execution: false
+    },
+    warning: "Secret éphémère : ne pas publier. La passerelle s'arrête automatiquement à expiration."
+  };
+}
+
+let localCapabilityBridgeStopPending = false;
+
+function renderLocalCapabilityBridgePanel() {
+  if (!els.localCapabilityBridgeBox) return;
+  const runtime = state.localCapabilityBridge;
+  const running = localCapabilityBridgeIsRunning(runtime);
+  const passportCurrent = capabilityPassportIsCurrent();
+  els.startLocalCapabilityBridgeBtn.disabled = !invoke || !passportCurrent || running;
+  els.copyLocalCapabilityBridgeBtn.disabled = !running || !runtime?.token;
+  els.refreshLocalCapabilityBridgeBtn.disabled = !invoke;
+  els.stopLocalCapabilityBridgeBtn.disabled = !invoke || !running;
+
+  if (running && !passportCurrent && !localCapabilityBridgeStopPending) {
+    localCapabilityBridgeStopPending = true;
+    void stopLocalCapabilityBridge(true).finally(() => {
+      localCapabilityBridgeStopPending = false;
+    });
+    els.localCapabilityBridgeState.textContent = "arrêt sécurité";
+    els.localCapabilityBridgeBox.className = "local-capability-bridge-box empty";
+    els.localCapabilityBridgeBox.textContent = "Les preuves ont changé. La passerelle locale est arrêtée pour ne pas servir un Passport périmé.";
+    return;
+  }
+  if (!invoke && !runtime?.test_mode) {
+    els.localCapabilityBridgeState.textContent = "app native requise";
+    els.localCapabilityBridgeBox.className = "local-capability-bridge-box empty";
+    els.localCapabilityBridgeBox.textContent = "La passerelle loopback est disponible uniquement dans l'application Windows/Linux, jamais dans la page web.";
+    return;
+  }
+  if (!state.scan) {
+    els.localCapabilityBridgeState.textContent = "scan requis";
+    els.localCapabilityBridgeBox.className = "local-capability-bridge-box empty";
+    els.localCapabilityBridgeBox.textContent = "Scanne la machine puis génère son AI Capability Passport.";
+    return;
+  }
+  if (!passportCurrent && !running) {
+    els.localCapabilityBridgeState.textContent = "Passport requis";
+    els.localCapabilityBridgeBox.className = "local-capability-bridge-box empty";
+    els.localCapabilityBridgeBox.textContent = "Génère un Passport à jour. Aucun serveur local ne démarre automatiquement.";
+    return;
+  }
+  if (!running) {
+    els.localCapabilityBridgeState.textContent = "désactivée";
+    els.localCapabilityBridgeBox.className = "local-capability-bridge-box empty";
+    els.localCapabilityBridgeBox.innerHTML = `
+      <strong>Prête, mais arrêtée par défaut.</strong>
+      <span>Un clic ouvre une API sur 127.0.0.1 pendant 15 minutes. Lecture seule, jeton éphémère, zéro persistance et aucune commande Ollama.</span>
+    `;
+    return;
+  }
+  const remainingMinutes = Math.max(1, Math.ceil((Number(runtime.expires_at_ms) - Date.now()) / 60_000));
+  const digest = runtime.passport_digest || "";
+  els.localCapabilityBridgeState.textContent = `active · ${remainingMinutes} min`;
+  els.localCapabilityBridgeBox.className = "local-capability-bridge-box";
+  els.localCapabilityBridgeBox.innerHTML = `
+    <div class="local-bridge-summary">
+      <strong>${escapeHtml(runtime.base_url || "127.0.0.1")}</strong>
+      <span>Lecture seule · expiration automatique dans ${escapeHtml(remainingMinutes)} min</span>
+      <span>Passport SHA-256 ${escapeHtml(digest ? `${digest.slice(0, 16)}…${digest.slice(-8)}` : "non affiché")}</span>
+    </div>
+    <div class="local-bridge-rules">
+      <span>Jeton conservé uniquement en mémoire.</span>
+      <span>Aucun prompt, résultat brut, fichier personnel ou jeton de compte exposé.</span>
+      <span>Aucune installation, suppression, exécution de benchmark ou backtest disponible.</span>
+    </div>
+  `;
+}
+
+async function startLocalCapabilityBridge() {
+  if (!invoke) {
+    setStatus("Passerelle disponible uniquement dans l'app native", "warn");
+    return null;
+  }
+  if (!capabilityPassportIsCurrent()) {
+    setStatus("Génère d'abord un AI Capability Passport à jour", "warn");
+    return null;
+  }
+  const confirmed = window.confirm(
+    "Ouvrir pendant 15 minutes une API locale en lecture seule sur 127.0.0.1 ? Aucun modèle, fichier ou réglage ne pourra être modifié."
+  );
+  if (!confirmed) return null;
+  try {
+    const payload = localCapabilityBridgePayload();
+    const result = await invoke("start_local_capability_bridge", {
+      request: { payload, ttl_seconds: LOCAL_CAPABILITY_BRIDGE_TTL_SECONDS }
+    });
+    if (result?.schema !== LOCAL_CAPABILITY_BRIDGE_SCHEMA || !result?.running || !result?.token) {
+      throw new Error("réponse native incomplète");
+    }
+    state.localCapabilityBridge = {
+      ...result,
+      passport_digest: state.capabilityPassport.integrity.digest,
+      token_persisted: false
+    };
+    renderLocalCapabilityBridgePanel();
+    renderStrategyBridgePanel();
+    renderReadinessPanel();
+    setStatus("Passerelle locale active pour 15 minutes", "ok");
+    return state.localCapabilityBridge;
+  } catch (error) {
+    state.localCapabilityBridge = null;
+    renderLocalCapabilityBridgePanel();
+    setStatus(`Passerelle locale impossible : ${error}`, "error");
+    return null;
+  }
+}
+
+async function stopLocalCapabilityBridge(silent = false) {
+  try {
+    if (invoke) await invoke("stop_local_capability_bridge");
+  } catch (error) {
+    if (!silent) setStatus(`Arrêt passerelle incomplet : ${error}`, "error");
+  } finally {
+    state.localCapabilityBridge = null;
+    renderLocalCapabilityBridgePanel();
+    renderStrategyBridgePanel();
+    renderReadinessPanel();
+  }
+  if (!silent) setStatus("Passerelle locale arrêtée", "ok");
+}
+
+async function refreshLocalCapabilityBridgeStatus(silent = false) {
+  if (!invoke) return null;
+  try {
+    const status = await invoke("get_local_capability_bridge_status");
+    if (!status?.running) {
+      state.localCapabilityBridge = null;
+    } else if (state.localCapabilityBridge) {
+      state.localCapabilityBridge = { ...state.localCapabilityBridge, ...status };
+    } else {
+      state.localCapabilityBridge = { ...status, token: "", passport_digest: "" };
+    }
+    renderLocalCapabilityBridgePanel();
+    if (!silent) setStatus(status?.running ? "Passerelle locale vérifiée" : "Passerelle locale arrêtée", "ok");
+    return status;
+  } catch (error) {
+    if (!silent) setStatus(`Vérification locale impossible : ${error}`, "error");
+    return null;
+  }
+}
+
+async function copyLocalCapabilityBridgeConnection() {
+  try {
+    const pairing = localCapabilityBridgePairingDocument();
+    await navigator.clipboard.writeText(`${JSON.stringify(pairing, null, 2)}\n`);
+    setStatus("Connexion locale copiée · secret éphémère", "ok");
+  } catch (error) {
+    setStatus(String(error), "warn");
+  }
 }
 
 async function copyStrategyBridgeJson() {
@@ -10806,7 +11152,7 @@ async function runModelAutopilot() {
   }
   const candidates = modelAutopilotCandidates(model);
   const runtime = defaultOllamaRuntime(model);
-  state.capabilityPassport = null;
+  invalidateCapabilityPassport();
   state.modelAutopilotRun = {
     schema: MODEL_AUTOPILOT_PROTOCOL,
     model,
@@ -10927,7 +11273,7 @@ function applyModelAutopilotRecommendation() {
   }
   const appliedResult = { ...recommended, autopilot_applied: true };
   state.benchmark = appliedResult;
-  state.capabilityPassport = null;
+  invalidateCapabilityPassport();
   saveBenchmarkHistoryEntry(appliedResult);
   renderBenchmark(appliedResult);
   renderModelAutopilot();
@@ -10957,7 +11303,7 @@ function rollbackModelAutopilotProfile() {
     delete store.profiles[key];
   }
   writeModelAutopilotStore(store);
-  state.capabilityPassport = null;
+  invalidateCapabilityPassport();
   renderModelAutopilot();
   renderFlightRecorder();
   renderCapabilityPassportPanel();
@@ -11393,7 +11739,7 @@ function saveFlightRecorderReference() {
     setStatus("Impossible d'enregistrer la référence locale", "bad");
     return;
   }
-  state.capabilityPassport = null;
+  invalidateCapabilityPassport();
   renderFlightRecorder();
   renderCapabilityPassportPanel();
   renderReadinessPanel();
@@ -11412,7 +11758,7 @@ function activateFlightRecorderReference(referenceId) {
   }
   store.active_by_binding[flightRecorderBindingKey(current)] = reference.id;
   writeFlightRecorderStore(store);
-  state.capabilityPassport = null;
+  invalidateCapabilityPassport();
   renderFlightRecorder();
   renderCapabilityPassportPanel();
   renderReadinessPanel();
@@ -14014,7 +14360,7 @@ function installTestHarness() {
         winner,
         confidence: privateWorkloadConfidence(results, winner)
       });
-      state.capabilityPassport = null;
+      invalidateCapabilityPassport();
       renderPrivateWorkloadPanel();
       renderReadinessPanel();
       const report = readinessReport();
@@ -14303,7 +14649,7 @@ function installTestHarness() {
       delete unknownScan.raw_scan.memory_probe.total_gb;
       delete unknownScan.raw_scan.gpu_probe.vram_gb;
       state.scan = unknownScan;
-      state.capabilityPassport = null;
+      invalidateCapabilityPassport();
       const unknownPassport = capabilityPassportDocument();
       const unknownField = fieldTestMachineEntry();
       state.scan = originalScan;
@@ -14329,6 +14675,47 @@ function installTestHarness() {
         field: fieldTestMachineEntry(),
         memory: cockpitMemoryMarkdown(),
         panel: els.capabilityPassportBox?.textContent || ""
+      };
+    },
+    async applyLocalCapabilityBridgeState() {
+      const passportState = await this.applyCapabilityPassportState();
+      const digest = passportState.passport.integrity.digest;
+      state.localCapabilityBridge = {
+        schema: LOCAL_CAPABILITY_BRIDGE_SCHEMA,
+        contract_version: LOCAL_CAPABILITY_BRIDGE_CONTRACT_VERSION,
+        running: true,
+        base_url: "http://127.0.0.1:43127",
+        token: `bridge-test-${"a".repeat(52)}`,
+        expires_at_ms: Date.now() + (LOCAL_CAPABILITY_BRIDGE_TTL_SECONDS * 1000),
+        ttl_seconds: LOCAL_CAPABILITY_BRIDGE_TTL_SECONDS,
+        bind: "127.0.0.1",
+        read_only: true,
+        token_persisted: false,
+        passport_digest: digest,
+        endpoints: localCapabilityBridgePolicy().endpoints,
+        test_mode: true
+      };
+      renderLocalCapabilityBridgePanel();
+      renderStrategyBridgePanel();
+      renderReadinessPanel();
+      return {
+        payload: localCapabilityBridgePayload(),
+        pairing: localCapabilityBridgePairingDocument(),
+        summary: localCapabilityBridgeSummary(),
+        passport: passportState.passport,
+        report: readinessReport(),
+        bridge: strategyArenaReadiness(),
+        panel: els.localCapabilityBridgeBox?.textContent || ""
+      };
+    },
+    invalidateLocalCapabilityBridgeState() {
+      invalidateCapabilityPassport();
+      renderCapabilityPassportPanel();
+      renderLocalCapabilityBridgePanel();
+      return {
+        summary: localCapabilityBridgeSummary(),
+        hasRuntime: Boolean(state.localCapabilityBridge),
+        panel: els.localCapabilityBridgeBox?.textContent || ""
       };
     },
     applyFlightRecorderState() {
@@ -15262,6 +15649,10 @@ els.copyStrategyBridgeMdBtn.addEventListener("click", copyStrategyBridgeMarkdown
 els.generateCapabilityPassportBtn?.addEventListener("click", generateCapabilityPassport);
 els.copyCapabilityPassportBtn?.addEventListener("click", copyCapabilityPassport);
 els.downloadCapabilityPassportBtn?.addEventListener("click", downloadCapabilityPassport);
+els.startLocalCapabilityBridgeBtn?.addEventListener("click", startLocalCapabilityBridge);
+els.copyLocalCapabilityBridgeBtn?.addEventListener("click", copyLocalCapabilityBridgeConnection);
+els.refreshLocalCapabilityBridgeBtn?.addEventListener("click", () => refreshLocalCapabilityBridgeStatus(false));
+els.stopLocalCapabilityBridgeBtn?.addEventListener("click", () => stopLocalCapabilityBridge(false));
 els.copyFieldTestBtn.addEventListener("click", copyFieldTestMarkdown);
 els.copyFieldTestJsonBtn?.addEventListener("click", copyFieldTestJson);
 els.downloadFieldTestJsonBtn?.addEventListener("click", downloadFieldTestJson);
@@ -15575,11 +15966,22 @@ renderFlightRecorder();
 renderPromptLibrary();
 renderChatHistory();
 renderPrivateWorkloadPanel();
+renderLocalCapabilityBridgePanel();
 renderPreparePanel();
 renderReadinessPanel();
 renderPrimaryAction();
 installTestHarness();
 refreshAuthState();
+
+if (invoke) {
+  void refreshLocalCapabilityBridgeStatus(true);
+  window.setInterval(() => {
+    if (state.localCapabilityBridge) void refreshLocalCapabilityBridgeStatus(true);
+  }, 15_000);
+  window.addEventListener("beforeunload", () => {
+    void invoke("stop_local_capability_bridge");
+  });
+}
 
 async function initializeAppMetadata() {
   await loadAppBuildInfo();

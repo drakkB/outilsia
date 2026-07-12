@@ -75,7 +75,11 @@ npm run verify:private-workload-packs
 npm run verify:private-workload-seo
 ```
 
-La source canonique est `server-work/static/data/private-workload-packs.json`. Le fichier `src/private-workload-packs.js` est généré par `npm run sync:private-workload-packs`. Une campagne compare une seule tâche sur deux ou trois modèles Ollama déjà installés, avec 60 secondes maximum par modèle et zéro téléchargement. Seuls scores, checks, métriques et SHA-256 sont persistés ; les consignes personnalisées et réponses brutes sont exclues du stockage, du rapport, du PDF, de MemoryForge et du Capability Passport 1.1.0.
+La source canonique est `server-work/static/data/private-workload-packs.json`. Le fichier `src/private-workload-packs.js` est généré par `npm run sync:private-workload-packs`. Une campagne compare une seule tâche sur deux ou trois modèles Ollama déjà installés, avec 60 secondes maximum par modèle et zéro téléchargement. Seuls scores, checks, métriques et SHA-256 sont persistés ; les consignes personnalisées et réponses brutes sont exclues du stockage, du rapport, du PDF, de MemoryForge et du Capability Passport 1.2.0.
+
+## Local Capability Bridge v1
+
+La passerelle locale est désactivée par défaut et disponible uniquement dans le mode Détails après génération d'un Passport à jour. Un consentement explicite ouvre un serveur HTTP sur `127.0.0.1` pendant 15 minutes. Les routes de données exigent un jeton Bearer aléatoire conservé uniquement en mémoire. Le contrat est GET-only : aucun téléchargement ou retrait de modèle, benchmark, chat, accès aux fichiers personnels, changement de configuration, backtest ou ordre de trading n'est exposé.
 
 Ce controle ouvre l'interface avec Playwright, verifie l'absence de debordement horizontal, la lisibilite des boutons et la grille desktop, puis genere les captures dans `.artifacts/visual-ui/`.
 

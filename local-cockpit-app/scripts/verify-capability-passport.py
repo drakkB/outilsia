@@ -30,7 +30,7 @@ def main():
     serialized = json.dumps(passport, ensure_ascii=False)
 
     assert passport["schema"] == "outilsia.ai_capability_passport.v1", passport["schema"]
-    assert passport["passport_version"] == "1.1.0", passport["passport_version"]
+    assert passport["passport_version"] == "1.2.0", passport["passport_version"]
     assert result["verified"] is True, result
     assert result["tamperedVerified"] is False, result
     assert result["staleSummary"] is None, result["staleSummary"]
@@ -46,6 +46,11 @@ def main():
     assert runtime_driver["actual_execution"]["is_proven"] is True
     assert passport["capabilities"]["runtime_driver_intelligence_v1"] is True
     assert passport["capabilities"]["private_workload_packs_v1"] is True
+    assert passport["capabilities"]["local_capability_bridge_v1"] is True
+    assert passport["interoperability"]["local_capability_bridge"]["enabled_by_default"] is False
+    assert passport["interoperability"]["local_capability_bridge"]["bind"] == "127.0.0.1"
+    assert passport["interoperability"]["local_capability_bridge"]["read_only"] is True
+    assert passport["interoperability"]["local_capability_bridge"]["token_persisted"] is False
     evidence = passport["runtime_readiness"]["evidence"]
     assert evidence["status"] == "gpu-proven", evidence
     assert evidence["source"] == "ollama_api_ps", evidence

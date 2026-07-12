@@ -134,12 +134,31 @@
           <article class="card p-4"><strong class="cyan">Zéro téléchargement</strong><p class="mini mt-2">Le run refuse les modèles absents et n'installe rien en arrière-plan.</p></article>
           <article class="card p-4"><strong class="cyan">Budget borné</strong><p class="mini mt-2">Une seule tâche, 2 à 3 modèles et 60 secondes maximum par modèle.</p></article>
           <article class="card p-4"><strong class="cyan">Preuves déterministes</strong><p class="mini mt-2">JSON, faits, termes obligatoires et action vérifiable produisent un score explicable sur 100.</p></article>
-          <article class="card p-4"><strong class="cyan">Contenu brut exclu</strong><p class="mini mt-2">Rapport, PDF, MemoryForge et Passport 1.1.0 gardent scores, checks et SHA-256, jamais la consigne ou les réponses brutes.</p></article>
+          <article class="card p-4"><strong class="cyan">Contenu brut exclu</strong><p class="mini mt-2">Rapport, PDF, MemoryForge et Passport 1.2.0 gardent scores, checks et SHA-256, jamais la consigne ou les réponses brutes.</p></article>
         </div>
         <p class="mini mt-5">Le classement décrit ce protocole court, cette machine et ce moment. Il ne remplace pas une validation longue et ne compte jamais comme validation physique de la campagne terrain.</p>
         <div class="flex flex-wrap gap-3 mt-6">
           <a class="btn btn-primary" href="/telecharger-scanner-ia-local">Comparer mes modèles sans cloud</a>
           <a class="btn btn-secondary" href="/securite-confidentialite-scanner">Voir les limites de confidentialité</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-4 py-10" id="passerelle-locale-capacites-ia">
+      <div class="max-w-6xl mx-auto card p-5 md:p-7" style="border-color:rgba(91,241,205,.38);background:linear-gradient(135deg,rgba(91,241,205,.10),rgba(15,23,42,.94),rgba(103,232,249,.06));">
+        <span class="pill">Local Capability Bridge v1 · candidat</span>
+        <h2 class="text-3xl md:text-4xl font-black mt-4">Partager les capacités locales du PC sans donner le contrôle de la machine</h2>
+        <p class="muted mt-3 text-lg">Après génération du Passport, OutilsIA peut ouvrir sur <code>127.0.0.1</code> un instantané en lecture seule pendant 15 minutes. Un jeton Bearer aléatoire protège les routes de données et n'est jamais enregistré sur disque.</p>
+        <div class="grid md:grid-cols-4 gap-3 mt-6">
+          <article class="card p-4"><strong class="cyan">Loopback uniquement</strong><p class="mini mt-2">Le serveur écoute sur cette machine, pas sur le réseau local ni Internet.</p></article>
+          <article class="card p-4"><strong class="cyan">Expiration automatique</strong><p class="mini mt-2">15 minutes par défaut, 30 minutes maximum, puis la session devient inutilisable.</p></article>
+          <article class="card p-4"><strong class="cyan">Lecture seule</strong><p class="mini mt-2">Capacités, Passport, modèles et handoff Strategy Arena : aucune commande Ollama ou système.</p></article>
+          <article class="card p-4"><strong class="cyan">Secrets exclus</strong><p class="mini mt-2">Aucun prompt, résultat brut, fichier personnel, jeton de compte, backtest ou ordre de trading.</p></article>
+        </div>
+        <p class="mini mt-5">Cette fonction reste candidate tant que le nouveau build Windows/Linux n'est pas publié. Elle ne constitue pas une preuve terrain physique et ne transforme pas Strategy Arena en gestionnaire Ollama.</p>
+        <div class="flex flex-wrap gap-3 mt-6">
+          <a class="btn btn-primary" href="/telecharger-scanner-ia-local">Voir la bêta Windows/Linux</a>
+          <a class="btn btn-secondary" href="/securite-confidentialite-scanner">Comprendre les garde-fous</a>
         </div>
       </div>
     </section>

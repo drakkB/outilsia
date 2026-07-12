@@ -5,7 +5,9 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
-const rust = readFileSync(resolve(root, "src-tauri/src/lib.rs"), "utf8");
+const rust = ["lib.rs", "local_capability_bridge.rs"]
+  .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
+  .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
 const privateWorkloadCatalog = readFileSync(resolve(root, "src/private-workload-packs.js"), "utf8");
 
@@ -117,6 +119,13 @@ const requiredFeatureText = [
   ["js private workload evaluator", js, "evaluatePrivateWorkloadPack"],
   ["js private workload privacy", js, "raw_content_in_passport: false"],
   ["css private workload", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".private-workload-box"],
+  ["html local capability bridge", html, "localCapabilityBridgeBox"],
+  ["html local capability bridge start", html, "startLocalCapabilityBridgeBtn"],
+  ["js local capability bridge schema", js, "outilsia.local_capability_bridge.v1"],
+  ["js local capability bridge privacy", js, "raw_model_outputs_included: false"],
+  ["rust local capability bridge loopback", rust, "TcpListener::bind((\"127.0.0.1\", 0))"],
+  ["rust local capability bridge auth", rust, "bearer_token_required"],
+  ["css local capability bridge", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".local-capability-bridge-box"],
 ];
 
 const missingFeature = requiredFeatureText.filter(([, text, needle]) => !text.includes(needle));

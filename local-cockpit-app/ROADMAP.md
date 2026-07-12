@@ -93,7 +93,7 @@ Premier jalon candidat v1 terminé le 12 juillet 2026. La fonction reste dans le
 - [x] Appliquer exactement la même consigne et les mêmes critères déterministes à chaque candidat.
 - [x] Éviter les doubles candidatures par alias Ollama d'un même modèle.
 - [x] Persister uniquement scores, checks, métriques et empreintes SHA-256 ; ne jamais persister la consigne personnalisée ou les réponses brutes.
-- [x] Propager une preuve bornée au rapport, PDF, MemoryForge et AI Capability Passport 1.1.0 sans contenu privé brut.
+- [x] Propager une preuve bornée au rapport, PDF, MemoryForge et AI Capability Passport 1.2.0 sans contenu privé brut.
 - [x] Ajouter une recette Playwright desktop/mobile qui injecte un marqueur secret et échoue s'il apparaît dans un export.
 - [x] Documenter la fonction dans les sources du hub, de la page téléchargement, de `llms.txt` et du monitoring SEO/GEO.
 - [x] Construire le candidat Windows/Linux avec Private Workload Packs v1 et vérifier les cinq artefacts/SHA-256.
@@ -147,6 +147,20 @@ Premier jalon v1 publié le 11 juillet 2026 dans le build Windows/Linux `2913378
 - Stabiliser le AI Capability Passport comme contrat en lecture seule.
 - Exposer plus tard un MCP/API local borné : profil machine, modèles, preuves et recommandation.
 - Laisser Strategy Arena consommer les capacités préparées par OutilsIA sans lui transférer la gestion Ollama.
+
+Premier jalon source v1 lancé le 12 juillet 2026. La passerelle n'est pas encore revendiquée dans le build public `291439601671` et ne constitue pas une preuve terrain.
+
+- [x] Servir un instantané figé du Passport sur `127.0.0.1` uniquement.
+- [x] Désactiver la passerelle par défaut et exiger un consentement explicite pour 15 minutes.
+- [x] Générer un jeton Bearer aléatoire de 256 bits, conservé uniquement en mémoire et absent des exports.
+- [x] Limiter le contrat à GET/OPTIONS et refuser installation, suppression, benchmark, chat, fichiers, configuration, backtests et trading.
+- [x] Fermer CORS à Strategy Arena et aux origines loopback de développement.
+- [x] Exposer santé, capacités, Passport, modèles et handoff Strategy Arena sans contenu brut.
+- [x] Arrêter automatiquement la passerelle si le Passport devient périmé.
+- [x] Ajouter tests Rust réseau et recette Playwright desktop/mobile avec contrôle anti-fuite du jeton.
+- [ ] Construire un candidat Windows/Linux et vérifier les cinq artefacts avant toute communication publique.
+- [ ] Ajouter le consommateur côté Strategy Arena dans une session séparée, sans déplacer la gestion Ollama.
+- [ ] Étudier MCP local seulement après stabilisation de ce contrat HTTP minimal.
 
 ## Phase 7 - Réseau et communauté opt-in
 

@@ -64,6 +64,7 @@ def main():
         "expose_recommended_roles",
         "expose_benchmark_proof",
         "expose_runtime_driver_intelligence_read_only",
+        "expose_local_capability_bridge_read_only",
         "expose_runtime_command_prefix",
     ]:
         if capabilities.get(key) is not True:
@@ -80,6 +81,9 @@ def main():
         raise AssertionError(f"runtime/driver intelligence missing: {runtime_driver}")
     if runtime_driver.get("read_only") is not True:
         raise AssertionError("Strategy Arena runtime/driver payload must remain read-only")
+    local_bridge = profile.get("local_capability_bridge") or {}
+    if local_bridge.get("read_only") is not True or local_bridge.get("token_exposed_in_summary") is not False:
+        raise AssertionError(f"unsafe local capability bridge summary: {local_bridge}")
     if not profile.get("recommended_model"):
         raise AssertionError("missing recommended model")
     if len(profile.get("installed_models") or []) < 2:

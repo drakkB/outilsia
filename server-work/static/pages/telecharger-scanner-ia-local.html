@@ -135,9 +135,22 @@
         <div><strong>Modèles installés</strong><span>Aucun téléchargement ni installation pendant le run.</span></div>
         <div><strong>Budget fixe</strong><span>Une tâche, 2 à 3 candidats, 60 secondes maximum par modèle.</span></div>
         <div><strong>Score explicable</strong><span>Checks réussis, débit, latence et empreinte SHA-256 de chaque sortie.</span></div>
-        <div><strong>Confidentialité</strong><span>Consignes et réponses brutes exclues du rapport, PDF, MemoryForge et Passport 1.1.0.</span></div>
+        <div><strong>Confidentialité</strong><span>Consignes et réponses brutes exclues du rapport, PDF, MemoryForge et Passport 1.2.0.</span></div>
       </div>
       <p class="fine">Le score compare des critères courts et bornés. Il ne mesure pas toute la qualité du modèle et ne compte jamais comme validation physique de la campagne terrain.</p>
+    </section>
+
+    <section class="wrap panel" id="passerelle-locale-capacites-ia" style="margin-bottom:18px;border-color:rgba(91,241,205,.36);background:linear-gradient(135deg,rgba(91,241,205,.10),rgba(15,23,42,.92),rgba(103,232,249,.06))">
+      <span class="pill">Local Capability Bridge v1 · candidat</span>
+      <h2>Une API locale temporaire pour lire les capacités, jamais pour piloter le PC</h2>
+      <p class="muted">Dans Détails, un Passport à jour peut être servi sur <code>127.0.0.1</code> pendant 15 minutes après consentement explicite. Les routes de données exigent un jeton Bearer aléatoire conservé uniquement en mémoire.</p>
+      <div class="proof" style="margin-top:14px">
+        <div><strong>Désactivée par défaut</strong><span>Aucun port n'est ouvert tant que l'utilisateur ne clique pas.</span></div>
+        <div><strong>GET uniquement</strong><span>Santé, capacités, Passport, modèles et handoff Strategy Arena.</span></div>
+        <div><strong>Aucune action distante</strong><span>Pas d'installation, suppression, benchmark, chat, configuration ou accès fichiers.</span></div>
+        <div><strong>Frontière quant</strong><span>Pas de backtest ni trading dans OutilsIA ; Strategy Arena reste le validateur séparé.</span></div>
+      </div>
+      <p class="fine">Fonction candidate non incluse dans le build public actuel. Le futur build devra conserver la parité Windows/Linux et passer les contrats de sécurité avant publication.</p>
     </section>
 
     <section class="wrap panel" id="model-autopilot-reglages-ollama" style="margin-bottom:18px;border-color:rgba(34,197,94,.36);background:linear-gradient(135deg,rgba(34,197,94,.10),rgba(15,23,42,.92),rgba(103,232,249,.07))">

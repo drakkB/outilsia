@@ -1648,7 +1648,8 @@ h2 {
 .readiness-panel { grid-column: span 12; order: 22; }
 .strategy-bridge-panel { grid-column: span 12; order: 23; }
 .capability-passport-panel { grid-column: span 12; order: 24; }
-.field-test-panel { grid-column: span 12; order: 25; }
+.local-capability-bridge-panel { grid-column: span 12; order: 25; }
+.field-test-panel { grid-column: span 12; order: 26; }
 .models-panel { grid-column: span 6; order: 25; }
 .commands-panel { grid-column: span 6; order: 26; }
 .account-panel { grid-column: span 6; order: 30; }
@@ -2058,6 +2059,7 @@ dd {
 .arena-box,
 .strategy-bridge-box,
 .capability-passport-box,
+.local-capability-bridge-box,
 .field-test-box {
   display: grid;
   gap: 7px;
@@ -2130,6 +2132,7 @@ dd {
 .arena-box.empty,
 .strategy-bridge-box.empty,
 .capability-passport-box.empty,
+.local-capability-bridge-box.empty,
 .field-test-box.empty {
   align-items: center;
   color: var(--muted);
@@ -2417,6 +2420,42 @@ dd {
 .capability-passport-box {
   display: grid;
   gap: 10px;
+}
+
+.local-capability-bridge-box {
+  background:
+    linear-gradient(135deg, rgba(8, 29, 29, 0.96), rgba(10, 17, 22, 0.92));
+  border: 1px solid rgba(91, 241, 205, 0.24);
+  border-radius: 8px;
+}
+
+.local-bridge-summary,
+.local-bridge-rules {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.local-bridge-summary {
+  border-bottom: 1px solid rgba(139, 163, 174, 0.16);
+  padding-bottom: 8px;
+}
+
+.local-bridge-summary strong,
+.local-bridge-summary span,
+.local-bridge-rules span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.local-bridge-summary strong {
+  color: var(--green);
+}
+
+.local-bridge-summary span,
+.local-bridge-rules span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .passport-proof-grid {
@@ -4204,6 +4243,7 @@ dd {
   .private-workload-panel,
   .strategy-bridge-panel,
   .capability-passport-panel,
+  .local-capability-bridge-panel,
   .field-test-panel,
   .operation-panel,
   .readiness-panel,
