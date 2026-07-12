@@ -6,7 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const COMPILE_REQUEST_SCHEMA: &str = "outilsia.workstack_compile_request.v1";
 const COMPILE_RESULT_SCHEMA: &str = "outilsia.workstack_compile_result.v1";
-const WORKSTACK_SCHEMA: &str = "outilsia.workstack.v1";
+pub(crate) const WORKSTACK_SCHEMA: &str = "outilsia.workstack.v1";
 const CONTRACT_VERSION: &str = "2026-07-12";
 const MAX_CONTEXT_BYTES: usize = 64 * 1024;
 
@@ -72,11 +72,48 @@ fn canonical_json(value: &Value, output: &mut String) {
     }
 }
 
-fn canonical_sha256(value: &Value) -> String {
+pub(crate) fn canonical_sha256(value: &Value) -> String {
     let mut canonical = String::new();
     canonical_json(value, &mut canonical);
     let digest = Sha256::digest(canonical.as_bytes());
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+pub(crate) fn validate_workstack_plan(plan: &Value) -> Result<(), String> {
+    if plan.get("schema").and_then(Value::as_str) != Some(WORKSTACK_SCHEMA) {
+        return Err("Contrat Workstack invalide.".to_string());
+    }
+    if plan.get("execution_enabled").and_then(Value::as_bool) != Some(false) {
+        return Err("Le Capability Router refuse un Workstack executable.".to_string());
+    }
+    let policy = plan.get("policy").unwrap_or(&Value::Null);
+    if policy.get("plan_only").and_then(Value::as_bool) != Some(true)
+        || policy.get("start_agents").and_then(Value::as_bool) != Some(false)
+        || policy.get("create_worktrees").and_then(Value::as_bool) != Some(false)
+        || policy.get("write_board").and_then(Value::as_bool) != Some(false)
+        || policy.get("publish").and_then(Value::as_bool) != Some(false)
+        || policy.get("merge").and_then(Value::as_bool) != Some(false)
+        || policy
+            .get("human_gate_non_delegable")
+            .and_then(Value::as_bool)
+            != Some(true)
+    {
+        return Err("Politique Workstack non compatible avec le mode simulation.".to_string());
+    }
+    let expected = plan
+        .pointer("/integrity/digest")
+        .and_then(Value::as_str)
+        .filter(|value| value.len() == 64)
+        .ok_or_else(|| "Empreinte Workstack absente.".to_string())?;
+    let mut unsigned = plan.clone();
+    unsigned
+        .as_object_mut()
+        .ok_or_else(|| "Document Workstack invalide.".to_string())?
+        .remove("integrity");
+    if canonical_sha256(&unsigned) != expected {
+        return Err("Empreinte Workstack incoherente.".to_string());
+    }
+    Ok(())
 }
 
 fn text_field<'a>(value: &'a Value, name: &str) -> &'a str {
@@ -397,5 +434,10 @@ mod tests {
             .expect("plan object")
             .remove("integrity");
         assert_eq!(first["integrity"]["digest"], canonical_sha256(&unsigned));
+        validate_workstack_plan(&first).expect("valid signed plan");
+
+        let mut tampered = first.clone();
+        tampered["execution_enabled"] = json!(true);
+        assert!(validate_workstack_plan(&tampered).is_err());
     }
 }

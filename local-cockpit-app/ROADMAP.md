@@ -210,6 +210,15 @@ Noyau et panneau Détails Board Observer v0 implémentés le 12 juillet 2026, sa
 
 Workstack Composer v0 implémenté dans les sources le 12 juillet 2026 : une carte normalisée produit un plan `outilsia.workstack.v1` déterministe et signé, avec priorité, rôles, budget, blocages et gate humaine. Le contexte optionnel est remplacé par son empreinte ; aucune exécution, création de worktree, écriture board, fusion ou publication n'est disponible.
 
+Capability Router v0 implémenté dans les sources le 12 juillet 2026, sans publication : il valide l'empreinte du Workstack, sonde en parallèle et avec timeout Codex CLI, Claude Code et Hermes Agent dans l'environnement natif et le WSL par défaut, ajoute les modèles Ollama déjà remontés par le scan, puis propose Planificateur, Exécutant et Vérificateur indépendant selon leurs capacités déclarées. Il ne lit aucun jeton, ne vérifie ni compte ni quota, ne scanne aucun dépôt, ne lance aucun agent et ne dépense aucun crédit API. Le résultat `outilsia.capability_router_result.v1` est signé, étiqueté dry-run et invalidé après un nouveau scan, une installation ou une suppression de modèle.
+
+- [x] Détecter les CLI officielles par commande de version bornée, sans retourner leur chemin.
+- [x] Distinguer Windows natif, Linux natif, WSL par défaut, Ollama natif et Ollama WSL.
+- [x] Router par capacités et type de mission sans verrouiller la proposition sur une marque.
+- [x] Imposer un vérificateur différent de l'exécutant lorsqu'une proposition complète est possible.
+- [x] Garder le panneau dans le mode Détails et fournir JSON, résumé et preuve visuelle desktop/mobile.
+- [ ] Ajouter un consentement d'exécution séparé seulement après ForgeBench, Evidence Ledger et isolation par worktree.
+
 - Séparer quatre responsabilités : Composer définit la chaîne, Workstack Arena exécute, ForgeBench évalue et Evidence Ledger conserve la preuve.
 - Créer le benchmark maison `Signal Maze v1` avec règles déterministes, starter scellé, tests visibles/cachés et captures desktop/Android.
 - Mesurer séparément résultat, vitesse, efficacité et coût ; toujours publier les valeurs brutes, les sous-scores et le caractère estimé ou inconnu d'une donnée.

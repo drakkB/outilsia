@@ -1,8 +1,10 @@
 mod board_observer;
+mod capability_router;
 mod local_capability_bridge;
 mod workstack_composer;
 
 use board_observer::observe_planka_board;
+use capability_router::route_workstack_capabilities;
 use local_capability_bridge::{
     get_local_capability_bridge_status, start_local_capability_bridge, stop_local_capability_bridge,
 };
@@ -2410,7 +2412,7 @@ fn delete_ollama_model(
     })
 }
 
-fn command_output_with_timeout(
+pub(crate) fn command_output_with_timeout(
     mut command: Command,
     timeout: Duration,
     label: &str,
@@ -3912,7 +3914,7 @@ fn run_command(program: &str, args: &[&str]) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
-fn decode_command_stdout(bytes: &[u8]) -> Option<String> {
+pub(crate) fn decode_command_stdout(bytes: &[u8]) -> Option<String> {
     if bytes.is_empty() {
         return None;
     }
@@ -5138,6 +5140,7 @@ pub fn run() {
             install_wsl_runtime,
             observe_planka_board,
             compile_work_card,
+            route_workstack_capabilities,
             start_local_capability_bridge,
             get_local_capability_bridge_status,
             stop_local_capability_bridge,

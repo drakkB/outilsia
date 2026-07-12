@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
-const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs"]
+const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
@@ -145,6 +145,16 @@ const requiredFeatureText = [
   ["rust workstack no raw context", rust, "raw_context_included\": false"],
   ["rust workstack human gate", rust, "human_gate_non_delegable\": true"],
   ["css workstack composer", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".workstack-composer-box"],
+  ["html capability router", html, "capabilityRouterBox"],
+  ["html capability router objective", html, "capabilityRouterObjective"],
+  ["js capability router request schema", js, "outilsia.capability_router_request.v1"],
+  ["js capability router result schema", js, "outilsia.capability_router_result.v1"],
+  ["rust capability routing schema", rust, "outilsia.capability_routing.v1"],
+  ["rust capability router dry run", rust, "\"dry_run\": true"],
+  ["rust capability router no execution", rust, "\"execution_started\": false"],
+  ["rust capability router no credentials", rust, "\"credentials_read\": false"],
+  ["rust capability router independent verifier", rust, "independent_verifier_enforced"],
+  ["css capability router", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".capability-router-box"],
   ["js install safety schema", js, "outilsia.install_safety_preflight.v1"],
   ["js install safety before pull", js, "runInstallSafetyPreflight(clean)"],
   ["js install safety path privacy", js, "excludes_ollama_storage_path: true"],

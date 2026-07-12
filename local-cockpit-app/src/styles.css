@@ -1651,7 +1651,8 @@ h2 {
 .local-capability-bridge-panel { grid-column: span 12; order: 25; }
 .board-observer-panel { grid-column: span 12; order: 25; }
 .workstack-composer-panel { grid-column: span 12; order: 25; }
-.field-test-panel { grid-column: span 12; order: 26; }
+.capability-router-panel { grid-column: span 12; order: 26; }
+.field-test-panel { grid-column: span 12; order: 27; }
 .models-panel { grid-column: span 6; order: 25; }
 .commands-panel { grid-column: span 6; order: 26; }
 .account-panel { grid-column: span 6; order: 30; }
@@ -2629,6 +2630,99 @@ dd {
 .workstack-blockers {
   color: var(--gold);
   font-size: 11px;
+}
+
+.capability-router-intro,
+.capability-router-box {
+  background: rgba(10, 18, 22, 0.92);
+  border: 1px solid rgba(71, 201, 177, 0.25);
+  border-radius: 8px;
+}
+
+.capability-router-intro {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 10px;
+}
+
+.capability-router-intro span,
+.capability-router-summary span,
+.capability-candidate span,
+.capability-assignment span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.capability-router-controls {
+  display: grid;
+  grid-template-columns: minmax(190px, 300px);
+  margin-bottom: 10px;
+}
+
+.capability-router-box {
+  display: grid;
+  gap: 10px;
+  line-height: 1.4;
+  min-height: 128px;
+  padding: 10px;
+}
+
+.capability-router-summary {
+  border-bottom: 1px solid rgba(139, 163, 174, 0.16);
+  display: grid;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+
+.capability-router-warning {
+  color: var(--gold);
+  font-size: 11px;
+}
+
+.capability-router-section {
+  display: grid;
+  gap: 4px;
+}
+
+.capability-router-section h3 {
+  font-size: 12px;
+  margin: 0;
+}
+
+.capability-candidate-list,
+.capability-assignment-list {
+  display: grid;
+}
+
+.capability-candidate,
+.capability-assignment {
+  align-items: start;
+  border-top: 1px solid rgba(139, 163, 174, 0.14);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 240px minmax(0, 1fr) auto;
+  padding: 7px 0;
+}
+
+.capability-candidate:first-child,
+.capability-assignment:first-child {
+  border-top: 0;
+}
+
+.capability-candidate small,
+.capability-assignment small {
+  color: var(--muted-2);
+  text-align: right;
+}
+
+.capability-candidate.available small {
+  color: var(--ok);
+}
+
+.capability-candidate.unavailable {
+  opacity: 0.65;
 }
 
 .board-observer-card button {
@@ -4453,6 +4547,7 @@ dd {
   .local-capability-bridge-panel,
   .board-observer-panel,
   .workstack-composer-panel,
+  .capability-router-panel,
   .field-test-panel,
   .operation-panel,
   .readiness-panel,
@@ -4651,11 +4746,16 @@ dd {
   }
 
   .workstack-composer-controls,
-  .workstack-stage {
+  .workstack-stage,
+  .capability-router-controls,
+  .capability-candidate,
+  .capability-assignment {
     grid-template-columns: 1fr;
   }
 
-  .workstack-stage small {
+  .workstack-stage small,
+  .capability-candidate small,
+  .capability-assignment small {
     text-align: left;
   }
 

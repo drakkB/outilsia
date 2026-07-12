@@ -409,6 +409,38 @@
           </div>
         </article>
 
+        <article class="panel capability-router-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Capability Router</h2>
+            <span id="capabilityRouterState">plan requis</span>
+          </div>
+          <div class="capability-router-intro">
+            <strong>Détection locale, affectation proposée</strong>
+            <span id="capabilityRouterPrivacy">Simulation uniquement : versions et modèles installés, sans lecture de jeton, lancement d'agent, appel réseau, dépense API ou modification du projet.</span>
+          </div>
+          <div class="capability-router-controls">
+            <label>
+              <span class="field-label">Type de mission</span>
+              <select id="capabilityRouterObjective" aria-describedby="capabilityRouterPrivacy">
+                <option value="general">Générale</option>
+                <option value="code">Code</option>
+                <option value="audit">Audit</option>
+                <option value="writing">Rédaction</option>
+                <option value="research">Recherche</option>
+              </select>
+            </label>
+          </div>
+          <div id="capabilityRouterBox" class="capability-router-box empty">
+            Compile d'abord une Workstack. Le routeur vérifiera ensuite les exécutants disponibles sans leur transmettre la mission.
+          </div>
+          <div class="row-actions">
+            <button id="routeCapabilitiesBtn" type="button" disabled>Détecter et proposer</button>
+            <button id="copyCapabilityRouterJsonBtn" type="button" disabled>Copier JSON</button>
+            <button id="copyCapabilityRouterMarkdownBtn" type="button" disabled>Copier résumé</button>
+            <button id="clearCapabilityRouterBtn" type="button" disabled>Effacer</button>
+          </div>
+        </article>
+
         <article class="panel field-test-panel advanced-panel">
           <div class="panel-title">
             <h2>Test terrain</h2>

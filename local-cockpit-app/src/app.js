@@ -56,6 +56,7 @@ const state = {
   boardObserver: null,
   workstackComposer: null,
   workstackSelectedCard: null,
+  capabilityRouter: null,
   installSafetyPreflight: null,
   localSnapshots: [],
   installingModels: {},
@@ -94,6 +95,8 @@ const BOARD_OBSERVER_REQUEST_SCHEMA = "outilsia.board_observer_request.v1";
 const BOARD_OBSERVER_RESULT_SCHEMA = "outilsia.board_observer_result.v1";
 const WORKSTACK_COMPILE_REQUEST_SCHEMA = "outilsia.workstack_compile_request.v1";
 const WORKSTACK_COMPILE_RESULT_SCHEMA = "outilsia.workstack_compile_result.v1";
+const CAPABILITY_ROUTER_REQUEST_SCHEMA = "outilsia.capability_router_request.v1";
+const CAPABILITY_ROUTER_RESULT_SCHEMA = "outilsia.capability_router_result.v1";
 const INSTALL_SAFETY_PREFLIGHT_SCHEMA = "outilsia.install_safety_preflight.v1";
 const INSTALL_SAFETY_MIN_RESERVE_GB = 3;
 const MODEL_AUTOPILOT_PROTOCOL = "outilsia.autopilot.v1";
@@ -432,6 +435,13 @@ const els = {
   copyWorkstackJsonBtn: $("copyWorkstackJsonBtn"),
   copyWorkstackMarkdownBtn: $("copyWorkstackMarkdownBtn"),
   clearWorkstackBtn: $("clearWorkstackBtn"),
+  capabilityRouterState: $("capabilityRouterState"),
+  capabilityRouterObjective: $("capabilityRouterObjective"),
+  capabilityRouterBox: $("capabilityRouterBox"),
+  routeCapabilitiesBtn: $("routeCapabilitiesBtn"),
+  copyCapabilityRouterJsonBtn: $("copyCapabilityRouterJsonBtn"),
+  copyCapabilityRouterMarkdownBtn: $("copyCapabilityRouterMarkdownBtn"),
+  clearCapabilityRouterBtn: $("clearCapabilityRouterBtn"),
   fieldTestState: $("fieldTestState"),
   fieldTestProfileSelect: $("fieldTestProfileSelect"),
   fieldTestBox: $("fieldTestBox"),
@@ -586,6 +596,8 @@ let boardObserverBusy = false;
 let boardObserverError = "";
 let workstackComposerBusy = false;
 let workstackComposerError = "";
+let capabilityRouterBusy = false;
+let capabilityRouterError = "";
 const privateWorkloadSelections = new Set();
 let recipeAutoSaveTimer = null;
 const UI_MODE_STORAGE_KEY = "outilsia-local-cockpit-ui-mode";
@@ -3471,6 +3483,7 @@ function useUsageProfilePack(target = "benchmark") {
 
 function renderScan(scan) {
   invalidateCapabilityPassport();
+  clearCapabilityRouter(true);
   state.modelAutopilotRun = null;
   state.upgradeDigitalTwinRun = null;
   state.scan = scan;
@@ -5352,6 +5365,7 @@ function markOllamaModelInstalled(model) {
     source: "ollama",
     runtime: "ollama"
   });
+  clearCapabilityRouter(true);
 }
 
 function unmarkOllamaModelInstalled(model) {
@@ -5367,6 +5381,7 @@ function unmarkOllamaModelInstalled(model) {
       return !ollamaRefAliases(tag ? `${name}:${tag}` : name).some((alias) => aliases.has(alias));
     });
   }
+  clearCapabilityRouter(true);
 }
 
 function estimatedModelSizeLabel(model) {
@@ -10496,6 +10511,7 @@ function selectWorkstackCard(sourceKey) {
   }
   state.workstackSelectedCard = JSON.parse(JSON.stringify(card));
   state.workstackComposer = null;
+  clearCapabilityRouter(true);
   workstackComposerError = "";
   if (els.workstackLocalContext) els.workstackLocalContext.value = "";
   renderWorkstackComposerPanel();
@@ -10607,6 +10623,7 @@ async function compileSelectedWorkstack() {
   workstackComposerBusy = true;
   workstackComposerError = "";
   state.workstackComposer = null;
+  clearCapabilityRouter(true);
   renderWorkstackComposerPanel();
   setStatus("Compilation du plan Workstack...");
   try {
@@ -10633,6 +10650,7 @@ async function compileSelectedWorkstack() {
     workstackComposerBusy = false;
     if (els.workstackLocalContext) els.workstackLocalContext.value = "";
     renderWorkstackComposerPanel();
+    renderCapabilityRouterPanel();
   }
 }
 
@@ -10660,11 +10678,221 @@ async function copyWorkstackSummary() {
 function clearWorkstackComposer(silent = false) {
   state.workstackSelectedCard = null;
   state.workstackComposer = null;
+  clearCapabilityRouter(true);
   workstackComposerError = "";
   if (els.workstackLocalContext) els.workstackLocalContext.value = "";
   if (els.workstackPriority) els.workstackPriority.value = "balanced";
   renderWorkstackComposerPanel();
   if (!silent) setStatus("Workstack Composer effacé", "ok");
+}
+
+function capabilityRouterObjectiveLabel(value) {
+  return ({
+    general: "Générale",
+    code: "Code",
+    audit: "Audit",
+    writing: "Rédaction",
+    research: "Recherche"
+  })[value] || value;
+}
+
+function capabilityRouterStatusLabel(value) {
+  return ({
+    proposal_complete: "proposition complète",
+    proposal_partial: "proposition partielle",
+    workstack_blocked: "Workstack bloquée",
+    no_eligible_capability: "aucun exécutant éligible"
+  })[value] || value;
+}
+
+function capabilityRouterEnvironmentLabel(value) {
+  return ({
+    windows_native: "Windows",
+    linux_native: "Linux",
+    wsl_default: "WSL par défaut",
+    ollama_native: "Ollama natif",
+    ollama_wsl: "Ollama WSL"
+  })[value] || value;
+}
+
+function capabilityRouterInstalledModels() {
+  return (state.scan?.installed_models || []).map((model) => ({
+    model_ref: modelLabel(model),
+    runtime: model.source || model.runtime || "ollama",
+    size_gb: Number.isFinite(Number(model.size_gb)) ? Number(model.size_gb) : null
+  })).filter((model) => model.model_ref);
+}
+
+function capabilityRouterMarkdown(result = state.capabilityRouter) {
+  if (!result) return "";
+  const assignments = Array.isArray(result.routing?.assignments) ? result.routing.assignments : [];
+  const candidates = Array.isArray(result.candidates) ? result.candidates : [];
+  const unresolved = Array.isArray(result.routing?.unresolved_roles) ? result.routing.unresolved_roles : [];
+  return [
+    `# Capability Router · ${result.workstack_ref?.workstack_id || "Workstack"}`,
+    "",
+    `- Mission : ${capabilityRouterObjectiveLabel(result.objective_kind || "general")}`,
+    `- Statut : ${capabilityRouterStatusLabel(result.routing?.status || "inconnu")}`,
+    `- Exécutants disponibles : ${candidates.filter((candidate) => candidate.available).length}/${candidates.length}`,
+    `- Exécution lancée : non`,
+    `- Jetons ou quotas inspectés : non`,
+    `- Projet lu ou modifié : non`,
+    unresolved.length ? `- Rôles non résolus : ${unresolved.map(workstackRoleLabel).join(" ; ")}` : "- Rôles non résolus : aucun",
+    "",
+    "## Affectations proposées",
+    ...(assignments.length
+      ? assignments.map((assignment) => `- ${workstackRoleLabel(assignment.role)} : ${assignment.candidate_label} · score ${assignment.score}`)
+      : ["- Aucune affectation"]),
+    "",
+    "## Capacités détectées",
+    ...candidates.map((candidate) => `- ${candidate.label} : ${candidate.available ? `disponible${candidate.version ? ` · ${candidate.version}` : ""}` : "absent"}`),
+    "",
+    `SHA-256 : ${result.integrity?.digest || "non disponible"}`
+  ].join("\n");
+}
+
+function renderCapabilityRouterPanel() {
+  if (!els.capabilityRouterBox) return;
+  const plan = state.workstackComposer?.plan;
+  const result = state.capabilityRouter;
+  const routing = result?.routing;
+  els.routeCapabilitiesBtn.disabled = !invoke || capabilityRouterBusy || !plan;
+  els.copyCapabilityRouterJsonBtn.disabled = !result;
+  els.copyCapabilityRouterMarkdownBtn.disabled = !result;
+  els.clearCapabilityRouterBtn.disabled = capabilityRouterBusy || (!result && !capabilityRouterError);
+
+  if (!plan) {
+    els.capabilityRouterState.textContent = "plan requis";
+    els.capabilityRouterBox.className = "capability-router-box empty";
+    els.capabilityRouterBox.textContent = "Compile d'abord une Workstack. Le routeur vérifiera ensuite les exécutants disponibles sans leur transmettre la mission.";
+    return;
+  }
+  if (!invoke && !result?.test_mode) {
+    els.capabilityRouterState.textContent = "app native requise";
+    els.capabilityRouterBox.className = "capability-router-box empty";
+    els.capabilityRouterBox.textContent = "La détection des CLI et modèles locaux est disponible uniquement dans l'application Windows/Linux.";
+    return;
+  }
+  if (capabilityRouterBusy) {
+    els.capabilityRouterState.textContent = "détection locale";
+    els.capabilityRouterBox.className = "capability-router-box empty";
+    els.capabilityRouterBox.textContent = "Sondes de version bornées en cours. Aucun compte, jeton, projet ou quota n'est inspecté.";
+    return;
+  }
+  if (capabilityRouterError) {
+    els.capabilityRouterState.textContent = "simulation refusée";
+    els.capabilityRouterBox.className = "capability-router-box empty";
+    els.capabilityRouterBox.innerHTML = `<strong>Capability Router indisponible</strong><span>${escapeHtml(capabilityRouterError)}</span>`;
+    return;
+  }
+  if (!result) {
+    els.capabilityRouterState.textContent = "prêt à détecter";
+    els.capabilityRouterBox.className = "capability-router-box empty";
+    els.capabilityRouterBox.textContent = "Le résultat proposera Planificateur, Exécutant et Vérificateur indépendant. Aucun agent ne sera lancé.";
+    return;
+  }
+
+  const candidates = Array.isArray(result.candidates) ? result.candidates : [];
+  const assignments = Array.isArray(routing?.assignments) ? routing.assignments : [];
+  const unresolved = Array.isArray(routing?.unresolved_roles) ? routing.unresolved_roles : [];
+  const candidateRows = candidates.map((candidate) => `
+    <div class="capability-candidate ${candidate.available ? "available" : "unavailable"}">
+      <strong>${escapeHtml(candidate.label || candidate.id || "Capacité")}</strong>
+      <span>${escapeHtml(capabilityRouterEnvironmentLabel(candidate.environment || ""))}${candidate.version ? ` · ${escapeHtml(candidate.version)}` : ""}</span>
+      <small>${candidate.available ? "détecté" : candidate.evidence?.status === "timeout" ? "délai dépassé" : "absent"}</small>
+    </div>
+  `).join("");
+  const assignmentRows = assignments.map((assignment) => `
+    <div class="capability-assignment">
+      <strong>${escapeHtml(workstackRoleLabel(assignment.role || "rôle"))}</strong>
+      <span>${escapeHtml(assignment.candidate_label || assignment.candidate_id || "non résolu")}</span>
+      <small>score ${escapeHtml(assignment.score ?? "-")} · proposition</small>
+    </div>
+  `).join("");
+  const digest = result.integrity?.digest || "";
+  els.capabilityRouterState.textContent = capabilityRouterStatusLabel(routing?.status || "inconnu");
+  els.capabilityRouterBox.className = "capability-router-box";
+  els.capabilityRouterBox.innerHTML = `
+    <div class="capability-router-summary">
+      <strong>${escapeHtml(capabilityRouterObjectiveLabel(result.objective_kind || "general"))} · simulation uniquement</strong>
+      <span>${candidates.filter((candidate) => candidate.available).length}/${candidates.length} capacité(s) disponible(s) · compte et quota non vérifiés</span>
+      <span>Aucun agent lancé · aucun projet lu · SHA-256 ${escapeHtml(digest ? `${digest.slice(0, 14)}…${digest.slice(-8)}` : "indisponible")}</span>
+    </div>
+    ${unresolved.length ? `<div class="capability-router-warning">Non résolu : ${escapeHtml(unresolved.map(workstackRoleLabel).join(" · "))}</div>` : ""}
+    <div class="capability-router-section">
+      <h3>Affectations proposées</h3>
+      <div class="capability-assignment-list">${assignmentRows || '<span class="muted">Aucune affectation.</span>'}</div>
+    </div>
+    <div class="capability-router-section">
+      <h3>Capacités détectées</h3>
+      <div class="capability-candidate-list">${candidateRows || '<span class="muted">Aucune capacité détectée.</span>'}</div>
+    </div>
+  `;
+}
+
+async function routeWorkstackCapabilities() {
+  const plan = state.workstackComposer?.plan;
+  if (!invoke || capabilityRouterBusy || !plan) return null;
+  capabilityRouterBusy = true;
+  capabilityRouterError = "";
+  state.capabilityRouter = null;
+  renderCapabilityRouterPanel();
+  setStatus("Détection locale des capacités...");
+  try {
+    const result = await invoke("route_workstack_capabilities", {
+      request: {
+        schema: CAPABILITY_ROUTER_REQUEST_SCHEMA,
+        workstack: plan,
+        objective_kind: els.capabilityRouterObjective?.value || "general",
+        installed_models: capabilityRouterInstalledModels(),
+        include_wsl: true,
+        timeout_seconds: 4
+      }
+    });
+    if (result?.schema !== CAPABILITY_ROUTER_RESULT_SCHEMA || !result?.dry_run || result?.execution_started || result?.credentials_read || result?.network_called || !result?.routing) {
+      throw new Error("réponse native non conforme au mode simulation");
+    }
+    state.capabilityRouter = result;
+    setStatus(`Capability Router : ${capabilityRouterStatusLabel(result.routing.status)}`, result.routing.status === "proposal_complete" ? "ok" : "warn");
+    return result;
+  } catch (error) {
+    state.capabilityRouter = null;
+    capabilityRouterError = String(error || "Détection impossible");
+    setStatus(`Capability Router : ${capabilityRouterError}`, "error");
+    return null;
+  } finally {
+    capabilityRouterBusy = false;
+    renderCapabilityRouterPanel();
+  }
+}
+
+async function copyCapabilityRouterJson() {
+  if (!state.capabilityRouter) return;
+  try {
+    await navigator.clipboard.writeText(`${JSON.stringify(state.capabilityRouter, null, 2)}\n`);
+    setStatus("Proposition Capability Router copiée", "ok");
+  } catch (error) {
+    setStatus(`Copie Capability Router impossible : ${error}`, "error");
+  }
+}
+
+async function copyCapabilityRouterSummary() {
+  const markdown = capabilityRouterMarkdown();
+  if (!markdown) return;
+  try {
+    await navigator.clipboard.writeText(`${markdown}\n`);
+    setStatus("Résumé Capability Router copié", "ok");
+  } catch (error) {
+    setStatus(`Copie du résumé impossible : ${error}`, "error");
+  }
+}
+
+function clearCapabilityRouter(silent = false) {
+  state.capabilityRouter = null;
+  capabilityRouterError = "";
+  if (els.capabilityRouterObjective) els.capabilityRouterObjective.value = "general";
+  renderCapabilityRouterPanel();
+  if (!silent) setStatus("Capability Router effacé", "ok");
 }
 
 async function copyStrategyBridgeJson() {
@@ -15567,7 +15795,7 @@ function installTestHarness() {
             { id: "verify", role: "independent_verifier", action: "rerun_acceptance_checks", enabled: false, status: "not_started" },
             { id: "approve", role: "human_owner", action: "approve_merge_or_delivery", enabled: false, status: "not_started" }
           ],
-          policy: { plan_only: true, start_agents: false, create_worktrees: false, write_board: false, publish: false, merge: false },
+          policy: { plan_only: true, start_agents: false, create_worktrees: false, write_board: false, publish: false, merge: false, human_gate_non_delegable: true },
           privacy: { raw_context_included: false, credentials_included: false, persisted: false },
           integrity: { algorithm: "SHA-256", digest: "c".repeat(64) }
         }
@@ -15579,6 +15807,53 @@ function installTestHarness() {
         result: state.workstackComposer,
         panel: els.workstackComposerBox?.textContent || "",
         contextValue: els.workstackLocalContext?.value || ""
+      };
+    },
+    applyCapabilityRouterState() {
+      this.applyWorkstackComposerState();
+      state.capabilityRouter = {
+        schema: CAPABILITY_ROUTER_RESULT_SCHEMA,
+        contract_version: "2026-07-12",
+        router: "outilsia-capability-router-v0",
+        generated_at_ms: Date.now(),
+        dry_run: true,
+        execution_started: false,
+        credentials_read: false,
+        repository_scanned: false,
+        repository_modified: false,
+        network_called: false,
+        test_mode: true,
+        workstack_ref: { workstack_id: "ws-demo-signal-maze", source_key: "planka:card-ready-1", integrity_digest: "c".repeat(64) },
+        objective_kind: "code",
+        candidates: [
+          { id: "codex-cli:wsl_default", provider: "openai", label: "Codex CLI · WSL", kind: "official_cli", environment: "wsl_default", available: true, version: "0.144.1", capabilities: ["code", "tests"], auth: { status: "not_inspected" }, evidence: { status: "version_command_succeeded" } },
+          { id: "claude-code:windows_native", provider: "anthropic", label: "Claude Code · Windows", kind: "official_cli", environment: "windows_native", available: true, version: "2.1.206", capabilities: ["audit", "tests"], auth: { status: "not_inspected" }, evidence: { status: "version_command_succeeded" } },
+          { id: "hermes-agent:wsl_default", provider: "nous-research", label: "Hermes Agent · WSL", kind: "official_cli", environment: "wsl_default", available: false, version: null, capabilities: ["planning"], auth: { status: "not_inspected" }, evidence: { status: "not_found" } },
+          { id: "local-model:ollama_native:hermes3:8b", provider: "ollama", label: "hermes3:8b · Ollama natif", kind: "local_model", environment: "ollama_native", available: true, version: null, capabilities: ["analysis", "orchestration", "planning"], auth: { status: "not_required" }, evidence: { status: "reported_installed" } }
+        ],
+        routing: {
+          schema: "outilsia.capability_routing.v1",
+          status: "proposal_complete",
+          workstack_ready: true,
+          assignments: [
+            { role: "planner", candidate_id: "local-model:ollama_native:hermes3:8b", candidate_label: "hermes3:8b · Ollama natif", score: 57, confidence: "declared_capability_match", reasons: ["capability:planning"], task_execution_started: false },
+            { role: "worker", candidate_id: "codex-cli:wsl_default", candidate_label: "Codex CLI · WSL", score: 65, confidence: "declared_capability_match", reasons: ["capability:code"], task_execution_started: false },
+            { role: "independent_verifier", candidate_id: "claude-code:windows_native", candidate_label: "Claude Code · Windows", score: 65, confidence: "declared_capability_match", reasons: ["capability:audit"], task_execution_started: false }
+          ],
+          unresolved_roles: [],
+          independent_verifier_enforced: true,
+          subscription_quota_verified: false
+        },
+        policy: { detect_only: true, start_agents: false, create_worktrees: false, write_board: false, modify_repository: false, spend_api_credit: false, publish: false, merge: false, human_approval_required_before_execution: true },
+        privacy: { credential_files_read_by_outilsia: false, tokens_returned: false, command_paths_returned: false, raw_task_context_returned: false, persisted: false },
+        integrity: { algorithm: "SHA-256", digest: "d".repeat(64) }
+      };
+      capabilityRouterError = "";
+      if (els.capabilityRouterObjective) els.capabilityRouterObjective.value = "code";
+      renderCapabilityRouterPanel();
+      return {
+        result: state.capabilityRouter,
+        panel: els.capabilityRouterBox?.textContent || ""
       };
     },
     invalidateLocalCapabilityBridgeState() {
@@ -16547,10 +16822,20 @@ els.clearWorkstackBtn?.addEventListener("click", () => clearWorkstackComposer(fa
 for (const input of [els.workstackPriority, els.workstackLocalContext]) {
   input?.addEventListener("input", () => {
     state.workstackComposer = null;
+    clearCapabilityRouter(true);
     workstackComposerError = "";
     renderWorkstackComposerPanel();
   });
 }
+els.routeCapabilitiesBtn?.addEventListener("click", routeWorkstackCapabilities);
+els.copyCapabilityRouterJsonBtn?.addEventListener("click", copyCapabilityRouterJson);
+els.copyCapabilityRouterMarkdownBtn?.addEventListener("click", copyCapabilityRouterSummary);
+els.clearCapabilityRouterBtn?.addEventListener("click", () => clearCapabilityRouter(false));
+els.capabilityRouterObjective?.addEventListener("change", () => {
+  state.capabilityRouter = null;
+  capabilityRouterError = "";
+  renderCapabilityRouterPanel();
+});
 els.copyFieldTestBtn.addEventListener("click", copyFieldTestMarkdown);
 els.copyFieldTestJsonBtn?.addEventListener("click", copyFieldTestJson);
 els.downloadFieldTestJsonBtn?.addEventListener("click", downloadFieldTestJson);
@@ -16872,6 +17157,7 @@ renderPrivateWorkloadPanel();
 renderLocalCapabilityBridgePanel();
 renderBoardObserverPanel();
 renderWorkstackComposerPanel();
+renderCapabilityRouterPanel();
 renderPreparePanel();
 renderReadinessPanel();
 renderPrimaryAction();
