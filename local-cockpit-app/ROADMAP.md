@@ -181,7 +181,10 @@ Premier jalon candidat v1 terminé le 12 juillet 2026 dans le build Windows/Linu
 ## Phase 7 - Workstack Composer
 
 - Composer une chaîne de travail par capacités : planification, recherche, code, design, critique et validation.
-- Distinguer quatre classes : modèles locaux, API facturées à l'usage, abonnements web et IA gratuites sans abonnement.
+- Distinguer six voies : modèles locaux, agents CLI officiels connectés au compte utilisateur, API gratuites, API facturées à l'usage, interfaces web gratuites et abonnements web.
+- Détecter Codex CLI, Claude Code ou d'autres agents officiels dans Windows, WSL et Linux sans lire leurs jetons ni convertir un abonnement en pseudo-API.
+- Isoler chaque agent dans un worktree ou dossier distinct ; aucun agent parallèle ne modifie le même espace de travail et toute fusion passe par une validation humaine.
+- Distinguer quota d'abonnement, crédits supplémentaires et facturation API ; ne jamais activer un basculement payant sans consentement explicite.
 - Automatiser uniquement les connecteurs officiels ; produire des paquets de transfert manuels pour les interfaces sans API.
 - Utiliser un graphe borné avec schémas d'entrée/sortie, budget, confidentialité, limite de boucles et validations humaines.
 - Choisir les exécutants par capacité et preuve plutôt que figer un nom ou une version de modèle.
