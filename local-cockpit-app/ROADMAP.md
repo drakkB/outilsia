@@ -55,6 +55,20 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [ ] Publier Windows/Linux et annoncer la fonction sur le site uniquement après toutes les gates et SHA-256 verts.
 - [ ] Envisager plus tard un installateur de pilote borné seulement si URL artefact, signature/hash, préflight, consentement, restauration et rollback sont tous prouvés ; sinon conserver le mode manuel officiel.
 
+## Candidat en cours - Install Safety Preflight v1
+
+Objectif au 12 juillet 2026 : vérifier le runtime et le volume réellement ciblés avant tout `ollama pull`, sans exposer le chemin personnel du dossier de modèles et sans confondre stockage Windows, WSL et Linux.
+
+- [x] Sonder le volume du dossier Ollama natif par défaut ou personnalisé sans exporter son chemin.
+- [x] Sonder séparément le stockage de la distribution WSL par défaut.
+- [x] Estimer une taille haute et ajouter une réserve distincte.
+- [x] Bloquer avant le premier octet uniquement lorsque l'insuffisance est mesurée.
+- [x] Demander confirmation quand la taille ou le volume restent inconnus.
+- [x] Propager un résumé borné au rapport et au AI Capability Passport 1.3.0.
+- [x] Ajouter tests Rust, recette Playwright et contrôle anti-fuite de chemin.
+- [ ] Construire et vérifier un candidat Windows/Linux avant toute revendication publique.
+- [ ] Confirmer les sondes native et WSL sur les machines physiques.
+
 ## Phase 1 - Preuve terrain fiable
 
 - Collecter les cinq profils physiques sans fabriquer de preuve.
@@ -93,7 +107,7 @@ Premier jalon candidat v1 terminé le 12 juillet 2026. La fonction reste dans le
 - [x] Appliquer exactement la même consigne et les mêmes critères déterministes à chaque candidat.
 - [x] Éviter les doubles candidatures par alias Ollama d'un même modèle.
 - [x] Persister uniquement scores, checks, métriques et empreintes SHA-256 ; ne jamais persister la consigne personnalisée ou les réponses brutes.
-- [x] Propager une preuve bornée au rapport, PDF, MemoryForge et AI Capability Passport 1.2.0 sans contenu privé brut.
+- [x] Propager une preuve bornée au rapport, PDF, MemoryForge et AI Capability Passport 1.3.0 sans contenu privé brut.
 - [x] Ajouter une recette Playwright desktop/mobile qui injecte un marqueur secret et échoue s'il apparaît dans un export.
 - [x] Documenter la fonction dans les sources du hub, de la page téléchargement, de `llms.txt` et du monitoring SEO/GEO.
 - [x] Construire le candidat Windows/Linux avec Private Workload Packs v1 et vérifier les cinq artefacts/SHA-256.
@@ -162,7 +176,19 @@ Premier jalon candidat v1 terminé le 12 juillet 2026 dans le build Windows/Linu
 - [ ] Ajouter le consommateur côté Strategy Arena dans une session séparée, sans déplacer la gestion Ollama.
 - [ ] Étudier MCP local seulement après stabilisation de ce contrat HTTP minimal.
 
-## Phase 7 - Réseau et communauté opt-in
+## Phase 7 - Workstack Composer
+
+- Composer une chaîne de travail par capacités : planification, recherche, code, design, critique et validation.
+- Distinguer quatre classes : modèles locaux, API facturées à l'usage, abonnements web et IA gratuites sans abonnement.
+- Automatiser uniquement les connecteurs officiels ; produire des paquets de transfert manuels pour les interfaces sans API.
+- Utiliser un graphe borné avec schémas d'entrée/sortie, budget, confidentialité, limite de boucles et validations humaines.
+- Choisir les exécutants par capacité et preuve plutôt que figer un nom ou une version de modèle.
+- Garder les clés API dans le coffre système et les exclure des rapports, Passport, MemoryForge et pont local.
+- Livrer d'abord Composer v0 sans exécution, puis Local v1 sur modèles Ollama installés, puis Hybrid v2 optionnel.
+- Conserver un Evidence Ledger : auteur, critique, validation, coût, latence, empreinte et décision humaine.
+- Ne pas déplacer les backtests ou la logique financière de Strategy Arena dans ce module.
+
+## Phase 8 - Réseau et communauté opt-in
 
 - Découvrir plusieurs machines OutilsIA sur un réseau privé et router vers la capacité disponible.
 - Collecter uniquement sur consentement des benchmarks anonymisés et vérifiables.

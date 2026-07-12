@@ -72,12 +72,13 @@ try {
       artifact_platforms: ["linux", "windows-x64"],
       merged_release: true,
     },
-    features: ["upgrade_digital_twin_v1", "runtime_driver_intelligence_v1", "private_workload_packs_v1", "local_capability_bridge_v1"],
+    features: ["upgrade_digital_twin_v1", "runtime_driver_intelligence_v1", "private_workload_packs_v1", "local_capability_bridge_v1", "install_safety_preflight_v1"],
     release_notes: [
       "Upgrade Digital Twin v1 public verifier test",
       "Runtime & Driver Intelligence v1 public verifier test",
       "Private Workload Packs v1 public verifier test",
-      "Local Capability Bridge v1 public verifier test"
+      "Local Capability Bridge v1 public verifier test",
+      "Install Safety Preflight v1 public verifier test"
     ],
     primary_download: { ...windows, platform: "windows-x64" },
     downloads_by_platform: {

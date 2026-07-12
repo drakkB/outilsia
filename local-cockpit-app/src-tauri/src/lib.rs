@@ -15,7 +15,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env, fs};
-use sysinfo::System;
+use sysinfo::{Disks, System};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const OUTILSIA_ENDPOINT: &str = "https://outilsia.fr";
@@ -231,6 +231,28 @@ pub struct InstallModelRequest {
     model: String,
     timeout_seconds: Option<u64>,
     runtime: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct InstallPreflightRequest {
+    model: String,
+    runtime: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct InstallPreflightResult {
+    schema: String,
+    model: String,
+    runtime: String,
+    runtime_ready: bool,
+    model_already_installed: bool,
+    storage_free_gb: Option<f64>,
+    storage_scope: String,
+    storage_source: String,
+    storage_path_exposed: bool,
+    checked_at_ms: u128,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2040,6 +2062,48 @@ fn spawn_install_reader<R: Read + Send + 'static>(
 }
 
 #[tauri::command]
+async fn preflight_ollama_install(
+    request: InstallPreflightRequest,
+) -> Result<InstallPreflightResult, String> {
+    let model = validate_ollama_model_ref(&request.model)?;
+    let runtime = normalize_ollama_runtime(request.runtime.as_deref());
+    tauri::async_runtime::spawn_blocking(move || ollama_install_preflight_inner(model, runtime))
+        .await
+        .map_err(|err| format!("Préflight Ollama interrompu: {err}"))?
+}
+
+fn ollama_install_preflight_inner(
+    model: String,
+    runtime: OllamaRuntime,
+) -> Result<InstallPreflightResult, String> {
+    let list_output = run_ollama_command_for(runtime, &["list"]);
+    let runtime_ready =
+        list_output.is_some() || run_ollama_command_for(runtime, &["--version"]).is_some();
+    let model_already_installed = list_output
+        .as_deref()
+        .map(|output| {
+            parse_ollama_list_with_source(output, ollama_runtime_name(runtime))
+                .iter()
+                .any(|installed| installed_model_matches_ref(installed, &model))
+        })
+        .unwrap_or(false);
+    let storage = ollama_storage_probe(runtime);
+
+    Ok(InstallPreflightResult {
+        schema: "outilsia.install_safety_preflight.v1".to_string(),
+        model,
+        runtime: ollama_runtime_name(runtime).to_string(),
+        runtime_ready,
+        model_already_installed,
+        storage_free_gb: storage.free_gb,
+        storage_scope: storage.scope,
+        storage_source: storage.source,
+        storage_path_exposed: false,
+        checked_at_ms: now_ms(),
+    })
+}
+
+#[tauri::command]
 fn install_ollama_model(
     app: AppHandle,
     active_installs: State<'_, ActiveInstalls>,
@@ -3540,6 +3604,136 @@ enum OllamaRuntime {
     Wsl,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct OllamaStorageProbe {
+    free_gb: Option<f64>,
+    scope: String,
+    source: String,
+}
+
+fn installed_model_matches_ref(installed: &InstalledModel, requested: &str) -> bool {
+    let requested = requested.trim().to_ascii_lowercase();
+    let name = installed.name.trim().to_ascii_lowercase();
+    let full = installed
+        .tag
+        .as_deref()
+        .map(|tag| format!("{name}:{}", tag.trim().to_ascii_lowercase()))
+        .unwrap_or_else(|| name.clone());
+    if requested.contains(':') {
+        full == requested
+    } else {
+        name == requested
+    }
+}
+
+fn gibibytes_rounded(bytes: u64) -> f64 {
+    (((bytes as f64) / 1024_f64.powi(3)) * 10.0).round() / 10.0
+}
+
+fn available_space_for_path(path: &Path) -> Option<u64> {
+    let target = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        env::current_dir().ok()?.join(path)
+    };
+    let disks = Disks::new_with_refreshed_list();
+    disks
+        .iter()
+        .filter(|disk| target.starts_with(disk.mount_point()))
+        .max_by_key(|disk| disk.mount_point().components().count())
+        .map(|disk| disk.available_space())
+}
+
+fn native_ollama_storage_probe() -> OllamaStorageProbe {
+    let custom = env::var("OLLAMA_MODELS")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let target = custom.as_deref().map(PathBuf::from).or_else(|| {
+        let home = if cfg!(target_os = "windows") {
+            env::var("USERPROFILE")
+                .ok()
+                .or_else(|| env::var("HOME").ok())
+        } else {
+            env::var("HOME").ok()
+        }?;
+        Some(PathBuf::from(home).join(".ollama").join("models"))
+    });
+    if let Some(path) = target {
+        if let Some(bytes) = available_space_for_path(&path) {
+            return OllamaStorageProbe {
+                free_gb: Some(gibibytes_rounded(bytes)),
+                scope: if custom.is_some() {
+                    "custom_model_store".to_string()
+                } else {
+                    "default_model_store".to_string()
+                },
+                source: "native_model_store_volume".to_string(),
+            };
+        }
+    }
+    OllamaStorageProbe {
+        free_gb: detect_storage_free_gb().map(f64::from),
+        scope: "system_volume_fallback".to_string(),
+        source: "system_volume_fallback".to_string(),
+    }
+}
+
+fn parse_wsl_storage_probe(output: &str) -> OllamaStorageProbe {
+    let mut scope = "unknown_model_store".to_string();
+    let mut free_kib = None;
+    for line in output.lines() {
+        if let Some(value) = line.trim().strip_prefix("scope=") {
+            scope = match value.trim() {
+                "custom" => "custom_model_store".to_string(),
+                "default" => "default_model_store".to_string(),
+                _ => "unknown_model_store".to_string(),
+            };
+        }
+        if let Some(value) = line.trim().strip_prefix("free_kib=") {
+            free_kib = value.trim().parse::<u64>().ok();
+        }
+    }
+    OllamaStorageProbe {
+        free_gb: free_kib.map(|value| gibibytes_rounded(value.saturating_mul(1024))),
+        scope,
+        source: "wsl_df_model_store".to_string(),
+    }
+}
+
+fn wsl_ollama_storage_probe() -> OllamaStorageProbe {
+    const SCRIPT: &str = r#"if [ -n "${OLLAMA_MODELS:-}" ]; then scope=custom; target="$OLLAMA_MODELS"; else scope=default; target="$HOME/.ollama/models"; fi
+probe="$target"
+while [ ! -e "$probe" ] && [ "$probe" != "/" ]; do probe="$(dirname "$probe")"; done
+free_kib="$(df -Pk "$probe" 2>/dev/null | awk 'NR==2 {print $4}')"
+printf 'scope=%s\nfree_kib=%s\n' "$scope" "$free_kib""#;
+    let mut command = Command::new("wsl.exe");
+    command.args(["sh", "-lc", SCRIPT]);
+    if let Ok((output, timed_out)) = command_output_with_timeout(
+        command,
+        DETECTION_COMMAND_TIMEOUT,
+        "Préflight stockage Ollama WSL",
+    ) {
+        if !timed_out && output.status.success() {
+            if let Some(text) = decode_command_stdout(&output.stdout) {
+                return parse_wsl_storage_probe(&text);
+            }
+        }
+    }
+    OllamaStorageProbe {
+        free_gb: None,
+        scope: "unknown_model_store".to_string(),
+        source: "wsl_storage_unavailable".to_string(),
+    }
+}
+
+fn ollama_storage_probe(runtime: OllamaRuntime) -> OllamaStorageProbe {
+    match runtime {
+        OllamaRuntime::Wsl if cfg!(target_os = "windows") => wsl_ollama_storage_probe(),
+        _ => native_ollama_storage_probe(),
+    }
+}
+
 fn normalize_ollama_runtime(value: Option<&str>) -> OllamaRuntime {
     match value
         .unwrap_or_default()
@@ -4932,6 +5126,7 @@ pub fn run() {
             sync_benchmark_with_token,
             benchmark_ollama,
             chat_ollama,
+            preflight_ollama_install,
             install_ollama_model,
             cancel_ollama_install,
             delete_ollama_model,
@@ -5335,6 +5530,35 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603|2026-06-15|PCI\\VEN_10DE|
             assert!(program.contains("ollama"));
             assert!(args.is_empty());
         }
+    }
+
+    #[test]
+    fn matches_installed_models_without_collapsing_tags() {
+        let installed = InstalledModel {
+            name: "qwen3".to_string(),
+            tag: Some("14b".to_string()),
+            size_gb: Some(9.0),
+            source: "ollama".to_string(),
+            quantization: None,
+        };
+        assert!(installed_model_matches_ref(&installed, "qwen3"));
+        assert!(installed_model_matches_ref(&installed, "qwen3:14b"));
+        assert!(!installed_model_matches_ref(&installed, "qwen3:0.6b"));
+    }
+
+    #[test]
+    fn parses_wsl_storage_without_exposing_a_path() {
+        let probe = parse_wsl_storage_probe("scope=custom\nfree_kib=104857600\n");
+        assert_eq!(probe.scope, "custom_model_store");
+        assert_eq!(probe.source, "wsl_df_model_store");
+        assert_eq!(probe.free_gb, Some(100.0));
+    }
+
+    #[test]
+    fn keeps_unknown_wsl_storage_unknown() {
+        let probe = parse_wsl_storage_probe("scope=default\nfree_kib=\n");
+        assert_eq!(probe.scope, "default_model_store");
+        assert_eq!(probe.free_gb, None);
     }
 
     #[test]

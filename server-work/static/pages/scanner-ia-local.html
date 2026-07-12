@@ -125,6 +125,25 @@
       </div>
     </section>
 
+    <section class="px-4 py-10" id="preflight-installation-modele-ollama" style="scroll-margin-top:84px">
+      <div class="max-w-6xl mx-auto card p-5 md:p-7" style="border-color:rgba(248,113,113,.38);background:linear-gradient(135deg,rgba(248,113,113,.10),rgba(15,23,42,.94),rgba(251,191,36,.06));">
+        <span class="pill">Install Safety Preflight v1 · candidat</span>
+        <h2 class="text-3xl md:text-4xl font-black mt-4">Vérifier le disque Windows, WSL ou Linux avant de télécharger un gros modèle Ollama</h2>
+        <p class="muted mt-3 text-lg">Avant chaque <code>ollama pull</code>, le cockpit vérifie le runtime réellement ciblé et l'espace libre du volume de modèles. Il estime un budget prudent, conserve une réserve et bloque une insuffisance mesurée avant le premier octet.</p>
+        <div class="grid md:grid-cols-4 gap-3 mt-6">
+          <article class="card p-4"><strong class="cyan">Bon runtime</strong><p class="mini mt-2">Ollama Windows, WSL ou Linux doit répondre avant le téléchargement.</p></article>
+          <article class="card p-4"><strong class="cyan">Bon volume</strong><p class="mini mt-2">Le dossier par défaut ou un stockage Ollama personnalisé est contrôlé sans confondre C: et la distribution WSL.</p></article>
+          <article class="card p-4"><strong class="cyan">Réserve prudente</strong><p class="mini mt-2">Taille haute estimée et marge de sécurité restent séparées et visibles.</p></article>
+          <article class="card p-4"><strong class="cyan">Chemin privé</strong><p class="mini mt-2">Le rapport et le Passport 1.3.0 n'exportent jamais le chemin personnel du dossier de modèles.</p></article>
+        </div>
+        <p class="mini mt-5">Une mesure inconnue demande confirmation au lieu de fabriquer un feu vert. Ce préflight ne prédit ni la vitesse ni l'offload GPU et ne compte pas comme preuve terrain physique.</p>
+        <div class="flex flex-wrap gap-3 mt-6">
+          <a class="btn btn-primary" href="/telecharger-scanner-ia-local">Préparer une installation Ollama</a>
+          <a class="btn btn-secondary" href="/securite-confidentialite-scanner">Voir la politique de sécurité</a>
+        </div>
+      </div>
+    </section>
+
     <section class="px-4 py-10" id="tests-prives-modeles-ollama">
       <div class="max-w-6xl mx-auto card p-5 md:p-7" style="border-color:rgba(45,212,191,.38);background:linear-gradient(135deg,rgba(45,212,191,.10),rgba(15,23,42,.94),rgba(251,191,36,.06));">
         <span class="pill">Private Workload Packs v1</span>
@@ -134,7 +153,7 @@
           <article class="card p-4"><strong class="cyan">Zéro téléchargement</strong><p class="mini mt-2">Le run refuse les modèles absents et n'installe rien en arrière-plan.</p></article>
           <article class="card p-4"><strong class="cyan">Budget borné</strong><p class="mini mt-2">Une seule tâche, 2 à 3 modèles et 60 secondes maximum par modèle.</p></article>
           <article class="card p-4"><strong class="cyan">Preuves déterministes</strong><p class="mini mt-2">JSON, faits, termes obligatoires et action vérifiable produisent un score explicable sur 100.</p></article>
-          <article class="card p-4"><strong class="cyan">Contenu brut exclu</strong><p class="mini mt-2">Rapport, PDF, MemoryForge et Passport 1.2.0 gardent scores, checks et SHA-256, jamais la consigne ou les réponses brutes.</p></article>
+          <article class="card p-4"><strong class="cyan">Contenu brut exclu</strong><p class="mini mt-2">Rapport, PDF, MemoryForge et Passport 1.3.0 gardent scores, checks et SHA-256, jamais la consigne ou les réponses brutes.</p></article>
         </div>
         <p class="mini mt-5">Le classement décrit ce protocole court, cette machine et ce moment. Il ne remplace pas une validation longue et ne compte jamais comme validation physique de la campagne terrain.</p>
         <div class="flex flex-wrap gap-3 mt-6">

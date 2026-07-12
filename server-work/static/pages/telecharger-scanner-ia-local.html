@@ -127,6 +127,19 @@
       <p class="fine">La décision vaut pour ce protocole court et cette machine. OutilsIA demande de confirmer le gagnant sur les tâches longues de l'utilisateur.</p>
     </section>
 
+    <section class="wrap panel" id="preflight-installation-modele-ollama" style="scroll-margin-top:84px;margin-bottom:18px;border-color:rgba(248,113,113,.36);background:linear-gradient(135deg,rgba(248,113,113,.10),rgba(15,23,42,.92),rgba(251,191,36,.06))">
+      <span class="pill">Install Safety Preflight v1 · candidat</span>
+      <h2>Contrôler le vrai volume Ollama avant chaque téléchargement de modèle</h2>
+      <p class="muted">Le futur build vérifie d'abord le runtime ciblé et l'espace libre là où Ollama stocke réellement ses modèles, côté Windows, WSL ou Linux. Une insuffisance mesurée bloque le pull avant le premier octet ; une mesure inconnue demande confirmation.</p>
+      <div class="proof" style="margin-top:14px">
+        <div><strong>Runtime prêt</strong><span>Le préflight refuse de lancer un pull vers un Ollama qui ne répond pas.</span></div>
+        <div><strong>Budget prudent</strong><span>Taille haute estimée du modèle plus réserve disque explicite.</span></div>
+        <div><strong>WSL séparé</strong><span>Le volume Linux de la distribution n'est pas confondu avec le disque système Windows.</span></div>
+        <div><strong>Aucun chemin exporté</strong><span>Rapport, PDF et Passport 1.3.0 gardent le verdict et les nombres, jamais le chemin personnel.</span></div>
+      </div>
+      <p class="fine">Fonction candidate, absente du build public actuel. Elle ne garantit ni les performances du modèle ni son offload GPU et ne constitue pas une preuve terrain physique.</p>
+    </section>
+
     <section class="wrap panel" id="tests-prives-modeles-ollama" style="margin-bottom:18px;border-color:rgba(45,212,191,.36);background:linear-gradient(135deg,rgba(45,212,191,.10),rgba(15,23,42,.92),rgba(251,191,36,.06))">
       <span class="pill">Private Workload Packs v1</span>
       <h2>Comparer 2 ou 3 modèles installés sur une tâche privée, sans cloud</h2>
@@ -135,7 +148,7 @@
         <div><strong>Modèles installés</strong><span>Aucun téléchargement ni installation pendant le run.</span></div>
         <div><strong>Budget fixe</strong><span>Une tâche, 2 à 3 candidats, 60 secondes maximum par modèle.</span></div>
         <div><strong>Score explicable</strong><span>Checks réussis, débit, latence et empreinte SHA-256 de chaque sortie.</span></div>
-        <div><strong>Confidentialité</strong><span>Consignes et réponses brutes exclues du rapport, PDF, MemoryForge et Passport 1.2.0.</span></div>
+        <div><strong>Confidentialité</strong><span>Consignes et réponses brutes exclues du rapport, PDF, MemoryForge et Passport 1.3.0.</span></div>
       </div>
       <p class="fine">Le score compare des critères courts et bornés. Il ne mesure pas toute la qualité du modèle et ne compte jamais comme validation physique de la campagne terrain.</p>
     </section>

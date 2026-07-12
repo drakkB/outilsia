@@ -33,7 +33,7 @@ for (const [label, html] of [["hub", hub], ["download", download]]) {
     "2 à 3 modèles",
     "60 secondes maximum par modèle",
     "réponses brutes",
-    "Passport 1.2.0",
+    "Passport 1.3.0",
     "ne compte jamais comme validation physique"
   ]) {
     if (!html.includes(token)) fail(`${label}: missing ${token}`);

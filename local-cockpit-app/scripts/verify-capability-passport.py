@@ -30,7 +30,7 @@ def main():
     serialized = json.dumps(passport, ensure_ascii=False)
 
     assert passport["schema"] == "outilsia.ai_capability_passport.v1", passport["schema"]
-    assert passport["passport_version"] == "1.2.0", passport["passport_version"]
+    assert passport["passport_version"] == "1.3.0", passport["passport_version"]
     assert result["verified"] is True, result
     assert result["tamperedVerified"] is False, result
     assert result["staleSummary"] is None, result["staleSummary"]
@@ -47,6 +47,7 @@ def main():
     assert passport["capabilities"]["runtime_driver_intelligence_v1"] is True
     assert passport["capabilities"]["private_workload_packs_v1"] is True
     assert passport["capabilities"]["local_capability_bridge_v1"] is True
+    assert passport["capabilities"]["install_safety_preflight_v1"] is True
     assert passport["interoperability"]["local_capability_bridge"]["enabled_by_default"] is False
     assert passport["interoperability"]["local_capability_bridge"]["bind"] == "127.0.0.1"
     assert passport["interoperability"]["local_capability_bridge"]["read_only"] is True
@@ -68,6 +69,7 @@ def main():
     assert passport["privacy"]["excludes_prompt_and_model_outputs"] is True
     assert passport["privacy"]["excludes_private_workload_prompts"] is True
     assert passport["privacy"]["excludes_private_workload_outputs"] is True
+    assert passport["privacy"]["excludes_ollama_storage_path"] is True
     assert "Pourquoi la VRAM" not in serialized
     assert "La VRAM stocke les poids" not in serialized
     assert "desktop_token" not in serialized

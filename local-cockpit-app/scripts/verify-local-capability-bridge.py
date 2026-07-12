@@ -92,7 +92,7 @@ def main():
     assert state_text.startswith("active")
     assert copy_enabled is True
 
-    assert passport["passport_version"] == "1.2.0"
+    assert passport["passport_version"] == "1.3.0"
     assert passport["capabilities"]["local_capability_bridge_v1"] is True
     interop = passport["interoperability"]["local_capability_bridge"]
     assert interop["enabled_by_default"] is False

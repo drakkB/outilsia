@@ -53,6 +53,7 @@ const state = {
   upgradeDigitalTwinRun: null,
   capabilityPassport: null,
   localCapabilityBridge: null,
+  installSafetyPreflight: null,
   localSnapshots: [],
   installingModels: {},
   optimisticInstalledModels: []
@@ -86,6 +87,8 @@ const PRIVATE_WORKLOAD_PROTOCOL = "outilsia.private_workload_pack.v1";
 const LOCAL_CAPABILITY_BRIDGE_SCHEMA = "outilsia.local_capability_bridge.v1";
 const LOCAL_CAPABILITY_BRIDGE_CONTRACT_VERSION = "2026-07-12";
 const LOCAL_CAPABILITY_BRIDGE_TTL_SECONDS = 15 * 60;
+const INSTALL_SAFETY_PREFLIGHT_SCHEMA = "outilsia.install_safety_preflight.v1";
+const INSTALL_SAFETY_MIN_RESERVE_GB = 3;
 const MODEL_AUTOPILOT_PROTOCOL = "outilsia.autopilot.v1";
 const FLIGHT_RECORDER_PROTOCOL = "outilsia.flight_recorder.v1";
 const UPGRADE_DIGITAL_TWIN_PROTOCOL = "outilsia.upgrade_digital_twin.v1";
@@ -5350,12 +5353,202 @@ function estimatedModelSizeLabel(model) {
   return "taille variable";
 }
 
-function hasStorageWarning(model) {
-  const free = Number(state.scan?.storage_free_gb || 0);
-  if (!free) return false;
-  const clean = String(model || "").toLowerCase();
-  const approximate = clean.includes("70b") ? 45 : clean.includes("32b") ? 24 : clean.includes("14b") ? 12 : clean.includes("8b") || clean.includes("7b") ? 6 : clean.includes("4b") ? 4 : clean.includes("0.6b") || clean.includes("1.7b") ? 2 : 3;
-  return free < approximate + 10;
+function catalogModelForOllamaRef(model) {
+  const clean = normalizeOllamaRef(model);
+  if (!clean) return null;
+  const compatibility = state.compatibility?.compatibility || state.compatibility || {};
+  return extractModels(compatibility)
+    .find((item) => {
+      const ref = actionableOllamaRef(item);
+      return ref && sameOllamaModel(ref, clean);
+    }) || null;
+}
+
+function fallbackInstallModelSizeGb(model) {
+  const clean = normalizeOllamaRef(model);
+  if (!clean) return null;
+  if (/0[._-]?6b|0\.6b/.test(clean)) return 0.6;
+  if (/8x7b/.test(clean)) return 14;
+  const tagged = clean.match(/(?:^|[:/_-])(\d+(?:\.\d+)?)b(?:$|[^a-z0-9])/i)
+    || clean.match(/(\d+(?:\.\d+)?)b/i);
+  if (!tagged) return null;
+  const params = Number(tagged[1]);
+  if (!Number.isFinite(params) || params <= 0) return null;
+  return Math.max(0.5, Number((params * 0.64).toFixed(1)));
+}
+
+function modelInstallSizeBudget(model) {
+  const clean = normalizeOllamaRef(model);
+  const catalog = catalogModelForOllamaRef(clean);
+  const installed = (state.scan?.installed_models || [])
+    .find((item) => sameOllamaModel(modelLabel(item), clean));
+  const installedSize = Number(installed?.size_gb || 0);
+  const catalogSize = Number(catalog?.vram_q4 || 0);
+  const fallbackSize = fallbackInstallModelSizeGb(clean);
+  const estimated = installedSize > 0
+    ? installedSize
+    : catalogSize > 0
+      ? catalogSize
+      : fallbackSize;
+  const source = installedSize > 0
+    ? "installed_model_size"
+    : catalogSize > 0
+      ? "catalog_q4_proxy"
+      : estimated
+        ? "parameter_count_estimate"
+        : "unknown";
+  if (!Number.isFinite(estimated) || estimated <= 0) {
+    return {
+      estimated_download_gb: null,
+      estimated_upper_gb: null,
+      reserve_gb: 8,
+      required_free_gb: null,
+      source
+    };
+  }
+  const upper = Number(Math.max(estimated + 0.4, estimated * 1.18).toFixed(1));
+  const reserve = estimated <= 1
+    ? INSTALL_SAFETY_MIN_RESERVE_GB
+    : estimated <= 10
+      ? 6
+      : 10;
+  return {
+    estimated_download_gb: Number(estimated.toFixed(1)),
+    estimated_upper_gb: upper,
+    reserve_gb: reserve,
+    required_free_gb: Number((upper + reserve).toFixed(1)),
+    source
+  };
+}
+
+function evaluateInstallSafetyPreflight(model, probe = {}) {
+  const clean = normalizeOllamaRef(model);
+  const budget = modelInstallSizeBudget(clean);
+  const hasStorageValue = probe.storage_free_gb !== null
+    && probe.storage_free_gb !== undefined
+    && probe.storage_free_gb !== "";
+  const freeValue = Number(probe.storage_free_gb);
+  const storageFree = hasStorageValue && Number.isFinite(freeValue) && freeValue >= 0
+    ? Number(freeValue.toFixed(1))
+    : null;
+  const runtime = probe.runtime || defaultOllamaRuntime(clean);
+  const runtimeReady = probe.runtime_ready !== false;
+  const alreadyInstalled = Boolean(probe.model_already_installed || isOllamaModelInstalled(clean));
+  const blockers = [];
+  const warnings = [];
+  if (!runtimeReady) blockers.push(`Le runtime ${runtime === "ollama-wsl" || runtime === "wsl" ? "Ollama WSL" : "Ollama"} ne répond pas.`);
+  if (storageFree != null && budget.required_free_gb != null && storageFree < budget.required_free_gb) {
+    blockers.push(`${storageFree} Go libres mesurés, ${budget.required_free_gb} Go requis avec réserve.`);
+  }
+  if (storageFree == null) warnings.push("L'espace du volume Ollama n'a pas pu être mesuré.");
+  if (probe.storage_scope === "system_volume_fallback") {
+    warnings.push("Le volume système est utilisé comme repli ; un dossier Ollama personnalisé reste à confirmer.");
+  }
+  if (budget.estimated_download_gb == null) warnings.push("La taille du modèle est inconnue dans le catalogue local.");
+
+  const catalog = catalogModelForOllamaRef(clean);
+  const neededMemory = Number(catalog?.vram_q4 || 0);
+  const availableMemory = effectiveModelMemoryGb(state.scan);
+  if (neededMemory > 0 && availableMemory > 0 && neededMemory > availableMemory) {
+    warnings.push(`${neededMemory} Go estimés en Q4 pour ${availableMemory} Go de mémoire modèle disponible ; offload CPU ou échec possible.`);
+  }
+
+  const verdict = alreadyInstalled
+    ? "already_installed"
+    : blockers.length
+      ? "blocked"
+      : warnings.length
+        ? "warning"
+        : "ready";
+  return {
+    schema: INSTALL_SAFETY_PREFLIGHT_SCHEMA,
+    checked_at: new Date(Number(probe.checked_at_ms || Date.now())).toISOString(),
+    machine_key: state.scan?.machine_key || "",
+    model: clean,
+    runtime: runtime === "ollama-wsl" ? "wsl" : runtime,
+    verdict,
+    allowed: verdict !== "blocked",
+    requires_confirmation: verdict === "warning" && !isStarterModelRef(clean),
+    runtime_ready: runtimeReady,
+    model_already_installed: alreadyInstalled,
+    storage_free_gb: storageFree,
+    storage_scope: probe.storage_scope || "unknown_model_store",
+    storage_source: probe.storage_source || "unknown",
+    storage_path_exposed: false,
+    ...budget,
+    blockers,
+    warnings,
+    limitations: [
+      "La taille de téléchargement reste une estimation tant qu'Ollama n'expose pas le manifeste complet avant le pull.",
+      "Le préflight ne prouve ni la vitesse du modèle ni son offload GPU."
+    ]
+  };
+}
+
+function installSafetyPreflightSummary() {
+  const preflight = state.installSafetyPreflight;
+  if (!preflight || preflight.machine_key !== (state.scan?.machine_key || "")) return null;
+  return {
+    schema: preflight.schema,
+    checked_at: preflight.checked_at,
+    model: preflight.model,
+    runtime: preflight.runtime,
+    verdict: preflight.verdict,
+    allowed: preflight.allowed,
+    storage_free_gb: preflight.storage_free_gb,
+    estimated_download_gb: preflight.estimated_download_gb,
+    required_free_gb: preflight.required_free_gb,
+    reserve_gb: preflight.reserve_gb,
+    storage_scope: preflight.storage_scope,
+    storage_source: preflight.storage_source,
+    storage_path_exposed: false,
+    blockers: [...preflight.blockers],
+    warnings: [...preflight.warnings]
+  };
+}
+
+function appendInstallSafetyPreflight(preflight) {
+  const tone = preflight.verdict === "blocked" ? "erreur" : preflight.verdict === "warning" ? "alerte" : "ok";
+  const runtimeLabel = preflight.runtime === "wsl"
+    ? "Ollama WSL"
+    : /linux/i.test(String(state.scan?.os_name || ""))
+      ? "Ollama Linux"
+      : "Ollama Windows";
+  appendOperationLine(
+    `Préflight ${runtimeLabel}: ${preflight.storage_free_gb == null ? "espace inconnu" : `${preflight.storage_free_gb} Go libres`} · ${preflight.required_free_gb == null ? "besoin inconnu" : `${preflight.required_free_gb} Go requis avec réserve`}.`,
+    tone
+  );
+  for (const message of preflight.blockers) appendOperationLine(message, "erreur");
+  for (const message of preflight.warnings) appendOperationLine(message, "alerte");
+}
+
+async function runInstallSafetyPreflight(model) {
+  const clean = preferredInstallRef(model);
+  const runtime = defaultOllamaRuntime(clean);
+  const probe = invoke
+    ? await invoke("preflight_ollama_install", {
+        request: {
+          model: clean,
+          ...(runtime === "wsl" ? { runtime: "wsl" } : {})
+        }
+      })
+    : {
+        schema: INSTALL_SAFETY_PREFLIGHT_SCHEMA,
+        model: clean,
+        runtime,
+        runtime_ready: hasUsableOllamaRuntime(state.scan),
+        model_already_installed: isOllamaModelInstalled(clean),
+        storage_free_gb: state.scan?.storage_free_gb ?? null,
+        storage_scope: "system_volume_fallback",
+        storage_source: "browser_demo",
+        storage_path_exposed: false,
+        checked_at_ms: Date.now()
+      };
+  const decision = evaluateInstallSafetyPreflight(clean, probe);
+  state.installSafetyPreflight = decision;
+  invalidateCapabilityPassport();
+  appendInstallSafetyPreflight(decision);
+  return decision;
 }
 
 function friendlyOllamaError(error) {
@@ -5759,6 +5952,7 @@ function readinessReport() {
     purchases_suppressed_by_digital_twin: digitalTwinSuppressesPurchases(),
     capability_passport: capabilityPassportSummary(),
     local_capability_bridge: localCapabilityBridgeSummary(),
+    install_safety_preflight: installSafetyPreflightSummary(),
     model_autopilot: modelAutopilotSnapshot(),
     usage_profile: {
       key: usage.key,
@@ -5844,6 +6038,9 @@ function readinessMarkdown(report = readinessReport()) {
     `- État du runtime: ${report.runtime_readiness?.label || "non vérifié"} - ${report.runtime_readiness?.detail || ""}`,
     `- AI Capability Passport: ${report.capability_passport ? `SHA-256 ${report.capability_passport.digest}` : "non généré ou à régénérer"}`,
     `- Passerelle locale: ${report.local_capability_bridge?.running ? `active en lecture seule jusqu'à ${new Date(report.local_capability_bridge.expires_at_ms).toISOString()}` : "désactivée par défaut"}`,
+    report.install_safety_preflight
+      ? `- Préflight installation: ${report.install_safety_preflight.model} · ${report.install_safety_preflight.verdict} · ${report.install_safety_preflight.storage_free_gb == null ? "espace inconnu" : `${report.install_safety_preflight.storage_free_gb} Go libres`} · aucun chemin personnel exporté`
+      : "- Préflight installation: non lancé.",
     `- Machine: ${report.machine.name}`,
     `- CPU: ${report.machine.cpu}`,
     `- RAM: ${report.machine.ram}`,
@@ -5987,6 +6184,7 @@ function readinessSummaryText(report = readinessReport()) {
     `Upgrade Digital Twin: ${report.upgrade_digital_twin ? `${report.upgrade_digital_twin.decision.label} (${report.upgrade_digital_twin.compatibility.status}, confiance ${report.upgrade_digital_twin.compatibility.confidence})` : "aucun scénario"}`,
     `AI Capability Passport: ${report.capability_passport ? `SHA-256 ${report.capability_passport.digest}` : "non généré"}`,
     `Passerelle locale: ${report.local_capability_bridge?.running ? "active · 127.0.0.1 · lecture seule" : "désactivée"}`,
+    `Préflight installation: ${report.install_safety_preflight ? `${report.install_safety_preflight.model} · ${report.install_safety_preflight.verdict}` : "non lancé"}`,
     `Upgrade utile: ${upgrade}`,
     `Prochaine action: ${report.next[0] || "sauvegarder le rapport"}`
   ];
@@ -6093,6 +6291,7 @@ function premiumReportHtml(report = readinessReport()) {
     flightRecorder?.comparison ? `Flight Recorder : ${flightRecorder.comparison.headline} · confiance ${flightRecorder.comparison.confidence}` : "Flight Recorder : aucune référence locale",
     report.capability_passport ? `Capability Passport : SHA-256 ${report.capability_passport.digest}` : "AI Capability Passport à générer dans Détails",
     report.local_capability_bridge?.running ? "Passerelle locale : active sur 127.0.0.1 · lecture seule" : "Passerelle locale : désactivée par défaut",
+    report.install_safety_preflight ? `Préflight installation : ${report.install_safety_preflight.model} · ${report.install_safety_preflight.verdict}` : "Préflight installation : non lancé",
     model.ref ? `Modèle suivant : ${model.ref}` : "Modèle suivant à déterminer"
   ];
   const installNow = model.ref || report.test_model || "qwen3:0.6b";
@@ -6816,6 +7015,7 @@ function renderReadinessPanel() {
       <span>${report.upgrade_digital_twin ? `Upgrade Digital Twin : ${escapeHtml(report.upgrade_digital_twin.decision.label)} · ${escapeHtml(report.upgrade_digital_twin.compatibility.status)} · confiance ${escapeHtml(report.upgrade_digital_twin.compatibility.confidence)}` : "Upgrade Digital Twin : aucun scénario calculé."}</span>
       <span>${report.capability_passport ? `Passport : SHA-256 ${escapeHtml(`${report.capability_passport.digest.slice(0, 16)}…`)}` : "AI Capability Passport disponible dans Détails après génération."}</span>
       <span>${report.local_capability_bridge?.running ? `Passerelle locale : active sur 127.0.0.1 · lecture seule · expiration automatique.` : "Passerelle locale : désactivée par défaut dans Détails."}</span>
+      ${report.install_safety_preflight ? `<span>Préflight installation : ${escapeHtml(report.install_safety_preflight.model)} · ${escapeHtml(report.install_safety_preflight.verdict)} · ${report.install_safety_preflight.storage_free_gb == null ? "espace inconnu" : `${escapeHtml(report.install_safety_preflight.storage_free_gb)} Go libres`} · aucun chemin exporté.</span>` : ""}
       <span>${report.upgrades[0] ? `Upgrade utile : ${escapeHtml(report.upgrades[0].title)}` : "Aucun achat prioritaire pour l'instant."}</span>
       <span>${report.account_ready ? "Compte prêt : rapport partageable disponible après synchronisation." : "Connecte le compte pour sauvegarder et partager ce rapport."}</span>
     </div>
@@ -9433,6 +9633,7 @@ function capabilityPassportSourceRevision() {
     canonicalJson(flightRecorderSummary() || {}),
     canonicalJson(digitalTwinSummary() || {}),
     canonicalJson(privateWorkloadPackSummary() || {}),
+    canonicalJson(installSafetyPreflightSummary() || {}),
     recommendation.created_at_ms || recommendation.id || "",
     arena.created_at_ms || arena.id || "",
     (state.scan?.installed_models || []).map(modelLabel).sort().join(","),
@@ -9466,6 +9667,7 @@ function capabilityPassportSummary(passport = state.capabilityPassport) {
     doctor_score: passport.hardware_doctor?.score ?? null,
     runtime_status: passport.runtime_readiness?.key || "untested",
     upgrade_digital_twin_decision: passport.upgrade_digital_twin?.decision?.key || "not_simulated",
+    install_safety_preflight_verdict: passport.install_safety_preflight?.verdict || "not_run",
     digest_algorithm: passport.integrity?.algorithm || "",
     digest: passport.integrity?.digest || "",
     identity_signature: false,
@@ -9488,7 +9690,7 @@ function capabilityPassportDocument() {
   const storageSource = scan.storage_free_gb == null ? "not_detected" : "scan";
   return {
     schema: "outilsia.ai_capability_passport.v1",
-    passport_version: "1.2.0",
+    passport_version: "1.3.0",
     generated_at: new Date().toISOString(),
     source_revision: capabilityPassportSourceRevision(),
     issuer: {
@@ -9540,6 +9742,7 @@ function capabilityPassportDocument() {
       upgrade_digital_twin_v1: Boolean(report.upgrade_digital_twin),
       private_workload_packs_v1: true,
       local_capability_bridge_v1: true,
+      install_safety_preflight_v1: true,
       local_arena: Boolean(report.arena),
       strategy_arena_profile_export: true
     },
@@ -9571,6 +9774,7 @@ function capabilityPassportDocument() {
     flight_recorder: report.flight_recorder,
     upgrade_digital_twin: report.upgrade_digital_twin,
     private_workload_pack: report.private_workload_pack,
+    install_safety_preflight: report.install_safety_preflight,
     arena: report.arena,
     strategy_arena_handoff: {
       schema: bridge.schema,
@@ -9593,6 +9797,7 @@ function capabilityPassportDocument() {
       excludes_private_workload_prompts: true,
       excludes_private_workload_outputs: true,
       excludes_personal_files: true,
+      excludes_ollama_storage_path: true,
       machine_key_is_local_pseudonymous_identifier: true
     },
     limitations: [
@@ -9603,6 +9808,7 @@ function capabilityPassportDocument() {
       "Flight Recorder compare des mesures locales liées à une référence explicite ; ses causes possibles restent des hypothèses et ne constituent pas une preuve terrain physique.",
       "Upgrade Digital Twin simule des scénarios ; alimentation, connecteurs, dimensions, slots et QVL doivent être vérifiés physiquement avant achat.",
       "Tests privés compare des sorties avec des critères déterministes bornés ; les prompts et réponses bruts ne sont pas inclus dans le Passport.",
+      "Install Safety Preflight estime le budget du modèle et mesure l'espace du volume Ollama sans exporter son chemin ; il ne prédit pas la vitesse ni l'offload GPU.",
       "La passerelle locale est désactivée par défaut, liée à 127.0.0.1, bornée dans le temps et strictement en lecture seule ; son jeton éphémère n'est pas inclus dans ce Passport.",
       "L'empreinte SHA-256 détecte une modification du document ; elle ne prouve ni l'identité du PC ni celle du propriétaire.",
       "Ce passeport ne constitue pas une validation de stratégie financière ni un résultat de backtest."
@@ -12636,15 +12842,12 @@ async function installRecommendedModel(model, button = null) {
   if (requested && normalizeOllamaRef(requested) !== normalizeOllamaRef(clean)) {
     appendOperationLine(`Référence corrigée : ${requested} -> ${clean}`, "info");
   }
-  setOperationFocus(`Téléchargement en cours : ${clean}`, [
-    `Commande : ${ollamaRuntimeCommandLabel(clean)} pull ${clean}`,
+  setOperationFocus(`Vérification avant téléchargement : ${clean}`, [
+    `Runtime ciblé : ${ollamaRuntimeCommandLabel(clean)}`,
     `Taille estimée : ${estimatedModelSizeLabel(clean)}`,
-    "La progression apparaît ici et dans la console détaillée."
+    "OutilsIA vérifie le runtime et le volume de modèles avant tout pull."
   ]);
-  await ensureInstallProgressListener().catch((error) => {
-    appendOperationLine(`Console temps réel non initialisée : ${error}`, "erreur");
-  });
-  setStatus(`Préparation du téléchargement ${clean}...`);
+  setStatus(`Préflight installation ${clean}...`);
   if (!hasUsableOllamaRuntime(state.scan) && invoke) {
     const message = "Aucun runtime Ollama utilisable n'est détecté. Installe Ollama Windows ou prépare Ollama dans WSL, relance le scan, puis réessaie.";
     els.benchmarkResult.innerHTML = `
@@ -12658,9 +12861,78 @@ async function installRecommendedModel(model, button = null) {
     setStatus(message, "bad");
     return;
   }
-  const warning = hasStorageWarning(clean)
-    ? " Espace disque limité : surveille le téléchargement."
-    : "";
+  let preflight;
+  try {
+    preflight = await runInstallSafetyPreflight(clean);
+  } catch (_) {
+    preflight = evaluateInstallSafetyPreflight(clean, {
+      runtime: defaultOllamaRuntime(clean),
+      runtime_ready: hasUsableOllamaRuntime(state.scan),
+      model_already_installed: isOllamaModelInstalled(clean),
+      storage_free_gb: null,
+      storage_scope: "unknown_model_store",
+      storage_source: "preflight_command_unavailable",
+      checked_at_ms: Date.now()
+    });
+    preflight.warnings.unshift("La sonde native du volume Ollama est indisponible ; vérification manuelle requise.");
+    preflight.verdict = preflight.blockers.length ? "blocked" : "warning";
+    preflight.allowed = preflight.verdict !== "blocked";
+    preflight.requires_confirmation = preflight.allowed && !isStarterModelRef(clean);
+    state.installSafetyPreflight = preflight;
+    invalidateCapabilityPassport();
+    appendInstallSafetyPreflight(preflight);
+  }
+  if (!preflight.allowed) {
+    const reason = preflight.blockers[0] || "Le préflight a bloqué cette installation.";
+    els.operationState.textContent = "bloqué";
+    finishOperationMonitor("Installation bloquée avant téléchargement");
+    els.benchmarkResult.innerHTML = `
+      <strong>Installation bloquée avant téléchargement</strong>
+      <span>${escapeHtml(reason)}</span>
+      <span>Aucun octet du modèle n'a été téléchargé.</span>
+    `;
+    setStatus(reason, "bad");
+    renderReadinessPanel();
+    return;
+  }
+  if (preflight.model_already_installed) {
+    els.operationState.textContent = "déjà installé";
+    finishOperationMonitor("Modèle déjà présent dans le runtime ciblé");
+    els.benchmarkModelInput.value = clean;
+    els.chatModelInput.value = clean;
+    els.benchmarkResult.innerHTML = `
+      <strong>${escapeHtml(clean)} est déjà installé</strong>
+      <span>Aucun téléchargement relancé. Tu peux le tester, dialoguer ou le comparer dans l'Arena.</span>
+    `;
+    setStatus(`${clean} déjà installé`, "ok");
+    renderReadinessPanel();
+    return;
+  }
+  if (preflight.requires_confirmation) {
+    const detail = [
+      `Modèle : ${clean}`,
+      `Taille haute estimée : ${preflight.estimated_upper_gb == null ? "inconnue" : `${preflight.estimated_upper_gb} Go`}`,
+      `Espace libre mesuré : ${preflight.storage_free_gb == null ? "inconnu" : `${preflight.storage_free_gb} Go`}`,
+      ...preflight.warnings,
+      "Continuer le téléchargement ?"
+    ].join("\n");
+    if (!window.confirm(detail)) {
+      els.operationState.textContent = "annulé";
+      finishOperationMonitor("Téléchargement annulé avant démarrage");
+      setStatus("Téléchargement annulé avant le pull Ollama", "warn");
+      renderReadinessPanel();
+      return;
+    }
+  }
+  setOperationFocus(`Téléchargement en cours : ${clean}`, [
+    `Commande : ${ollamaRuntimeCommandLabel(clean)} pull ${clean}`,
+    `Budget : ${preflight.estimated_upper_gb == null ? "taille inconnue" : `${preflight.estimated_upper_gb} Go maximum estimé`} + ${preflight.reserve_gb} Go de réserve`,
+    "La progression apparaît ici et dans la console détaillée."
+  ]);
+  await ensureInstallProgressListener().catch((error) => {
+    appendOperationLine(`Console temps réel non initialisée : ${error}`, "erreur");
+  });
+  const warning = preflight.warnings.length ? ` ${preflight.warnings[0]}` : "";
   state.installingModels[clean] = true;
   setCancelOperationEnabled(true, clean);
   const compatibility = state.compatibility?.compatibility || state.compatibility || {};
@@ -14266,6 +14538,9 @@ function installTestHarness() {
     verifyCapabilityPassportIntegrity,
     capabilityPassportSummary,
     strategyArenaReadiness,
+    modelInstallSizeBudget,
+    evaluateInstallSafetyPreflight,
+    installSafetyPreflightSummary,
     setViewMode,
     defaultOllamaRuntime,
     ollamaRuntimePayload,
@@ -14297,6 +14572,71 @@ function installTestHarness() {
     restorePreviousUpgradeDigitalTwinScenario,
     applyModelAutopilotRecommendation,
     rollbackModelAutopilotProfile,
+    async applyInstallSafetyPreflightState() {
+      this.applyDemoState();
+      const ready = evaluateInstallSafetyPreflight("qwen3:14b", {
+        schema: INSTALL_SAFETY_PREFLIGHT_SCHEMA,
+        model: "qwen3:14b",
+        runtime: "native",
+        runtime_ready: true,
+        model_already_installed: false,
+        storage_free_gb: 120,
+        storage_scope: "default_model_store",
+        storage_source: "native_model_store_volume",
+        storage_path_exposed: false,
+        checked_at_ms: Date.now()
+      });
+      const blocked = evaluateInstallSafetyPreflight("qwen3:70b", {
+        runtime: "native",
+        runtime_ready: true,
+        model_already_installed: false,
+        storage_free_gb: 20,
+        storage_scope: "custom_model_store",
+        storage_source: "native_model_store_volume",
+        storage_path_exposed: false,
+        checked_at_ms: Date.now()
+      });
+      const unknown = evaluateInstallSafetyPreflight("qwen3-coder-next", {
+        runtime: "wsl",
+        runtime_ready: true,
+        model_already_installed: false,
+        storage_free_gb: null,
+        storage_scope: "unknown_model_store",
+        storage_source: "wsl_storage_unavailable",
+        storage_path_exposed: false,
+        checked_at_ms: Date.now()
+      });
+      const alreadyInstalled = evaluateInstallSafetyPreflight("qwen3:0.6b", {
+        runtime: "native",
+        runtime_ready: true,
+        model_already_installed: true,
+        storage_free_gb: 120,
+        storage_scope: "default_model_store",
+        storage_source: "native_model_store_volume",
+        storage_path_exposed: false,
+        checked_at_ms: Date.now()
+      });
+      state.installSafetyPreflight = ready;
+      if (els.operationState) els.operationState.textContent = "préflight validé";
+      appendInstallSafetyPreflight(ready);
+      renderReadinessPanel();
+      const report = readinessReport();
+      const passport = await buildCapabilityPassport();
+      state.capabilityPassport = passport;
+      renderCapabilityPassportPanel();
+      return {
+        ready,
+        blocked,
+        unknown,
+        alreadyInstalled,
+        summary: installSafetyPreflightSummary(),
+        report,
+        passport,
+        markdown: readinessMarkdown(report),
+        panel: els.readinessBox?.textContent || "",
+        operation: els.operationConsole?.textContent || ""
+      };
+    },
     async applyPrivateWorkloadPackState() {
       const secretPrompt = "Prépare la décision privée DOSSIER-PRIVATE-7788 sans envoyer son contenu.";
       const requiredTerms = ["dossier-private-7788", "validation-locale"];

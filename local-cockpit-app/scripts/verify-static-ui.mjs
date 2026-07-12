@@ -126,6 +126,12 @@ const requiredFeatureText = [
   ["rust local capability bridge loopback", rust, "TcpListener::bind((\"127.0.0.1\", 0))"],
   ["rust local capability bridge auth", rust, "bearer_token_required"],
   ["css local capability bridge", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".local-capability-bridge-box"],
+  ["js install safety schema", js, "outilsia.install_safety_preflight.v1"],
+  ["js install safety before pull", js, "runInstallSafetyPreflight(clean)"],
+  ["js install safety path privacy", js, "excludes_ollama_storage_path: true"],
+  ["rust install safety command", rust, "preflight_ollama_install"],
+  ["rust install safety WSL storage", rust, "wsl_df_model_store"],
+  ["rust install safety path excluded", rust, "storage_path_exposed: false"],
 ];
 
 const missingFeature = requiredFeatureText.filter(([, text, needle]) => !text.includes(needle));
