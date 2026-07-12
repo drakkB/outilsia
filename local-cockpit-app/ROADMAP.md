@@ -193,6 +193,28 @@ Premier jalon candidat v1 terminé le 12 juillet 2026 dans le build Windows/Linu
 - Conserver un Evidence Ledger : auteur, critique, validation, coût, latence, empreinte et décision humaine.
 - Ne pas déplacer les backtests ou la logique financière de Strategy Arena dans ce module.
 
+### Coordination par board
+
+- Créditer le travail Planka + Hermes Kanban de Supersocks comme inspiration conceptuelle, sans copier son texte, son dépôt ou son interface.
+- Définir un contrat générique `board_adapter.v1` ; Planka reste un service externe facultatif et ne devient pas une dépendance embarquée.
+- Traiter chaque carte comme un contrat de travail : objectif, contexte, périmètre, permissions, interdits, critères d'acceptation, vérifications et dernière décision humaine.
+- Utiliser une machine d'état stricte : inbox, ready, in progress, blocked, review required, done et archived.
+- Synchroniser par webhook avec une réconciliation périodique, des clés d'idempotence et une identité stable de tâche ; ne jamais faire confiance aux webhooks seuls.
+- Commencer par un Board Observer en lecture seule avant tout commentaire, déplacement ou création de carte depuis OutilsIA.
+- Conserver les preuves opérationnelles dans l'Evidence Ledger et projeter uniquement décisions, bilans et trajectoire durable vers MemoryForge/Obsidian.
+- Vérifier la licence et les droits d'intégration de chaque board avant distribution, hébergement ou revente.
+
+### Workstack Arena et ForgeBench
+
+- Séparer quatre responsabilités : Composer définit la chaîne, Workstack Arena exécute, ForgeBench évalue et Evidence Ledger conserve la preuve.
+- Créer le benchmark maison `Signal Maze v1` avec règles déterministes, starter scellé, tests visibles/cachés et captures desktop/Android.
+- Mesurer séparément résultat, vitesse, efficacité et coût ; toujours publier les valeurs brutes, les sous-scores et le caractère estimé ou inconnu d'une donnée.
+- Utiliser comme score équilibré initial `50 % résultat + 20 % efficacité + 15 % vitesse + 15 % coût`, sans masquer les podiums par dimension ni la frontière de Pareto.
+- Comparer d'abord trois stacks : Codex CLI seul, Claude Code seul et Hermes planification -> Codex construction -> Claude audit.
+- Exiger un worktree et une session neufs par worker, un évaluateur indépendant, des versions datées et au moins trois seeds pour tout résultat présenté comme scientifique.
+- Invalider ou pénaliser les runs qui changent les règles, retirent des tests, élargissent les permissions ou reçoivent une aide non enregistrée.
+- Étendre ensuite ForgeBench aux pistes maintenance et évolution afin d'éviter un classement dépendant d'un seul mini-jeu.
+
 ## Phase 8 - Réseau et communauté opt-in
 
 - Découvrir plusieurs machines OutilsIA sur un réseau privé et router vers la capacité disponible.
