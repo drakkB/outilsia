@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
-const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "evidence_ledger.rs"]
+const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
@@ -174,6 +174,10 @@ const requiredFeatureText = [
   ["rust ForgeBench sandbox no process overclaim", rust, '"process_isolation_enforced": false'],
   ["rust ForgeBench sandbox no network overclaim", rust, '"network_isolation_enforced": false'],
   ["rust ForgeBench sandbox no hidden material", rust, '"hidden_suite_material_copied": false'],
+  ["rust ForgeBench isolation probe schema", rust, "outilsia.forgebench_isolation_probe_result.v1"],
+  ["rust ForgeBench bubblewrap canary", rust, "BWRAP_CANARY_SCRIPT"],
+  ["rust ForgeBench isolation no worker", rust, '"worker_command_executed": false'],
+  ["rust ForgeBench isolation no science", rust, '"scientific_eligible": false'],
   ["ForgeBench Signal Maze schema", forgeBenchContract, "outilsia.forgebench_benchmark.v1"],
   ["ForgeBench explicit hidden suite absence", forgeBenchContract, '"status": "not_provisioned"'],
   ["ForgeBench score policy", forgeBenchContract, '"result": 50, "efficiency": 20, "speed": 15, "cost": 15'],
@@ -181,6 +185,9 @@ const requiredFeatureText = [
   ["html ForgeBench hidden suite", html, "forgeBenchVaultBox"],
   ["html ForgeBench worker sandbox", html, "forgeBenchSandboxBox"],
   ["css ForgeBench worker sandbox", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".forgebench-sandbox"],
+  ["html ForgeBench isolation probe", html, "forgeBenchIsolationBox"],
+  ["js ForgeBench isolation schema", js, "outilsia.forgebench_isolation_probe_result.v1"],
+  ["css ForgeBench isolation probe", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".forgebench-isolation"],
   ["html evidence ledger", html, "evidenceLedgerBox"],
   ["html evidence source", html, "evidenceLedgerSource"],
   ["js evidence append schema", js, "outilsia.evidence_append_request.v1"],
@@ -189,6 +196,7 @@ const requiredFeatureText = [
   ["rust evidence append only", rust, "append_only_between_resets"],
   ["rust evidence no raw source", rust, "raw_source_documents_stored\": false"],
   ["rust evidence no execution", rust, "\"started\": false"],
+  ["rust evidence isolation preflight", rust, "signed_isolation_preflight"],
   ["css evidence ledger", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".evidence-ledger-box"],
   ["notice Board Observer", workstackNotice, "Board Observer"],
   ["notice Evidence Ledger", workstackNotice, "Ce que prouve l'Evidence Ledger"],

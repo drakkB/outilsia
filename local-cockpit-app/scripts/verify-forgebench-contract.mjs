@@ -55,7 +55,7 @@ if (bundleDigest !== manifest.bundle_sha256 || bundleDigest !== benchmark.starte
   throw new Error("starter bundle digest mismatch");
 }
 
-const rust = ["forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs"]
+const rust = ["forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri", "src", name), "utf8"))
   .join("\n");
 const js = readFileSync(resolve(root, "src", "app.js"), "utf8");
@@ -81,6 +81,9 @@ for (const needle of [
   '"hidden_suite_access_blocked": false',
   '"worker_execution_ready": false',
   "forgebench-worker-sandboxes-v1",
+  "outilsia.forgebench_isolation_probe_result.v1",
+  "BWRAP_CANARY_SCRIPT",
+  '"worker_command_executed": false',
 ]) {
   if (!rust.includes(needle)) throw new Error(`missing Rust ForgeBench guard: ${needle}`);
 }
@@ -92,17 +95,19 @@ for (const needle of [
   "Aucun chemin exposé",
   "aucun worker lancé",
   "processus, réseau et accès au vault non isolés",
+  "canari isolé vérifié",
+  "runner et évaluateur encore absents",
 ]) {
   if (!js.includes(needle)) throw new Error(`missing UI truth label: ${needle}`);
 }
 for (const [label, text, needles] of [
-  ["hub", hub, ["forgebench-workspaces-stacks-ia", "ForgeBench Workspaces v0 · candidat source", "Aucun worker ou shell lancé", "accès au vault ne sont pas encore isolés", "ForgeBench peut-il déjà lancer Codex, Claude Code et Hermes automatiquement ?"]],
-  ["download", download, ["forgebench-workspaces-stacks-ia", "ForgeBench Workspaces v0 · candidat source", "Pas encore une sandbox OS", "ne débloque ni exécution automatique, ni score, ni conclusion scientifique", "ForgeBench peut-il déjà lancer Codex, Claude Code et Hermes automatiquement ?"]],
-  ["llms", llms, ["ForgeBench Workspaces v0 (source candidate, not in the current public build)", "No worker or shell is launched", "not isolated execution, scientific evidence, scoring or a winner"]],
+  ["hub", hub, ["forgebench-workspaces-stacks-ia", "ForgeBench Workspaces v0 · candidat source", "Canari bubblewrap", "Aucun worker ou shell n'est lancé", "n'applique encore cette isolation à aucun worker", "ForgeBench peut-il déjà lancer Codex, Claude Code et Hermes automatiquement ?"]],
+  ["download", download, ["forgebench-workspaces-stacks-ia", "ForgeBench Workspaces v0 · candidat source", "Canari bubblewrap", "Aucun CLI n'est lancé", "Le canari vérifie une capacité d'isolation, pas une exécution worker", "ForgeBench peut-il déjà lancer Codex, Claude Code et Hermes automatiquement ?"]],
+  ["llms", llms, ["ForgeBench Workspaces v0 (source candidate, not in the current public build)", "bubblewrap canary", "No Codex, Claude or Hermes worker is launched", "not isolated run evidence, scientific scoring or a winner"]],
 ]) {
   for (const needle of needles) {
     if (!text.includes(needle)) throw new Error(`missing ForgeBench SEO/GEO truth on ${label}: ${needle}`);
   }
 }
 
-console.log(`forgebench_contract_ok benchmark=${benchmark.id} seeds=${benchmark.determinism.default_seeds.length} starter=${bundleDigest} hidden=absent workspaces=fresh-not-executed isolation=false seo=hub-download-llms execution=false`);
+console.log(`forgebench_contract_ok benchmark=${benchmark.id} seeds=${benchmark.determinism.default_seeds.length} starter=${bundleDigest} hidden=absent workspaces=fresh-not-executed isolation=canary-only seo=hub-download-llms execution=false`);

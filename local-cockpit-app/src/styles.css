@@ -2793,7 +2793,8 @@ dd {
 }
 
 .forgebench-vault,
-.forgebench-sandbox {
+.forgebench-sandbox,
+.forgebench-isolation {
   background: rgba(13, 20, 24, 0.82);
   border: 1px solid rgba(229, 184, 92, 0.22);
   border-radius: 8px;
@@ -2807,8 +2808,14 @@ dd {
   border-color: rgba(94, 193, 225, 0.24);
 }
 
+.forgebench-isolation {
+  border-color: rgba(134, 239, 172, 0.24);
+  margin-top: 4px;
+}
+
 .forgebench-vault-heading,
-.forgebench-sandbox-heading {
+.forgebench-sandbox-heading,
+.forgebench-isolation-heading {
   align-items: center;
   display: flex;
   gap: 12px;
@@ -2817,16 +2824,20 @@ dd {
 
 .forgebench-vault-heading span,
 .forgebench-sandbox-heading span,
+.forgebench-isolation-heading span,
 .forgebench-vault-box span,
 .forgebench-vault-box small,
 .forgebench-sandbox-box span,
-.forgebench-sandbox-box small {
+.forgebench-sandbox-box small,
+.forgebench-isolation-box span,
+.forgebench-isolation-box small {
   color: var(--muted);
   font-size: 11px;
 }
 
 .forgebench-vault-box,
-.forgebench-sandbox-box {
+.forgebench-sandbox-box,
+.forgebench-isolation-box {
   display: grid;
   gap: 4px;
   min-width: 0;
@@ -2835,7 +2846,9 @@ dd {
 .forgebench-vault-box span,
 .forgebench-vault-box small,
 .forgebench-sandbox-box span,
-.forgebench-sandbox-box small {
+.forgebench-sandbox-box small,
+.forgebench-isolation-box span,
+.forgebench-isolation-box small {
   overflow-wrap: anywhere;
 }
 

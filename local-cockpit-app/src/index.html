@@ -506,6 +506,18 @@
               <button id="clearForgeBenchSandboxBtn" type="button" disabled>Effacer</button>
             </div>
           </div>
+          <div class="forgebench-isolation">
+            <div class="forgebench-isolation-heading">
+              <strong>Préflight isolation</strong>
+              <span id="forgeBenchIsolationState">non vérifié</span>
+            </div>
+            <div id="forgeBenchIsolationBox" class="forgebench-isolation-box empty">
+              Teste un canari borné Linux ou WSL. Aucun agent, credential ou test caché n'est transmis.
+            </div>
+            <div class="row-actions">
+              <button id="probeForgeBenchIsolationBtn" type="button" disabled>Tester l'isolation</button>
+            </div>
+          </div>
           <div id="forgeBenchBox" class="forgebench-box empty">
             Compile d'abord une Workstack puis un routage complet. ForgeBench préparera l'expérience sans l'exécuter.
           </div>
@@ -534,6 +546,7 @@
                 <option value="workstack_compiled">Workstack compilée</option>
                 <option value="capability_routing_proposed">Routage proposé</option>
                 <option value="forgebench_experiment_compiled">Expérience ForgeBench préparée</option>
+                <option value="forgebench_isolation_probed">Isolation ForgeBench testée</option>
               </select>
             </label>
           </div>

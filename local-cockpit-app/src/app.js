@@ -60,6 +60,7 @@ const state = {
   forgeBench: null,
   forgeBenchHiddenSuite: null,
   forgeBenchWorkerSandbox: null,
+  forgeBenchIsolation: null,
   evidenceLedger: null,
   installSafetyPreflight: null,
   localSnapshots: [],
@@ -112,6 +113,8 @@ const FORGEBENCH_WORKER_SANDBOX_PREPARE_REQUEST_SCHEMA = "outilsia.forgebench_wo
 const FORGEBENCH_WORKER_SANDBOX_PREPARE_RESULT_SCHEMA = "outilsia.forgebench_worker_sandbox_prepare_result.v1";
 const FORGEBENCH_WORKER_SANDBOX_STATUS_SCHEMA = "outilsia.forgebench_worker_sandbox_status.v1";
 const FORGEBENCH_WORKER_SANDBOX_RECEIPT_SCHEMA = "outilsia.forgebench_worker_sandbox_receipt.v1";
+const FORGEBENCH_ISOLATION_PROBE_REQUEST_SCHEMA = "outilsia.forgebench_isolation_probe_request.v1";
+const FORGEBENCH_ISOLATION_PROBE_RESULT_SCHEMA = "outilsia.forgebench_isolation_probe_result.v1";
 const EVIDENCE_APPEND_REQUEST_SCHEMA = "outilsia.evidence_append_request.v1";
 const EVIDENCE_APPEND_RESULT_SCHEMA = "outilsia.evidence_append_result.v1";
 const EVIDENCE_LEDGER_SCHEMA = "outilsia.evidence_ledger.v1";
@@ -480,6 +483,9 @@ const els = {
   prepareForgeBenchSandboxBtn: $("prepareForgeBenchSandboxBtn"),
   refreshForgeBenchSandboxBtn: $("refreshForgeBenchSandboxBtn"),
   clearForgeBenchSandboxBtn: $("clearForgeBenchSandboxBtn"),
+  forgeBenchIsolationState: $("forgeBenchIsolationState"),
+  forgeBenchIsolationBox: $("forgeBenchIsolationBox"),
+  probeForgeBenchIsolationBtn: $("probeForgeBenchIsolationBtn"),
   evidenceLedgerState: $("evidenceLedgerState"),
   evidenceLedgerSource: $("evidenceLedgerSource"),
   evidenceLedgerBox: $("evidenceLedgerBox"),
@@ -650,6 +656,8 @@ let forgeBenchVaultBusy = false;
 let forgeBenchVaultError = "";
 let forgeBenchSandboxBusy = false;
 let forgeBenchSandboxError = "";
+let forgeBenchIsolationBusy = false;
+let forgeBenchIsolationError = "";
 let evidenceLedgerBusy = false;
 let evidenceLedgerError = "";
 const privateWorkloadSelections = new Set();
@@ -11286,6 +11294,7 @@ async function loadForgeBenchSandbox(silent = false) {
   } finally {
     forgeBenchSandboxBusy = false;
     renderForgeBenchSandboxPanel();
+    renderForgeBenchIsolationPanel();
   }
 }
 
@@ -11333,6 +11342,7 @@ async function prepareForgeBenchSandbox() {
   } finally {
     forgeBenchSandboxBusy = false;
     renderForgeBenchSandboxPanel();
+    renderForgeBenchIsolationPanel();
   }
 }
 
@@ -11353,6 +11363,140 @@ async function clearForgeBenchSandbox() {
   } finally {
     forgeBenchSandboxBusy = false;
     renderForgeBenchSandboxPanel();
+    renderForgeBenchIsolationPanel();
+  }
+}
+
+function forgeBenchIsolationReasonLabel(code) {
+  return ({
+    bubblewrap_not_installed: "bubblewrap absent",
+    bubblewrap_canary_failed: "canari bubblewrap refusé",
+    isolation_canary_failed: "canari d'isolation incomplet",
+    probe_timed_out: "préflight expiré",
+    no_supported_native_isolation_backend: "backend Windows natif non pris en charge",
+    no_supported_isolation_backend: "backend d'isolation non pris en charge",
+    workspace_path_not_utf8: "chemin du workspace non compatible"
+  })[String(code || "")] || "backend non vérifié";
+}
+
+function forgeBenchIsolationResult(result = state.forgeBenchIsolation) {
+  const candidates = Array.isArray(result?.candidates) ? result.candidates : [];
+  const selected = candidates.find((candidate) => candidate?.id === result?.selected_backend && candidate?.canary_passed === true);
+  const backendReady = result?.readiness?.isolation_backend_ready === true;
+  const blockers = Array.isArray(result?.readiness?.blockers) ? result.readiness.blockers : [];
+  if (
+    result?.schema !== FORGEBENCH_ISOLATION_PROBE_RESULT_SCHEMA
+    || !/^[a-f0-9]{64}$/i.test(String(result?.integrity?.digest || ""))
+    || result?.security?.probe_attempted !== true
+    || result?.security?.canary_command_succeeded !== backendReady
+    || result?.security?.worker_started !== false
+    || result?.security?.worker_command_executed !== false
+    || result?.security?.credentials_read !== false
+    || result?.security?.paths_returned !== false
+    || result?.security?.hidden_suite_contents_returned !== false
+    || result?.security?.source_repository_mounted !== false
+    || result?.readiness?.worker_execution_ready !== false
+    || result?.readiness?.scientific_eligible !== false
+    || !blockers.includes("worker_runner_not_implemented")
+    || !blockers.includes("worker_process_not_started")
+    || !blockers.includes("isolated_evaluator_not_implemented")
+    || backendReady !== Boolean(selected)
+    || (!backendReady && !blockers.includes("verified_isolation_backend_unavailable"))
+  ) return null;
+  if (backendReady && (
+    result?.capabilities?.user_namespace_available !== true
+    || result?.capabilities?.mount_namespace_available !== true
+    || result?.capabilities?.network_namespace_available !== true
+    || result?.capabilities?.pid_namespace_available !== true
+    || result?.capabilities?.workspace_write_canary_passed !== true
+    || result?.capabilities?.host_root_hidden_in_canary !== true
+    || result?.capabilities?.hidden_vault_not_mounted_by_policy !== true
+    || result?.capabilities?.outbound_network_request_attempted !== false
+  )) return null;
+  return result;
+}
+
+function renderForgeBenchIsolationPanel() {
+  if (!els.forgeBenchIsolationBox) return;
+  const result = forgeBenchIsolationResult();
+  const workspacesReady = forgeBenchSandboxMatchesExperiment();
+  els.probeForgeBenchIsolationBtn.disabled = !invoke || forgeBenchIsolationBusy || !workspacesReady;
+  if (!invoke && !result?.test_mode) {
+    els.forgeBenchIsolationState.textContent = "app native requise";
+    els.forgeBenchIsolationBox.className = "forgebench-isolation-box empty";
+    els.forgeBenchIsolationBox.textContent = "Le canari d'isolation nécessite l'application Windows/Linux.";
+    return;
+  }
+  if (forgeBenchIsolationBusy) {
+    els.forgeBenchIsolationState.textContent = "canari en cours";
+    els.forgeBenchIsolationBox.className = "forgebench-isolation-box empty";
+    els.forgeBenchIsolationBox.textContent = "Test borné des namespaces et du workspace. Aucun agent, credential ou test caché n'est transmis.";
+    return;
+  }
+  if (forgeBenchIsolationError) {
+    els.forgeBenchIsolationState.textContent = "préflight refusé";
+    els.forgeBenchIsolationBox.className = "forgebench-isolation-box empty";
+    els.forgeBenchIsolationBox.innerHTML = `<strong>Isolation non vérifiée</strong><span>${escapeHtml(forgeBenchIsolationError)}</span>`;
+    return;
+  }
+  if (!result) {
+    els.forgeBenchIsolationState.textContent = workspacesReady ? "à tester" : "workspaces requis";
+    els.forgeBenchIsolationBox.className = "forgebench-isolation-box empty";
+    els.forgeBenchIsolationBox.textContent = workspacesReady
+      ? "Teste bubblewrap sous Linux ou WSL avant toute future exécution de worker."
+      : "Prépare d'abord les workspaces frais liés à l'expérience.";
+    return;
+  }
+  const ready = result.readiness?.isolation_backend_ready === true;
+  const selected = result.candidates.find((candidate) => candidate.id === result.selected_backend);
+  els.forgeBenchIsolationState.textContent = ready ? "canari isolé vérifié" : "backend indisponible";
+  els.forgeBenchIsolationBox.className = `forgebench-isolation-box${ready ? "" : " empty"}`;
+  if (ready) {
+    els.forgeBenchIsolationBox.innerHTML = `
+      <strong>${escapeHtml(selected?.label || result.selected_backend)} · canari réussi</strong>
+      <span>Namespaces utilisateur, montage, réseau et processus séparés · écriture limitée au workspace · racine hôte masquée</span>
+      <small>${escapeHtml(selected?.version || "version non exposée")} · aucun worker lancé · runner et évaluateur encore absents · aucune conclusion scientifique</small>
+    `;
+    return;
+  }
+  const reasons = result.candidates
+    .map((candidate) => `${candidate.label}: ${forgeBenchIsolationReasonLabel(candidate.reason_code)}`)
+    .join(" · ");
+  els.forgeBenchIsolationBox.innerHTML = `
+    <strong>Aucun backend vérifié</strong>
+    <span>${escapeHtml(reasons || "Préflight sans résultat exploitable")}</span>
+    <small>Windows natif n'est pas déclaré isolé. Le chemin prévu est bubblewrap sous Linux ou WSL, après installation administrateur hors de l'app.</small>
+  `;
+}
+
+async function probeForgeBenchIsolation() {
+  if (!invoke || forgeBenchIsolationBusy || !forgeBenchSandboxMatchesExperiment()) return null;
+  forgeBenchIsolationBusy = true;
+  forgeBenchIsolationError = "";
+  state.forgeBenchIsolation = null;
+  renderForgeBenchIsolationPanel();
+  setStatus("Test du backend d'isolation ForgeBench...");
+  try {
+    const result = await invoke("probe_forgebench_isolation", {
+      request: {
+        schema: FORGEBENCH_ISOLATION_PROBE_REQUEST_SCHEMA,
+        prefer_wsl: true
+      }
+    });
+    if (!forgeBenchIsolationResult(result)) throw new Error("résultat natif du préflight non conforme");
+    state.forgeBenchIsolation = result;
+    if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "forgebench_isolation_probed";
+    renderEvidenceLedgerPanel();
+    const ready = result.readiness?.isolation_backend_ready === true;
+    setStatus(ready ? "Canari d'isolation ForgeBench vérifié" : "Aucun backend d'isolation vérifié", ready ? "ok" : "warn");
+    return result;
+  } catch (error) {
+    forgeBenchIsolationError = String(error || "Préflight d'isolation impossible");
+    setStatus(`Isolation ForgeBench : ${forgeBenchIsolationError}`, "error");
+    return null;
+  } finally {
+    forgeBenchIsolationBusy = false;
+    renderForgeBenchIsolationPanel();
   }
 }
 
@@ -11376,7 +11520,8 @@ function forgeBenchMarkdown(result = state.forgeBench) {
     `- Préflight exploratoire : ${readiness.exploratory_ready ? "prêt" : "bloqué"}`,
     `- Préflight scientifique : ${readiness.scientific_ready ? "prêt" : "bloqué"}`,
     `- Workspaces frais : ${forgeBenchSandboxMatchesExperiment() ? `${forgeBenchSandboxReceipt()?.workspaces_total || 0} préparés, sans exécution` : "non préparés pour ce préflight"}`,
-    `- Isolation processus/réseau : non`,
+    `- Backend d'isolation : ${forgeBenchIsolationResult()?.readiness?.isolation_backend_ready ? `${forgeBenchIsolationResult()?.selected_backend} (canari vérifié, worker non lancé)` : "non vérifié"}`,
+    `- Isolation appliquée à un worker : non`,
     blockers.length ? `- Blocages : ${blockers.map(forgeBenchBlockerLabel).join(" ; ")}` : "- Blocages : aucun",
     `- Score : résultat ${weights.result || 0}% · efficacité ${weights.efficiency || 0}% · vitesse ${weights.speed || 0}% · coût ${weights.cost || 0}%`,
     `- Coût inconnu traité comme zéro : non`,
@@ -11567,7 +11712,8 @@ function evidenceEventLabel(value) {
     board_observed: "Board observé",
     workstack_compiled: "Workstack compilée",
     capability_routing_proposed: "Routage proposé",
-    forgebench_experiment_compiled: "Expérience ForgeBench préparée"
+    forgebench_experiment_compiled: "Expérience ForgeBench préparée",
+    forgebench_isolation_probed: "Isolation ForgeBench testée"
   })[value] || value;
 }
 
@@ -11576,7 +11722,8 @@ function evidenceActorLabel(value) {
     board_observer: "Board Observer",
     workstack_composer: "Workstack Composer",
     capability_router: "Capability Router",
-    forgebench: "ForgeBench"
+    forgebench: "ForgeBench",
+    forgebench_isolation: "ForgeBench Isolation"
   })[value] || value;
 }
 
@@ -11585,11 +11732,12 @@ function evidenceSourceDocument(eventType) {
   if (eventType === "workstack_compiled") return state.workstackComposer?.plan || null;
   if (eventType === "capability_routing_proposed") return state.capabilityRouter || null;
   if (eventType === "forgebench_experiment_compiled") return state.forgeBench || null;
+  if (eventType === "forgebench_isolation_probed") return forgeBenchIsolationResult() || null;
   return null;
 }
 
 function evidenceAvailableTypes() {
-  return ["forgebench_experiment_compiled", "capability_routing_proposed", "workstack_compiled", "board_observed"]
+  return ["forgebench_isolation_probed", "forgebench_experiment_compiled", "capability_routing_proposed", "workstack_compiled", "board_observed"]
     .filter((eventType) => Boolean(evidenceSourceDocument(eventType)));
 }
 
@@ -16889,18 +17037,56 @@ function installTestHarness() {
           integrity: { digest: "3".repeat(64) }
         }
       };
+      state.forgeBenchIsolation = {
+        schema: FORGEBENCH_ISOLATION_PROBE_RESULT_SCHEMA,
+        contract_version: "2026-07-13",
+        probed_at_ms: Date.now(),
+        host_environment: "linux",
+        selected_backend: "linux-bwrap-native",
+        test_mode: true,
+        candidates: [{
+          id: "linux-bwrap-native",
+          label: "Bubblewrap Linux",
+          environment: "linux_native",
+          backend: "bubblewrap",
+          installed: true,
+          probe_executed: true,
+          timed_out: false,
+          canary_passed: true,
+          version: "bubblewrap 0.11.0",
+          reason_code: null,
+          capabilities: { user_namespace: true, mount_namespace: true, network_namespace: true, pid_namespace: true, workspace_write: true, host_root_hidden: true, host_sentinel_unchanged: true }
+        }],
+        capabilities: {
+          isolation_backend_ready: true,
+          user_namespace_available: true,
+          mount_namespace_available: true,
+          network_namespace_available: true,
+          pid_namespace_available: true,
+          workspace_write_canary_passed: true,
+          host_root_hidden_in_canary: true,
+          hidden_vault_not_mounted_by_policy: true,
+          outbound_network_request_attempted: false
+        },
+        security: { probe_attempted: true, canary_command_succeeded: true, worker_started: false, worker_command_executed: false, credentials_read: false, paths_returned: false, hidden_suite_contents_returned: false, source_repository_mounted: false },
+        readiness: { isolation_backend_ready: true, worker_execution_ready: false, scientific_eligible: false, blockers: ["worker_runner_not_implemented", "worker_process_not_started", "isolated_evaluator_not_implemented"] },
+        integrity: { digest: "4".repeat(64) }
+      };
       forgeBenchError = "";
       forgeBenchVaultError = "";
       forgeBenchSandboxError = "";
+      forgeBenchIsolationError = "";
       if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "forgebench_experiment_compiled";
       renderForgeBenchVaultPanel();
       renderForgeBenchPanel();
       renderForgeBenchSandboxPanel();
+      renderForgeBenchIsolationPanel();
       renderEvidenceLedgerPanel();
       return {
         result: state.forgeBench,
         vault: state.forgeBenchHiddenSuite,
         sandbox: state.forgeBenchWorkerSandbox,
+        isolation: state.forgeBenchIsolation,
         panel: els.forgeBenchBox?.textContent || "",
         markdown: forgeBenchMarkdown()
       };
@@ -17961,12 +18147,14 @@ els.clearForgeBenchVaultBtn?.addEventListener("click", clearForgeBenchVault);
 els.prepareForgeBenchSandboxBtn?.addEventListener("click", prepareForgeBenchSandbox);
 els.refreshForgeBenchSandboxBtn?.addEventListener("click", () => loadForgeBenchSandbox(false));
 els.clearForgeBenchSandboxBtn?.addEventListener("click", clearForgeBenchSandbox);
+els.probeForgeBenchIsolationBtn?.addEventListener("click", probeForgeBenchIsolation);
 for (const input of [els.forgeBenchBenchmark, els.forgeBenchClaimLevel, els.forgeBenchSeedCount]) {
   input?.addEventListener("change", () => {
     state.forgeBench = null;
     forgeBenchError = "";
     renderForgeBenchPanel();
     renderForgeBenchSandboxPanel();
+    renderForgeBenchIsolationPanel();
     renderEvidenceLedgerPanel();
   });
 }
@@ -17975,6 +18163,7 @@ els.forgeBenchStacks?.addEventListener("change", () => {
   forgeBenchError = "";
   renderForgeBenchPanel();
   renderForgeBenchSandboxPanel();
+  renderForgeBenchIsolationPanel();
   renderEvidenceLedgerPanel();
 });
 els.appendEvidenceBtn?.addEventListener("click", appendSelectedEvidence);
@@ -18308,6 +18497,7 @@ renderCapabilityRouterPanel();
 renderForgeBenchVaultPanel();
 renderForgeBenchPanel();
 renderForgeBenchSandboxPanel();
+renderForgeBenchIsolationPanel();
 renderEvidenceLedgerPanel();
 renderPreparePanel();
 renderReadinessPanel();

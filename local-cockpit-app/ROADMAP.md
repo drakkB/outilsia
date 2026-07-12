@@ -236,7 +236,8 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Générer et sceller localement une suite privée avec seeds aléatoires, manifeste interne, reçu sans contenu, stockage atomique et permissions utilisateur.
 - [x] Garder `scientific_ready=false` tant que le vault n'est ni chiffré ni inaccessible aux futurs workers.
 - [x] Matérialiser un workspace frais par stack et seed public, hors dépôt source, avec starter embarqué revérifié, reçu signé sans chemin et aucune exécution.
-- [ ] Enfermer réellement chaque worker dans son workspace avec isolation de processus, montage minimal, réseau conforme au budget et accès au vault techniquement bloqué.
+- [x] Ajouter un préflight bubblewrap Linux/WSL qui prouve par canari les namespaces processus/montage/réseau, le workspace seul en écriture et la racine hôte masquée, sans lancer de worker.
+- [ ] Enfermer réellement chaque worker dans son workspace avec le backend vérifié, un plan de montage minimal, le réseau conforme au budget et l'accès au vault techniquement bloqué.
 - [ ] Construire un évaluateur isolé capable de consommer la suite privée sans la révéler au worker avant toute affirmation scientifique.
 - Mesurer séparément résultat, vitesse, efficacité et coût ; toujours publier les valeurs brutes, les sous-scores et le caractère estimé ou inconnu d'une donnée.
 - Utiliser comme score équilibré initial `50 % résultat + 20 % efficacité + 15 % vitesse + 15 % coût`, sans masquer les podiums par dimension ni la frontière de Pareto.

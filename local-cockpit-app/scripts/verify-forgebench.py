@@ -73,6 +73,22 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     for forbidden in ["workspace_relative", "hidden_seeds", "/home/", "C:\\Users\\"]:
         if forbidden in sandbox_json:
             raise AssertionError(f"{label}: sandbox receipt leaked {forbidden!r}")
+    isolation = proof["isolation"]
+    if isolation["schema"] != "outilsia.forgebench_isolation_probe_result.v1":
+        raise AssertionError(f"{label}: isolation probe schema mismatch")
+    if isolation["readiness"]["isolation_backend_ready"] is not True:
+        raise AssertionError(f"{label}: isolation canary fixture not ready")
+    if isolation["readiness"]["worker_execution_ready"] is not False or isolation["readiness"]["scientific_eligible"] is not False:
+        raise AssertionError(f"{label}: isolation canary unlocked execution or science")
+    if isolation["security"]["worker_started"] is not False or isolation["security"]["worker_command_executed"] is not False:
+        raise AssertionError(f"{label}: isolation canary claims a worker execution")
+    for key in ["user_namespace_available", "mount_namespace_available", "network_namespace_available", "pid_namespace_available", "workspace_write_canary_passed", "host_root_hidden_in_canary"]:
+        if isolation["capabilities"][key] is not True:
+            raise AssertionError(f"{label}: isolation canary missing {key}")
+    isolation_json = json.dumps(isolation, sort_keys=True)
+    for forbidden in ["workspace_relative", "hidden_seeds", "/home/", "C:\\Users\\"]:
+        if forbidden in isolation_json:
+            raise AssertionError(f"{label}: isolation result leaked {forbidden!r}")
     if page.locator("#copyForgeBenchJsonBtn").is_disabled() or page.locator("#copyForgeBenchProtocolBtn").is_disabled():
         raise AssertionError(f"{label}: compiled preflight cannot be exported")
     if page.locator("#evidenceLedgerSource").input_value() != "forgebench_experiment_compiled":
@@ -100,6 +116,11 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "Aucun chemin exposé",
         "aucun worker lancé",
         "processus, réseau et accès au vault non isolés",
+        "Préflight isolation",
+        "canari isolé vérifié",
+        "Namespaces utilisateur, montage, réseau et processus séparés",
+        "aucun worker lancé",
+        "runner et évaluateur encore absents",
         "Aucun agent lancé",
         "aucun score calculé",
         "aucun vainqueur déclaré",
@@ -137,7 +158,7 @@ def main() -> None:
         browser.close()
     print(
         f"forgebench_ui_ok desktop={desktop} mobile={mobile} "
-        "starter=sealed hidden=locally-sealed-not-isolated workspaces=9 isolation=false scores=false winner=false execution=false"
+        "starter=sealed hidden=locally-sealed-not-isolated workspaces=9 isolation=canary-only worker=false scores=false winner=false execution=false"
     )
 
 

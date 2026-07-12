@@ -29,8 +29,8 @@ function jsonLdDocuments(html, label) {
 
 for (const [label, html] of [["hub", hub], ["download", download]]) {
   for (const token of [
-    "Private Workload Packs v1",
-    "2 à 3 modèles",
+    "Private Workload Packs v1 · candidat source",
+    "candidat source postérieur au build public actuel",
     "60 secondes maximum par modèle",
     "réponses brutes",
     "Passport 1.3.0",
@@ -38,14 +38,17 @@ for (const [label, html] of [["hub", hub], ["download", download]]) {
   ]) {
     if (!html.includes(token)) fail(`${label}: missing ${token}`);
   }
+  if (!html.includes("2 à 3 modèles") && !html.includes("2 ou 3 modèles")) {
+    fail(`${label}: bounded model count missing`);
+  }
   if (!html.includes("Aucun téléchargement") && !html.includes("Zéro téléchargement")) {
     fail(`${label}: zero-download claim missing`);
   }
   const documents = jsonLdDocuments(html, label);
   const software = documents.find((item) => item?.["@type"] === "SoftwareApplication");
   const faq = documents.find((item) => item?.["@type"] === "FAQPage");
-  if (!software || !String(software.description || "").includes("Tests privés")) {
-    fail(`${label}: SoftwareApplication must mention Tests privés`);
+  if (!software || String(software.description || "").includes("Tests privés")) {
+    fail(`${label}: current SoftwareApplication must not claim source-candidate private tests`);
   }
   if (!faq || !Array.isArray(faq.mainEntity)) fail(`${label}: FAQPage missing`);
   const question = faq.mainEntity.find((item) => String(item?.name || "").includes("tâche privée sans cloud"));
@@ -55,7 +58,7 @@ for (const [label, html] of [["hub", hub], ["download", download]]) {
 }
 
 for (const token of [
-  "Private Workload Packs v1",
+  "Private Workload Packs v1 (source candidate, not in the current public build)",
   "2 or 3 already-installed Ollama models",
   "60-second limit per model",
   "zero downloads or cloud uploads",

@@ -1,5 +1,6 @@
 use crate::capability_router::validate_capability_router_result;
 use crate::forgebench::validate_forgebench_result;
+use crate::forgebench_isolation::validate_forgebench_isolation_result;
 use crate::workstack_composer::{canonical_sha256, validate_workstack_plan};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -534,6 +535,48 @@ fn source_contract(event_type: &str, source: &Value) -> Result<Value, String> {
                 }
             }))
         }
+        "forgebench_isolation_probed" => {
+            validate_forgebench_isolation_result(source)?;
+            let candidates = source
+                .get("candidates")
+                .and_then(Value::as_array)
+                .ok_or_else(|| "Candidats d'isolation absents pour Evidence Ledger.".to_string())?;
+            if candidates.len() > 3 {
+                return Err("Trop de backends d'isolation pour Evidence Ledger.".to_string());
+            }
+            let selected_backend = source
+                .get("selected_backend")
+                .and_then(Value::as_str)
+                .map(safe_candidate_id)
+                .transpose()?
+                .map(Value::String)
+                .unwrap_or(Value::Null);
+            let host_environment = required_enum_claim(
+                source,
+                "/host_environment",
+                &["windows", "linux", "unsupported"],
+                "Environnement du préflight d'isolation",
+            )?;
+            Ok(json!({
+                "actor": {"kind": "outilsia_component", "id": "forgebench_isolation"},
+                "workstack_id": Value::Null,
+                "proof_level": "signed_isolation_preflight",
+                "source_integrity_sha256": source.pointer("/integrity/digest").cloned().unwrap_or(Value::Null),
+                "claims": {
+                    "host_environment": host_environment,
+                    "selected_backend": selected_backend,
+                    "candidates_total": candidates.len(),
+                    "isolation_backend_ready": source.pointer("/readiness/isolation_backend_ready").cloned().unwrap_or(json!(false)),
+                    "user_namespace_available": source.pointer("/capabilities/user_namespace_available").cloned().unwrap_or(json!(false)),
+                    "mount_namespace_available": source.pointer("/capabilities/mount_namespace_available").cloned().unwrap_or(json!(false)),
+                    "network_namespace_available": source.pointer("/capabilities/network_namespace_available").cloned().unwrap_or(json!(false)),
+                    "pid_namespace_available": source.pointer("/capabilities/pid_namespace_available").cloned().unwrap_or(json!(false)),
+                    "host_root_hidden_in_canary": source.pointer("/capabilities/host_root_hidden_in_canary").cloned().unwrap_or(json!(false)),
+                    "worker_execution_ready": false,
+                    "scientific_eligible": false
+                }
+            }))
+        }
         _ => Err("Type de preuve Evidence Ledger inconnu.".to_string()),
     }
 }
@@ -860,6 +903,70 @@ mod tests {
         result
     }
 
+    fn isolation_source() -> Value {
+        let mut result = json!({
+            "schema": "outilsia.forgebench_isolation_probe_result.v1",
+            "contract_version": "2026-07-13",
+            "probed_at_ms": 4_500,
+            "host_environment": "linux",
+            "selected_backend": "linux-bwrap-native",
+            "candidates": [{
+                "id": "linux-bwrap-native",
+                "label": "Bubblewrap Linux",
+                "environment": "linux_native",
+                "backend": "bubblewrap",
+                "installed": true,
+                "probe_executed": true,
+                "timed_out": false,
+                "canary_passed": true,
+                "version": "bubblewrap 0.11.0",
+                "reason_code": Value::Null,
+                "capabilities": {
+                    "user_namespace": true,
+                    "mount_namespace": true,
+                    "network_namespace": true,
+                    "pid_namespace": true,
+                    "workspace_write": true,
+                    "host_root_hidden": true,
+                    "host_sentinel_unchanged": true
+                }
+            }],
+            "capabilities": {
+                "isolation_backend_ready": true,
+                "user_namespace_available": true,
+                "mount_namespace_available": true,
+                "network_namespace_available": true,
+                "pid_namespace_available": true,
+                "workspace_write_canary_passed": true,
+                "host_root_hidden_in_canary": true,
+                "hidden_vault_not_mounted_by_policy": true,
+                "outbound_network_request_attempted": false
+            },
+            "security": {
+                "probe_attempted": true,
+                "canary_command_succeeded": true,
+                "worker_started": false,
+                "worker_command_executed": false,
+                "credentials_read": false,
+                "paths_returned": false,
+                "hidden_suite_contents_returned": false,
+                "source_repository_mounted": false
+            },
+            "readiness": {
+                "isolation_backend_ready": true,
+                "worker_execution_ready": false,
+                "scientific_eligible": false,
+                "blockers": [
+                    "worker_runner_not_implemented",
+                    "worker_process_not_started",
+                    "isolated_evaluator_not_implemented"
+                ]
+            }
+        });
+        sign_document(&mut result).expect("signed isolation source");
+        result
+    }
+
     #[test]
     fn empty_ledger_is_valid_and_contains_no_entry() {
         let ledger = empty_ledger().expect("empty ledger");
@@ -916,6 +1023,30 @@ mod tests {
         let serialized = serde_json::to_string(&ledger).expect("ledger JSON");
         assert!(!serialized.contains("\"candidate_stacks\":"));
         assert!(!serialized.contains("\"hidden_suite\":"));
+    }
+
+    #[test]
+    fn appends_an_isolation_preflight_without_worker_or_namespace_ids() {
+        let (ledger, appended) = append_to_ledger(
+            empty_ledger().expect("empty"),
+            "forgebench_isolation_probed",
+            &isolation_source(),
+            4_500,
+        )
+        .expect("isolation entry");
+        assert!(appended);
+        verify_ledger(&ledger).expect("verified isolation ledger");
+        let entry = &ledger["entries"][0];
+        assert_eq!(
+            entry["evidence"]["proof_level"],
+            "signed_isolation_preflight"
+        );
+        assert_eq!(entry["evidence"]["claims"]["worker_execution_ready"], false);
+        assert_eq!(entry["evidence"]["claims"]["scientific_eligible"], false);
+        let serialized = serde_json::to_string(&ledger).expect("ledger JSON");
+        assert!(!serialized.contains("user:["));
+        assert!(!serialized.contains("workspace"));
+        assert!(!serialized.contains("hidden_suite"));
     }
 
     #[test]

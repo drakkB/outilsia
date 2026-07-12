@@ -191,9 +191,9 @@
           <article class="card p-4"><strong class="cyan">Matrice équitable</strong><p class="mini mt-2">Un espace distinct par combinaison stack × seed, avec les mêmes règles, budgets et tests visibles.</p></article>
           <article class="card p-4"><strong class="cyan">Starter vérifié</strong><p class="mini mt-2">Un fichier ajouté, supprimé ou modifié invalide la vérification du workspace.</p></article>
           <article class="card p-4"><strong class="cyan">Reçu sans chemin</strong><p class="mini mt-2">Le reçu expose compteurs et empreintes, jamais chemin personnel, credential ou seed caché.</p></article>
-          <article class="card p-4"><strong class="cyan">Limite explicite</strong><p class="mini mt-2">Aucun worker ou shell lancé ; processus, réseau et accès au vault ne sont pas encore isolés.</p></article>
+          <article class="card p-4"><strong class="cyan">Canari bubblewrap</strong><p class="mini mt-2">Le candidat teste les namespaces processus, montage et réseau sous Linux/WSL. Aucun worker ou shell n'est lancé ; le runner et l'évaluateur restent absents.</p></article>
         </div>
-        <p class="mini mt-5">Fonction présente dans les sources après le build public actuel. Elle prépare les workspaces mais ne constitue ni une exécution agentique, ni une preuve scientifique, ni un vainqueur ForgeBench.</p>
+        <p class="mini mt-5">Fonction présente dans les sources après le build public actuel. Elle prépare les workspaces et vérifie la disponibilité d'un backend d'isolation par canari, mais n'applique encore cette isolation à aucun worker. Ce n'est ni une exécution agentique, ni une preuve scientifique, ni un vainqueur ForgeBench.</p>
         <div class="flex flex-wrap gap-3 mt-6">
           <a class="btn btn-primary" href="/telecharger-scanner-ia-local">Voir la bêta Windows/Linux actuelle</a>
           <a class="btn btn-secondary" href="/comment-nous-testons">Lire la méthode de test</a>
