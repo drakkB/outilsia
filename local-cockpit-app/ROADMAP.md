@@ -195,6 +195,8 @@ Premier jalon candidat v1 terminé le 12 juillet 2026 dans le build Windows/Linu
 
 ### Coordination par board
 
+Noyau et panneau Détails Board Observer v0 implémentés le 12 juillet 2026, sans publication : commande Tauri Planka en lecture seule, contrat versionné, HTTPS obligatoire hors loopback, redirections refusées, clé API gardée en mémoire puis effacée, snapshot filtré, cinq tests Rust dont un serveur HTTP local et recette Playwright desktop/mobile. Les écritures, commentaires, webhooks et exécutions restent absents.
+
 - Créditer le travail Planka + Hermes Kanban de Supersocks comme inspiration conceptuelle, sans copier son texte, son dépôt ou son interface.
 - Définir un contrat générique `board_adapter.v1` ; Planka reste un service externe facultatif et ne devient pas une dépendance embarquée.
 - Traiter chaque carte comme un contrat de travail : objectif, contexte, périmètre, permissions, interdits, critères d'acceptation, vérifications et dernière décision humaine.

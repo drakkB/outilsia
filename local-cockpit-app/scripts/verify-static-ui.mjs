@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
-const rust = ["lib.rs", "local_capability_bridge.rs"]
+const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
@@ -126,6 +126,16 @@ const requiredFeatureText = [
   ["rust local capability bridge loopback", rust, "TcpListener::bind((\"127.0.0.1\", 0))"],
   ["rust local capability bridge auth", rust, "bearer_token_required"],
   ["css local capability bridge", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".local-capability-bridge-box"],
+  ["html board observer", html, "boardObserverBox"],
+  ["html board observer ephemeral key", html, "boardObserverApiKey"],
+  ["js board observer request schema", js, "outilsia.board_observer_request.v1"],
+  ["js board observer result schema", js, "outilsia.board_observer_result.v1"],
+  ["rust board observer read only", rust, "write_board\": false"],
+  ["rust board observer no descriptions", rust, "raw_descriptions_returned\": false"],
+  ["rust board observer redirect guard", rust, "Policy::none()"],
+  ["rust board observer bounded response", rust, ".chunk()"],
+  ["rust board observer no key persistence", rust, "credential_persisted: false"],
+  ["css board observer", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".board-observer-box"],
   ["js install safety schema", js, "outilsia.install_safety_preflight.v1"],
   ["js install safety before pull", js, "runInstallSafetyPreflight(clean)"],
   ["js install safety path privacy", js, "excludes_ollama_storage_path: true"],

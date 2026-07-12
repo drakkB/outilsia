@@ -53,6 +53,7 @@ const state = {
   upgradeDigitalTwinRun: null,
   capabilityPassport: null,
   localCapabilityBridge: null,
+  boardObserver: null,
   installSafetyPreflight: null,
   localSnapshots: [],
   installingModels: {},
@@ -87,6 +88,8 @@ const PRIVATE_WORKLOAD_PROTOCOL = "outilsia.private_workload_pack.v1";
 const LOCAL_CAPABILITY_BRIDGE_SCHEMA = "outilsia.local_capability_bridge.v1";
 const LOCAL_CAPABILITY_BRIDGE_CONTRACT_VERSION = "2026-07-12";
 const LOCAL_CAPABILITY_BRIDGE_TTL_SECONDS = 15 * 60;
+const BOARD_OBSERVER_REQUEST_SCHEMA = "outilsia.board_observer_request.v1";
+const BOARD_OBSERVER_RESULT_SCHEMA = "outilsia.board_observer_result.v1";
 const INSTALL_SAFETY_PREFLIGHT_SCHEMA = "outilsia.install_safety_preflight.v1";
 const INSTALL_SAFETY_MIN_RESERVE_GB = 3;
 const MODEL_AUTOPILOT_PROTOCOL = "outilsia.autopilot.v1";
@@ -408,6 +411,14 @@ const els = {
   copyLocalCapabilityBridgeBtn: $("copyLocalCapabilityBridgeBtn"),
   refreshLocalCapabilityBridgeBtn: $("refreshLocalCapabilityBridgeBtn"),
   stopLocalCapabilityBridgeBtn: $("stopLocalCapabilityBridgeBtn"),
+  boardObserverState: $("boardObserverState"),
+  boardObserverUrl: $("boardObserverUrl"),
+  boardObserverBoardId: $("boardObserverBoardId"),
+  boardObserverApiKey: $("boardObserverApiKey"),
+  boardObserverBox: $("boardObserverBox"),
+  observeBoardBtn: $("observeBoardBtn"),
+  copyBoardSnapshotBtn: $("copyBoardSnapshotBtn"),
+  clearBoardObserverBtn: $("clearBoardObserverBtn"),
   fieldTestState: $("fieldTestState"),
   fieldTestProfileSelect: $("fieldTestProfileSelect"),
   fieldTestBox: $("fieldTestBox"),
@@ -558,6 +569,8 @@ let operationLive = false;
 let primaryAnalysisBusy = false;
 let recommendationEngineBusy = false;
 let privateWorkloadBusy = false;
+let boardObserverBusy = false;
+let boardObserverError = "";
 const privateWorkloadSelections = new Set();
 let recipeAutoSaveTimer = null;
 const UI_MODE_STORAGE_KEY = "outilsia-local-cockpit-ui-mode";
@@ -10255,6 +10268,161 @@ async function copyLocalCapabilityBridgeConnection() {
   }
 }
 
+function boardObserverMissingLabel(value) {
+  return ({
+    context: "contexte",
+    acceptance_checks: "critères d'acceptation",
+    permission_boundary: "limites d'autorisation"
+  })[value] || value;
+}
+
+function boardObserverWarningLabel(value) {
+  return ({
+    unmapped_lanes: "colonnes non reconnues",
+    ready_for_agent_lane_missing: "colonne Ready for Agent absente",
+    review_lane_missing: "colonne Review absente",
+    done_lane_missing: "colonne Done absente",
+    incomplete_card_contracts: "contrats de carte incomplets"
+  })[value] || value;
+}
+
+function renderBoardObserverPanel() {
+  if (!els.boardObserverBox) return;
+  const result = state.boardObserver;
+  const hasUrl = Boolean(els.boardObserverUrl?.value.trim());
+  const hasBoard = Boolean(els.boardObserverBoardId?.value.trim());
+  const hasKey = Boolean(els.boardObserverApiKey?.value.trim());
+  const hasAnyInput = hasUrl || hasBoard || hasKey;
+  els.observeBoardBtn.disabled = !invoke || boardObserverBusy || !hasUrl || !hasBoard || !hasKey;
+  els.copyBoardSnapshotBtn.disabled = !result;
+  els.clearBoardObserverBtn.disabled = boardObserverBusy || (!result && !boardObserverError && !hasAnyInput);
+
+  if (!invoke && !result?.test_mode) {
+    els.boardObserverState.textContent = "app native requise";
+    els.boardObserverBox.className = "board-observer-box empty";
+    els.boardObserverBox.textContent = "Le Board Observer est disponible uniquement dans l'application Windows/Linux, jamais dans la page web.";
+    return;
+  }
+  if (boardObserverBusy) {
+    els.boardObserverState.textContent = "lecture en cours";
+    els.boardObserverBox.className = "board-observer-box empty";
+    els.boardObserverBox.textContent = "Lecture locale du board et vérification des contrats. Aucune écriture distante n'est autorisée.";
+    return;
+  }
+  if (boardObserverError) {
+    els.boardObserverState.textContent = "lecture refusée";
+    els.boardObserverBox.className = "board-observer-box empty";
+    els.boardObserverBox.innerHTML = `<strong>Board non observé</strong><span>${escapeHtml(boardObserverError)}</span>`;
+    return;
+  }
+  if (!result?.snapshot) {
+    els.boardObserverState.textContent = "non configuré";
+    els.boardObserverBox.className = "board-observer-box empty";
+    els.boardObserverBox.textContent = "Renseigne une instance HTTPS, un board et une clé API Planka. Le snapshot local indiquera les cartes prêtes, bloquées ou incomplètes sans retourner leur description brute.";
+    return;
+  }
+
+  const snapshot = result.snapshot;
+  const counts = snapshot.counts || {};
+  const states = snapshot.states || {};
+  const cards = Array.isArray(snapshot.cards) ? snapshot.cards : [];
+  const readyCards = cards.filter((card) => card?.work_state === "ready_for_agent");
+  const visibleCards = readyCards.slice(0, 6);
+  const warnings = Array.isArray(snapshot.warnings) ? snapshot.warnings : [];
+  const digest = snapshot.evidence?.source_response_sha256 || "";
+  const cardRows = visibleCards.length
+    ? visibleCards.map((card) => {
+      const missing = Array.isArray(card?.contract?.missing) ? card.contract.missing : [];
+      const status = card?.contract?.status === "complete"
+        ? "contrat complet"
+        : `manque : ${missing.map(boardObserverMissingLabel).join(", ") || "contrat"}`;
+      return `<div class="board-observer-card"><div><strong>${escapeHtml(card?.name || "Carte sans titre")}</strong><span>${escapeHtml(card?.source_key || "")}</span></div><small>${escapeHtml(status)}</small></div>`;
+    }).join("")
+    : `<span>Aucune carte n'est actuellement dans une colonne Ready for Agent reconnue.</span>`;
+  const warningRow = warnings.length
+    ? `<div class="board-observer-warning">À vérifier : ${escapeHtml(warnings.map(boardObserverWarningLabel).join(" · "))}</div>`
+    : "";
+  els.boardObserverState.textContent = `${readyCards.length} prête${readyCards.length > 1 ? "s" : ""} · lecture seule`;
+  els.boardObserverBox.className = "board-observer-box";
+  els.boardObserverBox.innerHTML = `
+    <div class="board-observer-summary">
+      <strong>${escapeHtml(snapshot.board?.name || "Board Planka")}</strong>
+      <span>${escapeHtml(snapshot.source?.instance_url || "instance locale")} · SHA-256 ${escapeHtml(digest ? `${digest.slice(0, 14)}…${digest.slice(-8)}` : "non disponible")}</span>
+    </div>
+    <div class="board-observer-metrics">
+      <div class="board-observer-metric"><strong>${escapeHtml(counts.lanes || 0)}</strong><span>Colonnes</span></div>
+      <div class="board-observer-metric"><strong>${escapeHtml(counts.cards || 0)}</strong><span>Cartes</span></div>
+      <div class="board-observer-metric"><strong>${escapeHtml(states.ready_for_agent || 0)}</strong><span>Prêtes agent</span></div>
+      <div class="board-observer-metric"><strong>${escapeHtml(counts.incomplete_contracts || 0)}</strong><span>Incomplètes</span></div>
+    </div>
+    <div class="board-observer-cards">${cardRows}</div>
+    ${warningRow}
+  `;
+}
+
+async function observePlankaBoard() {
+  if (!invoke || boardObserverBusy) return null;
+  const instanceUrl = els.boardObserverUrl?.value.trim() || "";
+  const boardId = els.boardObserverBoardId?.value.trim() || "";
+  const apiKey = els.boardObserverApiKey?.value.trim() || "";
+  if (!instanceUrl || !boardId || !apiKey) {
+    setStatus("Instance, board et clé API Planka requis", "warn");
+    return null;
+  }
+  boardObserverBusy = true;
+  boardObserverError = "";
+  state.boardObserver = null;
+  renderBoardObserverPanel();
+  setStatus("Lecture du board Planka en cours...");
+  try {
+    const result = await invoke("observe_planka_board", {
+      request: {
+        schema: BOARD_OBSERVER_REQUEST_SCHEMA,
+        adapter: "planka",
+        instance_url: instanceUrl,
+        board_id: boardId,
+        api_key: apiKey,
+        timeout_seconds: 12
+      }
+    });
+    if (result?.schema !== BOARD_OBSERVER_RESULT_SCHEMA || !result?.read_only || !result?.snapshot) {
+      throw new Error("réponse native incomplète");
+    }
+    state.boardObserver = result;
+    setStatus(`Board observé : ${result.snapshot.counts?.cards || 0} carte(s), aucune écriture`, "ok");
+    return result;
+  } catch (error) {
+    state.boardObserver = null;
+    boardObserverError = String(error || "Lecture impossible");
+    setStatus(`Board Observer : ${boardObserverError}`, "error");
+    return null;
+  } finally {
+    boardObserverBusy = false;
+    if (els.boardObserverApiKey) els.boardObserverApiKey.value = "";
+    renderBoardObserverPanel();
+  }
+}
+
+async function copyBoardObserverSnapshot() {
+  if (!state.boardObserver) return;
+  try {
+    await navigator.clipboard.writeText(`${JSON.stringify(state.boardObserver, null, 2)}\n`);
+    setStatus("Snapshot du board copié, sans clé API ni description brute", "ok");
+  } catch (error) {
+    setStatus(`Copie du snapshot impossible : ${error}`, "error");
+  }
+}
+
+function clearBoardObserver() {
+  state.boardObserver = null;
+  boardObserverError = "";
+  if (els.boardObserverUrl) els.boardObserverUrl.value = "";
+  if (els.boardObserverBoardId) els.boardObserverBoardId.value = "";
+  if (els.boardObserverApiKey) els.boardObserverApiKey.value = "";
+  renderBoardObserverPanel();
+  setStatus("Board Observer effacé", "ok");
+}
+
 async function copyStrategyBridgeJson() {
   if (!state.scan) {
     setStatus("Scan requis avant copie du profil Strategy Arena", "warn");
@@ -15048,6 +15216,64 @@ function installTestHarness() {
         panel: els.localCapabilityBridgeBox?.textContent || ""
       };
     },
+    applyBoardObserverState() {
+      state.boardObserver = {
+        schema: BOARD_OBSERVER_RESULT_SCHEMA,
+        contract_version: "2026-07-12",
+        adapter: "planka",
+        adapter_profile: "planka-openapi-2.0.1",
+        read_only: true,
+        credential_persisted: false,
+        raw_payload_returned: false,
+        test_mode: true,
+        snapshot: {
+          schema: "outilsia.board_snapshot.v1",
+          contract_version: "2026-07-12",
+          adapter: "planka",
+          read_only: true,
+          source: {
+            adapter: "planka",
+            instance_url: "https://planka.exemple.fr",
+            board_id: "board-demo"
+          },
+          board: { name: "OutilsIA Workstack", project_id: "project-demo" },
+          counts: { lanes: 6, cards: 12, incomplete_contracts: 3 },
+          states: { ready_for_agent: 2, blocked: 1, review_required: 1, done: 4 },
+          cards: [
+            {
+              source_key: "planka:card-ready-1",
+              work_state: "ready_for_agent",
+              name: "Construire Signal Maze v1",
+              contract: { status: "complete", missing: [], execution_allowed: false }
+            },
+            {
+              source_key: "planka:card-ready-2",
+              work_state: "ready_for_agent",
+              name: "Auditer le rendu Android",
+              contract: { status: "incomplete", missing: ["permission_boundary"], execution_allowed: false }
+            }
+          ],
+          warnings: ["incomplete_card_contracts"],
+          evidence: { source_response_sha256: "a".repeat(64) },
+          privacy: {
+            raw_descriptions_returned: false,
+            comments_returned: false,
+            users_returned: false,
+            api_key_returned: false
+          }
+        }
+      };
+      boardObserverError = "";
+      if (els.boardObserverUrl) els.boardObserverUrl.value = "https://planka.exemple.fr";
+      if (els.boardObserverBoardId) els.boardObserverBoardId.value = "board-demo";
+      if (els.boardObserverApiKey) els.boardObserverApiKey.value = "";
+      renderBoardObserverPanel();
+      return {
+        result: state.boardObserver,
+        panel: els.boardObserverBox?.textContent || "",
+        apiKeyValue: els.boardObserverApiKey?.value || ""
+      };
+    },
     invalidateLocalCapabilityBridgeState() {
       invalidateCapabilityPassport();
       renderCapabilityPassportPanel();
@@ -15993,6 +16219,20 @@ els.startLocalCapabilityBridgeBtn?.addEventListener("click", startLocalCapabilit
 els.copyLocalCapabilityBridgeBtn?.addEventListener("click", copyLocalCapabilityBridgeConnection);
 els.refreshLocalCapabilityBridgeBtn?.addEventListener("click", () => refreshLocalCapabilityBridgeStatus(false));
 els.stopLocalCapabilityBridgeBtn?.addEventListener("click", () => stopLocalCapabilityBridge(false));
+els.observeBoardBtn?.addEventListener("click", observePlankaBoard);
+els.copyBoardSnapshotBtn?.addEventListener("click", copyBoardObserverSnapshot);
+els.clearBoardObserverBtn?.addEventListener("click", clearBoardObserver);
+for (const input of [els.boardObserverUrl, els.boardObserverBoardId, els.boardObserverApiKey]) {
+  input?.addEventListener("input", () => {
+    boardObserverError = "";
+    renderBoardObserverPanel();
+  });
+}
+els.boardObserverApiKey?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || els.observeBoardBtn?.disabled) return;
+  event.preventDefault();
+  void observePlankaBoard();
+});
 els.copyFieldTestBtn.addEventListener("click", copyFieldTestMarkdown);
 els.copyFieldTestJsonBtn?.addEventListener("click", copyFieldTestJson);
 els.downloadFieldTestJsonBtn?.addEventListener("click", downloadFieldTestJson);
@@ -16307,6 +16547,7 @@ renderPromptLibrary();
 renderChatHistory();
 renderPrivateWorkloadPanel();
 renderLocalCapabilityBridgePanel();
+renderBoardObserverPanel();
 renderPreparePanel();
 renderReadinessPanel();
 renderPrimaryAction();

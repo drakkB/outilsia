@@ -1,5 +1,7 @@
+mod board_observer;
 mod local_capability_bridge;
 
+use board_observer::observe_planka_board;
 use local_capability_bridge::{
     get_local_capability_bridge_status, start_local_capability_bridge, stop_local_capability_bridge,
 };
@@ -5132,6 +5134,7 @@ pub fn run() {
             delete_ollama_model,
             install_ollama_runtime,
             install_wsl_runtime,
+            observe_planka_board,
             start_local_capability_bridge,
             get_local_capability_bridge_status,
             stop_local_capability_bridge,

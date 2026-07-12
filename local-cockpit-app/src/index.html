@@ -337,6 +337,39 @@
           </div>
         </article>
 
+        <article class="panel board-observer-panel advanced-panel">
+          <div class="panel-title">
+            <h2>Board Observer</h2>
+            <span id="boardObserverState">non configuré</span>
+          </div>
+          <div class="board-observer-intro">
+            <strong>Observer un board Planka sans agir</strong>
+            <span id="boardObserverPrivacy">La clé est envoyée uniquement à l'instance indiquée, gardée en mémoire le temps de la lecture puis effacée du formulaire. Aucun commentaire, déplacement ou lancement d'agent.</span>
+          </div>
+          <div class="board-observer-fields">
+            <label>
+              <span class="field-label">Instance Planka</span>
+              <input id="boardObserverUrl" type="url" autocomplete="off" spellcheck="false" placeholder="https://planka.exemple.fr" aria-describedby="boardObserverPrivacy">
+            </label>
+            <label>
+              <span class="field-label">Identifiant du board</span>
+              <input id="boardObserverBoardId" type="text" autocomplete="off" spellcheck="false" placeholder="1357158568008091264" aria-describedby="boardObserverPrivacy">
+            </label>
+            <label>
+              <span class="field-label">Clé API éphémère</span>
+              <input id="boardObserverApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="X-Api-Key" aria-describedby="boardObserverPrivacy">
+            </label>
+          </div>
+          <div id="boardObserverBox" class="board-observer-box empty">
+            Renseigne une instance HTTPS, un board et une clé API Planka. Le snapshot local indiquera les cartes prêtes, bloquées ou incomplètes sans retourner leur description brute.
+          </div>
+          <div class="row-actions">
+            <button id="observeBoardBtn" type="button" disabled>Observer</button>
+            <button id="copyBoardSnapshotBtn" type="button" disabled>Copier le snapshot</button>
+            <button id="clearBoardObserverBtn" type="button" disabled>Effacer</button>
+          </div>
+        </article>
+
         <article class="panel field-test-panel advanced-panel">
           <div class="panel-title">
             <h2>Test terrain</h2>

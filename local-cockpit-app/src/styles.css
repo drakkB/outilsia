@@ -1649,6 +1649,7 @@ h2 {
 .strategy-bridge-panel { grid-column: span 12; order: 23; }
 .capability-passport-panel { grid-column: span 12; order: 24; }
 .local-capability-bridge-panel { grid-column: span 12; order: 25; }
+.board-observer-panel { grid-column: span 12; order: 25; }
 .field-test-panel { grid-column: span 12; order: 26; }
 .models-panel { grid-column: span 6; order: 25; }
 .commands-panel { grid-column: span 6; order: 26; }
@@ -2060,6 +2061,7 @@ dd {
 .strategy-bridge-box,
 .capability-passport-box,
 .local-capability-bridge-box,
+.board-observer-box,
 .field-test-box {
   display: grid;
   gap: 7px;
@@ -2133,6 +2135,7 @@ dd {
 .strategy-bridge-box.empty,
 .capability-passport-box.empty,
 .local-capability-bridge-box.empty,
+.board-observer-box.empty,
 .field-test-box.empty {
   align-items: center;
   color: var(--muted);
@@ -2427,6 +2430,113 @@ dd {
     linear-gradient(135deg, rgba(8, 29, 29, 0.96), rgba(10, 17, 22, 0.92));
   border: 1px solid rgba(91, 241, 205, 0.24);
   border-radius: 8px;
+}
+
+.board-observer-intro,
+.board-observer-box {
+  background:
+    linear-gradient(135deg, rgba(12, 27, 36, 0.96), rgba(10, 17, 22, 0.92));
+  border: 1px solid rgba(120, 220, 232, 0.22);
+  border-radius: 8px;
+}
+
+.board-observer-intro {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 10px;
+}
+
+.board-observer-intro span,
+.board-observer-summary span,
+.board-observer-card span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.board-observer-card span {
+  display: block;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.board-observer-fields {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1.4fr 1fr 1.2fr;
+  margin-bottom: 10px;
+}
+
+.board-observer-fields label {
+  min-width: 0;
+}
+
+.board-observer-box {
+  display: grid;
+  gap: 10px;
+  line-height: 1.4;
+  min-height: 118px;
+  padding: 10px;
+}
+
+.board-observer-summary {
+  border-bottom: 1px solid rgba(139, 163, 174, 0.16);
+  display: grid;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+
+.board-observer-metrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.board-observer-metric {
+  border-left: 2px solid rgba(120, 220, 232, 0.45);
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-left: 8px;
+}
+
+.board-observer-metric strong {
+  font-size: 17px;
+}
+
+.board-observer-metric span {
+  color: var(--muted-2);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.board-observer-cards {
+  display: grid;
+}
+
+.board-observer-card {
+  align-items: start;
+  border-top: 1px solid rgba(139, 163, 174, 0.14);
+  display: grid;
+  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 8px 0;
+}
+
+.board-observer-card:first-child {
+  border-top: 0;
+}
+
+.board-observer-card small {
+  color: var(--muted-2);
+  text-align: right;
+}
+
+.board-observer-warning {
+  color: var(--gold);
+  font-size: 11px;
 }
 
 .local-bridge-summary,
@@ -4244,6 +4354,7 @@ dd {
   .strategy-bridge-panel,
   .capability-passport-panel,
   .local-capability-bridge-panel,
+  .board-observer-panel,
   .field-test-panel,
   .operation-panel,
   .readiness-panel,
@@ -4419,6 +4530,22 @@ dd {
   .feedback-panel,
   .history-panel {
     grid-column: 1 / -1;
+  }
+
+  .board-observer-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .board-observer-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .board-observer-card {
+    grid-template-columns: 1fr;
+  }
+
+  .board-observer-card small {
+    text-align: left;
   }
 
   .command-line {
