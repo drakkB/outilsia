@@ -36,7 +36,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 
 ## Candidat validé - Runtime & Driver Intelligence v1
 
-État au 12 juillet 2026 : Runtime & Driver Intelligence est inclus avec Tests privés dans le candidat cross-platform `291871945901`, commit `a1c1dcd`, run GitHub Actions `29187194590` terminé avec succès. Le build public reste `291439601671` et ne revendique pas encore ces capacités. Les cinq artefacts candidats et leurs SHA-256 ont été vérifiés hors production ; le terrain reste `0/5`.
+État au 12 juillet 2026 : Runtime & Driver Intelligence est inclus avec Tests privés et Local Capability Bridge dans le candidat cross-platform `291887472771`, commit `6b5187e`, run GitHub Actions `29188747277` terminé avec succès. Le build public reste `291439601671` et ne revendique pas encore ces capacités. Les cinq artefacts candidats et leurs SHA-256 ont été vérifiés hors production ; le terrain reste `0/5`.
 
 - [x] Créer une matrice canonique versionnée, datée et sourcée pour NVIDIA, AMD, Intel, Apple et CPU.
 - [x] Séparer pilote détecté, API signalée, support Ollama documenté et preuve réelle `/api/ps`.
@@ -86,7 +86,7 @@ Premier jalon publié au 10 juillet 2026 dans le build public `291204755461` : c
 - Exécuter exactement les mêmes tâches sur les candidats sans envoyer les fichiers au cloud.
 - Distinguer critères déterministes et éventuel jugement local optionnel.
 
-Premier jalon candidat v1 terminé le 12 juillet 2026. La fonction reste dans le mode Détails et n'est pas encore incluse dans le build public `291439601671`. Le candidat Windows/Linux `291871945901`, commit `a1c1dcd`, run `29187194590`, contient les cinq artefacts attendus et passe le contrat de release renforcé. Les workflows autonomes Windows `29187019961` et Linux `29187019927` passent aussi avec des contrôles source fail-fast.
+Premier jalon candidat v1 terminé le 12 juillet 2026. La fonction reste dans le mode Détails et n'est pas encore incluse dans le build public `291439601671`. Le candidat Windows/Linux `291887472771`, commit `6b5187e`, run `29188747277`, contient les cinq artefacts attendus et passe le contrat de release renforcé. Les workflows autonomes Windows `29188569395` et Linux `29188569378` passent aussi avec des contrôles source fail-fast.
 
 - [x] Créer cinq packs versionnés : Code, Français, résumé, Mémoire / Obsidian et métier personnalisé.
 - [x] Limiter une campagne à une tâche, 2 à 3 modèles déjà installés, 60 secondes par modèle et zéro téléchargement.
@@ -148,7 +148,7 @@ Premier jalon v1 publié le 11 juillet 2026 dans le build Windows/Linux `2913378
 - Exposer plus tard un MCP/API local borné : profil machine, modèles, preuves et recommandation.
 - Laisser Strategy Arena consommer les capacités préparées par OutilsIA sans lui transférer la gestion Ollama.
 
-Premier jalon source v1 lancé le 12 juillet 2026. La passerelle n'est pas encore revendiquée dans le build public `291439601671` et ne constitue pas une preuve terrain.
+Premier jalon candidat v1 terminé le 12 juillet 2026 dans le build Windows/Linux `291887472771`, commit `6b5187e`, run `29188747277`. La passerelle n'est pas encore revendiquée dans le build public `291439601671` et ne constitue pas une preuve terrain.
 
 - [x] Servir un instantané figé du Passport sur `127.0.0.1` uniquement.
 - [x] Désactiver la passerelle par défaut et exiger un consentement explicite pour 15 minutes.
@@ -158,7 +158,7 @@ Premier jalon source v1 lancé le 12 juillet 2026. La passerelle n'est pas encor
 - [x] Exposer santé, capacités, Passport, modèles et handoff Strategy Arena sans contenu brut.
 - [x] Arrêter automatiquement la passerelle si le Passport devient périmé.
 - [x] Ajouter tests Rust réseau et recette Playwright desktop/mobile avec contrôle anti-fuite du jeton.
-- [ ] Construire un candidat Windows/Linux et vérifier les cinq artefacts avant toute communication publique.
+- [x] Construire un candidat Windows/Linux et vérifier les cinq artefacts, le manifeste et les SHA-256 avant toute communication publique.
 - [ ] Ajouter le consommateur côté Strategy Arena dans une session séparée, sans déplacer la gestion Ollama.
 - [ ] Étudier MCP local seulement après stabilisation de ce contrat HTTP minimal.
 
