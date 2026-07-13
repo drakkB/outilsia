@@ -17,7 +17,7 @@ L'application conserve le matériel détecté en tête de fenêtre, puis répart
 | Atelier IA | Préparer les Workstacks, router les capacités, exécuter ForgeBench et chaîner les preuves. |
 | Compte | Synchroniser, partager, signaler un problème, vérifier la release et retrouver l'historique. |
 
-Les actions transversales ouvrent automatiquement l'espace correspondant. Par exemple, **Bench** ouvre Tests, **Dialogue** ouvre Assistant et **Préparer** depuis Board Observer ouvre Atelier IA.
+Les actions transversales ouvrent automatiquement l'espace correspondant. Par exemple, **Bench** ouvre Tests, **Dialogue** ouvre Assistant et **Préparer** depuis Board Observer ouvre Atelier IA. Le menu **Section** mène directement au module choisi dans l'espace actif.
 
 ## Rôle de chaque module
 

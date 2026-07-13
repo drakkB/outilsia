@@ -1,12 +1,26 @@
 # OutilsIA Local Cockpit - Roadmap produit
 
-Mise à jour : 2026-07-12
+Mise à jour : 2026-07-13
 
 ## Cap produit
 
 OutilsIA doit devenir la couche de décision de l'IA locale : savoir ce qu'une machine peut réellement exécuter, dans quelles conditions, pour quel usage et avec quel niveau de confiance.
 
 L'application reste centrée sur le diagnostic, l'installation consentie, la mesure, la comparaison, la recommandation et la preuve. Elle ne devient pas un chat généraliste et ne réalise pas les backtests de Strategy Arena.
+
+## Livré dans les sources - Navigation par espaces
+
+État au 13 juillet 2026 : l'ancienne page unique Essentiel/Détails est remplacée par sept espaces persistants : Accueil, Machine, Modèles, Tests, Assistant, Atelier IA et Compte. Le commit `ff3ed59` passe les pipelines Windows `29259013783` et Linux `29259013856`. Le candidat n'est pas encore déployé comme release publique.
+
+- [x] Conserver le matériel détecté et l'action d'analyse au sommet de la fenêtre.
+- [x] Attribuer chaque panneau à un ou plusieurs espaces sans changer ses identifiants ou son état.
+- [x] Router automatiquement Dialogue vers Assistant, Bench vers Tests, Upgrade vers Machine et Workstack vers Atelier IA.
+- [x] Ajouter un menu Section contextuel pour atteindre directement les modules d'un espace long.
+- [x] Afficher les sept onglets sans défilement horizontal sur Android et prendre en charge les flèches, Début et Fin au clavier.
+- [x] Conserver les formulaires et mémoriser l'espace actif entre deux ouvertures.
+- [x] Réduire le pire cas mesuré de 18,1 à 5,4 hauteurs d'écran sur desktop et de 36,5 à 11,2 sur mobile.
+- [x] Ajouter une recette Playwright dédiée qui contrôle propriété des panneaux, routage, persistance, menu Section, clavier et débordements.
+- [ ] Publier cette interface et la présenter sur le site seulement après validation manuelle du build candidat.
 
 ## Maintenant - Hardware Doctor 2.0 et AI Capability Passport v1
 
@@ -15,7 +29,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - Relier le diagnostic aux benchmarks automatiques et CPU pour prouver ou non l'accélération.
 - Exporter un passeport JSON portable : machine, runtimes, modèles, benchmarks, Recommendation Engine, limites, confidentialité et frontière Strategy Arena.
 - Ajouter une empreinte SHA-256 couvrant le document hors bloc d'intégrité. Cette empreinte détecte une modification ; elle ne constitue pas une signature d'identité.
-- Garder le passeport dans le mode Détails pour ne pas encombrer le parcours Essentiel.
+- Garder le passeport dans Atelier IA pour ne pas encombrer l'Accueil.
 
 État au 11 juillet 2026 : Hardware Truth v1 est publié avec Hardware Doctor, Passport, Autopilot, Flight Recorder et Digital Twin dans le build Windows/Linux `291439601671`, issu du commit `6f5453d` et du run CI `29143960167`. Les cinq artefacts et leurs SHA-256 ont été revérifiés depuis la production ; le monitor SEO/GEO passe `33/33`. L'override conserve la parité Windows/Linux avant les essais : terrain toujours `0/5`, prochaine cible `old_laptop`, aucune revendication de validation physique.
 
@@ -102,7 +116,7 @@ Premier jalon publié au 10 juillet 2026 dans le build public `291204755461` : c
 - Exécuter exactement les mêmes tâches sur les candidats sans envoyer les fichiers au cloud.
 - Distinguer critères déterministes et éventuel jugement local optionnel.
 
-Premier jalon candidat v1 terminé le 12 juillet 2026. La fonction reste dans le mode Détails et n'est pas encore incluse dans le build public `291439601671`. Le candidat Windows/Linux `291887472771`, commit `6b5187e`, run `29188747277`, contient les cinq artefacts attendus et passe le contrat de release renforcé. Les workflows autonomes Windows `29188569395` et Linux `29188569378` passent aussi avec des contrôles source fail-fast.
+Premier jalon candidat v1 terminé le 12 juillet 2026. La fonction reste dans l'espace Tests et n'est pas encore incluse dans le build public `291439601671`. Le candidat Windows/Linux `291887472771`, commit `6b5187e`, run `29188747277`, contient les cinq artefacts attendus et passe le contrat de release renforcé. Les workflows autonomes Windows `29188569395` et Linux `29188569378` passent aussi avec des contrôles source fail-fast.
 
 - [x] Créer cinq packs versionnés : Code, Français, résumé, Mémoire / Obsidian et métier personnalisé.
 - [x] Limiter une campagne à une tâche, 2 à 3 modèles déjà installés, 60 secondes par modèle et zéro téléchargement.
@@ -195,7 +209,7 @@ Premier jalon candidat v1 terminé le 12 juillet 2026 dans le build Windows/Linu
 
 ### Coordination par board
 
-Noyau et panneau Détails Board Observer v0 implémentés le 12 juillet 2026, sans publication : commande Tauri Planka en lecture seule, contrat versionné, HTTPS obligatoire hors loopback, redirections refusées, clé API gardée en mémoire puis effacée, snapshot filtré, cinq tests Rust dont un serveur HTTP local et recette Playwright desktop/mobile. Les écritures, commentaires, webhooks et exécutions restent absents.
+Noyau et panneau Atelier IA Board Observer v0 implémentés le 12 juillet 2026, sans publication : commande Tauri Planka en lecture seule, contrat versionné, HTTPS obligatoire hors loopback, redirections refusées, clé API gardée en mémoire puis effacée, snapshot filtré, cinq tests Rust dont un serveur HTTP local et recette Playwright desktop/mobile. Les écritures, commentaires, webhooks et exécutions restent absents.
 
 - Créditer le travail Planka + Hermes Kanban de Supersocks comme inspiration conceptuelle, sans copier son texte, son dépôt ou son interface.
 - Définir un contrat générique `board_adapter.v1` ; Planka reste un service externe facultatif et ne devient pas une dépendance embarquée.
@@ -216,7 +230,7 @@ Capability Router v0 implémenté dans les sources le 12 juillet 2026, sans publ
 - [x] Distinguer Windows natif, Linux natif, WSL par défaut, Ollama natif et Ollama WSL.
 - [x] Router par capacités et type de mission sans verrouiller la proposition sur une marque.
 - [x] Imposer un vérificateur différent de l'exécutant lorsqu'une proposition complète est possible.
-- [x] Garder le panneau dans le mode Détails et fournir JSON, résumé et preuve visuelle desktop/mobile.
+- [x] Garder le panneau dans Atelier IA et fournir JSON, résumé et preuve visuelle desktop/mobile.
 - [x] Ajouter un consentement séparé et strict pour le pilote technique de référence : aucun CLI candidat, réseau ou crédit payant.
 - [x] Ajouter un second consentement et un budget explicite avant l'appel d'un modèle Ollama local déjà installé, sans accès fichier, Internet, API payante ou suite cachée ; l'exécution du code requiert une autorisation explicite distincte dans ce consentement.
 - [ ] Étendre ce mécanisme aux CLI candidats seulement après un contrat de permissions et de budget propre à chaque adaptateur.
@@ -226,7 +240,7 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Chaîner les entrées `outilsia.evidence_entry.v1` et signer le document `outilsia.evidence_ledger.v1`.
 - [x] Refuser Workstack modifiée, Router exécutable, worker identique au vérificateur et identifiants non bornés.
 - [x] Tester écriture/lecture réelle, restauration vérifiée, corruption, doublon et absence de contenu brut.
-- [x] Ajouter les actions explicites Ajouter, Vérifier, Copier, Télécharger et Réinitialiser dans le mode Détails.
+- [x] Ajouter les actions explicites Ajouter, Vérifier, Copier, Télécharger et Réinitialiser dans Atelier IA.
 - [x] Maintenir la notice canonique `NOTICE-UTILISATION-WORKSTACK.md` et vérifier ses responsabilités en CI.
 - [x] Ajouter `isolated_reference_run` avec exécution réelle, vérification visible indépendante et consentement enregistré, sans contenu brut.
 - [x] Ajouter `isolated_visible_browser_candidate` pour une génération Ollama locale, une vérification structurelle puis une exécution Chromium visible et isolée, sans sortie brute ni claim scientifique.

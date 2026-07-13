@@ -4,7 +4,7 @@ Application desktop Tauri pour scanner une machine, detecter Ollama et estimer q
 
 ## Navigation
 
-Le cockpit est séparé en sept espaces persistants : **Accueil**, **Machine**, **Modèles**, **Tests**, **Assistant**, **Atelier IA** et **Compte**. Le résumé matériel reste visible en tête, les actions ouvrent automatiquement l'espace pertinent et les saisies sont conservées lors d'un changement d'onglet.
+Le cockpit est séparé en sept espaces persistants : **Accueil**, **Machine**, **Modèles**, **Tests**, **Assistant**, **Atelier IA** et **Compte**. Le résumé matériel reste visible en tête, les actions ouvrent automatiquement l'espace pertinent, le menu **Section** atteint les modules longs et les saisies sont conservées lors d'un changement d'onglet.
 
 Vérification dédiée desktop, mobile et clavier :
 

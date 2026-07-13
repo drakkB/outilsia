@@ -64,6 +64,12 @@ def inspect_workspace(page, workspace: str, expected_panels: int, label: str):
     leaked = [panel for panel in state["visible"] if workspace not in panel["workspace"].split()]
     if leaked:
         raise AssertionError(f"{label}: panels leaked from another workspace: {leaked}")
+    expected_sections = 1 if workspace == "overview" else expected_panels
+    section_count = page.locator("#workspaceSectionSelect option").count() - 1
+    if section_count != expected_sections:
+        raise AssertionError(
+            f"{label}: expected {expected_sections} section shortcuts, got {section_count}"
+        )
     return state
 
 
@@ -110,6 +116,14 @@ def check(browser, width: int, height: int, label: str):
     if routed_benchmark != "tests":
         raise AssertionError(f"{label}: model benchmark action routed to {routed_benchmark!r}")
 
+    page.locator("#workspaceSectionSelect").select_option(".flight-recorder-panel")
+    page.wait_for_timeout(1500)
+    section_position = page.locator(".flight-recorder-panel").evaluate(
+        """(panel) => ({ top: panel.getBoundingClientRect().top, visible: panel.offsetParent !== null })"""
+    )
+    if not section_position["visible"] or section_position["top"] < 60 or section_position["top"] >= height:
+        raise AssertionError(f"{label}: section menu did not reveal Flight Recorder: {section_position}")
+
     page.locator("#workspaceOverviewBtn").focus()
     page.keyboard.press("ArrowRight")
     keyboard_state = page.evaluate(
@@ -122,8 +136,23 @@ def check(browser, width: int, height: int, label: str):
         raise AssertionError(f"{label}: keyboard tab navigation failed: {keyboard_state}")
 
     page.locator("#workspaceOverviewBtn").click()
+    page.wait_for_timeout(150)
+    tab_scroll = page.evaluate(
+        """() => ({
+          actual: window.scrollY,
+          expected: Math.min(
+            Math.max(0, (document.querySelector('.workspace-region')?.offsetTop || 0) - 8),
+            Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
+          )
+        })"""
+    )
+    if abs(tab_scroll["actual"] - tab_scroll["expected"]) > 3:
+        raise AssertionError(f"{label}: tab switch kept the previous page position: {tab_scroll}")
+    page.evaluate("() => window.scrollTo(0, 0)")
     page.screenshot(path=OUT / f"workspace-{label}-overview.png", full_page=True)
     page.locator("#workspaceWorkflowsBtn").click()
+    page.wait_for_timeout(150)
+    page.evaluate("() => window.scrollTo(0, 0)")
     page.screenshot(path=OUT / f"workspace-{label}-workflows.png", full_page=True)
     page.close()
     return heights

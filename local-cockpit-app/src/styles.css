@@ -523,7 +523,7 @@ h2 {
   border-radius: 8px;
   display: grid;
   gap: 8px;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) minmax(150px, 190px);
   margin-bottom: 8px;
   min-height: 54px;
   padding: 8px 10px;
@@ -568,6 +568,25 @@ h2 {
   background: linear-gradient(180deg, rgba(120, 220, 232, 0.24), rgba(120, 220, 232, 0.10));
   border-color: rgba(120, 220, 232, 0.42);
   color: var(--cyan);
+}
+
+.workspace-section-picker {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.workspace-section-picker span {
+  color: var(--muted-2);
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.workspace-section-picker select {
+  min-height: 34px;
+  min-width: 0;
+  width: 100%;
 }
 
 .quick-decision-strip {
@@ -853,6 +872,10 @@ h2 {
   min-height: 0;
   min-width: 0;
   padding: 12px;
+}
+
+.grid > article.panel {
+  scroll-margin-top: 76px;
 }
 
 .mode-essential .advanced-panel {
@@ -5022,6 +5045,20 @@ dd {
   .workspace-tabs button {
     min-width: 0;
     padding-inline: 4px;
+  }
+
+  .workspace-section-picker {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .workspace-section-picker span {
+    font-size: 10px;
+    padding-left: 3px;
+  }
+
+  .grid > article.panel {
+    scroll-margin-top: 126px;
   }
 
   .quick-decision-strip > div,

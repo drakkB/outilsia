@@ -339,6 +339,7 @@ const els = {
   workspaceNav: document.querySelector(".workspace-nav"),
   workspaceContent: $("workspaceContent"),
   workspaceTitle: $("workspaceTitle"),
+  workspaceSectionSelect: $("workspaceSectionSelect"),
   workspaceTabButtons: [...document.querySelectorAll("[data-workspace-tab-target]")],
   prepareBtn: $("prepareBtn"),
   preparePanelBtn: $("preparePanelBtn"),
@@ -693,6 +694,61 @@ const WORKSPACE_TITLES = {
   workflows: "Atelier IA",
   account: "Compte"
 };
+const WORKSPACE_SECTIONS = {
+  overview: [
+    ["Verdict", ".verdict-panel"]
+  ],
+  machine: [
+    ["Diagnostic matériel", ".machine-panel"],
+    ["Potentiel et runtime", ".verdict-panel"],
+    ["Guides d'achat", ".buying-panel"],
+    ["Test terrain", ".field-test-panel"],
+    ["Upgrade Digital Twin", ".upgrade-digital-twin-panel"],
+    ["Plan d'action", ".action-panel"],
+    ["Pack décision", ".decision-panel"]
+  ],
+  models: [
+    ["Modèles compatibles", ".models-panel"],
+    ["Prochain palier", ".next-panel"],
+    ["Nouveaux modèles", ".new-models-panel"],
+    ["Catalogues", ".catalog-panel"],
+    ["Modèles installés", ".installed-panel"],
+    ["Commandes Ollama", ".commands-panel"]
+  ],
+  tests: [
+    ["Parcours guidé", ".prepare-panel"],
+    ["Premier test", ".first-test-panel"],
+    ["Arena locale", ".arena-panel"],
+    ["Tests privés", ".private-workload-panel"],
+    ["Console", ".operation-panel"],
+    ["Benchmark", ".benchmark-panel"],
+    ["Model Autopilot", ".model-autopilot-panel"],
+    ["Flight Recorder", ".flight-recorder-panel"],
+    ["Historique benchmarks", ".benchmark-history-panel"]
+  ],
+  assistant: [
+    ["PromptForge", ".promptforge-panel"],
+    ["Mes prompts", ".prompt-library-panel"],
+    ["Dialogue local", ".chat-panel"],
+    ["MemoryForge", ".memory-panel"]
+  ],
+  workflows: [
+    ["Pont Strategy Arena", ".strategy-bridge-panel"],
+    ["AI Capability Passport", ".capability-passport-panel"],
+    ["Passerelle locale", ".local-capability-bridge-panel"],
+    ["Board Observer", ".board-observer-panel"],
+    ["Workstack Composer", ".workstack-composer-panel"],
+    ["Capability Router", ".capability-router-panel"],
+    ["ForgeBench", ".forgebench-panel"],
+    ["Evidence Ledger", ".evidence-ledger-panel"]
+  ],
+  account: [
+    ["Rapport machine", ".readiness-panel"],
+    ["Compte OutilsIA", ".account-panel"],
+    ["Feedback", ".feedback-panel"],
+    ["Historique local", ".history-panel"]
+  ]
+};
 const readinessProof = {
   copied: false,
   savedAccount: false,
@@ -702,6 +758,22 @@ const readinessProof = {
 function setStatus(text, kind = "") {
   els.statusText.textContent = text;
   els.statusText.className = kind;
+}
+
+function renderWorkspaceSectionMenu(tab) {
+  if (!els.workspaceSectionSelect) return;
+  const entries = WORKSPACE_SECTIONS[tab] || [];
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Aller à…";
+  const options = entries.map(([label, selector]) => {
+    const option = document.createElement("option");
+    option.value = selector;
+    option.textContent = label;
+    return option;
+  });
+  els.workspaceSectionSelect.replaceChildren(placeholder, ...options);
+  els.workspaceSectionSelect.value = "";
 }
 
 function setWorkspaceTab(tab = "overview", { persist = true, focusContent = false } = {}) {
@@ -720,6 +792,7 @@ function setWorkspaceTab(tab = "overview", { persist = true, focusContent = fals
   if (els.workspaceContent && activeButton) {
     els.workspaceContent.setAttribute("aria-labelledby", activeButton.id);
   }
+  renderWorkspaceSectionMenu(normalized);
   if (persist) {
     try {
       localStorage.setItem(WORKSPACE_TAB_STORAGE_KEY, normalized);
@@ -729,7 +802,10 @@ function setWorkspaceTab(tab = "overview", { persist = true, focusContent = fals
     }
   }
   if (focusContent) {
-    window.requestAnimationFrame(() => els.workspaceNav?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    window.requestAnimationFrame(() => {
+      const workspaceTop = els.workspaceNav?.parentElement?.offsetTop ?? els.workspaceNav?.offsetTop ?? 0;
+      window.scrollTo({ top: Math.max(0, workspaceTop - 8), behavior: "auto" });
+    });
   }
   return normalized;
 }
@@ -18605,7 +18681,7 @@ els.prepareBtn.addEventListener("click", handlePrimaryAction);
 els.stickyActionBtn?.addEventListener("click", handlePrimaryAction);
 els.quickActionBtn?.addEventListener("click", handlePrimaryAction);
 for (const button of els.workspaceTabButtons) {
-  button.addEventListener("click", () => setWorkspaceTab(button.dataset.workspaceTabTarget));
+  button.addEventListener("click", () => setWorkspaceTab(button.dataset.workspaceTabTarget, { focusContent: true }));
   button.addEventListener("keydown", (event) => {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
@@ -18616,10 +18692,16 @@ for (const button of els.workspaceTabButtons) {
         ? els.workspaceTabButtons.length - 1
         : (current + (event.key === "ArrowRight" ? 1 : -1) + els.workspaceTabButtons.length) % els.workspaceTabButtons.length;
     const target = els.workspaceTabButtons[next];
-    setWorkspaceTab(target.dataset.workspaceTabTarget);
+    setWorkspaceTab(target.dataset.workspaceTabTarget, { focusContent: true });
     target.focus();
   });
 }
+els.workspaceSectionSelect?.addEventListener("change", () => {
+  const selector = els.workspaceSectionSelect.value;
+  if (!selector) return;
+  const panel = els.workspaceContent?.querySelector(selector);
+  window.requestAnimationFrame(() => panel?.scrollIntoView({ behavior: "smooth", block: "start" }));
+});
 els.preparePanelBtn.addEventListener("click", prepareLocalAiFlow);
 els.oldPortablePresetBtn?.addEventListener("click", applyOldPortablePreset);
 els.scanBtn.addEventListener("click", scanMachine);
