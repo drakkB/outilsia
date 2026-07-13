@@ -245,6 +245,10 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Relire la soumission dans un second processus isolé, monté en lecture seule, puis conserver uniquement six checks visibles, durées et empreintes bornées.
 - [x] Ajouter un adaptateur Ollama prompt-only : identité runtime/modèle signée, modèle déjà installé, API loopback, une tentative bornée, réponse JSON à trois fichiers et aucun accès outil ou filesystem.
 - [x] Évaluer la soumission Ollama dans un processus bubblewrap séparé avec sept checks statiques, lecture seule, réseau isolé et suppression obligatoire du workspace, sans exécuter le code généré.
+- [x] Versionner un `Visible Gameplay Contract v1` public : seed, transformations, couleurs, signature, API, snapshot, raisons de rejet, DOM et recette desktop/Android.
+- [x] Livrer une implémentation de référence scellée et réellement jouée sur trois seeds, desktop, Android portrait/paysage, clavier, souris et tactile, sans ressource réseau.
+- [x] Exiger statiquement l'API visible et les marqueurs DOM dans les futures soumissions Ollama, tout en maintenant `generated_code_executed=false` et `gameplay_verified=false`.
+- [x] Câbler les tests Bubblewrap de référence et du candidat dans `verify:ci-source` : exécution réelle sur Linux, contrat vérifié sans faux claim sur Windows.
 - [x] Conserver dans l'Evidence Ledger uniquement génération, structure, métriques et empreintes ; garder gameplay, suite cachée, science et vainqueur à faux, et l'énergie locale inconnue.
 - [ ] Exécuter le code candidat dans un navigateur réellement isolé, avec tests visibles et captures, avant toute affirmation de gameplay.
 - [ ] Ajouter des adaptateurs de CLI candidats autorisés, sans élargir implicitement réseau, credentials ou budget.

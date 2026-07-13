@@ -95,7 +95,9 @@ Le **Préflight isolation** ajoute un canari bubblewrap borné sous Linux ou WSL
 
 Le **Pilote d'exécution** peut ensuite lancer, sur consentement explicite, un worker technique déterministe dans une copie fraîche puis un second processus évaluateur avec la soumission montée en lecture seule. Le réseau, la racine hôte, le dépôt source, le vault et les credentials restent hors montage ; le workspace temporaire est supprimé avant le retour. Ce pilote prouve le transport isolé et la vérification visible, pas la qualité d'une IA.
 
-Le **Candidat Ollama local** est le premier adaptateur de modèle réellement exécutable dans les sources. Après un second consentement, un modèle déjà installé reçoit seulement la tâche et le starter publics via l'API de boucle locale. Sa réponse stricte produit trois fichiers bornés, contrôlés dans un processus bubblewrap séparé et en lecture seule. Le code généré n'est pas exécuté : gameplay, tests cachés, score scientifique et vainqueur restent explicitement faux. La sortie brute n'est ni retournée ni persistée ; le Ledger conserve seulement métriques et SHA-256. Aucun CLI Codex, Claude ou Hermes n'est lancé par ce palier.
+Le **Candidat Ollama local** est le premier adaptateur de modèle réellement exécutable dans les sources. Après un second consentement, un modèle déjà installé reçoit seulement la tâche, le starter et le `Visible Gameplay Contract v1` publics via l'API de boucle locale. Sa réponse stricte produit trois fichiers bornés, contrôlés dans un processus bubblewrap séparé et en lecture seule. Le contrôle statique exige désormais l'API `__SIGNAL_MAZE_VISIBLE_API__`, le snapshot versionné et les marqueurs DOM, mais le code généré n'est pas exécuté : gameplay, tests cachés, score scientifique et vainqueur restent explicitement faux. La sortie brute n'est ni retournée ni persistée ; le Ledger conserve seulement métriques et SHA-256. Aucun CLI Codex, Claude ou Hermes n'est lancé par ce palier.
+
+Le **Visible Gameplay Contract v1** fixe publiquement la génération 9 x 9, les huit transformations, la permutation des couleurs, la signature FNV-1a, les raisons de rejet, le snapshot et les IDs DOM. Une implémentation de référence distincte est vérifiée sur trois seeds, trois viewports et les entrées clavier, souris et tactile avec `npm run verify:forgebench:visible`. Cette réussite concerne uniquement la référence ; elle ne valide aucune soumission Ollama.
 
 Contrôles dédiés :
 
@@ -104,6 +106,7 @@ npm run verify:board-observer
 npm run verify:workstack-composer
 npm run verify:capability-router
 npm run verify:forgebench
+npm run verify:forgebench:visible
 npm run verify:evidence-ledger
 ```
 

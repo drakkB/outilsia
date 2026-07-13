@@ -11883,7 +11883,7 @@ function renderForgeBenchCandidatePanel() {
     els.forgeBenchCandidateState.textContent = "soumission structurée vérifiée";
     els.forgeBenchCandidateBox.className = "forgebench-candidate-box";
     els.forgeBenchCandidateBox.innerHTML = `
-      <strong>${escapeHtml(result.candidate.model_ref)} a généré une soumission · contrôle statique 7/7</strong>
+      <strong>${escapeHtml(result.candidate.model_ref)} a généré une soumission · contrôle statique 7/7 · contrat visible v1 présent</strong>
       <span>${escapeHtml(result.candidate.runtime === "wsl" ? "Ollama WSL" : "Ollama natif")} · génération ${generationSeconds} s · évaluateur ${evaluatorMs} ms · ${escapeHtml(result.generation?.eval_count || 0)} tokens mesurés</span>
       <small>Code non exécuté · gameplay non vérifié · énergie locale non mesurée · aucun test caché, score ou vainqueur</small>
     `;

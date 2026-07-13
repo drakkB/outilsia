@@ -162,7 +162,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "Aucun Codex, Claude, Hermes ou modèle local exécuté",
         "Candidat Ollama local",
         "soumission structurée vérifiée",
-        "hermes3:8b a généré une soumission · contrôle statique 7/7",
+        "hermes3:8b a généré une soumission · contrôle statique 7/7 · contrat visible v1 présent",
         "Code non exécuté",
         "gameplay non vérifié",
         "énergie locale non mesurée",

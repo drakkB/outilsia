@@ -27,6 +27,17 @@
     "files_total": 3,
     "bundle_sha256": "4d88bea3831044755d3d504fb6cd9a470647f8734d4a67265c2b3c3621f06e53"
   },
+  "visible_gameplay_contract": {
+    "status": "public_versioned",
+    "schema": "outilsia.forgebench_visible_gameplay_contract.v1",
+    "version": "1.0.0",
+    "path": "signal-maze-v1/visible-contract.json",
+    "reference_manifest": "signal-maze-v1/reference-manifest.json",
+    "reference_bundle_sha256": "1f060490a64564fe54e4e254b363520d1365aab60cb16dd1ee9f7a8661b66321",
+    "reference_gameplay_verified": true,
+    "candidate_execution_enabled": false,
+    "candidate_gameplay_verified": false
+  },
   "visible_checks": [
     {"id": "load-no-error", "dimension": "result", "description": "La page charge sans erreur JavaScript."},
     {"id": "seed-repeatability", "dimension": "result", "description": "Un meme seed produit exactement le meme plateau."},

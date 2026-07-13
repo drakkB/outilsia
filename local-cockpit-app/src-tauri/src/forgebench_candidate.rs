@@ -52,6 +52,8 @@ const REQUIRED_BLOCKERS: [&str; 6] = [
 ];
 
 const BENCHMARK_SPEC: &str = include_str!("../../forgebench/signal-maze-v1.json");
+const VISIBLE_GAMEPLAY_CONTRACT: &str =
+    include_str!("../../forgebench/signal-maze-v1/visible-contract.json");
 const STARTER_GAME: &str = include_str!("../../forgebench/signal-maze-v1/starter/game.js");
 const STARTER_INDEX: &str = include_str!("../../forgebench/signal-maze-v1/starter/index.html");
 const STARTER_STYLES: &str = include_str!("../../forgebench/signal-maze-v1/starter/styles.css");
@@ -80,9 +82,18 @@ bwrap "$@" -- /usr/bin/sh -c '
   grep -Fq "data-forgebench=\"signal-maze-v1\"" /submission/index.html
   grep -Fq "data-status=\"candidate\"" /submission/index.html
   grep -Fq "id=\"gameRoot\"" /submission/index.html
+  grep -Fq "id=\"signalMazeBoard\"" /submission/index.html
   grep -Fq "id=\"newGameBtn\"" /submission/index.html
   grep -Fq "id=\"resetBtn\"" /submission/index.html
+  grep -Fq "id=\"gameStatus\"" /submission/index.html
+  grep -Fq "data-state=" /submission/index.html
   grep -Fq "__SIGNAL_MAZE_CANDIDATE__" /submission/game.js
+  grep -Fq "__SIGNAL_MAZE_VISIBLE_API__" /submission/game.js
+  grep -Fq "signal-maze-visible-snapshot.v1" /submission/game.js
+  grep -Fq "newGame" /submission/game.js
+  grep -Fq "snapshot" /submission/game.js
+  grep -Fq "applyPath" /submission/game.js
+  grep -Fq "reset" /submission/game.js
   grep -Fq "implementation_started" /submission/game.js
   grep -Fq "styles.css" /submission/index.html
   grep -Fq "game.js" /submission/index.html
@@ -407,14 +418,19 @@ Construis Signal Maze v1 depuis le starter fourni. Le plateau est une grille 9 x
 CONTRAT DE SORTIE STRICT
 - Reponds uniquement avec l'objet JSON impose par le schema Ollama.
 - Fournis exactement index_html, styles_css et game_js, sans Markdown.
-- index_html conserve data-forgebench="signal-maze-v1", utilise data-status="candidate" et contient les IDs gameRoot, newGameBtn et resetBtn.
+- index_html conserve data-forgebench="signal-maze-v1", utilise data-status="candidate", expose data-state="playing" et contient les IDs gameRoot, signalMazeBoard, newGameBtn, resetBtn et gameStatus.
 - index_html charge uniquement styles.css et game.js.
 - game_js definit globalThis.__SIGNAL_MAZE_CANDIDATE__ avec benchmark="signal-maze-v1" et implementation_started=true.
+- game_js implemente globalThis.__SIGNAL_MAZE_VISIBLE_API__ avec exactement newGame, snapshot, applyPath et reset, ainsi que le snapshot signal-maze-visible-snapshot.v1.
 - Aucun URL, import, fetch, WebSocket, iframe, formulaire, ressource externe ou telemetrie.
 - Aucun contenu cache, depot, credential ou test prive n'est disponible.
+- Ce contrat public ne signifie pas que ForgeBench executera ou validera le code produit dans ce palier.
 
 SPECIFICATION PUBLIQUE
 {BENCHMARK_SPEC}
+
+CONTRAT DE GAMEPLAY VISIBLE PUBLIC
+{VISIBLE_GAMEPLAY_CONTRACT}
 
 STARTER index.html
 {STARTER_INDEX}
@@ -811,8 +827,11 @@ fn parse_candidate_files(raw_response: &str) -> Result<CandidateFiles, String> {
         "data-forgebench=\"signal-maze-v1\"",
         "data-status=\"candidate\"",
         "id=\"gameRoot\"",
+        "id=\"signalMazeBoard\"",
         "id=\"newGameBtn\"",
         "id=\"resetBtn\"",
+        "id=\"gameStatus\"",
+        "data-state=",
         "styles.css",
         "game.js",
     ] {
@@ -820,7 +839,13 @@ fn parse_candidate_files(raw_response: &str) -> Result<CandidateFiles, String> {
             return Err(format!("Marqueur candidat absent: {marker}."));
         }
     }
-    if !game_js.contains("__SIGNAL_MAZE_CANDIDATE__") || !game_js.contains("implementation_started")
+    if !game_js.contains("__SIGNAL_MAZE_CANDIDATE__")
+        || !game_js.contains("implementation_started")
+        || !game_js.contains("__SIGNAL_MAZE_VISIBLE_API__")
+        || !game_js.contains("signal-maze-visible-snapshot.v1")
+        || !["newGame", "snapshot", "applyPath", "reset"]
+            .iter()
+            .all(|marker| game_js.contains(marker))
     {
         return Err("Marqueur d'implementation candidate absent.".to_string());
     }
@@ -1611,12 +1636,12 @@ pub(crate) mod tests {
 
     fn candidate_file_payload() -> String {
         let index = format!(
-            "<!doctype html><html><head><link rel=\"stylesheet\" href=\"styles.css\"></head><body><main data-forgebench=\"signal-maze-v1\" data-status=\"candidate\"><div id=\"gameRoot\"></div><button id=\"newGameBtn\">Nouvelle partie</button><button id=\"resetBtn\">Reinitialiser</button></main><script src=\"game.js\"></script></body></html>{}",
+            "<!doctype html><html><head><link rel=\"stylesheet\" href=\"styles.css\"></head><body><main id=\"gameRoot\" data-forgebench=\"signal-maze-v1\" data-status=\"candidate\" data-state=\"playing\"><div id=\"signalMazeBoard\"></div><output id=\"gameStatus\"></output><button id=\"newGameBtn\">Nouvelle partie</button><button id=\"resetBtn\">Reinitialiser</button></main><script src=\"game.js\"></script></body></html>{}",
             " ".repeat(200)
         );
         let styles = format!("body{{display:grid}}{}", "a{color:red}".repeat(50));
         let game = format!(
-            "globalThis.__SIGNAL_MAZE_CANDIDATE__={{benchmark:'signal-maze-v1',implementation_started:true}};{}",
+            "globalThis.__SIGNAL_MAZE_CANDIDATE__={{benchmark:'signal-maze-v1',implementation_started:true}};globalThis.__SIGNAL_MAZE_VISIBLE_API__={{newGame,snapshot,applyPath,reset}};const snapshotSchema='signal-maze-visible-snapshot.v1';{}",
             "const cell = 1;\n".repeat(100)
         );
         serde_json::to_string(&json!({
@@ -1693,6 +1718,12 @@ pub(crate) mod tests {
             networked["game_js"].as_str().unwrap()
         ));
         assert!(parse_candidate_files(&networked.to_string()).is_err());
+        let mut contract_missing = serde_json::from_str::<Value>(&payload).unwrap();
+        contract_missing["game_js"] = json!(contract_missing["game_js"]
+            .as_str()
+            .unwrap()
+            .replace("__SIGNAL_MAZE_VISIBLE_API__", "__MISSING_VISIBLE_API__"));
+        assert!(parse_candidate_files(&contract_missing.to_string()).is_err());
     }
 
     #[test]
@@ -1736,6 +1767,8 @@ pub(crate) mod tests {
     fn prompt_and_evaluator_do_not_receive_hidden_material() {
         let prompt = candidate_prompt(17011);
         assert!(prompt.contains("MISSION PUBLIQUE"));
+        assert!(prompt.contains("outilsia.forgebench_visible_gameplay_contract.v1"));
+        assert!(prompt.contains("candidate_execution_enabled_by_this_contract\": false"));
         assert!(!prompt.contains("forgebench-hidden-suite"));
         assert!(EVALUATOR_SCRIPT.contains("--unshare-all"));
         assert!(EVALUATOR_SCRIPT.contains("--ro-bind \"$PWD/workspace\" /submission"));

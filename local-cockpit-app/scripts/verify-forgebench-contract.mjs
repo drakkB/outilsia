@@ -7,8 +7,12 @@ const root = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(root, "..");
 const benchmarkPath = resolve(root, "forgebench", "signal-maze-v1.json");
 const manifestPath = resolve(root, "forgebench", "signal-maze-v1", "starter-manifest.json");
+const visibleContractPath = resolve(root, "forgebench", "signal-maze-v1", "visible-contract.json");
+const referenceManifestPath = resolve(root, "forgebench", "signal-maze-v1", "reference-manifest.json");
 const benchmark = JSON.parse(readFileSync(benchmarkPath, "utf8"));
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+const visibleContract = JSON.parse(readFileSync(visibleContractPath, "utf8"));
+const referenceManifest = JSON.parse(readFileSync(referenceManifestPath, "utf8"));
 const hub = readFileSync(resolve(repoRoot, "server-work", "static", "pages", "scanner-ia-local.html"), "utf8");
 const download = readFileSync(resolve(repoRoot, "server-work", "static", "pages", "telecharger-scanner-ia-local.html"), "utf8");
 const llms = readFileSync(resolve(repoRoot, "server-work", "static", "llms.txt"), "utf8");
@@ -53,6 +57,68 @@ for (const file of [...manifest.files].sort((left, right) => left.path.localeCom
 const bundleDigest = sha256(`${lines.join("\n")}\n`);
 if (bundleDigest !== manifest.bundle_sha256 || bundleDigest !== benchmark.starter.bundle_sha256) {
   throw new Error("starter bundle digest mismatch");
+}
+
+if (
+  visibleContract.schema !== "outilsia.forgebench_visible_gameplay_contract.v1"
+  || visibleContract.benchmark_id !== benchmark.id
+  || visibleContract.status !== "public_visible_contract"
+  || visibleContract.contract_version !== benchmark.visible_gameplay_contract?.version
+) {
+  throw new Error("visible gameplay contract mismatch");
+}
+if (
+  visibleContract.security?.candidate_execution_enabled_by_this_contract !== false
+  || visibleContract.claims?.ollama_candidate_generated_code_executed !== false
+  || visibleContract.claims?.ollama_candidate_gameplay_verified !== false
+  || visibleContract.claims?.scientific_score_available !== false
+  || visibleContract.claims?.winner_available !== false
+) {
+  throw new Error("visible gameplay contract overclaims candidate execution or science");
+}
+if (JSON.stringify(visibleContract.visible_recipe?.default_seeds) !== JSON.stringify(benchmark.determinism.default_seeds)) {
+  throw new Error("visible gameplay recipe and benchmark seeds differ");
+}
+if (
+  referenceManifest.schema !== "outilsia.forgebench_visible_reference_manifest.v1"
+  || referenceManifest.benchmark_id !== benchmark.id
+  || referenceManifest.contract_version !== visibleContract.contract_version
+) {
+  throw new Error("visible reference manifest mismatch");
+}
+const referenceLines = [];
+for (const file of [...referenceManifest.files].sort((left, right) => left.path.localeCompare(right.path))) {
+  if (!/^(reference\/(game\.js|index\.html|styles\.css)|visible-contract\.json)$/.test(file.path)) {
+    throw new Error(`unsafe visible reference path: ${file.path}`);
+  }
+  const bytes = readFileSync(resolve(root, "forgebench", "signal-maze-v1", file.path));
+  const digest = sha256(bytes);
+  if (digest !== file.sha256) throw new Error(`visible reference digest mismatch: ${file.path}`);
+  referenceLines.push(`${file.path}:${digest}`);
+}
+const referenceDigest = sha256(`${referenceLines.join("\n")}\n`);
+if (
+  referenceDigest !== referenceManifest.bundle_sha256
+  || referenceDigest !== benchmark.visible_gameplay_contract?.reference_bundle_sha256
+  || benchmark.visible_gameplay_contract?.candidate_execution_enabled !== false
+  || benchmark.visible_gameplay_contract?.candidate_gameplay_verified !== false
+) {
+  throw new Error("visible reference bundle or candidate truth mismatch");
+}
+const referenceSource = referenceManifest.files
+  .filter((file) => file.path.startsWith("reference/"))
+  .map((file) => readFileSync(resolve(root, "forgebench", "signal-maze-v1", file.path), "utf8"))
+  .join("\n");
+for (const marker of [
+  "__SIGNAL_MAZE_VISIBLE_API__",
+  "signal-maze-visible-snapshot.v1",
+  'id="signalMazeBoard"',
+  'id="gameStatus"',
+  "pointerdown",
+  "ArrowUp",
+  "touch-action: none",
+]) {
+  if (!referenceSource.includes(marker)) throw new Error(`visible reference marker missing: ${marker}`);
 }
 
 const rust = ["forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "forgebench_candidate.rs", "evidence_ledger.rs"]
@@ -102,6 +168,9 @@ for (const needle of [
   '"generated_code_executed": false',
   "deterministic_visible_static_gate",
   "isolated_local_model_candidate",
+  "outilsia.forgebench_visible_gameplay_contract.v1",
+  "__SIGNAL_MAZE_VISIBLE_API__",
+  "signal-maze-visible-snapshot.v1",
 ]) {
   if (!rust.includes(needle)) throw new Error(`missing Rust ForgeBench guard: ${needle}`);
 }
@@ -123,13 +192,13 @@ for (const needle of [
   if (!js.includes(needle)) throw new Error(`missing UI truth label: ${needle}`);
 }
 for (const [label, text, needles] of [
-  ["hub", hub, ["forgebench-workspaces-stacks-ia", "ForgeBench Ollama Candidate v0 · source, non public", "modèle Ollama déjà installé", "Contrôle statique 7/7", "Code non exécuté", "Aucun Codex, Claude Code ou Hermes", "ForgeBench peut-il déjà tester un modèle Ollama local ou lancer Codex, Claude Code et Hermes ?"]],
-  ["download", download, ["forgebench-workspaces-stacks-ia", "ForgeBench Ollama Candidate v0 · source, non public", "modèle déjà installé via la boucle locale Ollama", "Contrôle statique 7/7", "Génération et structure vérifiées", "Aucun Codex, Claude Code ou Hermes", "ForgeBench peut-il déjà tester un modèle Ollama local ou lancer Codex, Claude Code et Hermes ?"]],
-  ["llms", llms, ["ForgeBench Ollama Candidate v0 (source candidate, not in the current public build)", "already-installed native or WSL Ollama model", "generated code is not executed", "no hidden evaluation, scientific score, CLI-agent comparison or winner"]],
+  ["hub", hub, ["forgebench-workspaces-stacks-ia", "ForgeBench Ollama Candidate v0 · source, non public", "modèle Ollama déjà installé", "Contrôle statique 7/7", "Visible Gameplay Contract v1", "Cette preuve concerne la référence, pas le code Ollama", "Code non exécuté", "Aucun Codex, Claude Code ou Hermes", "ForgeBench peut-il déjà tester un modèle Ollama local ou lancer Codex, Claude Code et Hermes ?"]],
+  ["download", download, ["forgebench-workspaces-stacks-ia", "ForgeBench Ollama Candidate v0 · source, non public", "modèle déjà installé via la boucle locale Ollama", "Contrôle statique 7/7", "Visible Gameplay Contract v1", "Le candidat Ollama ne l'est pas", "Génération et structure vérifiées", "Aucun Codex, Claude Code ou Hermes", "ForgeBench peut-il déjà tester un modèle Ollama local ou lancer Codex, Claude Code et Hermes ?"]],
+  ["llms", llms, ["ForgeBench Ollama Candidate v0 (source candidate, not in the current public build)", "Visible Gameplay Contract v1", "separate reference implementation passes three seeds", "This reference proof does not validate the Ollama submission", "already-installed native or WSL Ollama model", "generated code is not executed", "no hidden evaluation, scientific score, CLI-agent comparison or winner"]],
 ]) {
   for (const needle of needles) {
     if (!text.includes(needle)) throw new Error(`missing ForgeBench SEO/GEO truth on ${label}: ${needle}`);
   }
 }
 
-console.log(`forgebench_contract_ok benchmark=${benchmark.id} seeds=${benchmark.determinism.default_seeds.length} starter=${bundleDigest} hidden=absent isolation=reference-plus-static-candidate candidate=ollama-prompt-only generated-code=false gameplay=false science=false winner=false seo=hub-download-llms`);
+console.log(`forgebench_contract_ok benchmark=${benchmark.id} seeds=${benchmark.determinism.default_seeds.length} starter=${bundleDigest} visible-contract=${visibleContract.contract_version} reference=${referenceDigest} hidden=absent isolation=reference-plus-static-candidate candidate=ollama-prompt-only generated-code=false gameplay=false science=false winner=false seo=hub-download-llms`);

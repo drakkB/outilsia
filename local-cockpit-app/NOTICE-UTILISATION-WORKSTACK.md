@@ -11,7 +11,7 @@ Périmètre : OutilsIA Local Cockpit, mode **Détails**
 | Workstack Composer | Transformer une carte prête en plan borné avec rôles, budget, permissions et gate humaine. | Aucune exécution, création de worktree, fusion ou publication. |
 | Capability Router | Détecter les CLI et modèles locaux disponibles, puis proposer un planificateur, un exécutant et un vérificateur distinct. | Ne lit pas les jetons, ne vérifie pas les quotas et ne transmet pas la mission aux agents. |
 | Evidence Ledger | Conserver une trace locale chaînée des étapes validées et de leurs empreintes. | Ne stocke ni description brute, prompt, réponse de modèle, credential ou fichier projet. Il ne prouve pas à lui seul la qualité du résultat. |
-| ForgeBench | Préparer un protocole équitable `Signal Maze v1`, sceller localement des seeds privés, matérialiser des espaces frais, tester bubblewrap, exécuter un pilote technique, puis appeler facultativement un modèle Ollama local sur le seul contrat public. | Le code produit par le modèle n'est pas exécuté. Aucun gameplay, test caché, score scientifique ou vainqueur n'est validé. Aucun CLI Codex, Claude ou Hermes n'est encore lancé. |
+| ForgeBench | Préparer un protocole équitable `Signal Maze v1`, publier un contrat de gameplay observable, vérifier une référence clavier/souris/tactile, sceller localement des seeds privés, tester bubblewrap, exécuter un pilote technique, puis appeler facultativement un modèle Ollama local sur le seul contrat public. | La référence visible est jouée, mais le code produit par le modèle n'est pas exécuté. Aucun gameplay candidat, test caché, score scientifique ou vainqueur n'est validé. Aucun CLI Codex, Claude ou Hermes n'est encore lancé. |
 | Workstack Arena | **Prévu après ForgeBench.** Exécuter une Workstack approuvée dans des espaces isolés et remettre le résultat en revue humaine. | Aucune exécution implicite, aucun partage de worktree entre workers et aucune fusion automatique. |
 | MemoryForge / Obsidian | Conserver les décisions, bilans et connaissances durables du projet. | Ne reçoit pas tous les logs, prompts ou sorties brutes du Ledger. |
 | Strategy Arena | Exploiter les capacités IA locales préparées par OutilsIA pour les workflows quant, puis compiler et backtester. | OutilsIA ne génère pas de stratégie financière et ne lance pas de backtest. |
@@ -39,7 +39,7 @@ Périmètre : OutilsIA Local Cockpit, mode **Détails**
 19. Pour tester un modèle local, cocher **Modèle Ollama local**, choisir un modèle déjà installé remonté par Capability Router, puis recréer l'expérience et les workspaces afin de signer cette identité exacte.
 20. Rejouer le préflight isolation et le pilote de référence sur ce batch. Le candidat local ne peut pas réutiliser une ancienne preuve ou un autre backend.
 21. Dans **Candidat Ollama local**, choisir un budget de 3, 5 ou 10 minutes, puis confirmer le second consentement. Il autorise uniquement le modèle local, l'API Ollama de boucle locale et une tentative ; Internet, API payante, suite cachée et exécution du code généré restent interdits.
-22. Contrôler le résultat : génération locale terminée, trois fichiers matérialisés, topologie exacte et sept checks statiques dans un processus séparé. Ce résultat ne signifie pas que le jeu fonctionne.
+22. Contrôler le résultat : génération locale terminée, trois fichiers matérialisés, topologie exacte, API du contrat visible présente et sept groupes de checks statiques dans un processus séparé. Ce résultat ne signifie pas que le jeu fonctionne.
 23. Dans **Evidence Ledger**, sélectionner chaque étape disponible, notamment **Pilote ForgeBench vérifié** puis **Candidat Ollama vérifié**, et cliquer sur **Ajouter la preuve**.
 24. Exporter le JSON du Ledger avant une réinitialisation ou un transfert de machine.
 
@@ -85,7 +85,7 @@ Le Ledger **ne prouve pas** :
 6. `signed_isolation_preflight` : canari bubblewrap signé prouvant la disponibilité de namespaces séparés et d'un montage minimal, sans worker lancé.
 7. `isolated_reference_run` : pilote technique réellement isolé, sans IA candidate, avec durée, coût API nul et sortie brute non conservée.
 8. `independent_visible_verification` : vérification dans un second processus isolé, soumission en lecture seule et six contrôles visibles. Les tests cachés restent absents.
-9. `isolated_local_model_candidate` : modèle Ollama installé appelé sur la seule tâche publique, sortie brute non conservée et soumission vérifiée structurellement par sept checks statiques. Ce niveau ne prouve ni gameplay, qualité, science ou victoire.
+9. `isolated_local_model_candidate` : modèle Ollama installé appelé sur la seule tâche publique, sortie brute non conservée et soumission vérifiée structurellement par sept groupes de checks statiques, dont la présence du contrat visible. Ce niveau ne prouve ni gameplay, qualité, science ou victoire.
 10. `human_decision` : **prévu**, acceptation, rejet ou demande de correction par le propriétaire humain.
 
 ## Ce que prépare ForgeBench
@@ -99,6 +99,14 @@ ForgeBench v0 compile `outilsia.forgebench_experiment.v1`. Chaque stack sélecti
 - une politique future de mesures séparées de résultat, vitesse, efficacité et coût ;
 - un évaluateur indépendant ;
 - une empreinte de protocole identique et exportable.
+
+### Visible Gameplay Contract v1
+
+Le fichier public `forgebench/signal-maze-v1/visible-contract.json` supprime les ambiguïtés du mini-jeu avant toute exécution candidate. Il fixe les dimensions, les huit transformations de coordonnées, la permutation des trois couleurs, la signature FNV-1a du plateau initial, les chemins valides, les collisions, le snapshot `signal-maze-visible-snapshot.v1`, l'API `__SIGNAL_MAZE_VISIBLE_API__` et les IDs DOM observables.
+
+L'implémentation `reference/` est scellée par `reference-manifest.json`. La recette `verify-forgebench-visible-gameplay.py` la joue sur les trois seeds publics, vérifie victoire et reset, exerce clavier, souris et événements tactiles, puis contrôle desktop, Android portrait/paysage et l'absence de requête externe.
+
+Cette preuve est une **preuve de la référence visible uniquement**. Le contrat porte explicitement `candidate_execution_enabled_by_this_contract=false`. Une soumission Ollama peut déclarer les mêmes API et passer les contrôles statiques sans que son JavaScript ait été exécuté ; `gameplay_verified=false` reste donc obligatoire.
 
 Le starter public de `Signal Maze v1` est scellé par un manifeste de fichiers et une empreinte SHA-256. Le vault peut maintenant générer cinq seeds privés et cinq familles de checks dans `forgebench-hidden-suite-v1.json`, sous le dossier applicatif Tauri. L'interface reçoit seulement un reçu signé avec identifiant, compteurs et empreinte.
 
@@ -134,7 +142,7 @@ Le contrat `outilsia.forgebench_ollama_candidate_result.v1` ajoute un adaptateur
 
 Après consentement, OutilsIA interroge uniquement l'API Ollama sur `127.0.0.1`, ou cette même boucle locale depuis WSL. Le modèle reçoit la spécification publique, le starter public et un seed public. Il ne reçoit ni chemin, dépôt, fichier utilisateur, outil, credential, suite privée ou accès Internet. Une seule tentative est permise, avec durée et taille de réponse bornées et coût API maximal de 0 €.
 
-La réponse JSON doit contenir exactement `index.html`, `styles.css` et `game.js`. L'hôte les écrit dans une copie fraîche, refuse toute autre topologie ou ressource externe, puis un second processus bubblewrap monte la soumission en lecture seule et effectue sept contrôles statiques. La réponse brute et les fichiers temporaires sont supprimés avant le retour ; seul un reçu signé avec métriques et empreintes peut rejoindre l'Evidence Ledger.
+La réponse JSON doit contenir exactement `index.html`, `styles.css` et `game.js`. L'hôte les écrit dans une copie fraîche, refuse toute autre topologie ou ressource externe, puis un second processus bubblewrap monte la soumission en lecture seule et effectue sept groupes de contrôles statiques. Les marqueurs de l'API visible, du snapshot et du DOM sont exigés, sans les exécuter. La réponse brute et les fichiers temporaires sont supprimés avant le retour ; seul un reçu signé avec métriques et empreintes peut rejoindre l'Evidence Ledger.
 
 Le code généré n'est volontairement **pas exécuté** dans ce palier. Le résultat conserve obligatoirement `gameplay_verified=false`, `hidden_evaluator_verified=false`, `scientific_eligible=false` et `winner_declared=false`. Le coût API est réellement nul ; la consommation électrique locale reste inconnue, jamais transformée en zéro.
 
@@ -168,6 +176,8 @@ Le fichier persistant se trouve dans le dossier applicatif Tauri sous le nom `ev
 - `outilsia.capability_router_result.v1`
 - `outilsia.capability_routing.v1`
 - `outilsia.forgebench_benchmark.v1`
+- `outilsia.forgebench_visible_gameplay_contract.v1`
+- `outilsia.forgebench_visible_reference_manifest.v1`
 - `outilsia.forgebench_score_policy.v1`
 - `outilsia.forgebench_hidden_suite.v1`
 - `outilsia.forgebench_hidden_suite_receipt.v1`

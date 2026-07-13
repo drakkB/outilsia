@@ -1,0 +1,25 @@
+{
+  "schema": "outilsia.forgebench_visible_reference_manifest.v1",
+  "benchmark_id": "signal-maze-v1",
+  "contract_version": "1.0.0",
+  "digest_algorithm": "sorted-path-sha256-v1",
+  "files": [
+    {
+      "path": "reference/game.js",
+      "sha256": "8d8a172182420d3db4ecc1827755cb429259bae65707d5b9a89d680a86bd4948"
+    },
+    {
+      "path": "reference/index.html",
+      "sha256": "2f1c1d93e0e41028ab1901cfda44d7f713fcd5c666f960194f4f5742a6880de8"
+    },
+    {
+      "path": "reference/styles.css",
+      "sha256": "bbe56779b0b8f0fabe0ba688463d24a4304b98525753630c0951a7482270776b"
+    },
+    {
+      "path": "visible-contract.json",
+      "sha256": "aac5d13b52837dc9a7a517c48a8e5d9fab8b89602ce3ca4d73b2c06a38d01a74"
+    }
+  ],
+  "bundle_sha256": "1f060490a64564fe54e4e254b363520d1365aab60cb16dd1ee9f7a8661b66321"
+}

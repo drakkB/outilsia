@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Signal Maze v1 - Référence visible ForgeBench</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="gameRoot" data-forgebench="signal-maze-v1" data-status="reference" data-state="playing">
+    <section class="game-stage" aria-labelledby="gameTitle">
+      <header class="game-header">
+        <div>
+          <p class="eyebrow">OutilsIA ForgeBench</p>
+          <h1 id="gameTitle">Signal Maze</h1>
+        </div>
+        <output id="gameStatus" class="game-status" aria-live="polite">0/3 signaux reliés</output>
+      </header>
+
+      <div class="game-layout">
+        <div id="signalMazeBoard" class="signal-board" role="grid" aria-label="Plateau Signal Maze 9 par 9"></div>
+
+        <aside class="game-controls" aria-label="Commandes de la partie">
+          <label class="seed-control" for="seedInput">
+            <span>Seed</span>
+            <input id="seedInput" type="number" min="0" max="4294967295" step="1" value="17011" inputmode="numeric">
+          </label>
+          <button id="newGameBtn" class="primary-command" type="button">Nouvelle partie</button>
+          <button id="resetBtn" class="secondary-command" type="button">Réinitialiser</button>
+          <div class="signal-key" aria-label="Trois signaux à connecter">
+            <span class="key-dot key-cyan">Cyan</span>
+            <span class="key-dot key-magenta">Magenta</span>
+            <span class="key-dot key-amber">Ambre</span>
+          </div>
+          <p id="interactionStatus" class="interaction-status" aria-live="polite"></p>
+        </aside>
+      </div>
+    </section>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>

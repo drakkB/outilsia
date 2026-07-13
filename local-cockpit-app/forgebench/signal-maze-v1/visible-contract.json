@@ -1,0 +1,147 @@
+{
+  "schema": "outilsia.forgebench_visible_gameplay_contract.v1",
+  "benchmark_id": "signal-maze-v1",
+  "contract_version": "1.0.0",
+  "status": "public_visible_contract",
+  "purpose": "Rendre la generation, les regles et les observations de Signal Maze deterministes avant toute execution de code candidat.",
+  "board": {
+    "rows": 9,
+    "columns": 9,
+    "pairs_total": 3,
+    "colors": ["cyan", "magenta", "amber"],
+    "cell_kinds": ["empty", "obstacle", "source", "receiver", "path"]
+  },
+  "determinism": {
+    "accepted_seed": "integer in [0, 4294967295]",
+    "seed_u32": "seed >>> 0",
+    "transform_index": "seed_u32 & 7",
+    "color_offset": "floor(seed_u32 / 8) % 3",
+    "role_color": "colors[(role + color_offset) % 3]",
+    "coordinate_transforms": [
+      {"index": 0, "formula": "[row, column]"},
+      {"index": 1, "formula": "[column, 8 - row]"},
+      {"index": 2, "formula": "[8 - row, 8 - column]"},
+      {"index": 3, "formula": "[8 - column, row]"},
+      {"index": 4, "formula": "[row, 8 - column]"},
+      {"index": 5, "formula": "[8 - column, 8 - row]"},
+      {"index": 6, "formula": "[8 - row, column]"},
+      {"index": 7, "formula": "[column, row]"}
+    ],
+    "board_signature": {
+      "algorithm": "fnv1a-32-ascii-v1",
+      "format": "8 lowercase hexadecimal characters",
+      "input": "signal-maze-v1|<seed_u32>|<transform_index>|<color_offset>|<81 row-major initial tokens joined by comma>",
+      "tokens": {
+        "empty": ".",
+        "obstacle": "#",
+        "source": "s:<color>",
+        "receiver": "r:<color>"
+      }
+    }
+  },
+  "base_layout": {
+    "endpoints": [
+      {"role": 0, "source": [1, 1], "receiver": [3, 7]},
+      {"role": 1, "source": [4, 1], "receiver": [4, 7]},
+      {"role": 2, "source": [7, 1], "receiver": [5, 7]}
+    ],
+    "obstacles": [
+      [1, 4],
+      [2, 2], [2, 3], [2, 4], [2, 5], [2, 6],
+      [3, 2], [3, 3], [3, 4], [3, 5], [3, 6],
+      [5, 2], [5, 3], [5, 4], [5, 5], [5, 6],
+      [6, 2], [6, 3], [6, 4], [6, 5], [6, 6],
+      [7, 4]
+    ],
+    "visible_solution_paths": [
+      {
+        "role": 0,
+        "cells": [[1, 1], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [1, 7], [2, 7], [3, 7]]
+      },
+      {
+        "role": 1,
+        "cells": [[4, 1], [4, 2], [4, 3], [4, 4], [4, 5], [4, 6], [4, 7]]
+      },
+      {
+        "role": 2,
+        "cells": [[7, 1], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 6], [8, 7], [7, 7], [6, 7], [5, 7]]
+      }
+    ]
+  },
+  "public_api": {
+    "global": "globalThis.__SIGNAL_MAZE_VISIBLE_API__",
+    "methods": {
+      "newGame": "newGame(seed) -> snapshot; rejects a seed outside the accepted range",
+      "snapshot": "snapshot() -> detached JSON-compatible snapshot",
+      "applyPath": "applyPath(color, cells) -> {accepted, reason, snapshot}",
+      "reset": "reset() -> snapshot using the current seed"
+    },
+    "path_cell": {"row": "integer 0..8", "column": "integer 0..8"},
+    "apply_path_reasons": [
+      "accepted",
+      "unknown_color",
+      "path_too_short",
+      "invalid_cell",
+      "out_of_bounds",
+      "repeated_cell",
+      "non_contiguous",
+      "endpoint_mismatch",
+      "obstacle_collision",
+      "endpoint_collision",
+      "path_collision"
+    ],
+    "replacement_rule": "A valid path replaces the previous path of the same color atomically. A rejected path changes nothing.",
+    "endpoint_rule": "A path starts and ends on the matching source and receiver, in either direction. No endpoint may appear inside a path.",
+    "collision_rule": "A path cannot use an obstacle, another color endpoint or another color path.",
+    "win_rule": "won is true exactly when all three colors have an accepted path."
+  },
+  "snapshot": {
+    "schema": "signal-maze-visible-snapshot.v1",
+    "exact_fields": [
+      "schema", "contract_version", "seed", "seed_u32", "rows", "columns",
+      "board_signature", "state", "pairs_total", "connected_pairs", "won",
+      "colors", "endpoints", "paths", "cells"
+    ],
+    "state_values": ["playing", "won"],
+    "endpoint_order": "canonical colors order",
+    "path_keys": ["cyan", "magenta", "amber"],
+    "cells": "exactly 81 row-major objects with row, column, kind, color and path_color",
+    "detached_result_required": true
+  },
+  "dom": {
+    "required_ids": ["gameRoot", "signalMazeBoard", "newGameBtn", "resetBtn", "gameStatus"],
+    "root_attributes": ["data-forgebench=signal-maze-v1", "data-status=candidate-or-reference", "data-state=playing-or-won"],
+    "board": {"role": "grid", "cells_total": 81},
+    "cell_attributes": ["data-cell", "data-row", "data-column", "data-kind"],
+    "input_modes": ["keyboard", "mouse", "touch"]
+  },
+  "visible_recipe": {
+    "default_seeds": [17011, 17029, 17047],
+    "checks": [
+      "page loads without JavaScript error",
+      "same seed produces the same complete snapshot and signature",
+      "different declared seeds produce different signatures",
+      "all visible solution paths are accepted through the public API",
+      "the third accepted path produces won=true and data-state=won",
+      "reset restores the initial snapshot for the current seed",
+      "desktop 1440x900 has no horizontal overflow",
+      "Android portrait 390x844 has no horizontal overflow",
+      "Android landscape 844x390 has no horizontal overflow",
+      "no external network request is required"
+    ]
+  },
+  "security": {
+    "external_network": false,
+    "external_assets": false,
+    "telemetry": false,
+    "candidate_execution_enabled_by_this_contract": false,
+    "hidden_suite_exposed": false
+  },
+  "claims": {
+    "reference_implementation_may_be_visibly_verified": true,
+    "ollama_candidate_generated_code_executed": false,
+    "ollama_candidate_gameplay_verified": false,
+    "scientific_score_available": false,
+    "winner_available": false
+  }
+}

@@ -8,7 +8,9 @@ const repoRoot = resolve(appRoot, "..");
 const workflowDir = join(repoRoot, ".github", "workflows");
 const crossPath = join(workflowDir, "local-cockpit-cross-platform-beta.yml");
 const linuxPath = join(workflowDir, "local-cockpit-linux-beta.yml");
-const helperPath = "/mnt/c/Users/chris/Desktop/OutilsIA-Local-Cockpit-Linux-Build-Kit/IMPORTER-LINUX-ARTEFACT.cmd";
+const windowsPath = join(workflowDir, "local-cockpit-windows-beta.yml");
+const packagePath = join(appRoot, "package.json");
+const helperGeneratorPath = join(appRoot, "scripts", "make-linux-build-kit.sh");
 
 function fail(message) {
   console.error(message);
@@ -32,7 +34,19 @@ function mustMatch(label, text, regexes) {
 
 const cross = read(crossPath);
 const linux = read(linuxPath);
-const helper = read(helperPath);
+const windows = read(windowsPath);
+const packageJson = JSON.parse(read(packagePath));
+const helperGenerator = read(helperGeneratorPath);
+
+if (!packageJson.scripts?.["verify:forgebench:runtime"]?.includes("test-forgebench-candidate-run.mjs")) {
+  fail("package verify:forgebench:runtime must execute the candidate isolation test");
+}
+if (!packageJson.scripts?.["verify:forgebench:runtime"]?.includes("test-forgebench-reference-run.mjs")) {
+  fail("package verify:forgebench:runtime must execute the reference isolation test");
+}
+if (!packageJson.scripts?.["verify:ci-source"]?.includes("npm run verify:forgebench:runtime")) {
+  fail("package verify:ci-source must include the ForgeBench runtime gate");
+}
 
 mustContain("cross-platform workflow", cross, [
   "workflow_dispatch:",
@@ -44,9 +58,11 @@ mustContain("cross-platform workflow", cross, [
   "runs-on: windows-latest",
   "runs-on: ubuntu-24.04",
   "sudo apt-get install -y",
+  "bubblewrap",
   "libwebkit2gtk-4.1-dev",
   "npm run build:beta:linux",
   "npm run verify:linux:artifacts",
+  "npm run verify:ci-source",
   "name: local-cockpit-windows-web-release",
   "name: local-cockpit-linux-web-release",
   "name: local-cockpit-cross-platform-web-release",
@@ -60,7 +76,8 @@ mustContain("cross-platform workflow", cross, [
 ]);
 mustMatch("cross-platform workflow", cross, [
   /needs:\s*\n\s*-\s*build-windows\s*\n\s*-\s*build-linux/,
-  /if:\s*\$\{\{\s*github\.event\.inputs\.deploy_to_vps == 'true'\s*\}\}/,
+  /DEPLOY_REQUESTED:\s*\$\{\{\s*github\.event\.inputs\.deploy_to_vps\s*\}\}/,
+  /if:\s*\$\{\{\s*steps\.deploy_config\.outputs\.enabled == 'true'\s*\}\}/,
   /Deploy merged release to outilsia\.fr[\s\S]*npm run publish:cross-platform[\s\S]*--deploy/,
 ]);
 
@@ -73,6 +90,7 @@ mustContain("linux workflow", linux, [
   "build_id:",
   "runs-on: ubuntu-24.04",
   "sudo apt-get install -y",
+  "bubblewrap",
   "pkg-config",
   "libwebkit2gtk-4.1-dev",
   "Resolve public build id",
@@ -80,12 +98,18 @@ mustContain("linux workflow", linux, [
   "OUTILSIA_BUILD_ID=$BUILD_ID",
   "npm run build:beta:linux",
   "npm run verify:linux:artifacts",
+  "npm run verify:ci-source",
   "name: outilsia-local-cockpit-linux-web-release",
   "name: outilsia-local-cockpit-linux-tauri-bundles",
   "if-no-files-found: error",
 ]);
 
-mustContain("linux import helper", helper, [
+mustContain("windows workflow", windows, [
+  "runs-on: windows-latest",
+  "npm run verify:ci-source",
+]);
+
+mustContain("linux import helper generator", helperGenerator, [
   "outilsia-local-cockpit-linux-web-release",
   "local-cockpit-linux-web-release",
   "local-cockpit-cross-platform-web-release",

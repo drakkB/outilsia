@@ -17,6 +17,9 @@ for (const required of [
   "--clearenv",
   '--ro-bind "$PWD/workspace" /submission',
   "test ! -e /etc/passwd",
+  'id=\\"signalMazeBoard\\"',
+  "__SIGNAL_MAZE_VISIBLE_API__",
+  "signal-maze-visible-snapshot.v1",
   "checks_passed=7",
   "readonly_verified=true",
 ]) {
@@ -41,9 +44,9 @@ const evaluation = resolve(run, "evaluation");
 mkdirSync(workspace, { recursive: true });
 mkdirSync(evaluation, { recursive: true });
 
-const index = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><link rel="stylesheet" href="styles.css"></head><body><main id="gameRoot" data-forgebench="signal-maze-v1" data-status="candidate"><h1>Signal Maze</h1><button id="newGameBtn">Nouvelle partie</button><button id="resetBtn">Réinitialiser</button><div class="board" aria-label="Plateau"></div></main><script src="game.js"></script></body></html>${" ".repeat(160)}`;
+const index = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><link rel="stylesheet" href="styles.css"></head><body><main id="gameRoot" data-forgebench="signal-maze-v1" data-status="candidate" data-state="playing"><h1>Signal Maze</h1><output id="gameStatus"></output><button id="newGameBtn">Nouvelle partie</button><button id="resetBtn">Réinitialiser</button><div id="signalMazeBoard" class="board" aria-label="Plateau"></div></main><script src="game.js"></script></body></html>${" ".repeat(160)}`;
 const styles = `body{display:grid;min-height:100vh;margin:0}.board{display:grid;grid-template-columns:repeat(9,1fr);gap:2px}${".cell{min-width:1rem;min-height:1rem;border:1px solid #000}".repeat(12)}`;
-const game = `globalThis.__SIGNAL_MAZE_CANDIDATE__={benchmark:"signal-maze-v1",implementation_started:true};\n${"const candidateCell = { row: 0, column: 0 };\n".repeat(40)}`;
+const game = `globalThis.__SIGNAL_MAZE_CANDIDATE__={benchmark:"signal-maze-v1",implementation_started:true};\nconst snapshotSchema="signal-maze-visible-snapshot.v1";function newGame(){} function snapshot(){return {schema:snapshotSchema}} function applyPath(){} function reset(){} globalThis.__SIGNAL_MAZE_VISIBLE_API__={newGame,snapshot,applyPath,reset};\n${"const candidateCell = { row: 0, column: 0 };\n".repeat(40)}`;
 writeFileSync(resolve(workspace, ".outilsia-run-contract.json"), "{}", "utf8");
 writeFileSync(resolve(workspace, "index.html"), index, "utf8");
 writeFileSync(resolve(workspace, "styles.css"), styles, "utf8");

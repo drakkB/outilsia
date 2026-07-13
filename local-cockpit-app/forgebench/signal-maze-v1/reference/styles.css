@@ -1,0 +1,362 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #071014;
+  color: #edf7f4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background:
+    linear-gradient(180deg, rgba(31, 72, 69, 0.22), transparent 42%),
+    #071014;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+#gameRoot {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.game-stage {
+  width: min(100%, 980px);
+}
+
+.game-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.eyebrow {
+  margin: 0 0 3px;
+  color: #87a9a2;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  color: #f7fffc;
+  font-size: clamp(1.55rem, 4vw, 2.3rem);
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.game-status {
+  min-width: 150px;
+  color: #a9c7c1;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+[data-state="won"] .game-status {
+  color: #a8f0cb;
+}
+
+.game-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 620px) minmax(190px, 260px);
+  gap: 20px;
+  align-items: start;
+}
+
+.signal-board {
+  width: min(100%, 620px, calc(100dvh - 116px));
+  aspect-ratio: 1;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  grid-template-rows: repeat(9, minmax(0, 1fr));
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid #31534e;
+  border-radius: 8px;
+  background: #0d1d20;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.3);
+  touch-action: none;
+  user-select: none;
+}
+
+.maze-cell {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid #1f3838;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #122629;
+  color: transparent;
+  cursor: crosshair;
+}
+
+.maze-cell:focus-visible {
+  z-index: 3;
+  outline: 3px solid #f5fbf7;
+  outline-offset: -3px;
+}
+
+.maze-cell[data-kind="obstacle"] {
+  border-color: #263238;
+  background:
+    linear-gradient(135deg, transparent 42%, #5b686c 43%, #5b686c 57%, transparent 58%),
+    #313e42;
+  cursor: not-allowed;
+}
+
+.maze-cell::before,
+.maze-cell::after {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.maze-cell[data-kind="source"]::before,
+.maze-cell[data-kind="receiver"]::before {
+  width: 46%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--signal-color);
+  box-shadow: 0 0 13px color-mix(in srgb, var(--signal-color) 70%, transparent);
+}
+
+.maze-cell[data-kind="receiver"]::after {
+  width: 68%;
+  aspect-ratio: 1;
+  border: 2px solid var(--signal-color);
+  border-radius: 50%;
+}
+
+.maze-cell[data-path-color],
+.maze-cell.is-preview {
+  background:
+    radial-gradient(circle, var(--path-color) 0 25%, transparent 28%),
+    linear-gradient(var(--path-color), var(--path-color)) center / 65% 20% no-repeat,
+    #122629;
+}
+
+.maze-cell.is-preview {
+  opacity: 0.72;
+}
+
+.maze-cell[data-color="cyan"] {
+  --signal-color: #37d9e6;
+}
+
+.maze-cell[data-color="magenta"] {
+  --signal-color: #f05bb5;
+}
+
+.maze-cell[data-color="amber"] {
+  --signal-color: #f4bd4c;
+}
+
+.maze-cell[data-path-color="cyan"],
+.maze-cell.is-preview[data-preview-color="cyan"] {
+  --path-color: #37d9e6;
+}
+
+.maze-cell[data-path-color="magenta"],
+.maze-cell.is-preview[data-preview-color="magenta"] {
+  --path-color: #f05bb5;
+}
+
+.maze-cell[data-path-color="amber"],
+.maze-cell.is-preview[data-preview-color="amber"] {
+  --path-color: #f4bd4c;
+}
+
+.game-controls {
+  display: grid;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.seed-control {
+  display: grid;
+  gap: 5px;
+  color: #a9c7c1;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.seed-control input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #31534e;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #0d1d20;
+  color: #edf7f4;
+}
+
+.primary-command,
+.secondary-command {
+  min-height: 42px;
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primary-command {
+  background: #e7f8f1;
+  color: #0a2621;
+}
+
+.secondary-command {
+  border: 1px solid #3b5b57;
+  background: #132629;
+  color: #d9e9e5;
+}
+
+.primary-command:focus-visible,
+.secondary-command:focus-visible,
+.seed-control input:focus-visible {
+  outline: 3px solid #67bcae;
+  outline-offset: 2px;
+}
+
+.signal-key {
+  display: grid;
+  gap: 7px;
+  padding-top: 6px;
+}
+
+.key-dot {
+  position: relative;
+  min-height: 22px;
+  padding-left: 26px;
+  color: #a9c7c1;
+  font-size: 0.78rem;
+}
+
+.key-dot::before {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.key-cyan { color: #37d9e6; }
+.key-magenta { color: #f05bb5; }
+.key-amber { color: #f4bd4c; }
+
+.interaction-status {
+  min-height: 38px;
+  margin: 4px 0 0;
+  color: #87a9a2;
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 720px) {
+  #gameRoot {
+    place-items: start center;
+    padding: 12px;
+  }
+
+  .game-header {
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .game-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .signal-board {
+    width: min(100%, calc(100dvh - 260px));
+    min-width: 280px;
+    justify-self: center;
+  }
+
+  .game-controls {
+    grid-template-columns: minmax(105px, 1fr) 1fr 1fr;
+    align-items: end;
+  }
+
+  .signal-key,
+  .interaction-status {
+    grid-column: 1 / -1;
+  }
+
+  .signal-key {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  #gameRoot {
+    display: block;
+    padding: 8px 12px;
+  }
+
+  .game-stage {
+    width: 100%;
+  }
+
+  .game-header {
+    display: none;
+  }
+
+  .game-layout {
+    grid-template-columns: minmax(260px, calc(100dvh - 16px)) minmax(220px, 1fr);
+    gap: 14px;
+  }
+
+  .signal-board {
+    width: calc(100dvh - 16px);
+    min-width: 0;
+  }
+
+  .game-controls {
+    grid-template-columns: 1fr 1fr;
+    align-content: center;
+    gap: 8px;
+  }
+
+  .seed-control,
+  .signal-key,
+  .interaction-status {
+    grid-column: 1 / -1;
+  }
+
+  .signal-key {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
