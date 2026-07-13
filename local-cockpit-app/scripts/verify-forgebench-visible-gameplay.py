@@ -337,8 +337,10 @@ def main() -> None:
         raise AssertionError("visible gameplay contract schema mismatch")
     if CONTRACT["security"]["candidate_execution_enabled_by_this_contract"] is not False:
         raise AssertionError("visible contract must not enable candidate execution")
-    if CONTRACT["claims"]["ollama_candidate_gameplay_verified"] is not False:
-        raise AssertionError("visible contract overclaims Ollama candidate gameplay")
+    if CONTRACT["claims"]["ollama_candidate_gameplay_may_be_verified_per_signed_run"] is not True:
+        raise AssertionError("visible contract does not expose the signed-run capability")
+    if CONTRACT["claims"]["public_recipe_is_scientific_score"] is not False:
+        raise AssertionError("visible contract overclaims scientific scoring")
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         screenshots = [

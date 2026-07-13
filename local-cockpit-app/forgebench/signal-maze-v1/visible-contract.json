@@ -139,8 +139,10 @@
   },
   "claims": {
     "reference_implementation_may_be_visibly_verified": true,
-    "ollama_candidate_generated_code_executed": false,
-    "ollama_candidate_gameplay_verified": false,
+    "ollama_candidate_visible_execution_available_in_source": true,
+    "ollama_candidate_gameplay_may_be_verified_per_signed_run": true,
+    "candidate_execution_requires_explicit_run_consent": true,
+    "public_recipe_is_scientific_score": false,
     "scientific_score_available": false,
     "winner_available": false
   }

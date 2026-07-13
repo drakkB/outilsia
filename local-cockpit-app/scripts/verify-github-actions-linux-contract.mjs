@@ -44,6 +44,9 @@ if (!packageJson.scripts?.["verify:forgebench:runtime"]?.includes("test-forgeben
 if (!packageJson.scripts?.["verify:forgebench:runtime"]?.includes("test-forgebench-reference-run.mjs")) {
   fail("package verify:forgebench:runtime must execute the reference isolation test");
 }
+if (!packageJson.scripts?.["verify:forgebench:runtime"]?.includes("test-forgebench-browser-run.mjs")) {
+  fail("package verify:forgebench:runtime must execute the isolated browser gameplay test");
+}
 if (!packageJson.scripts?.["verify:ci-source"]?.includes("npm run verify:forgebench:runtime")) {
   fail("package verify:ci-source must include the ForgeBench runtime gate");
 }
@@ -60,6 +63,9 @@ mustContain("cross-platform workflow", cross, [
   "sudo apt-get install -y",
   "bubblewrap",
   "Enable Bubblewrap namespaces on CI host",
+  "Verify Chromium runtime",
+  "/opt/google/chrome/chrome",
+  "/usr/lib/chromium/chromium",
   "kernel.apparmor_restrict_unprivileged_userns=0",
   "Restore CI namespace policy",
   "OUTILSIA_CI_ORIGINAL_APPARMOR_USERNS",
@@ -96,6 +102,9 @@ mustContain("linux workflow", linux, [
   "sudo apt-get install -y",
   "bubblewrap",
   "Enable Bubblewrap namespaces on CI host",
+  "Verify Chromium runtime",
+  "/opt/google/chrome/chrome",
+  "/usr/lib/chromium/chromium",
   "kernel.apparmor_restrict_unprivileged_userns=0",
   "Restore CI namespace policy",
   "OUTILSIA_CI_ORIGINAL_APPARMOR_USERNS",

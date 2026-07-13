@@ -19,8 +19,8 @@
     },
     {
       "path": "visible-contract.json",
-      "sha256": "aac5d13b52837dc9a7a517c48a8e5d9fab8b89602ce3ca4d73b2c06a38d01a74"
+      "sha256": "1df7bc47ae21be80678072c0228b93e1f1437530e61597b561151e1c9d9e8d5c"
     }
   ],
-  "bundle_sha256": "1f060490a64564fe54e4e254b363520d1365aab60cb16dd1ee9f7a8661b66321"
+  "bundle_sha256": "78d9386af13a83abfaeb992f7f82829f727d4b7a090eedd37f3fe23d494cb658"
 }

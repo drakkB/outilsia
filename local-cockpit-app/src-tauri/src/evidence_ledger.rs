@@ -673,7 +673,7 @@ fn source_contract(event_type: &str, source: &Value) -> Result<Value, String> {
             Ok(json!({
                 "actor": {"kind": "outilsia_component", "id": "forgebench_candidate_runner"},
                 "workstack_id": Value::Null,
-                "proof_level": "isolated_local_model_candidate",
+                "proof_level": "isolated_visible_browser_candidate",
                 "source_integrity_sha256": source.pointer("/integrity/digest").cloned().unwrap_or(Value::Null),
                 "claims": {
                     "run_id": source.get("run_id").cloned().unwrap_or(Value::Null),
@@ -684,19 +684,27 @@ fn source_contract(event_type: &str, source: &Value) -> Result<Value, String> {
                     "selected_backend": source.get("selected_backend").cloned().unwrap_or(Value::Null),
                     "candidate_generation_verified": true,
                     "candidate_submission_structure_verified": true,
-                    "gameplay_verified": false,
+                    "visible_browser_execution_verified": true,
+                    "gameplay_verified": true,
+                    "public_contract_only": true,
+                    "visible_seeds_total": numeric_claim(source, "/browser_evaluator/seeds_total"),
+                    "visible_viewports_total": numeric_claim(source, "/browser_evaluator/viewports_total"),
+                    "visible_checks_passed": numeric_claim(source, "/browser_evaluator/checks_passed"),
+                    "screenshots_total": source.pointer("/browser_evaluator/screenshots").and_then(Value::as_array).map(Vec::len).unwrap_or_default(),
                     "hidden_suite_used": false,
                     "scientific_eligible": false,
                     "winner_declared": false,
                     "submission_digest": source.pointer("/submission/digest").cloned().unwrap_or(Value::Null),
                     "generation_duration_ms": numeric_claim(source, "/generation/duration_ms"),
                     "evaluator_duration_ms": numeric_claim(source, "/evaluator/duration_ms"),
+                    "browser_evaluator_duration_ms": numeric_claim(source, "/browser_evaluator/duration_ms"),
                     "eval_count": numeric_claim(source, "/generation/eval_count")
                 },
                 "execution": {
                     "started": true,
                     "latency_ms": source.pointer("/generation/duration_ms").and_then(Value::as_u64).unwrap_or_default()
-                        + source.pointer("/evaluator/duration_ms").and_then(Value::as_u64).unwrap_or_default(),
+                        + source.pointer("/evaluator/duration_ms").and_then(Value::as_u64).unwrap_or_default()
+                        + source.pointer("/browser_evaluator/duration_ms").and_then(Value::as_u64).unwrap_or_default(),
                     "api_cost_eur": 0,
                     "cost_status": "api_not_incurred_energy_not_measured"
                 },
@@ -1225,11 +1233,15 @@ mod tests {
         let entry = &ledger["entries"][0];
         assert_eq!(
             entry["evidence"]["proof_level"],
-            "isolated_local_model_candidate"
+            "isolated_visible_browser_candidate"
         );
         assert_eq!(entry["execution"]["started"], true);
         assert_eq!(entry["execution"]["api_cost_eur"], 0);
-        assert_eq!(entry["evidence"]["claims"]["gameplay_verified"], false);
+        assert_eq!(
+            entry["evidence"]["claims"]["visible_browser_execution_verified"],
+            true
+        );
+        assert_eq!(entry["evidence"]["claims"]["gameplay_verified"], true);
         assert_eq!(entry["evidence"]["claims"]["scientific_eligible"], false);
         let serialized = serde_json::to_string(&ledger).expect("ledger JSON");
         assert!(!serialized.contains("raw_response"));

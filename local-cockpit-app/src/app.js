@@ -119,8 +119,8 @@ const FORGEBENCH_ISOLATION_PROBE_REQUEST_SCHEMA = "outilsia.forgebench_isolation
 const FORGEBENCH_ISOLATION_PROBE_RESULT_SCHEMA = "outilsia.forgebench_isolation_probe_result.v1";
 const FORGEBENCH_REFERENCE_PILOT_REQUEST_SCHEMA = "outilsia.forgebench_reference_pilot_request.v1";
 const FORGEBENCH_REFERENCE_PILOT_RESULT_SCHEMA = "outilsia.forgebench_reference_pilot_result.v1";
-const FORGEBENCH_OLLAMA_CANDIDATE_REQUEST_SCHEMA = "outilsia.forgebench_ollama_candidate_request.v1";
-const FORGEBENCH_OLLAMA_CANDIDATE_RESULT_SCHEMA = "outilsia.forgebench_ollama_candidate_result.v1";
+const FORGEBENCH_OLLAMA_CANDIDATE_REQUEST_SCHEMA = "outilsia.forgebench_ollama_candidate_request.v2";
+const FORGEBENCH_OLLAMA_CANDIDATE_RESULT_SCHEMA = "outilsia.forgebench_ollama_candidate_result.v2";
 const EVIDENCE_APPEND_REQUEST_SCHEMA = "outilsia.evidence_append_request.v1";
 const EVIDENCE_APPEND_RESULT_SCHEMA = "outilsia.evidence_append_result.v1";
 const EVIDENCE_LEDGER_SCHEMA = "outilsia.evidence_ledger.v1";
@@ -11758,10 +11758,10 @@ function forgeBenchOllamaCandidateResult(result = state.forgeBenchOllamaCandidat
     || !/^[a-f0-9]{64}$/i.test(String(result?.integrity?.digest || ""))
     || !/^fbo-[A-Za-z0-9_-]{1,76}$/.test(String(result?.run_id || ""))
     || result?.benchmark?.id !== "signal-maze-v1"
-    || result?.benchmark?.track !== "local_model_prompt_only_candidate"
+    || result?.benchmark?.track !== "local_model_visible_browser_candidate"
     || result?.batch_ref?.stack_key !== "ollama-local"
     || !["linux-bwrap-native", "wsl-bwrap"].includes(result?.selected_backend)
-    || result?.candidate?.adapter_kind !== "ollama_local_prompt_only_v1"
+    || result?.candidate?.adapter_kind !== "ollama_local_visible_browser_v2"
     || !isForgeBenchOllamaCandidateId(result?.candidate?.candidate_id)
     || !/^[A-Za-z0-9._:/-]{1,180}$/.test(String(result?.candidate?.model_ref || ""))
     || !["native", "wsl"].includes(result?.candidate?.runtime)
@@ -11779,13 +11779,13 @@ function forgeBenchOllamaCandidateResult(result = state.forgeBenchOllamaCandidat
     || result?.reference_pilot_ref?.integrity_digest !== reference.integrity?.digest
     || result?.selected_backend !== isolation?.selected_backend
     || result?.consent?.confirmed !== true
-    || result?.consent?.scope !== "ollama_local_candidate_v1"
+    || result?.consent?.scope !== "ollama_local_visible_browser_candidate_v2"
     || result?.consent?.candidate_model_allowed !== true
     || result?.consent?.external_network_access !== false
     || result?.consent?.loopback_ollama_allowed !== true
     || result?.consent?.paid_api_allowed !== false
     || result?.consent?.hidden_suite_allowed !== false
-    || result?.consent?.generated_code_execution_allowed !== false
+    || result?.consent?.generated_code_execution_allowed !== true
     || result?.budget?.max_attempts !== 1
     || result?.budget?.max_api_cost_eur !== 0
     || result?.budget?.max_output_bytes !== 524288
@@ -11802,7 +11802,7 @@ function forgeBenchOllamaCandidateResult(result = state.forgeBenchOllamaCandidat
     || result?.submission?.materialized !== true
     || result?.submission?.exact_topology_verified !== true
     || result?.submission?.files_total !== 4
-    || result?.submission?.generated_code_executed !== false
+    || result?.submission?.generated_code_executed !== true
     || !/^[a-f0-9]{64}$/i.test(String(result?.submission?.digest || ""))
     || result?.evaluator?.kind !== "deterministic_visible_static_gate"
     || result?.evaluator?.started !== true
@@ -11815,6 +11815,29 @@ function forgeBenchOllamaCandidateResult(result = state.forgeBenchOllamaCandidat
     || result?.evaluator?.visible_checks_total !== 7
     || result?.evaluator?.visible_checks_passed !== 7
     || result?.evaluator?.submission_digest !== result?.submission?.digest
+    || result?.browser_evaluator?.kind !== "chromium_visible_gameplay_gate"
+    || result?.browser_evaluator?.controller_kind !== "trusted_public_contract_controller_v1"
+    || result?.browser_evaluator?.browser_family !== "chromium"
+    || !["system", "playwright_cache"].includes(result?.browser_evaluator?.browser_origin)
+    || result?.browser_evaluator?.started !== true
+    || result?.browser_evaluator?.succeeded !== true
+    || result?.browser_evaluator?.timed_out !== false
+    || !(Number(result?.browser_evaluator?.duration_ms) > 0)
+    || result?.browser_evaluator?.independent_process !== true
+    || result?.browser_evaluator?.workspace_read_only !== true
+    || result?.browser_evaluator?.execution_copy_ephemeral !== true
+    || result?.browser_evaluator?.network_namespace_enforced !== true
+    || result?.browser_evaluator?.hidden_suite_used !== false
+    || result?.browser_evaluator?.public_contract_only !== true
+    || result?.browser_evaluator?.seeds_total !== 3
+    || result?.browser_evaluator?.viewports_total !== 3
+    || JSON.stringify(result?.browser_evaluator?.input_modes) !== JSON.stringify(["keyboard", "mouse", "touch"])
+    || result?.browser_evaluator?.checks_total !== 39
+    || result?.browser_evaluator?.checks_passed !== 39
+    || !Array.isArray(result?.browser_evaluator?.screenshots)
+    || result.browser_evaluator.screenshots.length !== 3
+    || result.browser_evaluator.screenshots.some((capture) => !/^[a-f0-9]{64}$/i.test(String(capture?.sha256 || "")))
+    || result?.browser_evaluator?.submission_digest !== result?.submission?.digest
     || result?.security?.candidate_received_public_prompt_only !== true
     || result?.security?.candidate_filesystem_context_supplied !== false
     || result?.security?.candidate_tool_access !== false
@@ -11825,7 +11848,7 @@ function forgeBenchOllamaCandidateResult(result = state.forgeBenchOllamaCandidat
     || result?.security?.credentials_read_by_outilsia !== false
     || result?.security?.raw_model_output_returned !== false
     || result?.security?.raw_model_output_persisted !== false
-    || result?.security?.generated_code_executed !== false
+    || result?.security?.generated_code_executed !== true
     || result?.security?.evaluator_process_isolated !== true
     || result?.security?.temporary_workspace_removed !== true
     || result?.security?.paths_returned !== false
@@ -11835,11 +11858,12 @@ function forgeBenchOllamaCandidateResult(result = state.forgeBenchOllamaCandidat
     || result?.cost?.energy_status !== "not_measured"
     || result?.readiness?.candidate_generation_verified !== true
     || result?.readiness?.candidate_submission_structure_verified !== true
-    || result?.readiness?.gameplay_verified !== false
+    || result?.readiness?.visible_browser_execution_verified !== true
+    || result?.readiness?.gameplay_verified !== true
     || result?.readiness?.hidden_evaluator_verified !== false
     || result?.readiness?.scientific_eligible !== false
     || result?.readiness?.winner_declared !== false
-    || !["generated_code_not_executed", "gameplay_not_verified", "hidden_suite_not_evaluated", "multi_seed_not_completed", "peer_candidates_not_run", "local_energy_not_measured"]
+    || !["visible_contract_public_and_gameable", "hidden_suite_not_evaluated", "peer_candidates_not_run", "local_energy_not_measured"]
       .every((blocker) => blockers.includes(blocker))
   ) return null;
   return result;
@@ -11868,7 +11892,7 @@ function renderForgeBenchCandidatePanel() {
   if (forgeBenchCandidateBusy) {
     els.forgeBenchCandidateState.textContent = "génération locale";
     els.forgeBenchCandidateBox.className = "forgebench-candidate-box empty";
-    els.forgeBenchCandidateBox.textContent = "Le modèle reçoit la tâche publique. Sa réponse brute reste en mémoire, puis un évaluateur statique séparé contrôle la soumission.";
+    els.forgeBenchCandidateBox.textContent = "Le modèle reçoit la tâche publique. Après le contrôle statique, Chromium exécute une copie éphémère sans réseau sur trois formats d'écran.";
     return;
   }
   if (forgeBenchCandidateError) {
@@ -11880,12 +11904,13 @@ function renderForgeBenchCandidatePanel() {
   if (result) {
     const generationSeconds = (Number(result.generation?.duration_ms || 0) / 1000).toFixed(1);
     const evaluatorMs = Number(result.evaluator?.duration_ms || 0);
-    els.forgeBenchCandidateState.textContent = "soumission structurée vérifiée";
+    const browserSeconds = (Number(result.browser_evaluator?.duration_ms || 0) / 1000).toFixed(1);
+    els.forgeBenchCandidateState.textContent = "gameplay visible vérifié";
     els.forgeBenchCandidateBox.className = "forgebench-candidate-box";
     els.forgeBenchCandidateBox.innerHTML = `
-      <strong>${escapeHtml(result.candidate.model_ref)} a généré une soumission · contrôle statique 7/7 · contrat visible v1 présent</strong>
-      <span>${escapeHtml(result.candidate.runtime === "wsl" ? "Ollama WSL" : "Ollama natif")} · génération ${generationSeconds} s · évaluateur ${evaluatorMs} ms · ${escapeHtml(result.generation?.eval_count || 0)} tokens mesurés</span>
-      <small>Code non exécuté · gameplay non vérifié · énergie locale non mesurée · aucun test caché, score ou vainqueur</small>
+      <strong>${escapeHtml(result.candidate.model_ref)} · code exécuté sans réseau · gameplay visible 39/39</strong>
+      <span>${escapeHtml(result.candidate.runtime === "wsl" ? "Ollama WSL" : "Ollama natif")} · génération ${generationSeconds} s · statique ${evaluatorMs} ms · navigateur ${browserSeconds} s · 3 captures vérifiées</span>
+      <small>3 seeds · desktop + Android portrait/paysage · clavier, souris, tactile · test public rejouable, donc aucun score caché ni vainqueur</small>
     `;
     return;
   }
@@ -11902,7 +11927,7 @@ function renderForgeBenchCandidatePanel() {
   } else if (!isolationReady || !workspacesReady) {
     els.forgeBenchCandidateBox.textContent = "Prépare les workspaces et vérifie l'isolation avant le candidat local.";
   } else {
-    els.forgeBenchCandidateBox.textContent = "Le modèle recevra uniquement le contrat public. Le code produit sera contrôlé mais pas exécuté.";
+    els.forgeBenchCandidateBox.textContent = "Le modèle recevra uniquement le contrat public. Chromium doit être disponible dans Linux/WSL pour exécuter le code sans réseau.";
   }
 }
 
@@ -11924,7 +11949,7 @@ async function runForgeBenchOllamaCandidate() {
     || ![180, 300, 600].includes(durationSeconds)
   ) return null;
   const modelRef = forgeBenchCandidateModelRef(candidate.candidate_id);
-  if (!window.confirm(`Lancer ${modelRef} comme candidat ForgeBench ?\n\nBudget : ${durationSeconds} secondes, 1 tentative, coût API maximal 0 €. Le modèle reçoit uniquement la tâche publique. Le code produit n'est pas exécuté et aucun test caché n'est ouvert.`)) return null;
+  if (!window.confirm(`Lancer ${modelRef} comme candidat ForgeBench ?\n\nBudget : ${durationSeconds} secondes, 1 tentative, coût API maximal 0 €. Après validation statique, le code sera exécuté dans Chromium isolé sans réseau sur 3 seeds et 3 viewports. Aucun test caché, score scientifique ou vainqueur.`)) return null;
   forgeBenchCandidateBusy = true;
   forgeBenchCandidateError = "";
   state.forgeBenchOllamaCandidate = null;
@@ -11939,13 +11964,13 @@ async function runForgeBenchOllamaCandidate() {
         isolation_result: isolation,
         consent: {
           confirmed: true,
-          scope: "ollama_local_candidate_v1",
+          scope: "ollama_local_visible_browser_candidate_v2",
           candidate_model_allowed: true,
           external_network_access: false,
           loopback_ollama_allowed: true,
           paid_api_allowed: false,
           hidden_suite_allowed: false,
-          generated_code_execution_allowed: false
+          generated_code_execution_allowed: true
         },
         budget: {
           max_duration_seconds: durationSeconds,
@@ -11959,7 +11984,7 @@ async function runForgeBenchOllamaCandidate() {
     state.forgeBenchOllamaCandidate = result;
     if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "forgebench_ollama_candidate_verified";
     renderEvidenceLedgerPanel();
-    setStatus(`Soumission ${modelRef} contrôlée structurellement`, "ok");
+    setStatus(`Gameplay visible de ${modelRef} vérifié dans Chromium isolé`, "ok");
     return result;
   } catch (error) {
     forgeBenchCandidateError = String(error || "Candidat Ollama impossible");
@@ -17594,20 +17619,21 @@ function installTestHarness() {
         schema: FORGEBENCH_OLLAMA_CANDIDATE_RESULT_SCHEMA,
         contract_version: "2026-07-13",
         run_id: "fbo-demo-local-candidate",
-        benchmark: { id: "signal-maze-v1", track: "local_model_prompt_only_candidate" },
+        benchmark: { id: "signal-maze-v1", track: "local_model_visible_browser_candidate" },
         batch_ref: { batch_id: "fbsb-demo-signal-maze", experiment_digest: "f".repeat(64), protocol_digest: protocolDigest, stack_key: "ollama-local", public_seed_sha256: "5".repeat(64) },
         reference_pilot_ref: { pilot_id: "fbp-demo-reference-run", integrity_digest: "7".repeat(64) },
         host_environment: "linux",
         selected_backend: "linux-bwrap-native",
-        candidate: { candidate_id: "local-model:ollama_native:hermes3:8b", adapter_kind: "ollama_local_prompt_only_v1", model_ref: "hermes3:8b", runtime: "native", environment: "ollama_native", model_invoked: true, cli_agent_invoked: false },
-        consent: { confirmed: true, scope: "ollama_local_candidate_v1", candidate_model_allowed: true, external_network_access: false, loopback_ollama_allowed: true, paid_api_allowed: false, hidden_suite_allowed: false, generated_code_execution_allowed: false },
+        candidate: { candidate_id: "local-model:ollama_native:hermes3:8b", adapter_kind: "ollama_local_visible_browser_v2", model_ref: "hermes3:8b", runtime: "native", environment: "ollama_native", model_invoked: true, cli_agent_invoked: false },
+        consent: { confirmed: true, scope: "ollama_local_visible_browser_candidate_v2", candidate_model_allowed: true, external_network_access: false, loopback_ollama_allowed: true, paid_api_allowed: false, hidden_suite_allowed: false, generated_code_execution_allowed: true },
         budget: { max_duration_seconds: 300, max_attempts: 1, max_api_cost_eur: 0, max_output_bytes: 524288 },
         generation: { started: true, succeeded: true, timed_out: false, attempts: 1, duration_ms: 9321, prompt_sha256: "8".repeat(64), response_sha256: "9".repeat(64), response_chars: 12842, prompt_eval_count: 2140, eval_count: 1620, eval_duration_ms: 8950, total_duration_ms: 9310, raw_response_returned: false, raw_response_persisted: false },
-        submission: { materialized: true, exact_topology_verified: true, files_total: 4, bytes_total: 12706, digest: "a".repeat(64), generated_code_executed: false },
+        submission: { materialized: true, exact_topology_verified: true, files_total: 4, bytes_total: 12706, digest: "a".repeat(64), generated_code_executed: true },
         evaluator: { kind: "deterministic_visible_static_gate", started: true, succeeded: true, timed_out: false, duration_ms: 142, independent_process: true, workspace_read_only: true, network_namespace_enforced: true, hidden_suite_used: false, visible_checks_total: 7, visible_checks_passed: 7, submission_digest: "a".repeat(64) },
-        security: { candidate_received_public_prompt_only: true, candidate_filesystem_context_supplied: false, candidate_tool_access: false, external_network_requested: false, loopback_ollama_requested: true, source_repository_mounted: false, hidden_suite_mounted: false, credentials_read_by_outilsia: false, raw_model_output_returned: false, raw_model_output_persisted: false, generated_code_executed: false, evaluator_process_isolated: true, temporary_workspace_removed: true, paths_returned: false },
+        browser_evaluator: { kind: "chromium_visible_gameplay_gate", controller_kind: "trusted_public_contract_controller_v1", browser_family: "chromium", browser_origin: "system", started: true, succeeded: true, timed_out: false, duration_ms: 4312, independent_process: true, workspace_read_only: true, execution_copy_ephemeral: true, network_namespace_enforced: true, hidden_suite_used: false, public_contract_only: true, seeds_total: 3, viewports_total: 3, input_modes: ["keyboard", "mouse", "touch"], checks_total: 39, checks_passed: 39, screenshots: [{ label: "desktop", width: 1440, height: 900, bytes: 48120, sha256: "c".repeat(64) }, { label: "android-portrait", width: 390, height: 844, bytes: 31920, sha256: "d".repeat(64) }, { label: "android-landscape", width: 844, height: 390, bytes: 30210, sha256: "e".repeat(64) }], submission_digest: "a".repeat(64) },
+        security: { candidate_received_public_prompt_only: true, candidate_filesystem_context_supplied: false, candidate_tool_access: false, external_network_requested: false, loopback_ollama_requested: true, source_repository_mounted: false, hidden_suite_mounted: false, credentials_read_by_outilsia: false, raw_model_output_returned: false, raw_model_output_persisted: false, generated_code_executed: true, evaluator_process_isolated: true, temporary_workspace_removed: true, paths_returned: false },
         cost: { api_cost_eur: 0, api_status: "not_incurred", local_energy_wh: null, energy_status: "not_measured" },
-        readiness: { candidate_generation_verified: true, candidate_submission_structure_verified: true, gameplay_verified: false, hidden_evaluator_verified: false, scientific_eligible: false, winner_declared: false, blockers: ["generated_code_not_executed", "gameplay_not_verified", "hidden_suite_not_evaluated", "multi_seed_not_completed", "peer_candidates_not_run", "local_energy_not_measured"] },
+        readiness: { candidate_generation_verified: true, candidate_submission_structure_verified: true, visible_browser_execution_verified: true, gameplay_verified: true, hidden_evaluator_verified: false, scientific_eligible: false, winner_declared: false, blockers: ["visible_contract_public_and_gameable", "hidden_suite_not_evaluated", "peer_candidates_not_run", "local_energy_not_measured"] },
         integrity: { digest: "b".repeat(64) },
         test_mode: true
       };

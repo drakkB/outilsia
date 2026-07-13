@@ -107,16 +107,23 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         if forbidden in pilot_json:
             raise AssertionError(f"{label}: reference pilot leaked {forbidden!r}")
     candidate = proof["candidate"]
-    if candidate["schema"] != "outilsia.forgebench_ollama_candidate_result.v1":
+    if candidate["schema"] != "outilsia.forgebench_ollama_candidate_result.v2":
         raise AssertionError(f"{label}: Ollama candidate schema mismatch")
     if candidate["candidate"]["model_invoked"] is not True or candidate["candidate"]["cli_agent_invoked"] is not False:
         raise AssertionError(f"{label}: Ollama invocation claim mismatch")
-    if candidate["submission"]["generated_code_executed"] is not False:
-        raise AssertionError(f"{label}: candidate fixture claims generated-code execution")
+    if candidate["submission"]["generated_code_executed"] is not True:
+        raise AssertionError(f"{label}: candidate fixture omits generated-code execution")
     if candidate["evaluator"]["visible_checks_passed"] != 7 or candidate["evaluator"]["workspace_read_only"] is not True:
         raise AssertionError(f"{label}: static candidate evaluator claim mismatch")
-    if candidate["readiness"]["gameplay_verified"] is not False or candidate["readiness"]["scientific_eligible"] is not False or candidate["readiness"]["winner_declared"] is not False:
-        raise AssertionError(f"{label}: candidate overclaims gameplay, science or winner")
+    browser = candidate["browser_evaluator"]
+    if browser["kind"] != "chromium_visible_gameplay_gate" or browser["checks_passed"] != 39:
+        raise AssertionError(f"{label}: browser evaluator claim mismatch")
+    if browser["seeds_total"] != 3 or browser["viewports_total"] != 3 or len(browser["screenshots"]) != 3:
+        raise AssertionError(f"{label}: browser evidence is incomplete")
+    if candidate["readiness"]["visible_browser_execution_verified"] is not True or candidate["readiness"]["gameplay_verified"] is not True:
+        raise AssertionError(f"{label}: candidate visible gameplay proof missing")
+    if candidate["readiness"]["scientific_eligible"] is not False or candidate["readiness"]["winner_declared"] is not False:
+        raise AssertionError(f"{label}: candidate overclaims science or winner")
     if candidate["cost"]["api_cost_eur"] != 0 or candidate["cost"]["local_energy_wh"] is not None:
         raise AssertionError(f"{label}: candidate cost truth mismatch")
     candidate_json = json.dumps(candidate, sort_keys=True)
@@ -161,11 +168,11 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "soumission montée en lecture seule",
         "Aucun Codex, Claude, Hermes ou modèle local exécuté",
         "Candidat Ollama local",
-        "soumission structurée vérifiée",
-        "hermes3:8b a généré une soumission · contrôle statique 7/7 · contrat visible v1 présent",
-        "Code non exécuté",
-        "gameplay non vérifié",
-        "énergie locale non mesurée",
+        "gameplay visible vérifié",
+        "hermes3:8b · code exécuté sans réseau · gameplay visible 39/39",
+        "3 captures vérifiées",
+        "3 seeds · desktop + Android portrait/paysage · clavier, souris, tactile",
+        "aucun score caché ni vainqueur",
         "Aucun agent lancé",
         "aucun score calculé",
         "aucun vainqueur déclaré",

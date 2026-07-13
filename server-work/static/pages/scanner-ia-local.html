@@ -184,16 +184,16 @@
 
     <section class="px-4 py-10" id="forgebench-workspaces-stacks-ia">
       <div class="max-w-6xl mx-auto card p-5 md:p-7" style="border-color:rgba(94,193,225,.38);background:rgba(15,23,42,.94);">
-        <span class="pill">ForgeBench Ollama Candidate v0 · source, non public</span>
-        <h2 class="text-3xl md:text-4xl font-black mt-4">Un premier modèle local candidat, sans lui ouvrir votre PC</h2>
-        <p class="muted mt-3 text-lg">Après le pilote technique, le candidat source peut appeler un modèle Ollama déjà installé sur la seule tâche publique Signal Maze. Le modèle rend exactement trois fichiers ; un second processus isolé vérifie leur structure sans exécuter le code.</p>
+        <span class="pill">ForgeBench Ollama Browser v1 · source, non public</span>
+        <h2 class="text-3xl md:text-4xl font-black mt-4">Faire construire puis jouer un mini-jeu par un modèle local, sans lui ouvrir votre PC</h2>
+        <p class="muted mt-3 text-lg">Après le pilote technique, ForgeBench peut appeler un modèle Ollama déjà installé sur la seule tâche publique Signal Maze. Le modèle rend exactement trois fichiers ; ils passent un contrôle statique puis une exécution Chromium isolée sans réseau.</p>
         <div class="grid md:grid-cols-4 gap-3 mt-6">
           <article class="card p-4"><strong class="cyan">Identité signée</strong><p class="mini mt-2">Runtime Windows ou WSL et référence exacte du modèle sont liés au protocole et au batch.</p></article>
           <article class="card p-4"><strong class="cyan">Prompt public seulement</strong><p class="mini mt-2">Aucun dépôt, fichier personnel, outil, credential, seed privé ou accès Internet n'est fourni au modèle.</p></article>
           <article class="card p-4"><strong class="cyan">Contrôle statique 7/7</strong><p class="mini mt-2">Topologie, tailles, API du contrat visible v1, ressources externes et montage en lecture seule sont vérifiés séparément.</p></article>
-          <article class="card p-4"><strong class="cyan">Limites visibles</strong><p class="mini mt-2">Code non exécuté, gameplay non vérifié, énergie locale inconnue, aucun test caché, score ou vainqueur.</p></article>
+          <article class="card p-4"><strong class="cyan">Gameplay visible 39/39</strong><p class="mini mt-2">Trois seeds, desktop, Android portrait/paysage, clavier, souris, tactile et trois captures éphémères vérifiées.</p></article>
         </div>
-        <p class="mini mt-5"><strong>Visible Gameplay Contract v1 :</strong> la génération du plateau, le snapshot et les règles observables sont maintenant versionnés ; une référence séparée gagne sur trois seeds et tient sur desktop et Android. Cette preuve concerne la référence, pas le code Ollama, qui reste non exécuté et non joué. Fonction présente dans les sources après le build public actuel. Aucun Codex, Claude Code ou Hermes n'est lancé ; aucune comparaison scientifique n'est encore annoncée.</p>
+        <p class="mini mt-5"><strong>Visible Gameplay Contract v1 :</strong> après consentement explicite, une copie éphémère du code Ollama est réellement jouée dans Chromium sous bubblewrap. Le workspace original reste en lecture seule, le réseau est séparé et seules les empreintes des captures rejoignent la preuve. La recette étant publique, ce résultat prouve le gameplay visible du run, pas un score scientifique. Fonction présente dans les sources après le build public actuel. Aucun Codex, Claude Code ou Hermes n'est lancé ; aucun test caché, classement ou vainqueur n'est encore annoncé.</p>
         <div class="flex flex-wrap gap-3 mt-6">
           <a class="btn btn-primary" href="/telecharger-scanner-ia-local">Voir la bêta Windows/Linux actuelle</a>
           <a class="btn btn-secondary" href="/comment-nous-testons">Lire la méthode de test</a>

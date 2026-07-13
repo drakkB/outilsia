@@ -33,9 +33,9 @@
     "version": "1.0.0",
     "path": "signal-maze-v1/visible-contract.json",
     "reference_manifest": "signal-maze-v1/reference-manifest.json",
-    "reference_bundle_sha256": "1f060490a64564fe54e4e254b363520d1365aab60cb16dd1ee9f7a8661b66321",
+    "reference_bundle_sha256": "78d9386af13a83abfaeb992f7f82829f727d4b7a090eedd37f3fe23d494cb658",
     "reference_gameplay_verified": true,
-    "candidate_execution_enabled": false,
+    "candidate_execution_enabled": true,
     "candidate_gameplay_verified": false
   },
   "visible_checks": [

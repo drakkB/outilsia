@@ -46,6 +46,17 @@ jobs:
           fi
           bwrap --version
 
+      - name: Verify Chromium runtime
+        run: |
+          for browser in /opt/google/chrome/chrome /usr/lib/chromium/chromium /usr/lib/chromium-browser/chromium-browser; do
+            if [ -x "$browser" ]; then
+              "$browser" --version
+              exit 0
+            fi
+          done
+          echo "No supported Chromium runtime found on the Linux runner" >&2
+          exit 1
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

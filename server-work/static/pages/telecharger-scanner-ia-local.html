@@ -167,16 +167,16 @@
     </section>
 
     <section class="wrap panel" id="forgebench-workspaces-stacks-ia" style="margin-bottom:18px;border-color:rgba(94,193,225,.36);background:rgba(15,23,42,.92)">
-      <span class="pill">ForgeBench Ollama Candidate v0 · source, non public</span>
-      <h2>Un modèle Ollama local peut produire une soumission bornée</h2>
-      <p class="muted">Après le pilote de référence, le candidat source peut appeler un modèle déjà installé via la boucle locale Ollama. Il reçoit seulement la tâche publique Signal Maze et doit rendre exactement trois fichiers ; le code produit n'est pas exécuté.</p>
+      <span class="pill">ForgeBench Ollama Browser v1 · source, non public</span>
+      <h2>Un modèle Ollama local peut produire puis faire jouer une soumission bornée</h2>
+      <p class="muted">Après le pilote de référence, le candidat source peut appeler un modèle déjà installé via la boucle locale Ollama. Il reçoit seulement la tâche publique Signal Maze, rend exactement trois fichiers, puis Chromium les exécute sous bubblewrap sans réseau.</p>
       <div class="proof" style="margin-top:14px">
         <div><strong>Consentement séparé</strong><span>Une tentative, durée bornée, coût API maximal 0 € et modèle déjà installé.</span></div>
         <div><strong>Contexte minimal</strong><span>Aucun fichier utilisateur, outil, dépôt, credential, seed caché ou Internet donné au modèle.</span></div>
         <div><strong>Contrôle statique 7/7</strong><span>API du contrat visible v1 présente et soumission montée en lecture seule dans un évaluateur bubblewrap séparé.</span></div>
-        <div><strong>Preuve honnête</strong><span>Génération et structure vérifiées ; gameplay, énergie, tests cachés, science et victoire non vérifiés.</span></div>
+        <div><strong>Gameplay visible 39/39</strong><span>Trois seeds, trois viewports, clavier, souris, tactile et trois captures dont seules les empreintes sont conservées.</span></div>
       </div>
-      <p class="fine"><strong>Visible Gameplay Contract v1 :</strong> une référence distincte est jouée sur trois seeds, clavier, souris, tactile, desktop et Android. Le candidat Ollama ne l'est pas : son code reste non exécuté et son gameplay non vérifié. Fonction présente dans les sources après le build public actuel ; elle ne doit pas être attribuée au téléchargement disponible aujourd'hui. Aucun Codex, Claude Code ou Hermes n'est lancé et aucun score scientifique ou vainqueur n'est annoncé.</p>
+      <p class="fine"><strong>Visible Gameplay Contract v1 :</strong> après consentement, le code candidat est réellement joué dans une copie éphémère Chromium, avec workspace original en lecture seule et namespace réseau séparé. Cette recette publique peut établir le gameplay visible d'un run signé, mais pas une note scientifique ou un vainqueur. Fonction présente dans les sources après le build public actuel ; elle ne doit pas être attribuée au téléchargement disponible aujourd'hui. Aucun Codex, Claude Code ou Hermes n'est lancé, aucun test caché n'est ouvert et l'énergie locale reste non mesurée.</p>
     </section>
 
     <section class="wrap panel" id="model-autopilot-reglages-ollama" style="margin-bottom:18px;border-color:rgba(34,197,94,.36);background:linear-gradient(135deg,rgba(34,197,94,.10),rgba(15,23,42,.92),rgba(103,232,249,.07))">

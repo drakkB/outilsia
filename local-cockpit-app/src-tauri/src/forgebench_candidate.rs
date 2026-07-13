@@ -1,4 +1,7 @@
 use crate::forgebench::validate_forgebench_result;
+use crate::forgebench_browser::{
+    evaluate_visible_browser, preflight_visible_browser, validate_visible_browser_evidence,
+};
 use crate::forgebench_runner::{
     isolated_command, selected_backend, validate_forgebench_reference_pilot_result,
 };
@@ -19,10 +22,10 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
 
-const REQUEST_SCHEMA: &str = "outilsia.forgebench_ollama_candidate_request.v1";
-const RESULT_SCHEMA: &str = "outilsia.forgebench_ollama_candidate_result.v1";
+const REQUEST_SCHEMA: &str = "outilsia.forgebench_ollama_candidate_request.v2";
+const RESULT_SCHEMA: &str = "outilsia.forgebench_ollama_candidate_result.v2";
 const CONTRACT_VERSION: &str = "2026-07-13";
-const CONSENT_SCOPE: &str = "ollama_local_candidate_v1";
+const CONSENT_SCOPE: &str = "ollama_local_visible_browser_candidate_v2";
 const BENCHMARK_ID: &str = "signal-maze-v1";
 const STACK_KEY: &str = "ollama-local";
 const RUN_ROOT: &str = "forgebench-ollama-candidate-runs-v1";
@@ -42,11 +45,9 @@ const MIN_DURATION_SECONDS: u64 = 30;
 const MAX_DURATION_SECONDS: u64 = 600;
 const FIXED_OUTPUT_BUDGET_BYTES: u64 = 512 * 1024;
 const EXPECTED_FILES: [&str; 4] = [RUN_CONTRACT_FILE, "game.js", "index.html", "styles.css"];
-const REQUIRED_BLOCKERS: [&str; 6] = [
-    "generated_code_not_executed",
-    "gameplay_not_verified",
+const REQUIRED_BLOCKERS: [&str; 4] = [
+    "visible_contract_public_and_gameable",
     "hidden_suite_not_evaluated",
-    "multi_seed_not_completed",
     "peer_candidates_not_run",
     "local_energy_not_measured",
 ];
@@ -295,7 +296,7 @@ fn validate_consent(consent: &Value) -> Result<(), String> {
         || consent
             .get("generated_code_execution_allowed")
             .and_then(Value::as_bool)
-            != Some(false)
+            != Some(true)
     {
         return Err("Consentement du candidat Ollama absent ou trop large.".to_string());
     }
@@ -424,7 +425,8 @@ CONTRAT DE SORTIE STRICT
 - game_js implemente globalThis.__SIGNAL_MAZE_VISIBLE_API__ avec exactement newGame, snapshot, applyPath et reset, ainsi que le snapshot signal-maze-visible-snapshot.v1.
 - Aucun URL, import, fetch, WebSocket, iframe, formulaire, ressource externe ou telemetrie.
 - Aucun contenu cache, depot, credential ou test prive n'est disponible.
-- Ce contrat public ne signifie pas que ForgeBench executera ou validera le code produit dans ce palier.
+- Apres consentement explicite, ForgeBench executera ces trois fichiers dans Chromium headless isole par Bubblewrap, sans reseau, sur trois seeds et trois viewports visibles.
+- Cette recette publique est volontairement rejouable et ne produit ni score scientifique, ni comparaison cachee, ni vainqueur.
 
 SPECIFICATION PUBLIQUE
 {BENCHMARK_SPEC}
@@ -969,6 +971,7 @@ pub(crate) fn validate_forgebench_ollama_candidate_result(result: &Value) -> Res
             "generation",
             "submission",
             "evaluator",
+            "browser_evaluator",
             "security",
             "cost",
             "readiness",
@@ -984,7 +987,7 @@ pub(crate) fn validate_forgebench_ollama_candidate_result(result: &Value) -> Res
             .is_none_or(|value| !safe_id(value, "fbo-"))
         || result.pointer("/benchmark/id").and_then(Value::as_str) != Some(BENCHMARK_ID)
         || result.pointer("/benchmark/track").and_then(Value::as_str)
-            != Some("local_model_prompt_only_candidate")
+            != Some("local_model_visible_browser_candidate")
         || !matches!(
             result.get("selected_backend").and_then(Value::as_str),
             Some("linux-bwrap-native" | "wsl-bwrap")
@@ -1085,7 +1088,8 @@ pub(crate) fn validate_forgebench_ollama_candidate_result(result: &Value) -> Res
         ""
     };
     let expected_candidate_id = format!("local-model:{expected_environment}:{model_ref}");
-    if candidate.get("adapter_kind").and_then(Value::as_str) != Some("ollama_local_prompt_only_v1")
+    if candidate.get("adapter_kind").and_then(Value::as_str)
+        != Some("ollama_local_visible_browser_v2")
         || candidate
             .get("model_ref")
             .and_then(Value::as_str)
@@ -1192,7 +1196,7 @@ pub(crate) fn validate_forgebench_ollama_candidate_result(result: &Value) -> Res
         || submission
             .get("generated_code_executed")
             .and_then(Value::as_bool)
-            != Some(false)
+            != Some(true)
     {
         return Err("Soumission candidate invalide.".to_string());
     }
@@ -1245,6 +1249,13 @@ pub(crate) fn validate_forgebench_ollama_candidate_result(result: &Value) -> Res
     {
         return Err("Evaluation visible candidate invalide.".to_string());
     }
+    validate_visible_browser_evidence(
+        result.get("browser_evaluator").unwrap_or(&Value::Null),
+        submission
+            .get("digest")
+            .and_then(Value::as_str)
+            .unwrap_or_default(),
+    )?;
     exact_keys(
         result.get("security").unwrap_or(&Value::Null),
         &[
@@ -1275,7 +1286,6 @@ pub(crate) fn validate_forgebench_ollama_candidate_result(result: &Value) -> Res
         "credentials_read_by_outilsia",
         "raw_model_output_returned",
         "raw_model_output_persisted",
-        "generated_code_executed",
         "paths_returned",
     ] {
         if security.get(key).and_then(Value::as_bool) != Some(false) {
@@ -1285,6 +1295,7 @@ pub(crate) fn validate_forgebench_ollama_candidate_result(result: &Value) -> Res
     for key in [
         "candidate_received_public_prompt_only",
         "loopback_ollama_requested",
+        "generated_code_executed",
         "evaluator_process_isolated",
         "temporary_workspace_removed",
     ] {
@@ -1319,6 +1330,7 @@ pub(crate) fn validate_forgebench_ollama_candidate_result(result: &Value) -> Res
         &[
             "candidate_generation_verified",
             "candidate_submission_structure_verified",
+            "visible_browser_execution_verified",
             "gameplay_verified",
             "hidden_evaluator_verified",
             "scientific_eligible",
@@ -1344,7 +1356,11 @@ pub(crate) fn validate_forgebench_ollama_candidate_result(result: &Value) -> Res
             .get("candidate_submission_structure_verified")
             .and_then(Value::as_bool)
             != Some(true)
-        || readiness.get("gameplay_verified").and_then(Value::as_bool) != Some(false)
+        || readiness
+            .get("visible_browser_execution_verified")
+            .and_then(Value::as_bool)
+            != Some(true)
+        || readiness.get("gameplay_verified").and_then(Value::as_bool) != Some(true)
         || readiness
             .get("hidden_evaluator_verified")
             .and_then(Value::as_bool)
@@ -1481,6 +1497,7 @@ pub(crate) async fn run_forgebench_ollama_candidate(
             return Err("Le candidat ne correspond pas au batch pilote verifie.".to_string());
         }
         create_private_directory(&evaluation)?;
+        preflight_visible_browser(&run_dir)?;
         let prompt = candidate_prompt(source.public_seed);
         let prompt_digest = sha256_bytes(prompt.as_bytes());
         let generation = generate_candidate(&identity, &prompt, timeout).await?;
@@ -1511,6 +1528,7 @@ pub(crate) async fn run_forgebench_ollama_candidate(
         {
             return Err("L'evaluateur statique a refuse la soumission Ollama.".to_string());
         }
+        let browser_evaluator = evaluate_visible_browser(&run_dir, &submission_digest)?;
         let reference_digest = request
             .reference_pilot_result
             .pointer("/integrity/digest")
@@ -1520,7 +1538,7 @@ pub(crate) async fn run_forgebench_ollama_candidate(
             "schema": RESULT_SCHEMA,
             "contract_version": CONTRACT_VERSION,
             "run_id": run_id,
-            "benchmark": {"id": BENCHMARK_ID, "track": "local_model_prompt_only_candidate"},
+            "benchmark": {"id": BENCHMARK_ID, "track": "local_model_visible_browser_candidate"},
             "batch_ref": {
                 "batch_id": source.batch_id,
                 "experiment_digest": source.experiment_digest,
@@ -1536,7 +1554,7 @@ pub(crate) async fn run_forgebench_ollama_candidate(
             "selected_backend": backend,
             "candidate": {
                 "candidate_id": identity.candidate_id,
-                "adapter_kind": "ollama_local_prompt_only_v1",
+                "adapter_kind": "ollama_local_visible_browser_v2",
                 "model_ref": identity.model_ref,
                 "runtime": identity.runtime,
                 "environment": identity.environment,
@@ -1566,8 +1584,8 @@ pub(crate) async fn run_forgebench_ollama_candidate(
                 "exact_topology_verified": true,
                 "files_total": EXPECTED_FILES.len(),
                 "bytes_total": submission_bytes,
-                "digest": submission_digest
-                ,"generated_code_executed": false
+                "digest": submission_digest,
+                "generated_code_executed": true
             },
             "evaluator": {
                 "kind": EVALUATOR_KIND,
@@ -1583,6 +1601,7 @@ pub(crate) async fn run_forgebench_ollama_candidate(
                 "visible_checks_passed": 7,
                 "submission_digest": submission_digest
             },
+            "browser_evaluator": browser_evaluator,
             "security": {
                 "candidate_received_public_prompt_only": true,
                 "candidate_filesystem_context_supplied": false,
@@ -1594,7 +1613,7 @@ pub(crate) async fn run_forgebench_ollama_candidate(
                 "credentials_read_by_outilsia": false,
                 "raw_model_output_returned": false,
                 "raw_model_output_persisted": false,
-                "generated_code_executed": false,
+                "generated_code_executed": true,
                 "evaluator_process_isolated": true,
                 "temporary_workspace_removed": true,
                 "paths_returned": false
@@ -1608,7 +1627,8 @@ pub(crate) async fn run_forgebench_ollama_candidate(
             "readiness": {
                 "candidate_generation_verified": true,
                 "candidate_submission_structure_verified": true,
-                "gameplay_verified": false,
+                "visible_browser_execution_verified": true,
+                "gameplay_verified": true,
                 "hidden_evaluator_verified": false,
                 "scientific_eligible": false,
                 "winner_declared": false,
@@ -1657,7 +1677,7 @@ pub(crate) mod tests {
             "schema": RESULT_SCHEMA,
             "contract_version": CONTRACT_VERSION,
             "run_id": "fbo-test-ollama-candidate",
-            "benchmark": {"id": BENCHMARK_ID, "track": "local_model_prompt_only_candidate"},
+            "benchmark": {"id": BENCHMARK_ID, "track": "local_model_visible_browser_candidate"},
             "batch_ref": {
                 "batch_id": "fbsb-test-batch",
                 "experiment_digest": "a".repeat(64),
@@ -1670,7 +1690,7 @@ pub(crate) mod tests {
             "selected_backend": "linux-bwrap-native",
             "candidate": {
                 "candidate_id": "local-model:ollama_native:qwen3:8b",
-                "adapter_kind": "ollama_local_prompt_only_v1",
+                "adapter_kind": "ollama_local_visible_browser_v2",
                 "model_ref": "qwen3:8b",
                 "runtime": "native",
                 "environment": "ollama_native",
@@ -1685,7 +1705,7 @@ pub(crate) mod tests {
                 "loopback_ollama_allowed": true,
                 "paid_api_allowed": false,
                 "hidden_suite_allowed": false,
-                "generated_code_execution_allowed": false
+                "generated_code_execution_allowed": true
             },
             "budget": {"max_duration_seconds": 300, "max_attempts": 1, "max_api_cost_eur": 0, "max_output_bytes": FIXED_OUTPUT_BUDGET_BYTES},
             "generation": {
@@ -1695,11 +1715,12 @@ pub(crate) mod tests {
                 "eval_duration_ms": 1000, "total_duration_ms": 1200,
                 "raw_response_returned": false, "raw_response_persisted": false
             },
-            "submission": {"materialized": true, "exact_topology_verified": true, "files_total": 4, "bytes_total": 10000, "digest": "1".repeat(64), "generated_code_executed": false},
+            "submission": {"materialized": true, "exact_topology_verified": true, "files_total": 4, "bytes_total": 10000, "digest": "1".repeat(64), "generated_code_executed": true},
             "evaluator": {"kind": EVALUATOR_KIND, "started": true, "succeeded": true, "timed_out": false, "duration_ms": 15, "independent_process": true, "workspace_read_only": true, "network_namespace_enforced": true, "hidden_suite_used": false, "visible_checks_total": 7, "visible_checks_passed": 7, "submission_digest": "1".repeat(64)},
-            "security": {"candidate_received_public_prompt_only": true, "candidate_filesystem_context_supplied": false, "candidate_tool_access": false, "external_network_requested": false, "loopback_ollama_requested": true, "source_repository_mounted": false, "hidden_suite_mounted": false, "credentials_read_by_outilsia": false, "raw_model_output_returned": false, "raw_model_output_persisted": false, "generated_code_executed": false, "evaluator_process_isolated": true, "temporary_workspace_removed": true, "paths_returned": false},
+            "browser_evaluator": crate::forgebench_browser::test_visible_browser_evidence(&"1".repeat(64)),
+            "security": {"candidate_received_public_prompt_only": true, "candidate_filesystem_context_supplied": false, "candidate_tool_access": false, "external_network_requested": false, "loopback_ollama_requested": true, "source_repository_mounted": false, "hidden_suite_mounted": false, "credentials_read_by_outilsia": false, "raw_model_output_returned": false, "raw_model_output_persisted": false, "generated_code_executed": true, "evaluator_process_isolated": true, "temporary_workspace_removed": true, "paths_returned": false},
             "cost": {"api_cost_eur": 0, "api_status": "not_incurred", "local_energy_wh": Value::Null, "energy_status": "not_measured"},
-            "readiness": {"candidate_generation_verified": true, "candidate_submission_structure_verified": true, "gameplay_verified": false, "hidden_evaluator_verified": false, "scientific_eligible": false, "winner_declared": false, "blockers": REQUIRED_BLOCKERS}
+            "readiness": {"candidate_generation_verified": true, "candidate_submission_structure_verified": true, "visible_browser_execution_verified": true, "gameplay_verified": true, "hidden_evaluator_verified": false, "scientific_eligible": false, "winner_declared": false, "blockers": REQUIRED_BLOCKERS}
         });
         sign_document(&mut document).unwrap();
         document
@@ -1737,19 +1758,27 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn rehashing_cannot_forge_scientific_or_gameplay_claims() {
+    fn rehashing_cannot_forge_scientific_or_execution_claims() {
         let document = signed_result();
         validate_forgebench_ollama_candidate_result(&document).unwrap();
         for pointer in [
-            "/readiness/gameplay_verified",
             "/readiness/hidden_evaluator_verified",
             "/readiness/scientific_eligible",
             "/readiness/winner_declared",
+        ] {
+            let mut forged = document.clone();
+            *forged.pointer_mut(pointer).unwrap() = json!(true);
+            sign_document(&mut forged).unwrap();
+            assert!(validate_forgebench_ollama_candidate_result(&forged).is_err());
+        }
+        for pointer in [
+            "/readiness/visible_browser_execution_verified",
+            "/readiness/gameplay_verified",
             "/submission/generated_code_executed",
             "/security/generated_code_executed",
         ] {
             let mut forged = document.clone();
-            *forged.pointer_mut(pointer).unwrap() = json!(true);
+            *forged.pointer_mut(pointer).unwrap() = json!(false);
             sign_document(&mut forged).unwrap();
             assert!(validate_forgebench_ollama_candidate_result(&forged).is_err());
         }

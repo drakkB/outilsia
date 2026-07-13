@@ -76,8 +76,10 @@ if (
 }
 if (
   visibleContract.security?.candidate_execution_enabled_by_this_contract !== false
-  || visibleContract.claims?.ollama_candidate_generated_code_executed !== false
-  || visibleContract.claims?.ollama_candidate_gameplay_verified !== false
+  || visibleContract.claims?.ollama_candidate_visible_execution_available_in_source !== true
+  || visibleContract.claims?.ollama_candidate_gameplay_may_be_verified_per_signed_run !== true
+  || visibleContract.claims?.candidate_execution_requires_explicit_run_consent !== true
+  || visibleContract.claims?.public_recipe_is_scientific_score !== false
   || visibleContract.claims?.scientific_score_available !== false
   || visibleContract.claims?.winner_available !== false
 ) {
@@ -108,7 +110,7 @@ const referenceDigest = sha256(`${referenceLines.join("\n")}\n`);
 if (
   referenceDigest !== referenceManifest.bundle_sha256
   || referenceDigest !== benchmark.visible_gameplay_contract?.reference_bundle_sha256
-  || benchmark.visible_gameplay_contract?.candidate_execution_enabled !== false
+  || benchmark.visible_gameplay_contract?.candidate_execution_enabled !== true
   || benchmark.visible_gameplay_contract?.candidate_gameplay_verified !== false
 ) {
   throw new Error("visible reference bundle or candidate truth mismatch");
@@ -129,7 +131,7 @@ for (const marker of [
   if (!referenceSource.includes(marker)) throw new Error(`visible reference marker missing: ${marker}`);
 }
 
-const rust = ["forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "forgebench_candidate.rs", "evidence_ledger.rs"]
+const rust = ["forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_candidate.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri", "src", name), "utf8"))
   .join("\n");
 const js = readFileSync(resolve(root, "src", "app.js"), "utf8");
@@ -165,17 +167,19 @@ for (const needle of [
   '"candidate_worker_execution_ready": false',
   '"hidden_suite_used": false',
   "isolated_reference_run",
-  "outilsia.forgebench_ollama_candidate_result.v1",
-  "ollama_local_prompt_only_v1",
+  "outilsia.forgebench_ollama_candidate_result.v2",
+  "ollama_local_visible_browser_v2",
   "candidate_runtime_supported",
   "http://127.0.0.1:11434/api/chat",
   ".no_proxy()",
   '"--noproxy"',
   ".chunk()",
   '"raw_model_output_returned": false',
-  '"generated_code_executed": false',
+  '"generated_code_executed": true',
   "deterministic_visible_static_gate",
-  "isolated_local_model_candidate",
+  "chromium_visible_gameplay_gate",
+  "trusted_public_contract_controller_v1",
+  "isolated_visible_browser_candidate",
   "outilsia.forgebench_visible_gameplay_contract.v1",
   "__SIGNAL_MAZE_VISIBLE_API__",
   "signal-maze-visible-snapshot.v1",
@@ -194,19 +198,19 @@ for (const needle of [
   "pilote technique séparé disponible",
   "Worker de référence réussi · évaluateur indépendant 6/6",
   "Aucun Codex, Claude, Hermes ou modèle local exécuté",
-  "soumission structurée vérifiée",
-  "Code non exécuté · gameplay non vérifié · énergie locale non mesurée",
+  "gameplay visible vérifié",
+  "code exécuté sans réseau · gameplay visible 39/39",
 ]) {
   if (!js.includes(needle)) throw new Error(`missing UI truth label: ${needle}`);
 }
 for (const [label, text, needles] of [
-  ["hub", hub, ["forgebench-workspaces-stacks-ia", "ForgeBench Ollama Candidate v0 · source, non public", "modèle Ollama déjà installé", "Contrôle statique 7/7", "Visible Gameplay Contract v1", "Cette preuve concerne la référence, pas le code Ollama", "Code non exécuté", "Aucun Codex, Claude Code ou Hermes", "ForgeBench peut-il déjà tester un modèle Ollama local ou lancer Codex, Claude Code et Hermes ?"]],
-  ["download", download, ["forgebench-workspaces-stacks-ia", "ForgeBench Ollama Candidate v0 · source, non public", "modèle déjà installé via la boucle locale Ollama", "Contrôle statique 7/7", "Visible Gameplay Contract v1", "Le candidat Ollama ne l'est pas", "Génération et structure vérifiées", "Aucun Codex, Claude Code ou Hermes", "ForgeBench peut-il déjà tester un modèle Ollama local ou lancer Codex, Claude Code et Hermes ?"]],
-  ["llms", llms, ["ForgeBench Ollama Candidate v0 (source candidate, not in the current public build)", "Visible Gameplay Contract v1", "separate reference implementation passes three seeds", "This reference proof does not validate the Ollama submission", "already-installed native or WSL Ollama model", "generated code is not executed", "no hidden evaluation, scientific score, CLI-agent comparison or winner"]],
+  ["hub", hub, ["forgebench-workspaces-stacks-ia", "ForgeBench Ollama Browser v1 · source, non public", "modèle Ollama déjà installé", "Contrôle statique 7/7", "Gameplay visible 39/39", "Chromium sous bubblewrap", "recette étant publique", "Aucun Codex, Claude Code ou Hermes", "ForgeBench peut-il déjà tester un modèle Ollama local ou lancer Codex, Claude Code et Hermes ?"]],
+  ["download", download, ["forgebench-workspaces-stacks-ia", "ForgeBench Ollama Browser v1 · source, non public", "modèle déjà installé via la boucle locale Ollama", "Contrôle statique 7/7", "Gameplay visible 39/39", "copie éphémère Chromium", "pas une note scientifique", "Aucun Codex, Claude Code ou Hermes", "ForgeBench peut-il déjà tester un modèle Ollama local ou lancer Codex, Claude Code et Hermes ?"]],
+  ["llms", llms, ["ForgeBench Ollama Browser v1 (source candidate, not in the current public build)", "Visible Gameplay Contract v1", "ephemeral instrumented copy in headless Chromium", "three seeds", "desktop plus Android portrait/landscape", "39 public checks", "public recipe is gameable", "scientific score, CLI-agent comparison and winner remain unavailable"]],
 ]) {
   for (const needle of needles) {
     if (!text.includes(needle)) throw new Error(`missing ForgeBench SEO/GEO truth on ${label}: ${needle}`);
   }
 }
 
-console.log(`forgebench_contract_ok benchmark=${benchmark.id} seeds=${benchmark.determinism.default_seeds.length} starter=${bundleDigest} visible-contract=${visibleContract.contract_version} reference=${referenceDigest} hidden=absent isolation=reference-plus-static-candidate candidate=ollama-prompt-only generated-code=false gameplay=false science=false winner=false seo=hub-download-llms`);
+console.log(`forgebench_contract_ok benchmark=${benchmark.id} seeds=${benchmark.determinism.default_seeds.length} starter=${bundleDigest} visible-contract=${visibleContract.contract_version} reference=${referenceDigest} hidden=absent isolation=reference-plus-static-plus-browser candidate=ollama-visible-browser generated-code=true gameplay-visible=true checks=39 science=false winner=false seo=hub-download-llms`);
