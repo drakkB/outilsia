@@ -38,6 +38,14 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
+      - name: Enable Bubblewrap namespaces on CI host
+        run: |
+          if sysctl -N kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
+            echo "OUTILSIA_CI_ORIGINAL_APPARMOR_USERNS=$(sysctl -n kernel.apparmor_restrict_unprivileged_userns)" >> "$GITHUB_ENV"
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          bwrap --version
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -64,6 +72,13 @@ jobs:
 
       - name: Verify UI and source contracts
         run: npm run verify:ci-source
+
+      - name: Restore CI namespace policy
+        if: ${{ always() }}
+        run: |
+          if [ -n "${OUTILSIA_CI_ORIGINAL_APPARMOR_USERNS:-}" ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns="$OUTILSIA_CI_ORIGINAL_APPARMOR_USERNS"
+          fi
 
       - name: Resolve public build id
         env:

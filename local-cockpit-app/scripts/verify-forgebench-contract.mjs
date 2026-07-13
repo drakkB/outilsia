@@ -17,6 +17,10 @@ const hub = readFileSync(resolve(repoRoot, "server-work", "static", "pages", "sc
 const download = readFileSync(resolve(repoRoot, "server-work", "static", "pages", "telecharger-scanner-ia-local.html"), "utf8");
 const llms = readFileSync(resolve(repoRoot, "server-work", "static", "llms.txt"), "utf8");
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+const canonicalTextBytes = (value) => Buffer.from(
+  Buffer.from(value).toString("utf8").replace(/\r\n/g, "\n").replace(/\r/g, "\n"),
+  "utf8",
+);
 
 if (benchmark.schema !== "outilsia.forgebench_benchmark.v1" || benchmark.id !== "signal-maze-v1") {
   throw new Error("forgebench benchmark contract mismatch");
@@ -44,12 +48,15 @@ for (const permission of ["benchmark_contract_write", "visible_tests_write", "hi
 if (manifest.schema !== "outilsia.forgebench_starter_manifest.v1" || manifest.benchmark_id !== benchmark.id) {
   throw new Error("starter manifest mismatch");
 }
+if (manifest.text_canonicalization !== "newline-lf-v1") {
+  throw new Error("starter manifest must declare canonical LF text hashing");
+}
 const lines = [];
 for (const file of [...manifest.files].sort((left, right) => left.path.localeCompare(right.path))) {
   if (!/^starter\/[a-z0-9._/-]+$/.test(file.path) || file.path.includes("..")) {
     throw new Error(`unsafe starter path: ${file.path}`);
   }
-  const bytes = readFileSync(resolve(root, "forgebench", "signal-maze-v1", file.path));
+  const bytes = canonicalTextBytes(readFileSync(resolve(root, "forgebench", "signal-maze-v1", file.path)));
   const digest = sha256(bytes);
   if (digest !== file.sha256) throw new Error(`starter digest mismatch: ${file.path}`);
   lines.push(`${file.path}:${digest}`);
@@ -83,6 +90,7 @@ if (
   referenceManifest.schema !== "outilsia.forgebench_visible_reference_manifest.v1"
   || referenceManifest.benchmark_id !== benchmark.id
   || referenceManifest.contract_version !== visibleContract.contract_version
+  || referenceManifest.text_canonicalization !== "newline-lf-v1"
 ) {
   throw new Error("visible reference manifest mismatch");
 }
@@ -91,7 +99,7 @@ for (const file of [...referenceManifest.files].sort((left, right) => left.path.
   if (!/^(reference\/(game\.js|index\.html|styles\.css)|visible-contract\.json)$/.test(file.path)) {
     throw new Error(`unsafe visible reference path: ${file.path}`);
   }
-  const bytes = readFileSync(resolve(root, "forgebench", "signal-maze-v1", file.path));
+  const bytes = canonicalTextBytes(readFileSync(resolve(root, "forgebench", "signal-maze-v1", file.path)));
   const digest = sha256(bytes);
   if (digest !== file.sha256) throw new Error(`visible reference digest mismatch: ${file.path}`);
   referenceLines.push(`${file.path}:${digest}`);

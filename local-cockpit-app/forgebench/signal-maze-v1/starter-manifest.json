@@ -2,6 +2,7 @@
   "schema": "outilsia.forgebench_starter_manifest.v1",
   "benchmark_id": "signal-maze-v1",
   "digest_algorithm": "sorted-path-sha256-v1",
+  "text_canonicalization": "newline-lf-v1",
   "files": [
     {
       "path": "starter/game.js",

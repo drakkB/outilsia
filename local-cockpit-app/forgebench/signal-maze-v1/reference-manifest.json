@@ -3,6 +3,7 @@
   "benchmark_id": "signal-maze-v1",
   "contract_version": "1.0.0",
   "digest_algorithm": "sorted-path-sha256-v1",
+  "text_canonicalization": "newline-lf-v1",
   "files": [
     {
       "path": "reference/game.js",

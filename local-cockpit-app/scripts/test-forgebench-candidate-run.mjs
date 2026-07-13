@@ -36,6 +36,12 @@ if (process.platform !== "linux") {
 
 const bwrap = spawnSync("bwrap", ["--version"], { encoding: "utf8" });
 if (bwrap.status !== 0) throw new Error("bubblewrap is required for the Linux ForgeBench candidate runtime test");
+const diagnostic = (result) => [result.stdout, result.stderr]
+  .filter(Boolean)
+  .join(" | ")
+  .replace(/\s+/g, " ")
+  .trim()
+  .slice(0, 1200) || "no process output";
 
 const temporary = mkdtempSync(resolve(tmpdir(), "outilsia-forgebench-candidate-"));
 const run = resolve(temporary, "run");
@@ -64,7 +70,7 @@ const digestForWorkspace = () => {
 try {
   const accepted = spawnSync("sh", ["-c", evaluatorScript], { cwd: run, encoding: "utf8", timeout: 15_000 });
   if (accepted.status !== 0 || !accepted.stdout.includes("evaluator_marker=forgebench-ollama-static-evaluator-ok")) {
-    throw new Error(`candidate evaluator failed status=${accepted.status} signal=${accepted.signal || "none"}`);
+    throw new Error(`candidate evaluator failed status=${accepted.status} signal=${accepted.signal || "none"} diagnostic=${diagnostic(accepted)}`);
   }
   if (JSON.stringify(readdirSync(workspace).sort()) !== JSON.stringify(expectedFiles)) {
     throw new Error("candidate evaluator changed the submission topology");
