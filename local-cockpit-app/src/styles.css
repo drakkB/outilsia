@@ -2350,6 +2350,73 @@ dd {
   margin-top: 4px;
 }
 
+.arena-preflight {
+  background: rgba(4, 9, 12, 0.42);
+  border: 1px solid rgba(139, 163, 174, 0.18);
+  border-radius: 7px;
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+}
+
+.arena-preflight.is-ready {
+  border-color: rgba(134, 239, 172, 0.28);
+}
+
+.arena-preflight.is-warning {
+  border-color: rgba(241, 201, 107, 0.40);
+}
+
+.arena-preflight-head {
+  align-items: start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.arena-preflight-head span {
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 850;
+  text-align: right;
+}
+
+.arena-preflight-list {
+  display: grid;
+}
+
+.arena-preflight-row {
+  align-items: start;
+  border-top: 1px solid rgba(139, 163, 174, 0.14);
+  display: grid;
+  gap: 4px 12px;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.15fr);
+  padding: 7px 0;
+}
+
+.arena-preflight-row > strong,
+.arena-preflight-row > span,
+.arena-preflight-row > small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.arena-preflight-row > span,
+.arena-preflight > p,
+.arena-preflight-list > p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.arena-preflight-row > small {
+  color: var(--amber);
+  font-size: 10px;
+  grid-column: 1 / -1;
+  line-height: 1.4;
+}
+
 .arena-grid {
   display: grid;
   gap: 8px;
@@ -5124,6 +5191,18 @@ dd {
 
   .benchmark-preflight-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .arena-preflight-head {
+    display: grid;
+  }
+
+  .arena-preflight-head span {
+    text-align: left;
+  }
+
+  .arena-preflight-row {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .status-strip,

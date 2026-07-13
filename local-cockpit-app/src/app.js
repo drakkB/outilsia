@@ -662,6 +662,7 @@ let operationConsoleLines = [];
 let activeInstallModel = "";
 let operationLive = false;
 let primaryAnalysisBusy = false;
+let arenaBusy = false;
 let recommendationEngineBusy = false;
 let privateWorkloadBusy = false;
 let boardObserverBusy = false;
@@ -7878,7 +7879,7 @@ function renderFirstTestPanel() {
   renderPrimaryAction();
 }
 
-function arenaCandidates() {
+function arenaCandidatePool() {
   const compatibility = state.compatibility?.compatibility || state.compatibility || {};
   const recommended = sortRecommendedModels(extractModels(compatibility).filter((model) => actionableOllamaRef(model))).slice(0, 4);
   const installed = (state.scan?.installed_models || []).map((model) => {
@@ -7901,7 +7902,11 @@ function arenaCandidates() {
     const ref = normalizeOllamaRef(actionableOllamaRef(model));
     if (ref && !byRef.has(ref)) byRef.set(ref, model);
   }
-  return [...byRef.values()].slice(0, 6);
+  return [...byRef.values()];
+}
+
+function arenaCandidates() {
+  return arenaCandidatePool().slice(0, 6);
 }
 
 function promptForgeModelContext() {
@@ -8249,7 +8254,7 @@ function savePromptForgeToMemory() {
 }
 
 function arenaInstalledCandidates(limit = 3) {
-  const candidates = arenaCandidates().filter((model) => isOllamaModelInstalled(actionableOllamaRef(model)));
+  const candidates = arenaCandidatePool().filter((model) => isOllamaModelInstalled(actionableOllamaRef(model)));
   const preferred = [];
   const seen = new Set();
   const add = (model) => {
@@ -8258,10 +8263,96 @@ function arenaInstalledCandidates(limit = 3) {
     seen.add(ref);
     preferred.push(model);
   };
-  candidates.find((model) => normalizeOllamaRef(actionableOllamaRef(model)) === "qwen3:0.6b") && add(candidates.find((model) => normalizeOllamaRef(actionableOllamaRef(model)) === "qwen3:0.6b"));
-  candidates.filter((model) => normalizeOllamaRef(actionableOllamaRef(model)).includes("hermes")).forEach(add);
-  candidates.filter((model) => !normalizeOllamaRef(actionableOllamaRef(model)).includes("hermes")).forEach(add);
+  const byLighterRun = (left, right) => {
+    const leftRef = actionableOllamaRef(left);
+    const rightRef = actionableOllamaRef(right);
+    const timeoutDelta = benchmarkTimeoutSeconds(leftRef) - benchmarkTimeoutSeconds(rightRef);
+    if (timeoutDelta) return timeoutDelta;
+    return Number(modelInstallSizeBudget(leftRef).estimated_download_gb || 0)
+      - Number(modelInstallSizeBudget(rightRef).estimated_download_gb || 0);
+  };
+  const baseline = candidates.find((model) => normalizeOllamaRef(actionableOllamaRef(model)) === "qwen3:0.6b");
+  if (baseline) add(baseline);
+  const hermes = candidates
+    .filter((model) => normalizeOllamaRef(actionableOllamaRef(model)).includes("hermes"))
+    .sort(byLighterRun);
+  if (hermes[0]) add(hermes[0]);
+  candidates
+    .filter((model) => !normalizeOllamaRef(actionableOllamaRef(model)).includes("hermes"))
+    .forEach(add);
+  hermes.slice(1).forEach(add);
   return preferred.slice(0, limit);
+}
+
+function arenaPreflightState(limit = 3) {
+  const models = arenaInstalledCandidates(limit);
+  const candidates = models.map((model) => {
+    const ref = actionableOllamaRef(model);
+    const snapshot = benchmarkPreflightSnapshot(ref);
+    const timeoutSeconds = Math.max(60, Number(snapshot?.timeout_seconds || benchmarkTimeoutSeconds(ref)));
+    return {
+      definition: model,
+      ref,
+      ...snapshot,
+      arena_timeout_seconds: timeoutSeconds
+    };
+  });
+  const totalTimeoutSeconds = candidates.reduce((sum, candidate) => sum + candidate.arena_timeout_seconds, 0);
+  const budgetMinutes = Math.max(1, Math.ceil(totalTimeoutSeconds / 60));
+  const blocking = candidates.filter((candidate) => !candidate.installed || candidate.installing || !candidate.runtime);
+  return {
+    candidates,
+    model_count: candidates.length,
+    warning_count: candidates.filter((candidate) => candidate.tone === "warning").length,
+    total_timeout_seconds: totalTimeoutSeconds,
+    budget_minutes: budgetMinutes,
+    downloads: 0,
+    can_run: candidates.length >= 2 && blocking.length === 0,
+    blocking_reason: candidates.length < 2
+      ? "Deux modèles installés sont requis."
+      : blocking.length
+        ? "Un candidat n'a pas encore de runtime exécutable confirmé."
+        : ""
+  };
+}
+
+function arenaConfirmationText(preflight = arenaPreflightState()) {
+  const lines = preflight.candidates.map((candidate) => (
+    `- ${candidate.label} · ${candidate.runtime_label} · ${candidate.size_label} · ${candidate.arena_timeout_seconds} s max`
+  ));
+  return [
+    `Lancer la même épreuve sur ${preflight.model_count} modèles installés ?`,
+    "",
+    ...lines,
+    "",
+    `Budget maximum : ${preflight.budget_minutes} minute${preflight.budget_minutes > 1 ? "s" : ""}.`,
+    "Téléchargements : 0. Les tests s'exécutent l'un après l'autre.",
+    preflight.warning_count ? `${preflight.warning_count} candidat(s) utiliseront probablement l'offload RAM ou une marge mémoire faible.` : "Tous les candidats ont une marge mémoire plausible, à confirmer par Ollama."
+  ].join("\n");
+}
+
+function renderArenaPreflight(preflight = arenaPreflightState()) {
+  const status = preflight.can_run
+    ? `${preflight.model_count} modèles · ${preflight.budget_minutes} min max · zéro téléchargement`
+    : preflight.blocking_reason;
+  return `
+    <div class="arena-preflight ${preflight.warning_count ? "is-warning" : preflight.can_run ? "is-ready" : "is-blocked"}">
+      <div class="arena-preflight-head">
+        <strong>Préflight Arena</strong>
+        <span>${escapeHtml(status)}</span>
+      </div>
+      <div class="arena-preflight-list">
+        ${preflight.candidates.length ? preflight.candidates.map((candidate) => `
+          <div class="arena-preflight-row ${candidate.tone === "warning" ? "is-warning" : ""}">
+            <strong>${escapeHtml(candidate.label)}</strong>
+            <span>${escapeHtml(candidate.runtime_label)} · ${escapeHtml(candidate.size_label)} · ${escapeHtml(candidate.arena_timeout_seconds)} s max</span>
+            ${candidate.tone === "warning" ? `<small>${escapeHtml(candidate.detail)}</small>` : ""}
+          </div>
+        `).join("") : `<p>${escapeHtml(preflight.blocking_reason || "Aucun candidat installé.")}</p>`}
+      </div>
+      <p>Même protocole objectif, exécution séquentielle et aucun téléchargement pendant la campagne.</p>
+    </div>
+  `;
 }
 
 function arenaRole(model, index) {
@@ -8868,13 +8959,14 @@ function renderArenaPanel() {
     els.arenaBox.textContent = "Scanne un PC fixe, portable ou vieille config pour obtenir une sélection de modèles à comparer.";
     els.copyArenaBtn.disabled = true;
     els.runArenaBtn.disabled = true;
+    els.runArenaBtn.textContent = "Lancer Arena";
     els.clearArenaRunBtn.disabled = true;
     return;
   }
-  const installedCandidates = arenaInstalledCandidates();
+  const preflight = arenaPreflightState();
   const lastRun = readLastArenaRun();
   const benchmark = successfulBenchmarkFor("qwen3:0.6b");
-  els.arenaState.textContent = benchmark?.success ? "preuve locale" : "à comparer";
+  els.arenaState.textContent = arenaBusy ? "run en cours" : benchmark?.success ? "preuve locale" : "à comparer";
   els.arenaBox.className = "arena-box";
   els.arenaBox.innerHTML = `
     <div class="arena-summary">
@@ -8882,9 +8974,10 @@ function renderArenaPanel() {
       <span>${escapeHtml(gpuDisplayLabel(state.scan))} - ${escapeHtml(formatVram(state.scan.vram_gb))} - ${escapeHtml(formatGb(state.scan.ram_gb))} RAM</span>
       <span>${benchmark?.success ? `Dernier test : ${escapeHtml(benchmark.model)} à ${escapeHtml(benchmark.estimated_tokens_per_second)} tok/s` : "Prochaine étape : benchmarker le modèle léger puis comparer un modèle recommandé."}</span>
       <span>Sélection Arena : ${escapeHtml(candidates.length)} candidat(s). Liste complète : panneau Ollama installé.</span>
-      <span>Run auto : ${installedCandidates.length >= 2 ? `${escapeHtml(installedCandidates.length)} modèle(s) installés prêts` : "installer au moins 2 modèles pour comparer automatiquement"}.</span>
+      <span>Run auto : ${preflight.can_run ? `${escapeHtml(preflight.model_count)} modèle(s) installés prêts · ${escapeHtml(preflight.budget_minutes)} min max` : escapeHtml(preflight.blocking_reason)}.</span>
       <span>Chaque modèle reçoit le même micro-test objectif : JSON, instruction, mémoire, calcul, français et action.</span>
     </div>
+    ${renderArenaPreflight(preflight)}
     ${renderArenaRun(lastRun)}
     <div class="arena-grid">
       ${candidates.map((model, index) => `
@@ -8900,7 +8993,8 @@ function renderArenaPanel() {
     </div>
   `;
   els.copyArenaBtn.disabled = false;
-  els.runArenaBtn.disabled = installedCandidates.length < 2;
+  els.runArenaBtn.disabled = !preflight.can_run || arenaBusy;
+  els.runArenaBtn.textContent = preflight.can_run ? `Lancer Arena · ≤ ${preflight.budget_minutes} min` : "2 modèles requis";
   els.clearArenaRunBtn.disabled = !lastRun;
 }
 
@@ -8978,15 +9072,27 @@ function renderArenaProgress(models, results = [], activeRef = "") {
 }
 
 async function runAutomaticArena() {
+  if (arenaBusy) {
+    setStatus("Une campagne Arena est déjà en cours", "warn");
+    return;
+  }
   if (!state.scan) {
     setStatus("Scan requis avant Arena", "warn");
     return;
   }
-  const models = arenaInstalledCandidates(3);
-  if (models.length < 2) {
-    setStatus("Installe au moins 2 modèles pour lancer l'Arena", "warn");
+  const preflight = arenaPreflightState(3);
+  if (!preflight.can_run) {
+    setStatus(preflight.blocking_reason || "Préflight Arena incomplet", "warn");
+    renderArenaPanel();
     return;
   }
+  if (!window.confirm(arenaConfirmationText(preflight))) {
+    setStatus("Campagne Arena annulée avant exécution", "warn");
+    return;
+  }
+  const models = preflight.candidates.map((candidate) => candidate.definition);
+  arenaBusy = true;
+  try {
   const prompt = ARENA_OBJECTIVE_PROMPT;
   const results = [];
   els.runArenaBtn.disabled = true;
@@ -9072,6 +9178,15 @@ async function runAutomaticArena() {
   els.copyArenaBtn.disabled = false;
   els.clearArenaRunBtn.disabled = false;
   setStatus(winner ? `Arena terminée: ${winner.model} gagne` : "Arena terminée sans gagnant", winner ? "ok" : "warn");
+  } catch (error) {
+    const message = friendlyOllamaError(error);
+    finishOperationMonitor("Arena interrompue");
+    appendOperationLine(message, "erreur");
+    setStatus(message, "bad");
+  } finally {
+    arenaBusy = false;
+    renderArenaPanel();
+  }
 }
 
 function privateWorkloadPolicy() {
@@ -18634,6 +18749,93 @@ function installTestHarness() {
         memory: state.markdown,
         bridge: strategyArenaReadiness()
       };
+    },
+    applyArenaPreflightState() {
+      const scan = demoScan();
+      scan.name = "RTX 4080 SUPER · Arena preflight";
+      scan.gpu_name = "NVIDIA GeForce RTX 4080 SUPER";
+      scan.vram_gb = 16;
+      scan.ram_gb = 64;
+      scan.runtimes = {
+        ...(scan.runtimes || {}),
+        ollama: { installed: true, version: "ollama windows", source: "ollama-cli" },
+        ollama_wsl: { installed: true, version: "ollama wsl", source: "ollama-wsl" },
+        wsl: { installed: true, state: "wsl_ready", ollama_ready: true }
+      };
+      scan.installed_models = [
+        { model_name: "qwen3", model_tag: "0.6b", size_gb: 0.5, runtime: "ollama-wsl", source: "ollama-wsl" },
+        { model_name: "hermes3", model_tag: "8b", size_gb: 4.7, runtime: "ollama-wsl", source: "ollama-wsl" },
+        { model_name: "qwen3", model_tag: "14b", size_gb: 9, runtime: "ollama-wsl", source: "ollama-wsl" },
+        { model_name: "nous-hermes2-mixtral", model_tag: "8x7b", size_gb: 26, runtime: "ollama-wsl", source: "ollama-wsl" }
+      ];
+      renderScan(scan);
+      renderCompatibility(demoCompatibility());
+      const preferred = arenaPreflightState(3);
+
+      const heavyScan = {
+        ...scan,
+        installed_models: scan.installed_models.filter((model) => `${model.model_name}:${model.model_tag}` !== "qwen3:14b")
+      };
+      renderScan(heavyScan);
+      renderCompatibility(demoCompatibility());
+      const heavy = arenaPreflightState(3);
+      renderArenaPanel();
+      return {
+        preferred: {
+          refs: preferred.candidates.map((candidate) => candidate.ref),
+          budgetMinutes: preferred.budget_minutes,
+          warningCount: preferred.warning_count,
+          canRun: preferred.can_run
+        },
+        heavy: {
+          refs: heavy.candidates.map((candidate) => candidate.ref),
+          budgetMinutes: heavy.budget_minutes,
+          warningCount: heavy.warning_count,
+          canRun: heavy.can_run,
+          details: heavy.candidates.map((candidate) => ({
+            ref: candidate.ref,
+            runtime: candidate.runtime,
+            sizeGb: candidate.size_gb,
+            timeoutSeconds: candidate.arena_timeout_seconds,
+            tone: candidate.tone
+          }))
+        },
+        panel: els.arenaBox?.textContent || "",
+        button: els.runArenaBtn?.textContent || "",
+        confirmation: arenaConfirmationText(heavy)
+      };
+    },
+    async runArenaPreflightHarness() {
+      this.applyArenaPreflightState();
+      writeLastArenaRun(null);
+      const originalConfirm = window.confirm;
+      const confirmations = [];
+      try {
+        window.confirm = (message) => {
+          confirmations.push(String(message || ""));
+          return false;
+        };
+        await runAutomaticArena();
+        const cancelledRun = readLastArenaRun();
+        window.confirm = (message) => {
+          confirmations.push(String(message || ""));
+          return true;
+        };
+        await runAutomaticArena();
+        const acceptedRun = readLastArenaRun();
+        return {
+          confirmations,
+          cancelledRun,
+          acceptedRun,
+          busy: arenaBusy,
+          buttonDisabled: Boolean(els.runArenaBtn?.disabled),
+          button: els.runArenaBtn?.textContent || "",
+          state: els.arenaState?.textContent || ""
+        };
+      } finally {
+        window.confirm = originalConfirm;
+        arenaBusy = false;
+      }
     },
     applyRecommendationEngineState(profileKey = "code") {
       this.applyDemoState();

@@ -7,14 +7,24 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 HTML = ROOT / "src" / "index.html"
 APP = ROOT / "src" / "app.js"
+HUB = ROOT.parent / "server-work" / "static" / "pages" / "scanner-ia-local.html"
+DOWNLOAD = ROOT.parent / "server-work" / "static" / "pages" / "telecharger-scanner-ia-local.html"
+LLMS = ROOT.parent / "server-work" / "static" / "llms.txt"
 
 
 def main():
     app = APP.read_text(encoding="utf-8")
+    hub = HUB.read_text(encoding="utf-8")
+    download = DOWNLOAD.read_text(encoding="utf-8")
+    llms = LLMS.read_text(encoding="utf-8")
     assert "Math.max(60, benchmarkTimeoutSeconds(ref))" in app
     assert "incomplete_count: incomplete.length" in app
     assert 'benchmarkTimedOut(result) ? "délai dépassé" : "erreur"' in app
     assert 'benchmarkTimedOut(item) ? "incomplete-run" : "bad-run"' in app
+    assert "Préflight Arena · candidat source" in hub
+    assert "Préflight Arena · candidat source" in download
+    assert "Benchmark and Arena Preflight (source candidate, not in the current public build)" in llms
+    assert "zéro téléchargement" in hub and "zéro téléchargement" in download
     valid = (
         '{"instruction":"BLEU-47","memory":"RIVIERE-29",'
         '"calculation":42,"correction":"La VRAM accélère l’inférence locale.",'
@@ -29,7 +39,7 @@ def main():
     extra_key = valid[:-1] + ',"comment":"inutile"}'
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
-        page = browser.new_page()
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(HTML.as_uri(), wait_until="load")
         result = page.evaluate(
             """([valid, partial, fenced, extraKey]) => {
@@ -46,6 +56,22 @@ def main():
         )
         rendered = page.evaluate("() => window.__OUTILSIA_TEST__.applyObjectiveArenaState()")
         field_entry = page.evaluate("() => window.__OUTILSIA_TEST__.fieldTestEntry()")
+        arena_preflight = page.evaluate("() => window.__OUTILSIA_TEST__.applyArenaPreflightState()")
+        page.evaluate("""() => {
+          window.__OUTILSIA_TEST__.setWorkspaceTab('tests');
+          window.__OUTILSIA_TEST__.setWorkspaceSection('tests', '.arena-panel');
+        }""")
+        preflight_visible = page.locator(".arena-preflight").is_visible(timeout=5000)
+        page.set_viewport_size({"width": 390, "height": 844})
+        mobile = page.evaluate("""() => ({
+          viewport: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          rows: document.querySelectorAll('.arena-preflight-row').length,
+          rowColumns: getComputedStyle(document.querySelector('.arena-preflight-row')).gridTemplateColumns
+            .split(' ')
+            .filter(Boolean).length
+        })""")
+        arena_run_guard = page.evaluate("() => window.__OUTILSIA_TEST__.runArenaPreflightHarness()")
         browser.close()
 
     assert result["valid"]["score"] == 100, result
@@ -66,7 +92,38 @@ def main():
     assert field_entry["arena_objective"] is True, field_entry
     assert field_entry["arena_protocol"] == "outilsia.arena.objective.v1", field_entry
     assert field_entry["arena_objective_best_checks"] == "6/6", field_entry
-    print("arena_objective_ok protocol=outilsia.arena.objective.v1 checks=6")
+    assert arena_preflight["preferred"]["refs"] == ["qwen3:0.6b", "hermes3:8b", "qwen3:14b"], arena_preflight
+    assert arena_preflight["preferred"]["budgetMinutes"] == 3, arena_preflight
+    assert arena_preflight["preferred"]["warningCount"] == 0, arena_preflight
+    assert arena_preflight["preferred"]["canRun"] is True, arena_preflight
+    assert arena_preflight["heavy"]["refs"] == ["qwen3:0.6b", "hermes3:8b", "nous-hermes2-mixtral:8x7b"], arena_preflight
+    assert arena_preflight["heavy"]["budgetMinutes"] == 4, arena_preflight
+    assert arena_preflight["heavy"]["warningCount"] == 1, arena_preflight
+    assert arena_preflight["heavy"]["canRun"] is True, arena_preflight
+    mixtral = next(item for item in arena_preflight["heavy"]["details"] if item["ref"] == "nous-hermes2-mixtral:8x7b")
+    assert mixtral == {
+        "ref": "nous-hermes2-mixtral:8x7b",
+        "runtime": "wsl",
+        "sizeGb": 26,
+        "timeoutSeconds": 120,
+        "tone": "warning",
+    }, arena_preflight
+    for expected in ("Préflight Arena", "Ollama WSL", "26 Go", "offload", "zéro téléchargement"):
+        assert expected in arena_preflight["panel"], (expected, arena_preflight)
+    assert arena_preflight["button"] == "Lancer Arena · ≤ 4 min", arena_preflight
+    for expected in ("3 modèles installés", "4 minutes", "Téléchargements : 0", "nous-hermes2-mixtral:8x7b"):
+        assert expected in arena_preflight["confirmation"], (expected, arena_preflight)
+    assert preflight_visible is True
+    assert mobile["scrollWidth"] <= mobile["viewport"] + 1, mobile
+    assert mobile["rows"] == 3 and mobile["rowColumns"] == 1, mobile
+    assert arena_run_guard["cancelledRun"] is None, arena_run_guard
+    assert len(arena_run_guard["confirmations"]) == 2, arena_run_guard
+    assert all("Téléchargements : 0" in prompt and "4 minutes" in prompt for prompt in arena_run_guard["confirmations"]), arena_run_guard
+    assert arena_run_guard["acceptedRun"]["protocol"] == "outilsia.arena.objective.v1", arena_run_guard
+    assert [item["model"] for item in arena_run_guard["acceptedRun"]["results"]] == arena_preflight["heavy"]["refs"], arena_run_guard
+    assert arena_run_guard["busy"] is False and arena_run_guard["buttonDisabled"] is False, arena_run_guard
+    assert arena_run_guard["button"] == "Lancer Arena · ≤ 4 min", arena_run_guard
+    print("arena_objective_ok protocol=outilsia.arena.objective.v1 checks=6 preflight=3-models/4-min mobile=ok")
 
 
 if __name__ == "__main__":

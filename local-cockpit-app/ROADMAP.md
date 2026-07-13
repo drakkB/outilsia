@@ -1,6 +1,6 @@
 # OutilsIA Local Cockpit - Roadmap produit
 
-Mise à jour : 2026-07-13
+Mise à jour : 2026-07-14
 
 ## Cap produit
 
@@ -38,6 +38,9 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Afficher ensemble le nom lisible et la référence Ollama exacte, puis regrouper les anciens alias Hermes dans une seule identité de benchmark.
 - [x] Afficher avant chaque benchmark un préflight compact : référence exacte, état d'installation, runtime Windows/WSL, taille, mémoire disponible, fenêtre de test et offload probable.
 - [x] Adapter le libellé du bouton au budget réel (`Tester · 45 s` ou `Test long · 120 s`) et proposer les références exactes déjà détectées.
+- [x] Préparer l'Arena avec trois rôles distincts : baseline légère, un assistant Hermes prioritaire, puis un autre candidat installé hors Hermes avant un second Hermes lourd.
+- [x] Afficher avant l'Arena les runtimes, tailles, délais individuels, offload probable, budget global et garantie de zéro téléchargement.
+- [x] Exiger une confirmation chiffrée avant la campagne et empêcher deux exécutions Arena concurrentes.
 - [ ] Confirmer manuellement le nouveau libellé et le benchmark long dans le build Windows candidat.
 
 ## Maintenant - Hardware Doctor 2.0 et AI Capability Passport v1

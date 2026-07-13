@@ -8,6 +8,8 @@ Le cockpit est séparé en sept espaces persistants : **Accueil**, **Machine**, 
 
 Les modèles Hermes restent distingués par leur référence exacte : `hermes3:8b` est le modèle assistant léger, tandis que `nous-hermes2-mixtral:8x7b` correspond à un artefact Ollama Q4 de 26 Go. Sur une carte 16 Go, ce dernier est présenté comme un test long avec offload RAM, jamais comme un modèle rapide de 14 Go. Avant le clic, le préflight Benchmark affiche modèle exact, installation, runtime, taille, mémoire disponible, fenêtre de test et offload probable ; le bouton annonce directement `Tester · 45 s` ou `Test long · 120 s`. Le runtime affiché suit l'emplacement réel des modèles (Ollama natif, WSL ou mixte), pas la seule présence d'un client Windows. Un délai dépassé est enregistré comme **test incomplet** et non comme verdict d'incompatibilité ; résultat, historique et export nomment le modèle exact et donnent le contexte mémoire utile au retest. Arena, Recommendation Engine et Model Autopilot utilisent le même budget adaptatif ; les packs privés conservent au contraire leur limite fixe et préviennent avant le lancement lorsqu'un modèle la dépasse.
 
+L'Arena dispose du même préflight avant toute campagne. Elle choisit une baseline légère, un seul Hermes prioritaire puis un autre candidat installé hors Hermes avant de reprendre un second Hermes lourd. L'écran annonce runtime, taille, délai par modèle, budget global, offload probable et zéro téléchargement ; une confirmation explicite précède les tests séquentiels et un verrou interdit deux campagnes concurrentes.
+
 Vérification dédiée desktop, mobile et clavier :
 
 ```bash
