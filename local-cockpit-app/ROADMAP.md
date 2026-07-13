@@ -32,6 +32,8 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Étendre à 120 secondes le benchmark du modèle 26 Go quand il doit utiliser l'offload RAM.
 - [x] Afficher le runtime qui contient réellement les modèles : Windows, WSL ou mixte.
 - [x] Empêcher Mixtral 8x7B de devenir le choix assistant par défaut d'une machine 16 Go.
+- [x] Distinguer dans le résultat, l'historique et l'export un test incomplet par délai d'une erreur réelle ou d'une incompatibilité prouvée.
+- [x] Afficher ensemble le nom lisible et la référence Ollama exacte, puis regrouper les anciens alias Hermes dans une seule identité de benchmark.
 - [ ] Confirmer manuellement le nouveau libellé et le benchmark long dans le build Windows candidat.
 
 ## Maintenant - Hardware Doctor 2.0 et AI Capability Passport v1

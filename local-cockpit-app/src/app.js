@@ -5938,6 +5938,51 @@ function friendlyOllamaError(error) {
   return message;
 }
 
+function benchmarkTimedOut(result) {
+  const message = `${result?.error || ""} ${result?.output_preview || ""}`.toLowerCase();
+  return Boolean(result?.timed_out)
+    || ["timeout", "timed out", "stopp", "délai dépassé", "delai depasse"].some((signal) => message.includes(signal));
+}
+
+function benchmarkModelIdentityKey(model) {
+  const clean = normalizeOllamaRef(model);
+  if (!clean) return "";
+  if (sameOllamaModel(clean, "hermes3:8b")) return "hermes3:8b";
+  if (sameOllamaModel(clean, "nous-hermes2-mixtral:8x7b")) return "nous-hermes2-mixtral:8x7b";
+  return clean;
+}
+
+function benchmarkModelDisplayLabel(model) {
+  const clean = normalizeOllamaRef(model) || "modèle local";
+  const identity = benchmarkModelIdentityKey(clean);
+  if (identity === "hermes3:8b") return `Hermes 3 8B · ${clean}`;
+  if (identity === "nous-hermes2-mixtral:8x7b") return `Nous Hermes 2 Mixtral 8x7B · ${clean}`;
+  const catalog = catalogModelForOllamaRef(clean);
+  return catalog ? `${modelTitle(catalog)} · ${clean}` : clean;
+}
+
+function benchmarkOutcomeLabel(result) {
+  if (result?.success) return "Test réussi";
+  if (benchmarkTimedOut(result)) return "Test incomplet · délai dépassé";
+  if (isCudaBenchmarkFailure(result)) return "Test bloqué · GPU/CUDA";
+  return "Test terminé avec erreur";
+}
+
+function friendlyBenchmarkError(result) {
+  const raw = result?.error || result?.output_preview || "Sortie vide";
+  if (!benchmarkTimedOut(result)) return friendlyOllamaError(raw);
+  const model = normalizeOllamaRef(result?.model || "");
+  const label = benchmarkModelDisplayLabel(model);
+  const sizeGb = Number(modelInstallSizeBudget(model).estimated_download_gb || 0);
+  const availableMemory = effectiveModelMemoryGb(state.scan);
+  const elapsedSeconds = Math.max(1, Math.round(Number(result?.elapsed_ms || 0) / 1000));
+  const pressure = sizeGb >= 20 && availableMemory > 0 && sizeGb > availableMemory * 0.9;
+  if (pressure) {
+    return `${label} : délai de test atteint après ${elapsedSeconds} s. Le modèle pèse environ ${formatGb(sizeGb)} pour ${formatGb(availableMemory)} de mémoire GPU disponible et utilise l'offload RAM. Le test est incomplet, pas une preuve d'incompatibilité. Relance « Bench long » ou teste Hermes 3 8B.`;
+  }
+  return `${label} : délai de test atteint après ${elapsedSeconds} s avant une réponse complète. Ce résultat est incomplet, pas une preuve que le modèle est incompatible. Relance le test ou essaie un modèle plus léger.`;
+}
+
 function renderCommands(models) {
   const ollamaMissing = Boolean(state.scan && !hasUsableOllamaRuntime(state.scan));
   const starter = {
@@ -14630,6 +14675,7 @@ async function runBenchmark(options = {}) {
   appendOperationLine(`Prompt : ${els.benchmarkPromptInput.value.trim() || "prompt court par défaut"}`, "info");
   els.benchmarkResult.textContent = forceCpu ? "Retest CPU Ollama en cours..." : "Benchmark Ollama en cours...";
   setStatus(`${forceCpu ? "Retest CPU" : "Benchmark"} ${model} en cours...`);
+  const benchmarkStartedAt = Date.now();
   try {
     const result = invoke
       ? await invoke("benchmark_ollama", {
@@ -14667,14 +14713,39 @@ async function runBenchmark(options = {}) {
     renderModelAutopilot();
     renderFlightRecorder();
     await refreshAuthState();
-    finishOperationMonitor(normalizedResult.success ? "Benchmark terminé" : "Benchmark terminé avec erreur");
-    setStatus(normalizedResult.success ? "Benchmark terminé" : "Benchmark terminé avec erreur", normalizedResult.success ? "ok" : "warn");
+    const outcome = benchmarkOutcomeLabel(normalizedResult);
+    finishOperationMonitor(outcome);
+    setStatus(outcome, normalizedResult.success ? "ok" : benchmarkTimedOut(normalizedResult) ? "warn" : "bad");
   } catch (error) {
-    const message = friendlyOllamaError(error);
-    appendOperationLine(message, "erreur");
-    finishOperationMonitor("Benchmark en erreur");
-    els.benchmarkResult.textContent = message;
-    setStatus(message, "bad");
+    const rawError = String(error || "Benchmark Ollama interrompu.");
+    const failedResult = {
+      model,
+      prompt: els.benchmarkPromptInput.value.trim(),
+      elapsed_ms: Math.max(0, Date.now() - benchmarkStartedAt),
+      estimated_tokens: 0,
+      estimated_tokens_per_second: 0,
+      success: false,
+      timed_out: ["timeout", "timed out", "stopp", "délai", "delai"].some((signal) => rawError.toLowerCase().includes(signal)),
+      output_preview: "",
+      error: rawError,
+      runtime: defaultOllamaRuntime(model),
+      execution_mode: forceCpu ? "cpu" : "auto",
+      machine_key: state.scan?.machine_key || "",
+      measurement_source: "unavailable"
+    };
+    state.benchmark = failedResult;
+    const message = friendlyBenchmarkError(failedResult);
+    renderBenchmark(failedResult);
+    appendBenchmarkToConsole(failedResult);
+    saveBenchmarkHistoryEntry(failedResult);
+    renderPrimaryAction();
+    renderFirstTestPanel();
+    renderPreparePanel();
+    renderReadinessPanel();
+    renderArenaPanel();
+    renderFieldTestPanel();
+    finishOperationMonitor(benchmarkOutcomeLabel(failedResult));
+    setStatus(message, failedResult.timed_out ? "warn" : "bad");
   } finally {
     els.benchmarkBtn.disabled = false;
     renderModelAutopilot();
@@ -14683,14 +14754,14 @@ async function runBenchmark(options = {}) {
 }
 
 function appendBenchmarkToConsole(result) {
-  appendOperationLine(`${result.success ? "Test réussi" : "Test terminé avec erreur"} : ${result.model}`, result.success ? "ok" : "erreur");
+  appendOperationLine(`${benchmarkOutcomeLabel(result)} : ${benchmarkModelDisplayLabel(result.model)}`, result.success ? "ok" : benchmarkTimedOut(result) ? "alerte" : "erreur");
   appendOperationLine(`Temps: ${result.elapsed_ms ?? 0} ms · ${benchmarkSpeedLabel(result)}: ${result.estimated_tokens_per_second ?? 0} tok/s · ${benchmarkMeasurementLabel(result)} · Mode: ${String(result.execution_mode || "auto") === "cpu" ? "CPU seul" : "automatique"}`, "bench");
   const metricDetails = benchmarkMetricDetails(result);
   if (metricDetails) appendOperationLine(metricDetails, "bench");
   const output = result.success
     ? result.output_preview || "Sortie vide"
-    : friendlyOllamaError(result.error || result.output_preview || "Sortie vide");
-  appendOperationLine(output, result.success ? "réponse" : "erreur");
+    : friendlyBenchmarkError(result);
+  appendOperationLine(output, result.success ? "réponse" : benchmarkTimedOut(result) ? "alerte" : "erreur");
 }
 
 function preferredChatModel() {
@@ -15737,7 +15808,8 @@ async function syncBenchmark() {
 
 function benchmarkQualityVerdict(result) {
   if (!result?.success) {
-    const message = friendlyOllamaError(result?.error || result?.output_preview || "");
+    const message = friendlyBenchmarkError(result);
+    if (benchmarkTimedOut(result)) return "Qualité non évaluée : le test s'est arrêté avant une réponse complète.";
     if (message.includes("CUDA")) return "Échec benchmark : problème CUDA/Ollama probable, ne juge pas le modèle tant que le runtime n'est pas stabilisé.";
     return "Qualité courte : échec ou réponse incomplète, ne pas retenir ce modèle sans retest.";
   }
@@ -15795,10 +15867,10 @@ function renderBenchmark(result) {
     : "";
   const output = result.success
     ? result.output_preview || "Sortie vide"
-    : friendlyOllamaError(result.error || result.output_preview || "Sortie vide");
+    : friendlyBenchmarkError(result);
   els.benchmarkResult.innerHTML = `
     <div class="benchmark-card">
-      <strong>${escapeHtml(result.success ? "Test réussi" : "Test terminé avec erreur")} - ${escapeHtml(result.model)}</strong>
+      <strong>${escapeHtml(benchmarkOutcomeLabel(result))} - ${escapeHtml(benchmarkModelDisplayLabel(result.model))}</strong>
       <span>Temps de réponse : ${escapeHtml(result.elapsed_ms ?? 0)} ms${result.timed_out ? " - test interrompu" : ""}</span>
       <span>${escapeHtml(benchmarkSpeedLabel(result))} : ${escapeHtml(result.estimated_tokens_per_second ?? 0)} tok/s</span>
       <span>Méthode : ${escapeHtml(measurement)}</span>
@@ -15893,9 +15965,9 @@ function saveBenchmarkHistoryEntry(result) {
 function bestBenchmarkByModel(items) {
   const grouped = new Map();
   for (const item of items) {
-    const key = normalizeOllamaRef(item.model || "");
+    const key = benchmarkModelIdentityKey(item.model || "");
     if (!key) continue;
-    const current = grouped.get(key) || { model: item.model, count: 0, best: null, last: null };
+    const current = grouped.get(key) || { model: key, count: 0, best: null, last: null };
     current.count += 1;
     if (!current.last || Number(item.created_at_ms || 0) > Number(current.last.created_at_ms || 0)) {
       current.last = item;
@@ -15929,8 +16001,8 @@ function renderBenchmarkHistory(items = readBenchmarkHistory()) {
     <div class="benchmark-history-summary">
       ${leaders.slice(0, 4).map((item, index) => `
         <div class="benchmark-history-rank">
-          <strong>${escapeHtml(index === 0 ? "Meilleur local" : `#${index + 1}`)} · ${escapeHtml(item.model)}</strong>
-          <span>${item.best ? `${escapeHtml(item.best.estimated_tokens_per_second)} tok/s · ${escapeHtml(item.best.elapsed_ms)} ms` : "aucun succès"}</span>
+          <strong>${escapeHtml(index === 0 ? "Meilleur local" : `#${index + 1}`)} · ${escapeHtml(benchmarkModelDisplayLabel(item.model))}</strong>
+          <span>${item.best ? `${escapeHtml(item.best.estimated_tokens_per_second)} tok/s · ${escapeHtml(item.best.elapsed_ms)} ms` : "aucune mesure réussie"}</span>
           <span>${escapeHtml(item.count)} test${item.count > 1 ? "s" : ""}</span>
         </div>
       `).join("")}
@@ -15938,9 +16010,9 @@ function renderBenchmarkHistory(items = readBenchmarkHistory()) {
     <div class="benchmark-history-latest">
       ${latest.map((item) => `
         <div class="list-item">
-          <strong>${escapeHtml(item.model)} ${item.success ? "" : "· échec"}</strong>
+          <strong>${escapeHtml(benchmarkModelDisplayLabel(item.model))} ${item.success ? "" : `· ${escapeHtml(benchmarkTimedOut(item) ? "test incomplet" : "erreur")}`}</strong>
           <span>${escapeHtml(new Date(Number(item.created_at_ms || Date.now())).toLocaleString("fr-FR"))} · ${escapeHtml(item.estimated_tokens_per_second || 0)} tok/s · ${escapeHtml(item.elapsed_ms || 0)} ms</span>
-          <span>${escapeHtml(item.output_preview || item.error || "Sortie vide")}</span>
+          <span>${escapeHtml(item.success ? item.output_preview || "Sortie vide" : friendlyBenchmarkError(item))}</span>
         </div>
       `).join("")}
     </div>
@@ -15959,13 +16031,13 @@ function benchmarkHistoryMarkdown(items = readBenchmarkHistory()) {
     "## Classement local par meilleur débit",
     "",
     ...(leaders.length
-      ? leaders.map((item, index) => `- ${index + 1}. ${item.model}: ${item.best ? `${item.best.estimated_tokens_per_second} tok/s, ${item.best.elapsed_ms} ms` : "aucun succès"} (${item.count} test${item.count > 1 ? "s" : ""})`)
+      ? leaders.map((item, index) => `- ${index + 1}. ${benchmarkModelDisplayLabel(item.model)}: ${item.best ? `${item.best.estimated_tokens_per_second} tok/s, ${item.best.elapsed_ms} ms` : "aucune mesure réussie"} (${item.count} test${item.count > 1 ? "s" : ""})`)
       : ["- Aucun benchmark enregistré."]),
     "",
     "## Derniers tests",
     "",
     ...items.slice(0, 20).map((item) => [
-      `### ${item.model} - ${item.success ? "succès" : "échec"}`,
+      `### ${benchmarkModelDisplayLabel(item.model)} - ${item.success ? "succès" : benchmarkTimedOut(item) ? "test incomplet" : "erreur"}`,
       "",
       `- Date: ${new Date(Number(item.created_at_ms || Date.now())).toISOString()}`,
       `- Machine: ${item.machine?.name || "Machine IA locale"}`,
@@ -15975,7 +16047,7 @@ function benchmarkHistoryMarkdown(items = readBenchmarkHistory()) {
       `- ${benchmarkSpeedLabel(item)}: ${item.estimated_tokens_per_second} tok/s`,
       `- Méthode: ${benchmarkMeasurementLabel(item)}`,
       `- Tokens: ${item.estimated_tokens}`,
-      item.error ? `- Erreur: ${item.error}` : "",
+      !item.success ? `- Diagnostic: ${friendlyBenchmarkError(item)}` : "",
       "",
       "```text",
       item.output_preview || "",
@@ -18686,6 +18758,58 @@ function installTestHarness() {
         mixtralTimeout: benchmarkTimeoutSeconds("nous-hermes2-mixtral:8x7b"),
         mixtralSize: estimatedModelSizeLabel("nous-hermes2-mixtral:8x7b"),
         mixtralBudget: modelInstallSizeBudget("nous-hermes2-mixtral:8x7b")
+      };
+    },
+    applyBenchmarkTruthState() {
+      const scan = demoScan();
+      scan.gpu_name = "NVIDIA GeForce RTX 4080 SUPER";
+      scan.vram_gb = 16;
+      scan.ram_gb = 64;
+      scan.runtimes = {
+        ...(scan.runtimes || {}),
+        ollama: { installed: true, version: "ollama windows", source: "ollama-cli" },
+        ollama_wsl: { installed: true, version: "ollama wsl", source: "ollama-wsl" },
+        wsl: { installed: true, state: "wsl_ready", ollama_ready: true }
+      };
+      scan.installed_models = [
+        { model_name: "hermes3", model_tag: "8b", size_gb: 4.7, runtime: "ollama-wsl", source: "ollama-wsl" },
+        { model_name: "nous-hermes2-mixtral", model_tag: "8x7b", size_gb: 26, runtime: "ollama-wsl", source: "ollama-wsl" }
+      ];
+      renderScan(scan);
+      const simpleSuccess = {
+        ...demoBenchmark("hermes3:8b"),
+        success: true,
+        estimated_tokens_per_second: 121.7,
+        elapsed_ms: 4120,
+        output_preview: "Réponse Hermes 3 validée."
+      };
+      const heavyTimeout = {
+        model: "nous-hermes2-mixtral:8x7b",
+        prompt: "Pourquoi la VRAM est importante ?",
+        elapsed_ms: 45034,
+        estimated_tokens: 0,
+        estimated_tokens_per_second: 0,
+        success: false,
+        timed_out: true,
+        output_preview: "",
+        error: "Ollama stoppe apres 45 secondes.",
+        runtime: "wsl",
+        execution_mode: "auto",
+        measurement_source: "ollama_cli_estimate"
+      };
+      renderBenchmark(heavyTimeout);
+      renderBenchmarkHistory([heavyTimeout, simpleSuccess]);
+      return {
+        simpleLabel: benchmarkModelDisplayLabel(simpleSuccess.model),
+        heavyLabel: benchmarkModelDisplayLabel(heavyTimeout.model),
+        heavyOutcome: benchmarkOutcomeLabel(heavyTimeout),
+        heavyDiagnostic: friendlyBenchmarkError(heavyTimeout),
+        resultText: els.benchmarkResult?.textContent || "",
+        historyText: els.benchmarkHistoryBox?.textContent || "",
+        leaderCount: bestBenchmarkByModel([
+          simpleSuccess,
+          { ...simpleSuccess, model: "adrienbrault/nous-hermes2theta-llama3-8b:q4", success: false }
+        ])[0]?.count || 0
       };
     },
     applyInstallProgressState() {

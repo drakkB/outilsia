@@ -99,6 +99,7 @@ def main():
         )
         dual_runtime = page.evaluate("""() => window.__OUTILSIA_TEST__.applyDualRuntimeWslModelState()""")
         rtx_4080_wsl = page.evaluate("""() => window.__OUTILSIA_TEST__.applyRtx4080WslModelState()""")
+        benchmark_truth = page.evaluate("""() => window.__OUTILSIA_TEST__.applyBenchmarkTruthState()""")
         browser.close()
 
     if not hidden_in_essential:
@@ -144,6 +145,21 @@ def main():
         raise AssertionError(f"Mixtral size label must expose the real Q4 artifact size: {rtx_4080_wsl}")
     if rtx_4080_wsl.get("mixtralBudget", {}).get("estimated_download_gb") != 26:
         raise AssertionError(f"Mixtral install budget must use 26 GB: {rtx_4080_wsl}")
+    if benchmark_truth.get("simpleLabel") != "Hermes 3 8B · hermes3:8b":
+        raise AssertionError(f"simple Hermes identity is ambiguous: {benchmark_truth}")
+    if not benchmark_truth.get("heavyLabel", "").startswith("Nous Hermes 2 Mixtral 8x7B ·"):
+        raise AssertionError(f"heavy Hermes identity is ambiguous: {benchmark_truth}")
+    if benchmark_truth.get("heavyOutcome") != "Test incomplet · délai dépassé":
+        raise AssertionError(f"heavy timeout is still labeled as a generic failure: {benchmark_truth}")
+    heavy_diagnostic = benchmark_truth.get("heavyDiagnostic", "")
+    if "26 Go" not in heavy_diagnostic or "16 Go" not in heavy_diagnostic or "pas une preuve d'incompatibilité" not in heavy_diagnostic:
+        raise AssertionError(f"heavy timeout diagnostic lacks actionable memory context: {benchmark_truth}")
+    if "Téléchargement interrompu" in benchmark_truth.get("resultText", "") or "· échec" in benchmark_truth.get("historyText", ""):
+        raise AssertionError(f"benchmark UI still confuses timeout with download/failure: {benchmark_truth}")
+    if "Hermes 3 8B · hermes3:8b" not in benchmark_truth.get("historyText", "") or "Nous Hermes 2 Mixtral 8x7B" not in benchmark_truth.get("historyText", ""):
+        raise AssertionError(f"benchmark history does not distinguish both Hermes models: {benchmark_truth}")
+    if benchmark_truth.get("leaderCount") != 2:
+        raise AssertionError(f"Hermes aliases should share one benchmark identity: {benchmark_truth}")
 
     print(
         "wsl_runtime_ok "
