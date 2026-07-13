@@ -100,6 +100,22 @@ def main():
         dual_runtime = page.evaluate("""() => window.__OUTILSIA_TEST__.applyDualRuntimeWslModelState()""")
         rtx_4080_wsl = page.evaluate("""() => window.__OUTILSIA_TEST__.applyRtx4080WslModelState()""")
         benchmark_truth = page.evaluate("""() => window.__OUTILSIA_TEST__.applyBenchmarkTruthState()""")
+        page.evaluate("""() => {
+          window.__OUTILSIA_TEST__.setWorkspaceTab('tests');
+          window.__OUTILSIA_TEST__.setWorkspaceSection('tests', '.benchmark-panel');
+        }""")
+        preflight_visible = page.locator("#benchmarkPreflight").is_visible(timeout=5000)
+        benchmark_box = page.locator(".benchmark-panel").bounding_box()
+        viewport_width = page.evaluate("""() => window.innerWidth""")
+        page.set_viewport_size({"width": 390, "height": 844})
+        mobile_metrics = page.evaluate("""() => ({
+          viewport: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          columns: getComputedStyle(document.querySelector('.benchmark-preflight-grid')).gridTemplateColumns
+            .split(' ')
+            .filter(Boolean).length,
+          visible: Boolean(document.querySelector('#benchmarkPreflight')?.offsetParent)
+        })""")
         browser.close()
 
     if not hidden_in_essential:
@@ -149,6 +165,27 @@ def main():
         raise AssertionError(f"simple Hermes identity is ambiguous: {benchmark_truth}")
     if not benchmark_truth.get("heavyLabel", "").startswith("Nous Hermes 2 Mixtral 8x7B ·"):
         raise AssertionError(f"heavy Hermes identity is ambiguous: {benchmark_truth}")
+    simple_preflight = benchmark_truth.get("simplePreflight") or {}
+    if simple_preflight.get("model") != "hermes3:8b" or simple_preflight.get("runtime") != "wsl":
+        raise AssertionError(f"Hermes 3 preflight must expose its exact WSL target: {benchmark_truth}")
+    if simple_preflight.get("timeout_seconds") != 45 or benchmark_truth.get("simpleButtonText") != "Tester · 45 s":
+        raise AssertionError(f"Hermes 3 preflight should remain a short test: {benchmark_truth}")
+    simple_preflight_text = benchmark_truth.get("simplePreflightText", "")
+    if "Hermes 3 8B · hermes3:8b" not in simple_preflight_text or "4.7 Go" not in simple_preflight_text or "Ollama WSL" not in simple_preflight_text:
+        raise AssertionError(f"Hermes 3 preflight lacks exact identity, size or runtime: {benchmark_truth}")
+    heavy_preflight = benchmark_truth.get("heavyPreflight") or {}
+    if heavy_preflight.get("model") != "nous-hermes2-mixtral:8x7b" or heavy_preflight.get("runtime") != "wsl":
+        raise AssertionError(f"Mixtral preflight must expose its exact WSL target: {benchmark_truth}")
+    if heavy_preflight.get("timeout_seconds") != 120 or heavy_preflight.get("tone") != "warning":
+        raise AssertionError(f"Mixtral preflight should warn and reserve a long test window: {benchmark_truth}")
+    if benchmark_truth.get("heavyButtonText") != "Test long · 120 s":
+        raise AssertionError(f"Mixtral benchmark button must announce the real timeout: {benchmark_truth}")
+    heavy_preflight_text = benchmark_truth.get("heavyPreflightText", "")
+    for expected in ("Nous Hermes 2 Mixtral 8x7B", "26 Go", "16 Go", "Ollama WSL", "offload"):
+        if expected not in heavy_preflight_text:
+            raise AssertionError(f"Mixtral preflight should contain {expected!r}: {benchmark_truth}")
+    if not {"hermes3:8b", "nous-hermes2-mixtral:8x7b"}.issubset(set(benchmark_truth.get("modelOptions", []))):
+        raise AssertionError(f"benchmark model picker must retain exact installed refs: {benchmark_truth}")
     if benchmark_truth.get("heavyOutcome") != "Test incomplet · délai dépassé":
         raise AssertionError(f"heavy timeout is still labeled as a generic failure: {benchmark_truth}")
     heavy_diagnostic = benchmark_truth.get("heavyDiagnostic", "")
@@ -160,12 +197,24 @@ def main():
         raise AssertionError(f"benchmark history does not distinguish both Hermes models: {benchmark_truth}")
     if benchmark_truth.get("leaderCount") != 2:
         raise AssertionError(f"Hermes aliases should share one benchmark identity: {benchmark_truth}")
+    if not preflight_visible:
+        raise AssertionError("benchmark preflight must stay visible in the focused Tests section")
+    if not benchmark_box or benchmark_box.get("width", 0) < viewport_width * 0.8:
+        raise AssertionError(
+            f"focused benchmark panel must use the available workspace width: box={benchmark_box}, viewport={viewport_width}"
+        )
+    if not mobile_metrics.get("visible") or mobile_metrics.get("scrollWidth", 0) > mobile_metrics.get("viewport", 0) + 1:
+        raise AssertionError(f"benchmark preflight must remain visible without horizontal overflow on Android: {mobile_metrics}")
+    if mobile_metrics.get("columns") != 2:
+        raise AssertionError(f"benchmark preflight metrics should use a compact 2-column Android grid: {mobile_metrics}")
 
     print(
         "wsl_runtime_ok "
         f"hidden_essential={hidden_in_essential} "
         f"visible_advanced={visible_in_advanced} "
-        f"ready_command={wsl_ready.get('command')}"
+        f"ready_command={wsl_ready.get('command')} "
+        f"benchmark_width={round(benchmark_box.get('width', 0))} "
+        f"mobile_columns={mobile_metrics.get('columns')}"
     )
 
 

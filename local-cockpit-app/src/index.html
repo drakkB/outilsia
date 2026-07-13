@@ -825,7 +825,11 @@
             <button id="benchmarkBtn" type="button">Tester</button>
           </div>
           <label class="field-label" for="benchmarkModelInput">Modèle</label>
-          <input id="benchmarkModelInput" type="text" autocomplete="off" placeholder="qwen3:8b" />
+          <input id="benchmarkModelInput" type="text" list="benchmarkModelOptions" autocomplete="off" placeholder="qwen3:8b" />
+          <datalist id="benchmarkModelOptions"></datalist>
+          <div id="benchmarkPreflight" class="benchmark-preflight empty" aria-live="polite">
+            Choisis un modèle pour voir le runtime, la taille et la durée du test avant de le lancer.
+          </div>
           <label class="field-label" for="benchmarkPromptInput">Prompt court</label>
           <textarea id="benchmarkPromptInput" autocomplete="off">Pourquoi la VRAM est importante pour un LLM local ?</textarea>
           <div class="prompt-profiles" aria-label="Profils de test">

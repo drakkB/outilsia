@@ -16,6 +16,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Attribuer chaque panneau à un ou plusieurs espaces sans changer ses identifiants ou son état.
 - [x] Router automatiquement Dialogue vers Assistant, Bench vers Tests, Upgrade vers Machine et Workstack vers Atelier IA.
 - [x] Ajouter un menu Section contextuel qui concentre l'écran sur un module, avec précédent, suivant et vue complète.
+- [x] Donner toute la largeur disponible au module isolé par le menu Section, notamment au Benchmark.
 - [x] Afficher les sept onglets sans défilement horizontal sur Android et prendre en charge les flèches, Début et Fin au clavier.
 - [x] Conserver les formulaires et mémoriser l'espace actif entre deux ouvertures.
 - [x] Réduire le pire cas mesuré de 18,1 à 2,1 hauteurs d'écran sur desktop et de 36,5 à 3,6 sur mobile.
@@ -35,6 +36,8 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Distinguer dans le résultat, l'historique et l'export un test incomplet par délai d'une erreur réelle ou d'une incompatibilité prouvée.
 - [x] Appliquer le délai adaptatif à Arena, Recommendation Engine et Model Autopilot ; garder les packs privés scientifiquement bornés et refuser en amont un modèle trop lent pour leur protocole.
 - [x] Afficher ensemble le nom lisible et la référence Ollama exacte, puis regrouper les anciens alias Hermes dans une seule identité de benchmark.
+- [x] Afficher avant chaque benchmark un préflight compact : référence exacte, état d'installation, runtime Windows/WSL, taille, mémoire disponible, fenêtre de test et offload probable.
+- [x] Adapter le libellé du bouton au budget réel (`Tester · 45 s` ou `Test long · 120 s`) et proposer les références exactes déjà détectées.
 - [ ] Confirmer manuellement le nouveau libellé et le benchmark long dans le build Windows candidat.
 
 ## Maintenant - Hardware Doctor 2.0 et AI Capability Passport v1

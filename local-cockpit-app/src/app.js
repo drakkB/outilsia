@@ -583,6 +583,8 @@ const els = {
   downloadWindowsRecipeBtn: $("downloadWindowsRecipeBtn"),
   benchmarkPanel: document.querySelector(".benchmark-panel"),
   benchmarkModelInput: $("benchmarkModelInput"),
+  benchmarkModelOptions: $("benchmarkModelOptions"),
+  benchmarkPreflight: $("benchmarkPreflight"),
   benchmarkPromptInput: $("benchmarkPromptInput"),
   benchmarkResult: $("benchmarkResult"),
   modelAutopilotState: $("modelAutopilotState"),
@@ -3771,6 +3773,7 @@ function applyOldPortablePreset() {
   }
   renderPreparePanel();
   renderFieldTestPanel();
+  renderBenchmarkPreflight();
   renderModelAutopilot();
   setStatus("Mode vieux PC / portable prêt : petit modèle, contexte court, preuve locale d'abord", "ok");
 }
@@ -3788,6 +3791,7 @@ function useUsageProfilePack(target = "benchmark") {
   if (pack.model && els.benchmarkModelInput) els.benchmarkModelInput.value = pack.model;
   if (els.benchmarkPromptInput) els.benchmarkPromptInput.value = pack.test.prompt;
   els.benchmarkPromptInput?.focus?.();
+  renderBenchmarkPreflight();
   renderModelAutopilot();
   setStatus(`Pack ${pack.profile.label} prêt pour benchmark`, "ok");
 }
@@ -3844,6 +3848,8 @@ function renderScan(scan) {
       `;
       }).join("")
     : "Aucun modèle Ollama détecté.";
+  renderBenchmarkModelOptions();
+  renderBenchmarkPreflight();
   renderFirstTestPanel();
   renderPreparePanel();
   renderReadinessPanel();
@@ -3925,6 +3931,8 @@ function renderCompatibility(payload) {
     : "Aucun nouveau modèle signalé par le catalogue pour cette machine.";
 
   renderCommands(models);
+  renderBenchmarkModelOptions();
+  renderBenchmarkPreflight();
   const actions = renderActionPlan(compatibility, models, blocked, effectiveUpgrades, newModels);
   renderDecisionPack(compatibility, models, blocked, effectiveUpgrades, newModels, actions);
   renderCatalogStatus(compatibility);
@@ -5981,6 +5989,108 @@ function friendlyBenchmarkError(result) {
     return `${label} : délai de test atteint après ${elapsedSeconds} s. Le modèle pèse environ ${formatGb(sizeGb)} pour ${formatGb(availableMemory)} de mémoire GPU disponible et utilise l'offload RAM. Le test est incomplet, pas une preuve d'incompatibilité. Relance « Bench long » ou teste Hermes 3 8B.`;
   }
   return `${label} : délai de test atteint après ${elapsedSeconds} s avant une réponse complète. Ce résultat est incomplet, pas une preuve que le modèle est incompatible. Relance le test ou essaie un modèle plus léger.`;
+}
+
+function benchmarkPreflightSnapshot(model = els.benchmarkModelInput?.value || "") {
+  const clean = ollamaActionRef(model);
+  if (!clean) return null;
+  const budget = modelInstallSizeBudget(clean);
+  const sizeGb = Number(budget.estimated_download_gb || 0);
+  const availableMemoryGb = effectiveModelMemoryGb(state.scan);
+  const installed = isOllamaModelInstalled(clean);
+  const installing = isOllamaModelInstalling(clean);
+  const timeoutSeconds = benchmarkTimeoutSeconds(clean);
+  const runtime = state.scan ? defaultOllamaRuntime(clean) : "";
+  const runtimeLabel = runtime === "wsl" ? "Ollama WSL" : runtime === "native" ? "Ollama Windows" : "À confirmer après scan";
+  const sizeSourceLabel = {
+    installed_model_size: "taille installée",
+    catalog_q4_proxy: "estimation Q4",
+    parameter_count_estimate: "estimation paramètres"
+  }[budget.source] || "taille non confirmée";
+  const memoryLabel = state.scan?.unified_memory
+    ? availableMemoryGb > 0 ? `${formatGb(availableMemoryGb)} de budget modèle unifié estimé` : "Budget mémoire unifiée non confirmé"
+    : availableMemoryGb > 0 ? `${formatGb(availableMemoryGb)} de VRAM détectée` : "VRAM non confirmée";
+  const ramGb = Number(state.scan?.ram_gb || 0);
+  let tone = "neutral";
+  let detail = "Le scan matériel précisera si le modèle peut rester sur le GPU ou doit utiliser la RAM.";
+  if (sizeGb > 0 && availableMemoryGb > 0 && sizeGb > availableMemoryGb) {
+    tone = "warning";
+    detail = `${formatGb(sizeGb)} pour ${formatGb(availableMemoryGb)} de mémoire modèle : offload ${ramGb > 0 ? `vers les ${formatGb(ramGb)} de RAM ` : "RAM "}probable. Le premier chargement peut être long.`;
+  } else if (sizeGb > 0 && availableMemoryGb > 0 && sizeGb > availableMemoryGb * 0.85) {
+    tone = "warning";
+    detail = `${formatGb(sizeGb)} pour ${formatGb(availableMemoryGb)} disponibles : marge faible, à confirmer par la mesure Ollama.`;
+  } else if (sizeGb > 0 && availableMemoryGb > 0) {
+    tone = "ready";
+    detail = `${formatGb(sizeGb)} pour ${formatGb(availableMemoryGb)} disponibles : placement GPU plausible, à confirmer par Ollama pendant le test.`;
+  } else if (state.scan) {
+    detail = "La mémoire GPU ou la taille du modèle n'est pas confirmée ; le benchmark restera la preuve d'exécution.";
+  }
+  return {
+    model: clean,
+    label: benchmarkModelDisplayLabel(clean),
+    installed,
+    installing,
+    status_label: installing ? "Téléchargement en cours" : installed ? "Installé" : "Installation préalable",
+    runtime,
+    runtime_label: runtimeLabel,
+    size_gb: sizeGb || null,
+    size_label: sizeGb > 0 ? `${formatGb(sizeGb)} · ${sizeSourceLabel}` : "Taille non confirmée",
+    available_model_memory_gb: availableMemoryGb || null,
+    memory_label: memoryLabel,
+    timeout_seconds: timeoutSeconds,
+    test_label: timeoutSeconds > 45 ? `Test long · ${timeoutSeconds} s` : `Tester · ${timeoutSeconds} s`,
+    tone,
+    detail
+  };
+}
+
+function renderBenchmarkModelOptions() {
+  if (!els.benchmarkModelOptions) return;
+  const compatibility = state.compatibility?.compatibility || state.compatibility || {};
+  const refs = [
+    ...(state.scan?.installed_models || []).map(modelLabel),
+    ...extractModels(compatibility).map(actionableOllamaRef)
+  ].filter(Boolean);
+  const seen = new Set();
+  const options = [];
+  for (const ref of refs) {
+    const clean = ollamaActionRef(ref);
+    const key = normalizeOllamaRef(clean);
+    if (!clean || !key || seen.has(key)) continue;
+    seen.add(key);
+    options.push(clean);
+  }
+  els.benchmarkModelOptions.innerHTML = options
+    .sort((left, right) => left.localeCompare(right))
+    .map((ref) => `<option value="${escapeHtml(ref)}" label="${escapeHtml(benchmarkModelDisplayLabel(ref))}"></option>`)
+    .join("");
+}
+
+function renderBenchmarkPreflight() {
+  if (!els.benchmarkPreflight || !els.benchmarkBtn) return null;
+  const snapshot = benchmarkPreflightSnapshot();
+  if (!snapshot) {
+    els.benchmarkPreflight.className = "benchmark-preflight empty";
+    els.benchmarkPreflight.textContent = "Choisis un modèle pour voir le runtime, la taille et la durée du test avant de le lancer.";
+    els.benchmarkBtn.textContent = "Tester";
+    return null;
+  }
+  els.benchmarkPreflight.className = `benchmark-preflight is-${snapshot.tone}`;
+  els.benchmarkPreflight.innerHTML = `
+    <div class="benchmark-preflight-head">
+      <strong>${escapeHtml(snapshot.label)}</strong>
+      <span>${escapeHtml(snapshot.status_label)}</span>
+    </div>
+    <div class="benchmark-preflight-grid">
+      <div><span>Runtime</span><strong>${escapeHtml(snapshot.runtime_label)}</strong></div>
+      <div><span>Taille</span><strong>${escapeHtml(snapshot.size_label)}</strong></div>
+      <div><span>Mémoire</span><strong>${escapeHtml(snapshot.memory_label)}</strong></div>
+      <div><span>Fenêtre</span><strong>${escapeHtml(`${snapshot.timeout_seconds} s`)}</strong></div>
+    </div>
+    <p>${escapeHtml(snapshot.detail)}</p>
+  `;
+  els.benchmarkBtn.textContent = snapshot.test_label;
+  return snapshot;
 }
 
 function renderCommands(models) {
@@ -8066,6 +8176,7 @@ function usePromptLibraryItem(id, target) {
   }
   els.benchmarkPromptInput.value = item.optimized;
   els.benchmarkModelInput.value = item.model || els.benchmarkModelInput.value;
+  renderBenchmarkPreflight();
   revealWorkspacePanel("tests", els.benchmarkPanel);
   setStatus("Prompt envoyé vers Benchmark", "ok");
 }
@@ -14671,6 +14782,7 @@ async function runBenchmark(options = {}) {
   }
   els.benchmarkModelInput.value = model;
   els.chatModelInput.value = model;
+  renderBenchmarkPreflight();
   if (isOllamaModelInstalling(model)) {
     const message = `${model} est encore en téléchargement. Attends la fin du pull avant de lancer le benchmark.`;
     appendOperationLine(message, "alerte");
@@ -14781,6 +14893,7 @@ async function runBenchmark(options = {}) {
     setStatus(message, failedResult.timed_out ? "warn" : "bad");
   } finally {
     els.benchmarkBtn.disabled = false;
+    renderBenchmarkPreflight();
     renderModelAutopilot();
     renderFlightRecorder();
   }
@@ -15921,6 +16034,7 @@ function renderBenchmark(result) {
       ${cpuRetry}
     </div>
   `;
+  renderBenchmarkPreflight();
   renderFlightRecorder();
 }
 
@@ -18809,6 +18923,15 @@ function installTestHarness() {
         { model_name: "nous-hermes2-mixtral", model_tag: "8x7b", size_gb: 26, runtime: "ollama-wsl", source: "ollama-wsl" }
       ];
       renderScan(scan);
+      els.benchmarkModelInput.value = "hermes3:8b";
+      const simplePreflight = renderBenchmarkPreflight();
+      const simplePreflightText = els.benchmarkPreflight?.textContent || "";
+      const simpleButtonText = els.benchmarkBtn?.textContent || "";
+      els.benchmarkModelInput.value = "nous-hermes2-mixtral:8x7b";
+      const heavyPreflight = renderBenchmarkPreflight();
+      const heavyPreflightText = els.benchmarkPreflight?.textContent || "";
+      const heavyButtonText = els.benchmarkBtn?.textContent || "";
+      const modelOptions = [...(els.benchmarkModelOptions?.options || [])].map((option) => option.value);
       const simpleSuccess = {
         ...demoBenchmark("hermes3:8b"),
         success: true,
@@ -18835,6 +18958,13 @@ function installTestHarness() {
       return {
         simpleLabel: benchmarkModelDisplayLabel(simpleSuccess.model),
         heavyLabel: benchmarkModelDisplayLabel(heavyTimeout.model),
+        simplePreflight,
+        simplePreflightText,
+        simpleButtonText,
+        heavyPreflight,
+        heavyPreflightText,
+        heavyButtonText,
+        modelOptions,
         heavyOutcome: benchmarkOutcomeLabel(heavyTimeout),
         heavyDiagnostic: friendlyBenchmarkError(heavyTimeout),
         resultText: els.benchmarkResult?.textContent || "",
@@ -19048,6 +19178,7 @@ els.syncBenchmarkBtn.addEventListener("click", syncBenchmark);
 els.runModelAutopilotBtn?.addEventListener("click", runModelAutopilot);
 els.applyModelAutopilotBtn?.addEventListener("click", applyModelAutopilotRecommendation);
 els.rollbackModelAutopilotBtn?.addEventListener("click", rollbackModelAutopilotProfile);
+els.benchmarkModelInput?.addEventListener("input", renderBenchmarkPreflight);
 els.benchmarkModelInput?.addEventListener("input", renderModelAutopilot);
 els.benchmarkModelInput?.addEventListener("input", renderFlightRecorder);
 els.saveFlightReferenceBtn?.addEventListener("click", saveFlightRecorderReference);
@@ -19570,6 +19701,8 @@ restoreWorkspaceSectionState();
 restoreWorkspaceTab();
 loadHistory();
 renderBenchmarkHistory();
+renderBenchmarkModelOptions();
+renderBenchmarkPreflight();
 renderModelAutopilot();
 renderFlightRecorder();
 renderPromptLibrary();

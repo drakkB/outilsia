@@ -618,6 +618,10 @@ h2 {
   display: none !important;
 }
 
+.app-shell:not([data-workspace-section="all"]) #workspaceContent > article.panel:not(.workspace-section-hidden) {
+  grid-column: 1 / -1;
+}
+
 .quick-decision-strip {
   display: grid;
   gap: 10px;
@@ -2186,6 +2190,85 @@ dd {
   border: 1px solid rgba(139, 163, 174, 0.18);
   border-radius: 7px;
   padding: 10px;
+}
+
+.benchmark-preflight {
+  background: rgba(4, 9, 12, 0.52);
+  border: 1px solid rgba(139, 163, 174, 0.20);
+  border-radius: 7px;
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+}
+
+.benchmark-preflight.empty {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.benchmark-preflight.is-ready {
+  border-color: rgba(134, 239, 172, 0.34);
+}
+
+.benchmark-preflight.is-warning {
+  border-color: rgba(241, 201, 107, 0.44);
+}
+
+.benchmark-preflight-head {
+  align-items: start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.benchmark-preflight-head strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.benchmark-preflight-head span {
+  color: var(--cyan);
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.benchmark-preflight-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.benchmark-preflight-grid div {
+  min-width: 0;
+}
+
+.benchmark-preflight-grid span,
+.benchmark-preflight-grid strong {
+  display: block;
+}
+
+.benchmark-preflight-grid span {
+  color: var(--muted-2);
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.benchmark-preflight-grid strong {
+  font-size: 11px;
+  line-height: 1.35;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.benchmark-preflight p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 0;
 }
 
 .first-test-recommended {
@@ -5036,6 +5119,10 @@ dd {
   }
 
   .prompt-profiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .benchmark-preflight-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
