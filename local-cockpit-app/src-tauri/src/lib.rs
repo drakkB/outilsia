@@ -2,6 +2,7 @@ mod board_observer;
 mod capability_router;
 mod evidence_ledger;
 mod forgebench;
+mod forgebench_candidate;
 mod forgebench_isolation;
 mod forgebench_runner;
 mod forgebench_sandbox;
@@ -13,6 +14,7 @@ use board_observer::observe_planka_board;
 use capability_router::route_workstack_capabilities;
 use evidence_ledger::{append_evidence_entry, clear_evidence_ledger, get_evidence_ledger};
 use forgebench::compile_forgebench_experiment;
+use forgebench_candidate::run_forgebench_ollama_candidate;
 use forgebench_isolation::probe_forgebench_isolation;
 use forgebench_runner::run_forgebench_reference_pilot;
 use forgebench_sandbox::{
@@ -5170,6 +5172,7 @@ pub fn run() {
             clear_forgebench_worker_sandbox,
             probe_forgebench_isolation,
             run_forgebench_reference_pilot,
+            run_forgebench_ollama_candidate,
             start_local_capability_bridge,
             get_local_capability_bridge_status,
             stop_local_capability_bridge,

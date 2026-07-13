@@ -11,7 +11,7 @@ Périmètre : OutilsIA Local Cockpit, mode **Détails**
 | Workstack Composer | Transformer une carte prête en plan borné avec rôles, budget, permissions et gate humaine. | Aucune exécution, création de worktree, fusion ou publication. |
 | Capability Router | Détecter les CLI et modèles locaux disponibles, puis proposer un planificateur, un exécutant et un vérificateur distinct. | Ne lit pas les jetons, ne vérifie pas les quotas et ne transmet pas la mission aux agents. |
 | Evidence Ledger | Conserver une trace locale chaînée des étapes validées et de leurs empreintes. | Ne stocke ni description brute, prompt, réponse de modèle, credential ou fichier projet. Il ne prouve pas à lui seul la qualité du résultat. |
-| ForgeBench | Préparer un protocole équitable `Signal Maze v1`, sceller localement des seeds privés, matérialiser des espaces frais, tester bubblewrap, puis exécuter un pilote technique isolé avec un évaluateur visible séparé. | Le pilote n'exécute aucun CLI IA ou test caché, ne calcule aucun score de qualité et ne déclare aucun vainqueur. Il valide le transport d'exécution, pas une stack candidate. |
+| ForgeBench | Préparer un protocole équitable `Signal Maze v1`, sceller localement des seeds privés, matérialiser des espaces frais, tester bubblewrap, exécuter un pilote technique, puis appeler facultativement un modèle Ollama local sur le seul contrat public. | Le code produit par le modèle n'est pas exécuté. Aucun gameplay, test caché, score scientifique ou vainqueur n'est validé. Aucun CLI Codex, Claude ou Hermes n'est encore lancé. |
 | Workstack Arena | **Prévu après ForgeBench.** Exécuter une Workstack approuvée dans des espaces isolés et remettre le résultat en revue humaine. | Aucune exécution implicite, aucun partage de worktree entre workers et aucune fusion automatique. |
 | MemoryForge / Obsidian | Conserver les décisions, bilans et connaissances durables du projet. | Ne reçoit pas tous les logs, prompts ou sorties brutes du Ledger. |
 | Strategy Arena | Exploiter les capacités IA locales préparées par OutilsIA pour les workflows quant, puis compiler et backtester. | OutilsIA ne génère pas de stratégie financière et ne lance pas de backtest. |
@@ -36,10 +36,14 @@ Périmètre : OutilsIA Local Cockpit, mode **Détails**
 16. Si le canari passe, vérifier les quatre namespaces, l'écriture dans le seul workspace et la racine hôte masquée.
 17. Dans **Pilote d'exécution**, cliquer sur **Lancer le pilote** puis confirmer le périmètre : worker déterministe sans IA, réseau, API payante ou suite cachée.
 18. Contrôler que le worker de référence et l'évaluateur visible séparé sont vérifiés, que la soumission a été montée en lecture seule et que le workspace temporaire a été supprimé.
-19. Dans **Evidence Ledger**, sélectionner chaque étape disponible, y compris **Pilote ForgeBench vérifié**, puis cliquer sur **Ajouter la preuve**.
-20. Exporter le JSON du Ledger avant une réinitialisation ou un transfert de machine.
+19. Pour tester un modèle local, cocher **Modèle Ollama local**, choisir un modèle déjà installé remonté par Capability Router, puis recréer l'expérience et les workspaces afin de signer cette identité exacte.
+20. Rejouer le préflight isolation et le pilote de référence sur ce batch. Le candidat local ne peut pas réutiliser une ancienne preuve ou un autre backend.
+21. Dans **Candidat Ollama local**, choisir un budget de 3, 5 ou 10 minutes, puis confirmer le second consentement. Il autorise uniquement le modèle local, l'API Ollama de boucle locale et une tentative ; Internet, API payante, suite cachée et exécution du code généré restent interdits.
+22. Contrôler le résultat : génération locale terminée, trois fichiers matérialisés, topologie exacte et sept checks statiques dans un processus séparé. Ce résultat ne signifie pas que le jeu fonctionne.
+23. Dans **Evidence Ledger**, sélectionner chaque étape disponible, notamment **Pilote ForgeBench vérifié** puis **Candidat Ollama vérifié**, et cliquer sur **Ajouter la preuve**.
+24. Exporter le JSON du Ledger avant une réinitialisation ou un transfert de machine.
 
-Le parcours s'arrête ici. Aucun Codex, Claude, Hermes, modèle Ollama ou autre agent candidat n'est lancé dans cette version.
+Le parcours s'arrête ici. Un modèle Ollama local peut produire une soumission structurelle, mais aucun fichier généré n'est exécuté. Codex, Claude, Hermes et les autres agents CLI ne sont pas lancés ; aucun test caché, score comparatif ou vainqueur n'existe à ce stade.
 
 ## Ce que prouve l'Evidence Ledger
 
@@ -50,6 +54,7 @@ Une entrée du Ledger prouve localement que :
 - l'entrée est reliée à la précédente par son empreinte ;
 - aucune exécution n'avait commencé pour les étapes de préparation ;
 - pour `isolated_reference_run` uniquement, un worker technique déterministe a réellement été exécuté après consentement, puis vérifié par un second processus isolé ;
+- pour `isolated_local_model_candidate`, le modèle Ollama identifié a réellement répondu après un second consentement, puis sa soumission a passé sept contrôles statiques dans un processus isolé ;
 - seuls les claims minimaux et métriques prévus ont été conservés.
 
 Le Ledger refuse :
@@ -65,7 +70,7 @@ Le Ledger **ne prouve pas** :
 
 - que Codex, Claude ou Hermes est connecté à un compte ;
 - qu'un quota ou abonnement est disponible ;
-- qu'un agent candidat a réellement exécuté ou réussi la tâche ;
+- que le code produit par le candidat local a été exécuté ou que la tâche fonctionne ;
 - que la machine appartient à une personne précise ;
 - qu'un benchmark terrain a été réalisé sur une machine physique distincte ;
 - qu'une sortie est correcte sans vérification indépendante.
@@ -80,7 +85,8 @@ Le Ledger **ne prouve pas** :
 6. `signed_isolation_preflight` : canari bubblewrap signé prouvant la disponibilité de namespaces séparés et d'un montage minimal, sans worker lancé.
 7. `isolated_reference_run` : pilote technique réellement isolé, sans IA candidate, avec durée, coût API nul et sortie brute non conservée.
 8. `independent_visible_verification` : vérification dans un second processus isolé, soumission en lecture seule et six contrôles visibles. Les tests cachés restent absents.
-9. `human_decision` : **prévu**, acceptation, rejet ou demande de correction par le propriétaire humain.
+9. `isolated_local_model_candidate` : modèle Ollama installé appelé sur la seule tâche publique, sortie brute non conservée et soumission vérifiée structurellement par sept checks statiques. Ce niveau ne prouve ni gameplay, qualité, science ou victoire.
+10. `human_decision` : **prévu**, acceptation, rejet ou demande de correction par le propriétaire humain.
 
 ## Ce que prépare ForgeBench
 
@@ -120,7 +126,17 @@ Le contrat `outilsia.forgebench_reference_pilot_result.v1` exige un consentement
 
 Le worker ne reçoit ni dépôt source, credential, suite cachée ou accès réseau. L'évaluateur visible ne reçoit pas le vault et ne peut pas écrire dans la soumission. Les sorties brutes et chemins restent hors du résultat ; le dossier temporaire doit être supprimé avant qu'une preuve soit retournée.
 
-Ce pilote ferme la boucle technique **copie fraîche → worker isolé → évaluateur séparé → preuve bornée**. Il ne lance aucune stack candidate, n'évalue pas la qualité du mini-jeu et ne mesure pas encore le coût réel d'un abonnement ou d'une API. `candidate_worker_execution_ready=false` et `scientific_eligible=false` restent donc obligatoires.
+Ce pilote ferme la boucle technique **copie fraîche → worker isolé → évaluateur séparé → preuve bornée**. Le pilote lui-même ne lance aucune stack candidate, n'évalue pas la qualité du mini-jeu et ne mesure pas encore le coût réel d'un abonnement ou d'une API. `candidate_worker_execution_ready=false` et `scientific_eligible=false` restent donc obligatoires dans son contrat.
+
+### Candidat Ollama local
+
+Le contrat `outilsia.forgebench_ollama_candidate_result.v1` ajoute un adaptateur local borné, distinct du pilote. L'expérience signe l'identifiant exact `local-model:ollama_native:<modèle>` ou `local-model:ollama_wsl:<modèle>`. Le modèle doit déjà être installé dans ce runtime ; ForgeBench ne lance aucun téléchargement implicite.
+
+Après consentement, OutilsIA interroge uniquement l'API Ollama sur `127.0.0.1`, ou cette même boucle locale depuis WSL. Le modèle reçoit la spécification publique, le starter public et un seed public. Il ne reçoit ni chemin, dépôt, fichier utilisateur, outil, credential, suite privée ou accès Internet. Une seule tentative est permise, avec durée et taille de réponse bornées et coût API maximal de 0 €.
+
+La réponse JSON doit contenir exactement `index.html`, `styles.css` et `game.js`. L'hôte les écrit dans une copie fraîche, refuse toute autre topologie ou ressource externe, puis un second processus bubblewrap monte la soumission en lecture seule et effectue sept contrôles statiques. La réponse brute et les fichiers temporaires sont supprimés avant le retour ; seul un reçu signé avec métriques et empreintes peut rejoindre l'Evidence Ledger.
+
+Le code généré n'est volontairement **pas exécuté** dans ce palier. Le résultat conserve obligatoirement `gameplay_verified=false`, `hidden_evaluator_verified=false`, `scientific_eligible=false` et `winner_declared=false`. Le coût API est réellement nul ; la consommation électrique locale reste inconnue, jamais transformée en zéro.
 
 Le score équilibré futur reste explicite : `50 % résultat + 20 % efficacité + 15 % vitesse + 15 % coût`. Un coût inconnu n'est jamais transformé en zéro. Le score composite, les podiums par dimension, la frontière de Pareto et un éventuel vainqueur restent absents tant que des runs complets et comparables n'existent pas.
 
@@ -132,7 +148,8 @@ Le score équilibré futur reste explicite : `50 % résultat + 20 % efficacité 
 - Les modèles Ollama proviennent du scan local déjà effectué.
 - Aucun appel API payant n'est déclenché par Composer, Router, ForgeBench ou Ledger.
 - Le pilote technique exige un consentement distinct et impose réseau coupé, API payante interdite et CLI candidat interdit.
-- Une future exécution de stack candidate exigera un second consentement et un budget explicite.
+- Le candidat Ollama exige un second consentement et un budget explicite. Seule la boucle locale Ollama est ouverte ; aucun fichier généré n'est exécuté.
+- Une future exécution de CLI candidat exigera encore un contrat, un consentement et un budget séparés.
 
 ## Export et réinitialisation
 
@@ -161,6 +178,8 @@ Le fichier persistant se trouve dans le dossier applicatif Tauri sous le nom `ev
 - `outilsia.forgebench_isolation_probe_result.v1`
 - `outilsia.forgebench_reference_pilot_request.v1`
 - `outilsia.forgebench_reference_pilot_result.v1`
+- `outilsia.forgebench_ollama_candidate_request.v1`
+- `outilsia.forgebench_ollama_candidate_result.v1`
 - `outilsia.forgebench_experiment.v1`
 - `outilsia.forgebench_compile_result.v1`
 - `outilsia.evidence_entry.v1`

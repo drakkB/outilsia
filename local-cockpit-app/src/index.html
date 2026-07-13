@@ -477,6 +477,7 @@
             <label><input type="checkbox" name="forgeBenchStack" value="codex-solo" checked> <span>Codex CLI seul</span></label>
             <label><input type="checkbox" name="forgeBenchStack" value="claude-solo" checked> <span>Claude Code seul</span></label>
             <label><input type="checkbox" name="forgeBenchStack" value="hermes-codex-claude" checked> <span>Hermes → Codex → Claude</span></label>
+            <label><input type="checkbox" name="forgeBenchStack" value="ollama-local"> <span>Modèle Ollama local</span></label>
           </fieldset>
           <div class="forgebench-vault">
             <div class="forgebench-vault-heading">
@@ -530,6 +531,35 @@
               <button id="runForgeBenchPilotBtn" type="button" disabled>Lancer le pilote</button>
             </div>
           </div>
+          <div class="forgebench-candidate">
+            <div class="forgebench-candidate-heading">
+              <strong>Candidat Ollama local</strong>
+              <span id="forgeBenchCandidateState">stack locale requise</span>
+            </div>
+            <div class="forgebench-candidate-controls">
+              <label>
+                <span class="field-label">Modèle installé</span>
+                <select id="forgeBenchCandidateModel" aria-describedby="forgeBenchCandidatePrivacy">
+                  <option value="">Aucun modèle local routé</option>
+                </select>
+              </label>
+              <label>
+                <span class="field-label">Budget maximal</span>
+                <select id="forgeBenchCandidateDuration" aria-describedby="forgeBenchCandidatePrivacy">
+                  <option value="180">3 minutes</option>
+                  <option value="300" selected>5 minutes</option>
+                  <option value="600">10 minutes</option>
+                </select>
+              </label>
+            </div>
+            <div id="forgeBenchCandidateBox" class="forgebench-candidate-box empty">
+              Ajoute la stack Ollama locale à l'expérience. Le modèle recevra uniquement la tâche publique et rendra trois fichiers bornés.
+            </div>
+            <small id="forgeBenchCandidatePrivacy">Ollama local uniquement · coût API 0 € · aucune lecture de fichier par le modèle · code généré non exécuté · aucun test caché.</small>
+            <div class="button-row compact">
+              <button id="runForgeBenchCandidateBtn" type="button" disabled>Lancer le candidat local</button>
+            </div>
+          </div>
           <div id="forgeBenchBox" class="forgebench-box empty">
             Compile d'abord une Workstack puis un routage complet. ForgeBench préparera l'expérience sans l'exécuter.
           </div>
@@ -560,6 +590,7 @@
                 <option value="forgebench_experiment_compiled">Expérience ForgeBench préparée</option>
                 <option value="forgebench_isolation_probed">Isolation ForgeBench testée</option>
                 <option value="forgebench_reference_pilot_verified">Pilote ForgeBench vérifié</option>
+                <option value="forgebench_ollama_candidate_verified">Candidat Ollama vérifié</option>
               </select>
             </label>
           </div>

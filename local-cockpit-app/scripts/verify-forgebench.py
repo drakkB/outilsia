@@ -45,8 +45,10 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     digests = {stack["protocol_digest"] for stack in experiment["candidate_stacks"]}
     if digests != {experiment["protocol_digest"]}:
         raise AssertionError(f"{label}: candidate stacks do not share one protocol")
-    if len(experiment["candidate_stacks"]) != 3:
-        raise AssertionError(f"{label}: expected three initial stacks")
+    if len(experiment["candidate_stacks"]) != 4:
+        raise AssertionError(f"{label}: expected four candidate stacks")
+    if "ollama-local" not in {stack["key"] for stack in experiment["candidate_stacks"]}:
+        raise AssertionError(f"{label}: Ollama local stack is missing")
     receipt = proof["vault"]["receipt"]
     if receipt["hidden_seeds_total"] != 5 or receipt["security"]["worker_access_blocked"] is not False:
         raise AssertionError(f"{label}: hidden suite receipt overclaims isolation")
@@ -56,7 +58,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     sandbox = proof["sandbox"]["receipt"]
     if sandbox["schema"] != "outilsia.forgebench_worker_sandbox_receipt.v1":
         raise AssertionError(f"{label}: sandbox receipt schema mismatch")
-    if sandbox["workspaces_total"] != 9 or sandbox["candidate_stacks_total"] != 3 or sandbox["public_seeds_total"] != 3:
+    if sandbox["workspaces_total"] != 12 or sandbox["candidate_stacks_total"] != 4 or sandbox["public_seeds_total"] != 3:
         raise AssertionError(f"{label}: sandbox workspace matrix mismatch")
     if sandbox["experiment_digest"] != experiment["integrity"]["digest"] or sandbox["protocol_digest"] != experiment["protocol_digest"]:
         raise AssertionError(f"{label}: sandbox is not bound to the current experiment")
@@ -104,10 +106,27 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     for forbidden in ["workspace_path", "forgebench-reference-pilot-v1:", "/home/", "C:\\Users\\"]:
         if forbidden in pilot_json:
             raise AssertionError(f"{label}: reference pilot leaked {forbidden!r}")
+    candidate = proof["candidate"]
+    if candidate["schema"] != "outilsia.forgebench_ollama_candidate_result.v1":
+        raise AssertionError(f"{label}: Ollama candidate schema mismatch")
+    if candidate["candidate"]["model_invoked"] is not True or candidate["candidate"]["cli_agent_invoked"] is not False:
+        raise AssertionError(f"{label}: Ollama invocation claim mismatch")
+    if candidate["submission"]["generated_code_executed"] is not False:
+        raise AssertionError(f"{label}: candidate fixture claims generated-code execution")
+    if candidate["evaluator"]["visible_checks_passed"] != 7 or candidate["evaluator"]["workspace_read_only"] is not True:
+        raise AssertionError(f"{label}: static candidate evaluator claim mismatch")
+    if candidate["readiness"]["gameplay_verified"] is not False or candidate["readiness"]["scientific_eligible"] is not False or candidate["readiness"]["winner_declared"] is not False:
+        raise AssertionError(f"{label}: candidate overclaims gameplay, science or winner")
+    if candidate["cost"]["api_cost_eur"] != 0 or candidate["cost"]["local_energy_wh"] is not None:
+        raise AssertionError(f"{label}: candidate cost truth mismatch")
+    candidate_json = json.dumps(candidate, sort_keys=True)
+    for forbidden in ["index_html", "styles_css", "game_js", "workspace_path", "/home/", "C:\\Users\\"]:
+        if forbidden in candidate_json:
+            raise AssertionError(f"{label}: candidate result leaked {forbidden!r}")
     if page.locator("#copyForgeBenchJsonBtn").is_disabled() or page.locator("#copyForgeBenchProtocolBtn").is_disabled():
         raise AssertionError(f"{label}: compiled preflight cannot be exported")
-    if page.locator("#evidenceLedgerSource").input_value() != "forgebench_reference_pilot_verified":
-        raise AssertionError(f"{label}: reference-run proof is not offered to Evidence Ledger")
+    if page.locator("#evidenceLedgerSource").input_value() != "forgebench_ollama_candidate_verified":
+        raise AssertionError(f"{label}: candidate proof is not offered to Evidence Ledger")
 
     text = panel.inner_text()
     for expected in [
@@ -126,7 +145,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "Suite privée non montée dans le pilote et pas encore isolée pour les futurs agents",
         "Espaces worker frais",
         "workspaces vérifiés",
-        "9 espaces frais liés au préflight",
+        "12 espaces frais liés au préflight",
         "starter SHA-256 vérifié",
         "Aucun chemin exposé",
         "aucun worker lancé",
@@ -141,6 +160,12 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "Worker de référence réussi · évaluateur indépendant 6/6",
         "soumission montée en lecture seule",
         "Aucun Codex, Claude, Hermes ou modèle local exécuté",
+        "Candidat Ollama local",
+        "soumission structurée vérifiée",
+        "hermes3:8b a généré une soumission · contrôle statique 7/7",
+        "Code non exécuté",
+        "gameplay non vérifié",
+        "énergie locale non mesurée",
         "Aucun agent lancé",
         "aucun score calculé",
         "aucun vainqueur déclaré",
@@ -178,7 +203,7 @@ def main() -> None:
         browser.close()
     print(
         f"forgebench_ui_ok desktop={desktop} mobile={mobile} "
-        "starter=sealed hidden=locally-sealed-not-evaluated workspaces=9 isolation=reference-pilot evaluator=visible-only candidate=false science=false"
+        "starter=sealed hidden=locally-sealed-not-evaluated stacks=4 workspaces=12 isolation=reference-pilot candidate=ollama-local structure=true code-executed=false gameplay=false science=false winner=false"
     )
 
 

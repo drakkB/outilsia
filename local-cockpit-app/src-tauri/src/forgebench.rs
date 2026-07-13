@@ -17,7 +17,7 @@ const SIGNAL_MAZE_ID: &str = "signal-maze-v1";
 const SIGNAL_MAZE_SPEC: &str = include_str!("../../forgebench/signal-maze-v1.json");
 const MIN_SCIENTIFIC_SEEDS: usize = 3;
 const MAX_SEEDS: usize = 3;
-const MAX_STACKS: usize = 3;
+const MAX_STACKS: usize = 4;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -29,6 +29,7 @@ pub(crate) struct CompileForgeBenchRequest {
     claim_level: Option<String>,
     seed_count: Option<usize>,
     candidate_stacks: Option<Vec<String>>,
+    ollama_candidate_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -364,7 +365,7 @@ fn normalize_stack_keys(values: Option<Vec<String>>) -> Result<Vec<String>, Stri
         let value = value.trim().to_ascii_lowercase();
         if !matches!(
             value.as_str(),
-            "codex-solo" | "claude-solo" | "hermes-codex-claude"
+            "codex-solo" | "claude-solo" | "hermes-codex-claude" | "ollama-local"
         ) {
             return Err("Stack ForgeBench inconnue.".to_string());
         }
@@ -385,6 +386,22 @@ fn safe_candidate_id(value: &str) -> bool {
         && value.bytes().all(|byte| {
             byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-' | b'/' | b':')
         })
+}
+
+fn safe_ollama_candidate_id(value: &str) -> bool {
+    let model_ref = value
+        .strip_prefix("local-model:ollama_native:")
+        .or_else(|| value.strip_prefix("local-model:ollama_wsl:"));
+    model_ref.is_some_and(|model_ref| {
+        !model_ref.is_empty()
+            && model_ref.len() <= 180
+            && !model_ref.starts_with('/')
+            && !model_ref.contains("..")
+            && !model_ref.contains("//")
+            && model_ref.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-' | b'/' | b':')
+            })
+    })
 }
 
 fn candidate_by_prefix(router: &Value, prefix: &str) -> Option<Value> {
@@ -419,6 +436,33 @@ fn candidate_by_prefix(router: &Value, prefix: &str) -> Option<Value> {
         })
 }
 
+fn candidate_by_id(router: &Value, candidate_id: &str) -> Option<Value> {
+    if !safe_ollama_candidate_id(candidate_id) {
+        return None;
+    }
+    router
+        .get("candidates")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .find(|candidate| {
+            candidate.get("available").and_then(Value::as_bool) == Some(true)
+                && candidate.get("kind").and_then(Value::as_str) == Some("local_model")
+                && candidate.get("provider").and_then(Value::as_str) == Some("ollama")
+                && candidate.get("id").and_then(Value::as_str) == Some(candidate_id)
+        })
+        .map(|candidate| {
+            json!({
+                "candidate_id": candidate.get("id").cloned().unwrap_or(Value::Null),
+                "label": candidate.get("label").cloned().unwrap_or(Value::Null),
+                "environment": candidate.get("environment").cloned().unwrap_or(Value::Null),
+                "version": candidate.get("version").cloned().unwrap_or(Value::Null),
+                "auth_status": candidate.pointer("/auth/status").cloned().unwrap_or(Value::Null),
+                "quota_verified": candidate.pointer("/auth/quota_verified").cloned().unwrap_or(json!(false))
+            })
+        })
+}
+
 fn bind_role(role: &str, candidate: Option<Value>) -> Value {
     json!({
         "role": role,
@@ -427,7 +471,12 @@ fn bind_role(role: &str, candidate: Option<Value>) -> Value {
     })
 }
 
-fn compile_candidate_stack(key: &str, router: &Value, protocol_digest: &str) -> Value {
+fn compile_candidate_stack(
+    key: &str,
+    router: &Value,
+    protocol_digest: &str,
+    ollama_candidate_id: Option<&str>,
+) -> Value {
     let codex = || candidate_by_prefix(router, "codex-cli:");
     let claude = || candidate_by_prefix(router, "claude-code:");
     let hermes = || candidate_by_prefix(router, "hermes-agent:");
@@ -474,6 +523,26 @@ fn compile_candidate_stack(key: &str, router: &Value, protocol_digest: &str) -> 
                 bind_role("independent_verifier", claude()),
             ],
         ),
+        "ollama-local" => (
+            "Modèle Ollama local",
+            vec![
+                bind_role(
+                    "worker",
+                    ollama_candidate_id.and_then(|id| candidate_by_id(router, id)),
+                ),
+                bind_role(
+                    "independent_verifier",
+                    Some(json!({
+                        "candidate_id": "forgebench:deterministic-evaluator",
+                        "label": "Evaluateur deterministe ForgeBench",
+                        "environment": "isolated_evaluator",
+                        "version": CONTRACT_VERSION,
+                        "auth_status": "not_required",
+                        "quota_verified": true
+                    })),
+                ),
+            ],
+        ),
         _ => unreachable!("stack key validated"),
     };
     let blockers = bindings
@@ -509,6 +578,10 @@ fn validate_stack_bindings(key: &str, bindings: &[Value], available: bool) -> Re
             ("worker", "codex-cli:"),
             ("independent_verifier", "claude-code:"),
         ],
+        "ollama-local" => vec![
+            ("worker", "local-model:"),
+            ("independent_verifier", "forgebench:deterministic-evaluator"),
+        ],
         _ => return Err("Stack ForgeBench inconnue.".to_string()),
     };
     if bindings.len() != expected.len() {
@@ -533,7 +606,9 @@ fn validate_stack_bindings(key: &str, bindings: &[Value], available: bool) -> Re
             return Err(format!("Candidat ForgeBench absent: {role}."));
         }
         if candidate_id.is_some_and(|value| {
-            if expected_prefix.ends_with(':') {
+            if key == "ollama-local" && role == "worker" {
+                !safe_ollama_candidate_id(value)
+            } else if expected_prefix.ends_with(':') {
                 !value.starts_with(expected_prefix)
             } else {
                 value != expected_prefix
@@ -601,6 +676,18 @@ fn compile_experiment(
     let benchmark_digest = canonical_sha256(&spec);
     let claim_level = normalize_claim_level(request.claim_level.as_deref())?;
     let stack_keys = normalize_stack_keys(request.candidate_stacks.clone())?;
+    let ollama_candidate_id = request
+        .ollama_candidate_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    if stack_keys.iter().any(|key| key == "ollama-local") {
+        if ollama_candidate_id.is_none_or(|value| !safe_ollama_candidate_id(value)) {
+            return Err("Candidat Ollama ForgeBench absent ou invalide.".to_string());
+        }
+    } else if ollama_candidate_id.is_some() {
+        return Err("Candidat Ollama fourni sans stack locale.".to_string());
+    }
     let seed_count = request.seed_count.unwrap_or(MIN_SCIENTIFIC_SEEDS);
     if seed_count == 0 || seed_count > MAX_SEEDS {
         return Err("Nombre de seeds ForgeBench invalide.".to_string());
@@ -633,7 +720,12 @@ fn compile_experiment(
     let candidate_stacks = stack_keys
         .iter()
         .map(|key| {
-            compile_candidate_stack(key, &request.capability_routing, protocol_digest.as_str())
+            compile_candidate_stack(
+                key,
+                &request.capability_routing,
+                protocol_digest.as_str(),
+                ollama_candidate_id,
+            )
         })
         .collect::<Vec<_>>();
     let workstack_ready = request
@@ -705,6 +797,7 @@ fn compile_experiment(
         "router_sha256": request.capability_routing.pointer("/integrity/digest"),
         "claim_level": claim_level,
         "candidate_stack_keys": stack_keys,
+        "ollama_candidate_id": ollama_candidate_id,
         "seeds": seeds,
         "hidden_suite_digest": protocol.pointer("/hidden_suite/digest")
     });
@@ -916,8 +1009,10 @@ pub(crate) fn validate_forgebench_result(result: &Value) -> Result<(), String> {
                 || stack.get("execution_started").and_then(Value::as_bool) != Some(false)
                 || stack.get("scores_computed").and_then(Value::as_bool) != Some(false)
                 || stack.get("key").and_then(Value::as_str).is_none_or(|key| {
-                    !matches!(key, "codex-solo" | "claude-solo" | "hermes-codex-claude")
-                        || !stack_keys.insert(key.to_string())
+                    !matches!(
+                        key,
+                        "codex-solo" | "claude-solo" | "hermes-codex-claude" | "ollama-local"
+                    ) || !stack_keys.insert(key.to_string())
                 })
         })
     {
@@ -1238,6 +1333,7 @@ mod tests {
             claim_level: Some(claim_level.to_string()),
             seed_count: Some(seed_count),
             candidate_stacks: Some(stacks.iter().map(|value| (*value).to_string()).collect()),
+            ollama_candidate_id: None,
         }
     }
 
@@ -1337,6 +1433,7 @@ mod tests {
             claim_level: Some("exploratory".to_string()),
             seed_count: Some(3),
             candidate_stacks: Some(default_stack_keys()),
+            ollama_candidate_id: None,
         };
         let result = compile_result(&request).expect("blocked preflight");
         assert_eq!(result.experiment["readiness"]["exploratory_ready"], false);
@@ -1365,6 +1462,21 @@ mod tests {
         assert!(
             compile_result(&request("exploratory", 4, &["codex-solo", "claude-solo"])).is_err()
         );
+    }
+
+    #[test]
+    fn ollama_candidate_identity_requires_an_exact_runtime_and_safe_model_ref() {
+        assert!(safe_ollama_candidate_id(
+            "local-model:ollama_native:hermes3:8b"
+        ));
+        assert!(safe_ollama_candidate_id(
+            "local-model:ollama_wsl:namespace/model:q4_K_M"
+        ));
+        assert!(!safe_ollama_candidate_id("local-model:hermes3:8b"));
+        assert!(!safe_ollama_candidate_id(
+            "local-model:ollama_native:../model"
+        ));
+        assert!(!safe_ollama_candidate_id("local-model:ollama_wsl:/model"));
     }
 
     #[test]

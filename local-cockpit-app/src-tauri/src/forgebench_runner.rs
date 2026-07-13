@@ -227,7 +227,7 @@ fn sign_document(document: &mut Value) -> Result<(), String> {
     Ok(())
 }
 
-fn selected_backend(isolation: &Value) -> Result<&str, String> {
+pub(crate) fn selected_backend(isolation: &Value) -> Result<&str, String> {
     validate_forgebench_isolation_result(isolation)?;
     let backend = isolation
         .get("selected_backend")
@@ -262,14 +262,14 @@ fn validate_consent(consent: &Value) -> Result<(), String> {
 }
 
 #[cfg(target_os = "linux")]
-fn isolated_command(run_dir: &Path, script: &str) -> Result<Command, String> {
+pub(crate) fn isolated_command(run_dir: &Path, script: &str) -> Result<Command, String> {
     let mut command = Command::new("sh");
     command.args(["-lc", script]).current_dir(run_dir);
     Ok(command)
 }
 
 #[cfg(target_os = "windows")]
-fn isolated_command(run_dir: &Path, script: &str) -> Result<Command, String> {
+pub(crate) fn isolated_command(run_dir: &Path, script: &str) -> Result<Command, String> {
     let run_dir = run_dir
         .to_str()
         .ok_or_else(|| "Chemin du pilote ForgeBench non UTF-8.".to_string())?;
@@ -279,7 +279,7 @@ fn isolated_command(run_dir: &Path, script: &str) -> Result<Command, String> {
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-fn isolated_command(_run_dir: &Path, _script: &str) -> Result<Command, String> {
+pub(crate) fn isolated_command(_run_dir: &Path, _script: &str) -> Result<Command, String> {
     Err("Runner ForgeBench non pris en charge sur cette plateforme.".to_string())
 }
 

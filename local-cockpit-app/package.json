@@ -45,7 +45,7 @@
     "verify:board-observer": "python3 scripts/verify-board-observer.py",
     "verify:workstack-composer": "python3 scripts/verify-workstack-composer.py",
     "verify:capability-router": "python3 scripts/verify-capability-router.py",
-    "verify:forgebench": "node scripts/verify-forgebench-contract.mjs && node scripts/test-forgebench-reference-run.mjs && python3 scripts/verify-forgebench.py",
+    "verify:forgebench": "node scripts/verify-forgebench-contract.mjs && node scripts/test-forgebench-reference-run.mjs && node scripts/test-forgebench-candidate-run.mjs && python3 scripts/verify-forgebench.py",
     "verify:evidence-ledger": "python3 scripts/verify-evidence-ledger.py",
     "verify:install-safety-preflight": "python3 scripts/verify-install-safety-preflight.py",
     "verify:install-safety-preflight-seo": "node scripts/verify-install-safety-preflight-seo.mjs",

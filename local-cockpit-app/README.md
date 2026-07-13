@@ -93,7 +93,9 @@ Le module **Espaces worker frais** matérialise désormais un workspace neuf par
 
 Le **Préflight isolation** ajoute un canari bubblewrap borné sous Linux ou WSL. Il vérifie des namespaces utilisateur, montage, réseau et processus distincts, l'écriture dans le seul workspace et une racine hôte masquée. Il ne lit aucun credential, ne reçoit aucun contenu caché et ne lance aucun worker. Un canari vert prouve seulement que le backend est disponible.
 
-Le **Pilote d'exécution** peut ensuite lancer, sur consentement explicite, un worker technique déterministe dans une copie fraîche puis un second processus évaluateur avec la soumission montée en lecture seule. Le réseau, la racine hôte, le dépôt source, le vault et les credentials restent hors montage ; le workspace temporaire est supprimé avant le retour. Ce pilote prouve le transport isolé et la vérification visible, pas la qualité de Codex, Claude, Hermes ou d'un modèle local : aucun CLI candidat ni test caché n'est exécuté et `scientific_eligible=false` reste obligatoire.
+Le **Pilote d'exécution** peut ensuite lancer, sur consentement explicite, un worker technique déterministe dans une copie fraîche puis un second processus évaluateur avec la soumission montée en lecture seule. Le réseau, la racine hôte, le dépôt source, le vault et les credentials restent hors montage ; le workspace temporaire est supprimé avant le retour. Ce pilote prouve le transport isolé et la vérification visible, pas la qualité d'une IA.
+
+Le **Candidat Ollama local** est le premier adaptateur de modèle réellement exécutable dans les sources. Après un second consentement, un modèle déjà installé reçoit seulement la tâche et le starter publics via l'API de boucle locale. Sa réponse stricte produit trois fichiers bornés, contrôlés dans un processus bubblewrap séparé et en lecture seule. Le code généré n'est pas exécuté : gameplay, tests cachés, score scientifique et vainqueur restent explicitement faux. La sortie brute n'est ni retournée ni persistée ; le Ledger conserve seulement métriques et SHA-256. Aucun CLI Codex, Claude ou Hermes n'est lancé par ce palier.
 
 Contrôles dédiés :
 

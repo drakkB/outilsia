@@ -55,7 +55,7 @@ if (bundleDigest !== manifest.bundle_sha256 || bundleDigest !== benchmark.starte
   throw new Error("starter bundle digest mismatch");
 }
 
-const rust = ["forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "evidence_ledger.rs"]
+const rust = ["forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "forgebench_candidate.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri", "src", name), "utf8"))
   .join("\n");
 const js = readFileSync(resolve(root, "src", "app.js"), "utf8");
@@ -91,6 +91,17 @@ for (const needle of [
   '"candidate_worker_execution_ready": false',
   '"hidden_suite_used": false',
   "isolated_reference_run",
+  "outilsia.forgebench_ollama_candidate_result.v1",
+  "ollama_local_prompt_only_v1",
+  "candidate_runtime_supported",
+  "http://127.0.0.1:11434/api/chat",
+  ".no_proxy()",
+  '"--noproxy"',
+  ".chunk()",
+  '"raw_model_output_returned": false',
+  '"generated_code_executed": false',
+  "deterministic_visible_static_gate",
+  "isolated_local_model_candidate",
 ]) {
   if (!rust.includes(needle)) throw new Error(`missing Rust ForgeBench guard: ${needle}`);
 }
@@ -106,17 +117,19 @@ for (const needle of [
   "pilote technique séparé disponible",
   "Worker de référence réussi · évaluateur indépendant 6/6",
   "Aucun Codex, Claude, Hermes ou modèle local exécuté",
+  "soumission structurée vérifiée",
+  "Code non exécuté · gameplay non vérifié · énergie locale non mesurée",
 ]) {
   if (!js.includes(needle)) throw new Error(`missing UI truth label: ${needle}`);
 }
 for (const [label, text, needles] of [
-  ["hub", hub, ["forgebench-workspaces-stacks-ia", "ForgeBench Runner v0 · candidat source", "Pilote isolé vérifié", "worker technique déterministe", "aucun Codex, Claude, Hermes ou modèle local", "ForgeBench peut-il déjà lancer Codex, Claude Code et Hermes automatiquement ?"]],
-  ["download", download, ["forgebench-workspaces-stacks-ia", "ForgeBench Runner v0 · candidat source", "Pilote isolé vérifié", "worker technique déterministe", "n'exécute encore aucun Codex, Claude, Hermes ou modèle local", "ForgeBench peut-il déjà lancer Codex, Claude Code et Hermes automatiquement ?"]],
-  ["llms", llms, ["ForgeBench Runner v0 (source candidate, not in the current public build)", "deterministic reference worker", "No Codex, Claude, Hermes or local-model candidate is executed", "no scientific score or winner"]],
+  ["hub", hub, ["forgebench-workspaces-stacks-ia", "ForgeBench Ollama Candidate v0 · source, non public", "modèle Ollama déjà installé", "Contrôle statique 7/7", "Code non exécuté", "Aucun Codex, Claude Code ou Hermes", "ForgeBench peut-il déjà tester un modèle Ollama local ou lancer Codex, Claude Code et Hermes ?"]],
+  ["download", download, ["forgebench-workspaces-stacks-ia", "ForgeBench Ollama Candidate v0 · source, non public", "modèle déjà installé via la boucle locale Ollama", "Contrôle statique 7/7", "Génération et structure vérifiées", "Aucun Codex, Claude Code ou Hermes", "ForgeBench peut-il déjà tester un modèle Ollama local ou lancer Codex, Claude Code et Hermes ?"]],
+  ["llms", llms, ["ForgeBench Ollama Candidate v0 (source candidate, not in the current public build)", "already-installed native or WSL Ollama model", "generated code is not executed", "no hidden evaluation, scientific score, CLI-agent comparison or winner"]],
 ]) {
   for (const needle of needles) {
     if (!text.includes(needle)) throw new Error(`missing ForgeBench SEO/GEO truth on ${label}: ${needle}`);
   }
 }
 
-console.log(`forgebench_contract_ok benchmark=${benchmark.id} seeds=${benchmark.determinism.default_seeds.length} starter=${bundleDigest} hidden=absent isolation=reference-run-only candidate=false science=false seo=hub-download-llms`);
+console.log(`forgebench_contract_ok benchmark=${benchmark.id} seeds=${benchmark.determinism.default_seeds.length} starter=${bundleDigest} hidden=absent isolation=reference-plus-static-candidate candidate=ollama-prompt-only generated-code=false gameplay=false science=false winner=false seo=hub-download-llms`);

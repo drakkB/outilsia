@@ -1,5 +1,6 @@
 use crate::capability_router::validate_capability_router_result;
 use crate::forgebench::validate_forgebench_result;
+use crate::forgebench_candidate::validate_forgebench_ollama_candidate_result;
 use crate::forgebench_isolation::validate_forgebench_isolation_result;
 use crate::forgebench_runner::validate_forgebench_reference_pilot_result;
 use crate::workstack_composer::{canonical_sha256, validate_workstack_plan};
@@ -142,28 +143,41 @@ fn verify_entry(
         .and_then(Value::as_str)
         .ok_or_else(|| "Type d'entree Evidence Ledger absent.".to_string())?;
     let is_reference_run = event_type == "forgebench_reference_pilot_verified";
+    let is_candidate_run = event_type == "forgebench_ollama_candidate_verified";
+    let is_executed_run = is_reference_run || is_candidate_run;
     if entry
         .pointer("/privacy/raw_source_stored")
         .and_then(Value::as_bool)
         != Some(false)
-        || entry.pointer("/execution/started").and_then(Value::as_bool) != Some(is_reference_run)
+        || entry.pointer("/execution/started").and_then(Value::as_bool) != Some(is_executed_run)
         || entry
             .pointer("/validation/independent_run_verification")
             .and_then(Value::as_bool)
-            != Some(is_reference_run)
-        || (is_reference_run
+            != Some(is_executed_run)
+        || (is_executed_run
             && (entry
                 .pointer("/execution/api_cost_eur")
                 .and_then(Value::as_u64)
                 != Some(0)
-                || entry
-                    .pointer("/execution/cost_status")
-                    .and_then(Value::as_str)
-                    != Some("not_incurred")
-                || entry
-                    .pointer("/human_decision/status")
-                    .and_then(Value::as_str)
-                    != Some("explicitly_confirmed_reference_pilot")))
+                || if is_reference_run {
+                    entry
+                        .pointer("/execution/cost_status")
+                        .and_then(Value::as_str)
+                        != Some("not_incurred")
+                        || entry
+                            .pointer("/human_decision/status")
+                            .and_then(Value::as_str)
+                            != Some("explicitly_confirmed_reference_pilot")
+                } else {
+                    entry
+                        .pointer("/execution/cost_status")
+                        .and_then(Value::as_str)
+                        != Some("api_not_incurred_energy_not_measured")
+                        || entry
+                            .pointer("/human_decision/status")
+                            .and_then(Value::as_str)
+                            != Some("explicitly_confirmed_local_candidate")
+                }))
     {
         return Err("Entree Evidence Ledger non conforme a la politique locale.".to_string());
     }
@@ -634,6 +648,63 @@ fn source_contract(event_type: &str, source: &Value) -> Result<Value, String> {
                     "independent_run_verification": true
                 },
                 "human_decision": {"status": "explicitly_confirmed_reference_pilot"}
+            }))
+        }
+        "forgebench_ollama_candidate_verified" => {
+            validate_forgebench_ollama_candidate_result(source)?;
+            let candidate_id = safe_candidate_id(
+                source
+                    .pointer("/candidate/candidate_id")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default(),
+            )?;
+            let model_ref = safe_candidate_id(
+                source
+                    .pointer("/candidate/model_ref")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default(),
+            )?;
+            let runtime = required_enum_claim(
+                source,
+                "/candidate/runtime",
+                &["native", "wsl"],
+                "Runtime du candidat Ollama",
+            )?;
+            Ok(json!({
+                "actor": {"kind": "outilsia_component", "id": "forgebench_candidate_runner"},
+                "workstack_id": Value::Null,
+                "proof_level": "isolated_local_model_candidate",
+                "source_integrity_sha256": source.pointer("/integrity/digest").cloned().unwrap_or(Value::Null),
+                "claims": {
+                    "run_id": source.get("run_id").cloned().unwrap_or(Value::Null),
+                    "benchmark_id": source.pointer("/benchmark/id").cloned().unwrap_or(Value::Null),
+                    "candidate_id": candidate_id,
+                    "model_ref": model_ref,
+                    "runtime": runtime,
+                    "selected_backend": source.get("selected_backend").cloned().unwrap_or(Value::Null),
+                    "candidate_generation_verified": true,
+                    "candidate_submission_structure_verified": true,
+                    "gameplay_verified": false,
+                    "hidden_suite_used": false,
+                    "scientific_eligible": false,
+                    "winner_declared": false,
+                    "submission_digest": source.pointer("/submission/digest").cloned().unwrap_or(Value::Null),
+                    "generation_duration_ms": numeric_claim(source, "/generation/duration_ms"),
+                    "evaluator_duration_ms": numeric_claim(source, "/evaluator/duration_ms"),
+                    "eval_count": numeric_claim(source, "/generation/eval_count")
+                },
+                "execution": {
+                    "started": true,
+                    "latency_ms": source.pointer("/generation/duration_ms").and_then(Value::as_u64).unwrap_or_default()
+                        + source.pointer("/evaluator/duration_ms").and_then(Value::as_u64).unwrap_or_default(),
+                    "api_cost_eur": 0,
+                    "cost_status": "api_not_incurred_energy_not_measured"
+                },
+                "validation": {
+                    "source_contract_valid": true,
+                    "independent_run_verification": true
+                },
+                "human_decision": {"status": "explicitly_confirmed_local_candidate"}
             }))
         }
         _ => Err("Type de preuve Evidence Ledger inconnu.".to_string()),
@@ -1137,6 +1208,33 @@ mod tests {
         assert!(!serialized.contains("workspace_path"));
         assert!(!serialized.contains("raw_worker_output"));
         assert!(!serialized.contains("forgebench-reference-pilot-v1:"));
+    }
+
+    #[test]
+    fn appends_a_local_candidate_without_raw_model_output_or_quality_claim() {
+        let source = crate::forgebench_candidate::tests::signed_result();
+        let (ledger, appended) = append_to_ledger(
+            empty_ledger().expect("empty"),
+            "forgebench_ollama_candidate_verified",
+            &source,
+            4_900,
+        )
+        .expect("candidate run entry");
+        assert!(appended);
+        verify_ledger(&ledger).expect("verified candidate ledger");
+        let entry = &ledger["entries"][0];
+        assert_eq!(
+            entry["evidence"]["proof_level"],
+            "isolated_local_model_candidate"
+        );
+        assert_eq!(entry["execution"]["started"], true);
+        assert_eq!(entry["execution"]["api_cost_eur"], 0);
+        assert_eq!(entry["evidence"]["claims"]["gameplay_verified"], false);
+        assert_eq!(entry["evidence"]["claims"]["scientific_eligible"], false);
+        let serialized = serde_json::to_string(&ledger).expect("ledger JSON");
+        assert!(!serialized.contains("raw_response"));
+        assert!(!serialized.contains("index_html"));
+        assert!(!serialized.contains("workspace_path"));
     }
 
     #[test]

@@ -218,7 +218,8 @@ Capability Router v0 implémenté dans les sources le 12 juillet 2026, sans publ
 - [x] Imposer un vérificateur différent de l'exécutant lorsqu'une proposition complète est possible.
 - [x] Garder le panneau dans le mode Détails et fournir JSON, résumé et preuve visuelle desktop/mobile.
 - [x] Ajouter un consentement séparé et strict pour le pilote technique de référence : aucun CLI candidat, réseau ou crédit payant.
-- [ ] Ajouter un second consentement et un budget explicite avant toute exécution de stack candidate.
+- [x] Ajouter un second consentement et un budget explicite avant l'appel d'un modèle Ollama local déjà installé, sans accès fichier, Internet, API payante, suite cachée ou exécution du code produit.
+- [ ] Étendre ce mécanisme aux CLI candidats seulement après un contrat de permissions et de budget propre à chaque adaptateur.
 
 Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans publication : le fichier local `evidence-ledger-v1.json` accepte volontairement les preuves Board Observer, Workstack Composer, Capability Router et préflight ForgeBench après validation de leur contrat. Chaque entrée contient uniquement auteur composant, claims bornés, métriques, empreinte source et empreinte précédente. La chaîne complète est revalidée à chaque lecture et écriture, les doublons sont refusés, une rotation de secours protège le remplacement du fichier et aucun contenu brut n'est persisté. Le Ledger ne transforme pas une empreinte en preuve d'identité ou de qualité et ne lance aucune exécution.
 
@@ -228,7 +229,8 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Ajouter les actions explicites Ajouter, Vérifier, Copier, Télécharger et Réinitialiser dans le mode Détails.
 - [x] Maintenir la notice canonique `NOTICE-UTILISATION-WORKSTACK.md` et vérifier ses responsabilités en CI.
 - [x] Ajouter `isolated_reference_run` avec exécution réelle, vérification visible indépendante et consentement enregistré, sans contenu brut.
-- [ ] Ajouter les preuves d'exécution candidate, de vérification cachée et de décision humaine seulement avec Workstack Arena.
+- [x] Ajouter `isolated_local_model_candidate` pour une génération Ollama locale et une vérification structurelle visible, sans sortie brute ni claim de qualité.
+- [ ] Ajouter les preuves de gameplay, de vérification cachée et de décision humaine seulement après les gates correspondantes de Workstack Arena.
 
 - Séparer quatre responsabilités : Composer définit la chaîne, Workstack Arena exécute, ForgeBench évalue et Evidence Ledger conserve la preuve.
 - [x] Créer le contrat exploratoire `Signal Maze v1` avec règles déterministes, starter public scellé, trois seeds, checks visibles et viewports desktop/Android.
@@ -241,7 +243,11 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Ajouter un préflight bubblewrap Linux/WSL qui prouve par canari les namespaces processus/montage/réseau, le workspace seul en écriture et la racine hôte masquée, sans lancer de worker.
 - [x] Lancer un worker technique déterministe dans une copie fraîche avec le backend vérifié, réseau coupé, montage minimal, racine hôte/vault/dépôt source absents et nettoyage obligatoire.
 - [x] Relire la soumission dans un second processus isolé, monté en lecture seule, puis conserver uniquement six checks visibles, durées et empreintes bornées.
-- [ ] Remplacer le worker technique par des adaptateurs de CLI candidats autorisés, sans élargir implicitement réseau, credentials ou budget.
+- [x] Ajouter un adaptateur Ollama prompt-only : identité runtime/modèle signée, modèle déjà installé, API loopback, une tentative bornée, réponse JSON à trois fichiers et aucun accès outil ou filesystem.
+- [x] Évaluer la soumission Ollama dans un processus bubblewrap séparé avec sept checks statiques, lecture seule, réseau isolé et suppression obligatoire du workspace, sans exécuter le code généré.
+- [x] Conserver dans l'Evidence Ledger uniquement génération, structure, métriques et empreintes ; garder gameplay, suite cachée, science et vainqueur à faux, et l'énergie locale inconnue.
+- [ ] Exécuter le code candidat dans un navigateur réellement isolé, avec tests visibles et captures, avant toute affirmation de gameplay.
+- [ ] Ajouter des adaptateurs de CLI candidats autorisés, sans élargir implicitement réseau, credentials ou budget.
 - [ ] Construire un évaluateur caché isolé capable de consommer la suite privée sans la révéler au worker avant toute affirmation scientifique.
 - Mesurer séparément résultat, vitesse, efficacité et coût ; toujours publier les valeurs brutes, les sous-scores et le caractère estimé ou inconnu d'une donnée.
 - Utiliser comme score équilibré initial `50 % résultat + 20 % efficacité + 15 % vitesse + 15 % coût`, sans masquer les podiums par dimension ni la frontière de Pareto.

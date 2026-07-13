@@ -24,7 +24,7 @@ const ROOT_DIRECTORY: &str = "forgebench-worker-sandboxes-v1";
 const ACTIVE_MANIFEST: &str = "active.json";
 const ACTIVE_BACKUP: &str = "active.json.bak";
 const RUN_CONTRACT_FILE: &str = ".outilsia-run-contract.json";
-const MAX_STACKS: usize = 3;
+const MAX_STACKS: usize = 4;
 const MAX_SEEDS: usize = 3;
 const MAX_WORKSPACES: usize = MAX_STACKS * MAX_SEEDS;
 const STARTER_BUNDLE_SHA256: &str =
@@ -89,6 +89,7 @@ pub(crate) struct VerifiedPilotWorkspace {
     pub(crate) experiment_digest: String,
     pub(crate) protocol_digest: String,
     pub(crate) public_seed: u64,
+    pub(crate) stack_key: String,
 }
 
 fn sandbox_lock() -> &'static Mutex<()> {
@@ -116,7 +117,10 @@ fn safe_id(value: &str, prefix: &str) -> bool {
 }
 
 fn safe_stack_key(value: &str) -> bool {
-    matches!(value, "codex-solo" | "claude-solo" | "hermes-codex-claude")
+    matches!(
+        value,
+        "codex-solo" | "claude-solo" | "hermes-codex-claude" | "ollama-local"
+    )
 }
 
 fn sha256_bytes(bytes: &[u8]) -> String {
@@ -898,6 +902,14 @@ pub(crate) fn copy_verified_pilot_workspace(
     app: &AppHandle,
     destination: &Path,
 ) -> Result<VerifiedPilotWorkspace, String> {
+    copy_verified_workspace_for_stack(app, destination, None)
+}
+
+pub(crate) fn copy_verified_workspace_for_stack(
+    app: &AppHandle,
+    destination: &Path,
+    required_stack: Option<&str>,
+) -> Result<VerifiedPilotWorkspace, String> {
     let _guard = sandbox_lock()
         .lock()
         .map_err(|_| "Verrou des workspaces ForgeBench indisponible.".to_string())?;
@@ -909,11 +921,24 @@ pub(crate) fn copy_verified_pilot_workspace(
     let manifest = read_active_manifest(&root)?
         .ok_or_else(|| "Aucun batch ForgeBench verifie n'est disponible.".to_string())?;
     let receipt = validate_manifest(&root, &manifest)?;
+    if required_stack.is_some_and(|value| !safe_stack_key(value)) {
+        return Err("Stack du workspace ForgeBench invalide.".to_string());
+    }
     let run = manifest
         .get("runs")
         .and_then(Value::as_array)
-        .and_then(|runs| runs.first())
+        .and_then(|runs| {
+            runs.iter().find(|run| {
+                required_stack
+                    .is_none_or(|stack| run.get("stack_key").and_then(Value::as_str) == Some(stack))
+            })
+        })
         .ok_or_else(|| "Aucun workspace ForgeBench n'est disponible pour le pilote.".to_string())?;
+    let stack_key = run
+        .get("stack_key")
+        .and_then(Value::as_str)
+        .filter(|value| safe_stack_key(value))
+        .ok_or_else(|| "Stack du workspace pilote absente.".to_string())?;
     let batch_id = receipt
         .get("batch_id")
         .and_then(Value::as_str)
@@ -963,6 +988,7 @@ pub(crate) fn copy_verified_pilot_workspace(
             .get("public_seed")
             .and_then(Value::as_u64)
             .ok_or_else(|| "Seed public du pilote absent.".to_string())?,
+        stack_key: stack_key.to_string(),
     })
 }
 

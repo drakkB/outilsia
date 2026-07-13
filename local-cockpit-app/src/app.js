@@ -62,6 +62,7 @@ const state = {
   forgeBenchWorkerSandbox: null,
   forgeBenchIsolation: null,
   forgeBenchReferencePilot: null,
+  forgeBenchOllamaCandidate: null,
   evidenceLedger: null,
   installSafetyPreflight: null,
   localSnapshots: [],
@@ -118,6 +119,8 @@ const FORGEBENCH_ISOLATION_PROBE_REQUEST_SCHEMA = "outilsia.forgebench_isolation
 const FORGEBENCH_ISOLATION_PROBE_RESULT_SCHEMA = "outilsia.forgebench_isolation_probe_result.v1";
 const FORGEBENCH_REFERENCE_PILOT_REQUEST_SCHEMA = "outilsia.forgebench_reference_pilot_request.v1";
 const FORGEBENCH_REFERENCE_PILOT_RESULT_SCHEMA = "outilsia.forgebench_reference_pilot_result.v1";
+const FORGEBENCH_OLLAMA_CANDIDATE_REQUEST_SCHEMA = "outilsia.forgebench_ollama_candidate_request.v1";
+const FORGEBENCH_OLLAMA_CANDIDATE_RESULT_SCHEMA = "outilsia.forgebench_ollama_candidate_result.v1";
 const EVIDENCE_APPEND_REQUEST_SCHEMA = "outilsia.evidence_append_request.v1";
 const EVIDENCE_APPEND_RESULT_SCHEMA = "outilsia.evidence_append_result.v1";
 const EVIDENCE_LEDGER_SCHEMA = "outilsia.evidence_ledger.v1";
@@ -492,6 +495,11 @@ const els = {
   forgeBenchRunnerState: $("forgeBenchRunnerState"),
   forgeBenchRunnerBox: $("forgeBenchRunnerBox"),
   runForgeBenchPilotBtn: $("runForgeBenchPilotBtn"),
+  forgeBenchCandidateState: $("forgeBenchCandidateState"),
+  forgeBenchCandidateModel: $("forgeBenchCandidateModel"),
+  forgeBenchCandidateDuration: $("forgeBenchCandidateDuration"),
+  forgeBenchCandidateBox: $("forgeBenchCandidateBox"),
+  runForgeBenchCandidateBtn: $("runForgeBenchCandidateBtn"),
   evidenceLedgerState: $("evidenceLedgerState"),
   evidenceLedgerSource: $("evidenceLedgerSource"),
   evidenceLedgerBox: $("evidenceLedgerBox"),
@@ -666,6 +674,8 @@ let forgeBenchIsolationBusy = false;
 let forgeBenchIsolationError = "";
 let forgeBenchRunnerBusy = false;
 let forgeBenchRunnerError = "";
+let forgeBenchCandidateBusy = false;
+let forgeBenchCandidateError = "";
 let evidenceLedgerBusy = false;
 let evidenceLedgerError = "";
 const privateWorkloadSelections = new Set();
@@ -10984,7 +10994,8 @@ function forgeBenchStackLabel(value) {
   return ({
     "codex-solo": "Codex CLI seul",
     "claude-solo": "Claude Code seul",
-    "hermes-codex-claude": "Hermes planifie, Codex construit, Claude vérifie"
+    "hermes-codex-claude": "Hermes planifie, Codex construit, Claude vérifie",
+    "ollama-local": "Modèle Ollama local"
   })[value] || value;
 }
 
@@ -11086,7 +11097,11 @@ async function loadForgeBenchVault(silent = false) {
     const currentReceiptDigest = status?.receipt?.integrity?.digest || null;
     if (state.forgeBench && compiledReceiptDigest !== currentReceiptDigest) {
       state.forgeBench = null;
+      state.forgeBenchReferencePilot = null;
+      state.forgeBenchOllamaCandidate = null;
       forgeBenchError = "";
+      forgeBenchRunnerError = "";
+      forgeBenchCandidateError = "";
     }
     state.forgeBenchHiddenSuite = status;
     if (!silent) setStatus(status.exists ? "Suite cachée locale vérifiée" : "Aucune suite cachée locale", status.exists ? "ok" : "warn");
@@ -11101,6 +11116,8 @@ async function loadForgeBenchVault(silent = false) {
     renderForgeBenchVaultPanel();
     renderForgeBenchPanel();
     renderForgeBenchSandboxPanel();
+    renderForgeBenchRunnerPanel();
+    renderForgeBenchCandidatePanel();
     renderEvidenceLedgerPanel();
   }
 }
@@ -11133,7 +11150,11 @@ async function sealForgeBenchVault() {
       vault_path_returned: false
     };
     state.forgeBench = null;
+    state.forgeBenchReferencePilot = null;
+    state.forgeBenchOllamaCandidate = null;
     forgeBenchError = "";
+    forgeBenchRunnerError = "";
+    forgeBenchCandidateError = "";
     setStatus(result.replaced ? "Suite cachée remplacée" : "Suite cachée scellée localement", "ok");
     return result;
   } catch (error) {
@@ -11145,6 +11166,8 @@ async function sealForgeBenchVault() {
     renderForgeBenchVaultPanel();
     renderForgeBenchPanel();
     renderForgeBenchSandboxPanel();
+    renderForgeBenchRunnerPanel();
+    renderForgeBenchCandidatePanel();
     renderEvidenceLedgerPanel();
   }
 }
@@ -11160,7 +11183,11 @@ async function clearForgeBenchVault() {
     if (status?.schema !== FORGEBENCH_HIDDEN_SUITE_STATUS_SCHEMA || status?.exists !== false) throw new Error("suppression native incomplète");
     state.forgeBenchHiddenSuite = status;
     state.forgeBench = null;
+    state.forgeBenchReferencePilot = null;
+    state.forgeBenchOllamaCandidate = null;
     forgeBenchError = "";
+    forgeBenchRunnerError = "";
+    forgeBenchCandidateError = "";
     setStatus("Suite cachée locale effacée", "ok");
   } catch (error) {
     forgeBenchVaultError = String(error || "Suppression impossible");
@@ -11170,6 +11197,8 @@ async function clearForgeBenchVault() {
     renderForgeBenchVaultPanel();
     renderForgeBenchPanel();
     renderForgeBenchSandboxPanel();
+    renderForgeBenchRunnerPanel();
+    renderForgeBenchCandidatePanel();
     renderEvidenceLedgerPanel();
   }
 }
@@ -11188,7 +11217,7 @@ function forgeBenchSandboxReceipt(status = state.forgeBenchWorkerSandbox) {
     || !/^[a-f0-9]{64}$/i.test(String(receipt?.starter_bundle_sha256 || ""))
     || !/^[a-f0-9]{64}$/i.test(String(receipt?.batch_digest || ""))
     || !/^[a-f0-9]{64}$/i.test(String(digest || ""))
-    || stacks < 2 || stacks > 3 || seeds < 1 || seeds > 3 || workspaces !== stacks * seeds
+    || stacks < 2 || stacks > 4 || seeds < 1 || seeds > 3 || workspaces !== stacks * seeds
     || receipt?.paths_returned !== false
     || receipt?.security?.fresh_workspace_per_run !== true
     || receipt?.security?.workspace_outside_source_repository !== true
@@ -11304,6 +11333,7 @@ async function loadForgeBenchSandbox(silent = false) {
     renderForgeBenchSandboxPanel();
     renderForgeBenchIsolationPanel();
     renderForgeBenchRunnerPanel();
+    renderForgeBenchCandidatePanel();
   }
 }
 
@@ -11343,7 +11373,9 @@ async function prepareForgeBenchSandbox() {
     if (!forgeBenchSandboxReceipt(status)) throw new Error("reçu natif du sandbox invalide");
     state.forgeBenchWorkerSandbox = status;
     state.forgeBenchReferencePilot = null;
+    state.forgeBenchOllamaCandidate = null;
     forgeBenchRunnerError = "";
+    forgeBenchCandidateError = "";
     setStatus(result.replaced ? "Workspaces ForgeBench remplacés" : "Workspaces ForgeBench préparés", "ok");
     return result;
   } catch (error) {
@@ -11355,6 +11387,7 @@ async function prepareForgeBenchSandbox() {
     renderForgeBenchSandboxPanel();
     renderForgeBenchIsolationPanel();
     renderForgeBenchRunnerPanel();
+    renderForgeBenchCandidatePanel();
   }
 }
 
@@ -11369,7 +11402,9 @@ async function clearForgeBenchSandbox() {
     if (status?.schema !== FORGEBENCH_WORKER_SANDBOX_STATUS_SCHEMA || status?.exists !== false) throw new Error("suppression native incomplète");
     state.forgeBenchWorkerSandbox = status;
     state.forgeBenchReferencePilot = null;
+    state.forgeBenchOllamaCandidate = null;
     forgeBenchRunnerError = "";
+    forgeBenchCandidateError = "";
     setStatus("Workspaces ForgeBench effacés", "ok");
   } catch (error) {
     forgeBenchSandboxError = String(error || "Suppression impossible");
@@ -11379,6 +11414,7 @@ async function clearForgeBenchSandbox() {
     renderForgeBenchSandboxPanel();
     renderForgeBenchIsolationPanel();
     renderForgeBenchRunnerPanel();
+    renderForgeBenchCandidatePanel();
   }
 }
 
@@ -11490,9 +11526,12 @@ async function probeForgeBenchIsolation() {
   forgeBenchIsolationError = "";
   state.forgeBenchIsolation = null;
   state.forgeBenchReferencePilot = null;
+  state.forgeBenchOllamaCandidate = null;
   forgeBenchRunnerError = "";
+  forgeBenchCandidateError = "";
   renderForgeBenchIsolationPanel();
   renderForgeBenchRunnerPanel();
+  renderForgeBenchCandidatePanel();
   setStatus("Test du backend d'isolation ForgeBench...");
   try {
     const result = await invoke("probe_forgebench_isolation", {
@@ -11516,7 +11555,61 @@ async function probeForgeBenchIsolation() {
     forgeBenchIsolationBusy = false;
     renderForgeBenchIsolationPanel();
     renderForgeBenchRunnerPanel();
+    renderForgeBenchCandidatePanel();
   }
+}
+
+function isForgeBenchOllamaCandidateId(value) {
+  const match = String(value || "").match(/^local-model:ollama_(?:native|wsl):([A-Za-z0-9._:/-]{1,180})$/);
+  const modelRef = match?.[1] || "";
+  return Boolean(modelRef && !modelRef.startsWith("/") && !modelRef.includes("..") && !modelRef.includes("//"));
+}
+
+function forgeBenchLocalModelCandidates() {
+  const candidates = Array.isArray(state.capabilityRouter?.candidates) ? state.capabilityRouter.candidates : [];
+  return candidates
+    .filter((candidate) => candidate?.available === true && candidate?.provider === "ollama" && candidate?.kind === "local_model")
+    .filter((candidate) => isForgeBenchOllamaCandidateId(candidate?.id))
+    .sort((left, right) => String(left.label || left.id).localeCompare(String(right.label || right.id), "fr"));
+}
+
+function forgeBenchCandidateModelRef(candidate) {
+  const id = String(candidate?.id || candidate || "");
+  return id.replace(/^local-model:ollama_(?:native|wsl):/, "");
+}
+
+function syncForgeBenchCandidateModelControl() {
+  if (!els.forgeBenchCandidateModel) return "";
+  const candidates = forgeBenchLocalModelCandidates();
+  const current = els.forgeBenchCandidateModel.value;
+  els.forgeBenchCandidateModel.innerHTML = candidates.length
+    ? candidates.map((candidate) => `<option value="${escapeHtml(candidate.id)}">${escapeHtml(candidate.label || candidate.id)}</option>`).join("")
+    : '<option value="">Aucun modèle local routé</option>';
+  const ids = new Set(candidates.map((candidate) => candidate.id));
+  if (ids.has(current)) {
+    els.forgeBenchCandidateModel.value = current;
+    return current;
+  }
+  const recommendedRef = recommendedModelState().ref;
+  const recommended = candidates.find((candidate) => sameOllamaModel(forgeBenchCandidateModelRef(candidate), recommendedRef));
+  const nonStarter = candidates.find((candidate) => !isStarterModelRef(forgeBenchCandidateModelRef(candidate)));
+  const selected = recommended || nonStarter || candidates[0] || null;
+  els.forgeBenchCandidateModel.value = selected?.id || "";
+  return selected?.id || "";
+}
+
+function forgeBenchSelectedCandidateId() {
+  const selected = syncForgeBenchCandidateModelControl();
+  return forgeBenchLocalModelCandidates().some((candidate) => candidate.id === selected) ? selected : "";
+}
+
+function forgeBenchExperimentOllamaCandidate() {
+  const stacks = state.forgeBench?.experiment?.candidate_stacks;
+  const stack = Array.isArray(stacks) ? stacks.find((candidate) => candidate?.key === "ollama-local" && candidate?.available === true) : null;
+  const binding = Array.isArray(stack?.bindings) ? stack.bindings.find((candidate) => candidate?.role === "worker") : null;
+  const candidate = binding?.candidate;
+  if (!candidate || !isForgeBenchOllamaCandidateId(candidate.candidate_id)) return null;
+  return candidate;
 }
 
 function forgeBenchReferencePilotResult(result = state.forgeBenchReferencePilot) {
@@ -11615,7 +11708,10 @@ async function runForgeBenchReferencePilot() {
   forgeBenchRunnerBusy = true;
   forgeBenchRunnerError = "";
   state.forgeBenchReferencePilot = null;
+  state.forgeBenchOllamaCandidate = null;
+  forgeBenchCandidateError = "";
   renderForgeBenchRunnerPanel();
+  renderForgeBenchCandidatePanel();
   setStatus("Exécution du pilote isolé ForgeBench...");
   try {
     const result = await invoke("run_forgebench_reference_pilot", {
@@ -11644,6 +11740,234 @@ async function runForgeBenchReferencePilot() {
   } finally {
     forgeBenchRunnerBusy = false;
     renderForgeBenchRunnerPanel();
+    renderForgeBenchCandidatePanel();
+  }
+}
+
+function forgeBenchOllamaCandidateResult(result = state.forgeBenchOllamaCandidate) {
+  const blockers = Array.isArray(result?.readiness?.blockers) ? result.readiness.blockers : [];
+  const experimentCandidate = forgeBenchExperimentOllamaCandidate();
+  const sandbox = forgeBenchSandboxReceipt();
+  const reference = forgeBenchReferencePilotResult();
+  const isolation = forgeBenchIsolationResult();
+  const runtime = String(result?.candidate?.runtime || "");
+  const environment = runtime === "native" ? "ollama_native" : runtime === "wsl" ? "ollama_wsl" : "";
+  const expectedCandidateId = `local-model:${environment}:${String(result?.candidate?.model_ref || "")}`;
+  if (
+    result?.schema !== FORGEBENCH_OLLAMA_CANDIDATE_RESULT_SCHEMA
+    || !/^[a-f0-9]{64}$/i.test(String(result?.integrity?.digest || ""))
+    || !/^fbo-[A-Za-z0-9_-]{1,76}$/.test(String(result?.run_id || ""))
+    || result?.benchmark?.id !== "signal-maze-v1"
+    || result?.benchmark?.track !== "local_model_prompt_only_candidate"
+    || result?.batch_ref?.stack_key !== "ollama-local"
+    || !["linux-bwrap-native", "wsl-bwrap"].includes(result?.selected_backend)
+    || result?.candidate?.adapter_kind !== "ollama_local_prompt_only_v1"
+    || !isForgeBenchOllamaCandidateId(result?.candidate?.candidate_id)
+    || !/^[A-Za-z0-9._:/-]{1,180}$/.test(String(result?.candidate?.model_ref || ""))
+    || !["native", "wsl"].includes(result?.candidate?.runtime)
+    || result?.candidate?.environment !== environment
+    || result?.candidate?.candidate_id !== expectedCandidateId
+    || result?.candidate?.model_invoked !== true
+    || result?.candidate?.cli_agent_invoked !== false
+    || (experimentCandidate && result.candidate.candidate_id !== experimentCandidate.candidate_id)
+    || !sandbox
+    || result?.batch_ref?.batch_id !== sandbox.batch_id
+    || result?.batch_ref?.experiment_digest !== sandbox.experiment_digest
+    || result?.batch_ref?.protocol_digest !== sandbox.protocol_digest
+    || !reference
+    || result?.reference_pilot_ref?.pilot_id !== reference.pilot_id
+    || result?.reference_pilot_ref?.integrity_digest !== reference.integrity?.digest
+    || result?.selected_backend !== isolation?.selected_backend
+    || result?.consent?.confirmed !== true
+    || result?.consent?.scope !== "ollama_local_candidate_v1"
+    || result?.consent?.candidate_model_allowed !== true
+    || result?.consent?.external_network_access !== false
+    || result?.consent?.loopback_ollama_allowed !== true
+    || result?.consent?.paid_api_allowed !== false
+    || result?.consent?.hidden_suite_allowed !== false
+    || result?.consent?.generated_code_execution_allowed !== false
+    || result?.budget?.max_attempts !== 1
+    || result?.budget?.max_api_cost_eur !== 0
+    || result?.budget?.max_output_bytes !== 524288
+    || ![180, 300, 600].includes(result?.budget?.max_duration_seconds)
+    || result?.generation?.started !== true
+    || result?.generation?.succeeded !== true
+    || result?.generation?.timed_out !== false
+    || result?.generation?.attempts !== 1
+    || !(Number(result?.generation?.duration_ms) > 0)
+    || !/^[a-f0-9]{64}$/i.test(String(result?.generation?.prompt_sha256 || ""))
+    || !/^[a-f0-9]{64}$/i.test(String(result?.generation?.response_sha256 || ""))
+    || result?.generation?.raw_response_returned !== false
+    || result?.generation?.raw_response_persisted !== false
+    || result?.submission?.materialized !== true
+    || result?.submission?.exact_topology_verified !== true
+    || result?.submission?.files_total !== 4
+    || result?.submission?.generated_code_executed !== false
+    || !/^[a-f0-9]{64}$/i.test(String(result?.submission?.digest || ""))
+    || result?.evaluator?.kind !== "deterministic_visible_static_gate"
+    || result?.evaluator?.started !== true
+    || result?.evaluator?.succeeded !== true
+    || result?.evaluator?.timed_out !== false
+    || result?.evaluator?.independent_process !== true
+    || result?.evaluator?.workspace_read_only !== true
+    || result?.evaluator?.network_namespace_enforced !== true
+    || result?.evaluator?.hidden_suite_used !== false
+    || result?.evaluator?.visible_checks_total !== 7
+    || result?.evaluator?.visible_checks_passed !== 7
+    || result?.evaluator?.submission_digest !== result?.submission?.digest
+    || result?.security?.candidate_received_public_prompt_only !== true
+    || result?.security?.candidate_filesystem_context_supplied !== false
+    || result?.security?.candidate_tool_access !== false
+    || result?.security?.external_network_requested !== false
+    || result?.security?.loopback_ollama_requested !== true
+    || result?.security?.source_repository_mounted !== false
+    || result?.security?.hidden_suite_mounted !== false
+    || result?.security?.credentials_read_by_outilsia !== false
+    || result?.security?.raw_model_output_returned !== false
+    || result?.security?.raw_model_output_persisted !== false
+    || result?.security?.generated_code_executed !== false
+    || result?.security?.evaluator_process_isolated !== true
+    || result?.security?.temporary_workspace_removed !== true
+    || result?.security?.paths_returned !== false
+    || result?.cost?.api_cost_eur !== 0
+    || result?.cost?.api_status !== "not_incurred"
+    || result?.cost?.local_energy_wh !== null
+    || result?.cost?.energy_status !== "not_measured"
+    || result?.readiness?.candidate_generation_verified !== true
+    || result?.readiness?.candidate_submission_structure_verified !== true
+    || result?.readiness?.gameplay_verified !== false
+    || result?.readiness?.hidden_evaluator_verified !== false
+    || result?.readiness?.scientific_eligible !== false
+    || result?.readiness?.winner_declared !== false
+    || !["generated_code_not_executed", "gameplay_not_verified", "hidden_suite_not_evaluated", "multi_seed_not_completed", "peer_candidates_not_run", "local_energy_not_measured"]
+      .every((blocker) => blockers.includes(blocker))
+  ) return null;
+  return result;
+}
+
+function renderForgeBenchCandidatePanel() {
+  if (!els.forgeBenchCandidateBox) return;
+  const selectedId = syncForgeBenchCandidateModelControl();
+  const candidate = forgeBenchExperimentOllamaCandidate();
+  const isolationReady = forgeBenchIsolationResult()?.readiness?.isolation_backend_ready === true;
+  const workspacesReady = forgeBenchSandboxMatchesExperiment();
+  const referenceReady = Boolean(forgeBenchReferencePilotResult());
+  const candidateMatches = Boolean(candidate && selectedId && candidate.candidate_id === selectedId);
+  const result = forgeBenchOllamaCandidateResult();
+  const ready = Boolean(invoke && candidateMatches && isolationReady && workspacesReady && referenceReady);
+  els.runForgeBenchCandidateBtn.disabled = forgeBenchCandidateBusy || !ready;
+  els.forgeBenchCandidateModel.disabled = forgeBenchCandidateBusy || !forgeBenchLocalModelCandidates().length;
+  els.forgeBenchCandidateDuration.disabled = forgeBenchCandidateBusy;
+
+  if (!invoke && !result?.test_mode) {
+    els.forgeBenchCandidateState.textContent = "app native requise";
+    els.forgeBenchCandidateBox.className = "forgebench-candidate-box empty";
+    els.forgeBenchCandidateBox.textContent = "Le candidat Ollama est disponible uniquement dans l'application Windows/Linux.";
+    return;
+  }
+  if (forgeBenchCandidateBusy) {
+    els.forgeBenchCandidateState.textContent = "génération locale";
+    els.forgeBenchCandidateBox.className = "forgebench-candidate-box empty";
+    els.forgeBenchCandidateBox.textContent = "Le modèle reçoit la tâche publique. Sa réponse brute reste en mémoire, puis un évaluateur statique séparé contrôle la soumission.";
+    return;
+  }
+  if (forgeBenchCandidateError) {
+    els.forgeBenchCandidateState.textContent = "candidat refusé";
+    els.forgeBenchCandidateBox.className = "forgebench-candidate-box empty";
+    els.forgeBenchCandidateBox.innerHTML = `<strong>Exécution candidate non prouvée</strong><span>${escapeHtml(forgeBenchCandidateError)}</span>`;
+    return;
+  }
+  if (result) {
+    const generationSeconds = (Number(result.generation?.duration_ms || 0) / 1000).toFixed(1);
+    const evaluatorMs = Number(result.evaluator?.duration_ms || 0);
+    els.forgeBenchCandidateState.textContent = "soumission structurée vérifiée";
+    els.forgeBenchCandidateBox.className = "forgebench-candidate-box";
+    els.forgeBenchCandidateBox.innerHTML = `
+      <strong>${escapeHtml(result.candidate.model_ref)} a généré une soumission · contrôle statique 7/7</strong>
+      <span>${escapeHtml(result.candidate.runtime === "wsl" ? "Ollama WSL" : "Ollama natif")} · génération ${generationSeconds} s · évaluateur ${evaluatorMs} ms · ${escapeHtml(result.generation?.eval_count || 0)} tokens mesurés</span>
+      <small>Code non exécuté · gameplay non vérifié · énergie locale non mesurée · aucun test caché, score ou vainqueur</small>
+    `;
+    return;
+  }
+  els.forgeBenchCandidateState.textContent = ready ? "prêt sur consentement" : "préflight requis";
+  els.forgeBenchCandidateBox.className = "forgebench-candidate-box empty";
+  if (!selectedId) {
+    els.forgeBenchCandidateBox.textContent = "Aucun modèle Ollama installé n'a été routé. Relance le scan puis Capability Router.";
+  } else if (!candidate) {
+    els.forgeBenchCandidateBox.textContent = "Coche Modèle Ollama local, puis prépare à nouveau l'expérience et les workspaces.";
+  } else if (!candidateMatches) {
+    els.forgeBenchCandidateBox.textContent = "Le modèle choisi a changé. Recompile l'expérience pour signer cette identité exacte.";
+  } else if (!referenceReady) {
+    els.forgeBenchCandidateBox.textContent = "Exécute d'abord le pilote technique de référence sur ce batch.";
+  } else if (!isolationReady || !workspacesReady) {
+    els.forgeBenchCandidateBox.textContent = "Prépare les workspaces et vérifie l'isolation avant le candidat local.";
+  } else {
+    els.forgeBenchCandidateBox.textContent = "Le modèle recevra uniquement le contrat public. Le code produit sera contrôlé mais pas exécuté.";
+  }
+}
+
+async function runForgeBenchOllamaCandidate() {
+  const isolation = forgeBenchIsolationResult();
+  const reference = forgeBenchReferencePilotResult();
+  const candidate = forgeBenchExperimentOllamaCandidate();
+  const selectedId = forgeBenchSelectedCandidateId();
+  const durationSeconds = Number(els.forgeBenchCandidateDuration?.value || 300);
+  if (
+    !invoke
+    || forgeBenchCandidateBusy
+    || !state.forgeBench
+    || !candidate
+    || candidate.candidate_id !== selectedId
+    || !reference
+    || !forgeBenchSandboxMatchesExperiment()
+    || isolation?.readiness?.isolation_backend_ready !== true
+    || ![180, 300, 600].includes(durationSeconds)
+  ) return null;
+  const modelRef = forgeBenchCandidateModelRef(candidate.candidate_id);
+  if (!window.confirm(`Lancer ${modelRef} comme candidat ForgeBench ?\n\nBudget : ${durationSeconds} secondes, 1 tentative, coût API maximal 0 €. Le modèle reçoit uniquement la tâche publique. Le code produit n'est pas exécuté et aucun test caché n'est ouvert.`)) return null;
+  forgeBenchCandidateBusy = true;
+  forgeBenchCandidateError = "";
+  state.forgeBenchOllamaCandidate = null;
+  renderForgeBenchCandidatePanel();
+  setStatus(`ForgeBench interroge ${modelRef} via Ollama local...`);
+  try {
+    const result = await invoke("run_forgebench_ollama_candidate", {
+      request: {
+        schema: FORGEBENCH_OLLAMA_CANDIDATE_REQUEST_SCHEMA,
+        forgebench_result: state.forgeBench,
+        reference_pilot_result: reference,
+        isolation_result: isolation,
+        consent: {
+          confirmed: true,
+          scope: "ollama_local_candidate_v1",
+          candidate_model_allowed: true,
+          external_network_access: false,
+          loopback_ollama_allowed: true,
+          paid_api_allowed: false,
+          hidden_suite_allowed: false,
+          generated_code_execution_allowed: false
+        },
+        budget: {
+          max_duration_seconds: durationSeconds,
+          max_attempts: 1,
+          max_api_cost_eur: 0,
+          max_output_bytes: 524288
+        }
+      }
+    });
+    if (!forgeBenchOllamaCandidateResult(result)) throw new Error("preuve native du candidat Ollama non conforme");
+    state.forgeBenchOllamaCandidate = result;
+    if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "forgebench_ollama_candidate_verified";
+    renderEvidenceLedgerPanel();
+    setStatus(`Soumission ${modelRef} contrôlée structurellement`, "ok");
+    return result;
+  } catch (error) {
+    forgeBenchCandidateError = String(error || "Candidat Ollama impossible");
+    setStatus(`Candidat ForgeBench : ${forgeBenchCandidateError}`, "error");
+    return null;
+  } finally {
+    forgeBenchCandidateBusy = false;
+    renderForgeBenchCandidatePanel();
   }
 }
 
@@ -11655,6 +11979,7 @@ function forgeBenchMarkdown(result = state.forgeBench) {
   const stacks = Array.isArray(experiment.candidate_stacks) ? experiment.candidate_stacks : [];
   const blockers = Array.isArray(readiness.blockers) ? readiness.blockers : [];
   const weights = protocol.score_policy?.weights_percent || {};
+  const localCandidate = forgeBenchOllamaCandidateResult();
   return [
     `# ForgeBench · ${experiment.benchmark?.id || "Signal Maze v1"}`,
     "",
@@ -11669,11 +11994,13 @@ function forgeBenchMarkdown(result = state.forgeBench) {
     `- Workspaces frais : ${forgeBenchSandboxMatchesExperiment() ? `${forgeBenchSandboxReceipt()?.workspaces_total || 0} préparés, sans exécution` : "non préparés pour ce préflight"}`,
     `- Backend d'isolation : ${forgeBenchIsolationResult()?.readiness?.isolation_backend_ready ? `${forgeBenchIsolationResult()?.selected_backend} (canari vérifié)` : "non vérifié"}`,
     `- Pilote technique isolé : ${forgeBenchReferencePilotResult() ? "worker de référence + évaluateur visible vérifiés" : "non exécuté"}`,
-    `- Stack candidate exécutée : non`,
+    `- Candidat Ollama local : ${localCandidate ? `${localCandidate.candidate.model_ref} généré, structure 7/7, code non exécuté` : "non exécuté"}`,
+    `- Stack candidate exécutée : ${localCandidate ? "oui, adaptateur local prompt-only" : "non"}`,
     blockers.length ? `- Blocages : ${blockers.map(forgeBenchBlockerLabel).join(" ; ")}` : "- Blocages : aucun",
     `- Score : résultat ${weights.result || 0}% · efficacité ${weights.efficiency || 0}% · vitesse ${weights.speed || 0}% · coût ${weights.cost || 0}%`,
     `- Coût inconnu traité comme zéro : non`,
-    `- Agents candidats lancés : non`,
+    `- Agent CLI candidat lancé : non`,
+    `- Modèle local candidat lancé : ${localCandidate ? "oui" : "non"}`,
     `- Scores calculés : non`,
     `- Vainqueur déclaré : non`,
     "",
@@ -11692,8 +12019,10 @@ function renderForgeBenchPanel() {
   const result = state.forgeBench;
   const experiment = result?.experiment;
   const selectedStacks = forgeBenchSelectedStacks();
+  const selectedCandidateId = syncForgeBenchCandidateModelControl();
+  const localStackReady = !selectedStacks.includes("ollama-local") || Boolean(selectedCandidateId);
   const nativeOrTest = Boolean(invoke || result?.test_mode);
-  els.compileForgeBenchBtn.disabled = !invoke || forgeBenchBusy || !plan || !router || selectedStacks.length < 2;
+  els.compileForgeBenchBtn.disabled = !invoke || forgeBenchBusy || !plan || !router || selectedStacks.length < 2 || !localStackReady;
   els.copyForgeBenchJsonBtn.disabled = !experiment;
   els.copyForgeBenchProtocolBtn.disabled = !experiment;
   els.clearForgeBenchBtn.disabled = forgeBenchBusy || (!experiment && !forgeBenchError);
@@ -11723,11 +12052,13 @@ function renderForgeBenchPanel() {
     return;
   }
   if (!experiment) {
-    els.forgeBenchState.textContent = selectedStacks.length >= 2 ? "prêt à préparer" : "deux stacks requises";
+    els.forgeBenchState.textContent = selectedStacks.length < 2 ? "deux stacks requises" : localStackReady ? "prêt à préparer" : "modèle local requis";
     els.forgeBenchBox.className = "forgebench-box empty";
-    els.forgeBenchBox.textContent = selectedStacks.length >= 2
+    els.forgeBenchBox.textContent = selectedStacks.length >= 2 && localStackReady
       ? "Le préflight appliquera exactement le même starter, les mêmes règles, seeds, viewports, permissions et budgets à chaque stack."
-      : "Sélectionne au moins deux stacks pour former une comparaison.";
+      : selectedStacks.length < 2
+        ? "Sélectionne au moins deux stacks pour former une comparaison."
+        : "Sélectionne un modèle Ollama installé pour signer la stack locale.";
     return;
   }
 
@@ -11780,11 +12111,18 @@ async function compileForgeBenchExperiment() {
   const plan = state.workstackComposer?.plan;
   const router = state.capabilityRouter;
   const stacks = forgeBenchSelectedStacks();
-  if (!invoke || forgeBenchBusy || !plan || !router || stacks.length < 2) return null;
+  const ollamaCandidateId = stacks.includes("ollama-local") ? forgeBenchSelectedCandidateId() : "";
+  if (!invoke || forgeBenchBusy || !plan || !router || stacks.length < 2 || (stacks.includes("ollama-local") && !ollamaCandidateId)) return null;
   forgeBenchBusy = true;
   forgeBenchError = "";
   state.forgeBench = null;
+  state.forgeBenchReferencePilot = null;
+  state.forgeBenchOllamaCandidate = null;
+  forgeBenchRunnerError = "";
+  forgeBenchCandidateError = "";
   renderForgeBenchPanel();
+  renderForgeBenchRunnerPanel();
+  renderForgeBenchCandidatePanel();
   renderEvidenceLedgerPanel();
   setStatus("Préparation du protocole ForgeBench...");
   try {
@@ -11796,7 +12134,8 @@ async function compileForgeBenchExperiment() {
         capability_routing: router,
         claim_level: els.forgeBenchClaimLevel?.value || "exploratory",
         seed_count: Number(els.forgeBenchSeedCount?.value || 3),
-        candidate_stacks: stacks
+        candidate_stacks: stacks,
+        ollama_candidate_id: ollamaCandidateId || null
       }
     });
     if (result?.schema !== FORGEBENCH_COMPILE_RESULT_SCHEMA || result?.execution_started || result?.agents_started || result?.worktrees_created || result?.repository_modified || !result?.experiment || result.experiment?.schema !== FORGEBENCH_EXPERIMENT_SCHEMA) {
@@ -11816,6 +12155,7 @@ async function compileForgeBenchExperiment() {
     forgeBenchBusy = false;
     renderForgeBenchPanel();
     renderForgeBenchSandboxPanel();
+    renderForgeBenchCandidatePanel();
     renderEvidenceLedgerPanel();
   }
 }
@@ -11844,16 +12184,19 @@ async function copyForgeBenchProtocol() {
 function clearForgeBench(silent = false) {
   state.forgeBench = null;
   state.forgeBenchReferencePilot = null;
+  state.forgeBenchOllamaCandidate = null;
   forgeBenchError = "";
   forgeBenchRunnerError = "";
+  forgeBenchCandidateError = "";
   if (!silent) {
     if (els.forgeBenchClaimLevel) els.forgeBenchClaimLevel.value = "exploratory";
     if (els.forgeBenchSeedCount) els.forgeBenchSeedCount.value = "3";
-    for (const input of els.forgeBenchStacks?.querySelectorAll('input[name="forgeBenchStack"]') || []) input.checked = true;
+    for (const input of els.forgeBenchStacks?.querySelectorAll('input[name="forgeBenchStack"]') || []) input.checked = input.value !== "ollama-local";
   }
   renderForgeBenchPanel();
   renderForgeBenchSandboxPanel();
   renderForgeBenchRunnerPanel();
+  renderForgeBenchCandidatePanel();
   renderEvidenceLedgerPanel();
   if (!silent) setStatus("ForgeBench effacé", "ok");
 }
@@ -11865,7 +12208,8 @@ function evidenceEventLabel(value) {
     capability_routing_proposed: "Routage proposé",
     forgebench_experiment_compiled: "Expérience ForgeBench préparée",
     forgebench_isolation_probed: "Isolation ForgeBench testée",
-    forgebench_reference_pilot_verified: "Pilote ForgeBench vérifié"
+    forgebench_reference_pilot_verified: "Pilote ForgeBench vérifié",
+    forgebench_ollama_candidate_verified: "Candidat Ollama vérifié"
   })[value] || value;
 }
 
@@ -11876,7 +12220,8 @@ function evidenceActorLabel(value) {
     capability_router: "Capability Router",
     forgebench: "ForgeBench",
     forgebench_isolation: "ForgeBench Isolation",
-    forgebench_runner: "ForgeBench Runner"
+    forgebench_runner: "ForgeBench Runner",
+    forgebench_candidate_runner: "ForgeBench Candidat local"
   })[value] || value;
 }
 
@@ -11887,11 +12232,12 @@ function evidenceSourceDocument(eventType) {
   if (eventType === "forgebench_experiment_compiled") return state.forgeBench || null;
   if (eventType === "forgebench_isolation_probed") return forgeBenchIsolationResult() || null;
   if (eventType === "forgebench_reference_pilot_verified") return forgeBenchReferencePilotResult() || null;
+  if (eventType === "forgebench_ollama_candidate_verified") return forgeBenchOllamaCandidateResult() || null;
   return null;
 }
 
 function evidenceAvailableTypes() {
-  return ["forgebench_reference_pilot_verified", "forgebench_isolation_probed", "forgebench_experiment_compiled", "capability_routing_proposed", "workstack_compiled", "board_observed"]
+  return ["forgebench_ollama_candidate_verified", "forgebench_reference_pilot_verified", "forgebench_isolation_probed", "forgebench_experiment_compiled", "capability_routing_proposed", "workstack_compiled", "board_observed"]
     .filter((eventType) => Boolean(evidenceSourceDocument(eventType)));
 }
 
@@ -17098,9 +17444,9 @@ function installTestHarness() {
           integrity: { digest: "8".repeat(64) }
         }
       };
-      const binding = (role, candidateId, label) => ({
+      const binding = (role, candidateId, label, environment = "test") => ({
         role,
-        candidate: { candidate_id: candidateId, label, environment: "test", version: "1.0.0", auth_status: "not_inspected", quota_verified: false },
+        candidate: { candidate_id: candidateId, label, environment, version: "1.0.0", auth_status: "not_inspected", quota_verified: false },
         execution_started: false
       });
       state.forgeBench = {
@@ -17139,7 +17485,8 @@ function installTestHarness() {
           candidate_stacks: [
             { key: "codex-solo", label: "Codex CLI seul", available: true, bindings: [binding("worker", "codex-cli:test", "Codex CLI"), binding("independent_verifier", "forgebench:deterministic-evaluator", "Évaluateur déterministe ForgeBench")], blockers: [], protocol_digest: protocolDigest, execution_started: false, scores_computed: false },
             { key: "claude-solo", label: "Claude Code seul", available: true, bindings: [binding("worker", "claude-code:test", "Claude Code"), binding("independent_verifier", "forgebench:deterministic-evaluator", "Évaluateur déterministe ForgeBench")], blockers: [], protocol_digest: protocolDigest, execution_started: false, scores_computed: false },
-            { key: "hermes-codex-claude", label: "Hermes planifie, Codex construit, Claude vérifie", available: true, bindings: [binding("planner", "hermes-agent:test", "Hermes Agent"), binding("worker", "codex-cli:test", "Codex CLI"), binding("independent_verifier", "claude-code:test", "Claude Code")], blockers: [], protocol_digest: protocolDigest, execution_started: false, scores_computed: false }
+            { key: "hermes-codex-claude", label: "Hermes planifie, Codex construit, Claude vérifie", available: true, bindings: [binding("planner", "hermes-agent:test", "Hermes Agent"), binding("worker", "codex-cli:test", "Codex CLI"), binding("independent_verifier", "claude-code:test", "Claude Code")], blockers: [], protocol_digest: protocolDigest, execution_started: false, scores_computed: false },
+            { key: "ollama-local", label: "Modèle Ollama local", available: true, bindings: [binding("worker", "local-model:ollama_native:hermes3:8b", "hermes3:8b · Ollama natif", "ollama_native"), binding("independent_verifier", "forgebench:deterministic-evaluator", "Évaluateur déterministe ForgeBench")], blockers: [], protocol_digest: protocolDigest, execution_started: false, scores_computed: false }
           ],
           readiness: { protocol_ready: true, exploratory_ready: true, scientific_ready: false, selected_claim_ready: true, blockers: [], warnings: ["local_hidden_suite_not_worker_isolated"] },
           measurements: { runs_recorded: 0, dimensions_measured: [], scores_computed: false, winner_declared: false, cost_status: "not_measured_not_zero" },
@@ -17164,9 +17511,9 @@ function installTestHarness() {
           experiment_id: "fb-demo-signal-maze",
           experiment_digest: "f".repeat(64),
           protocol_digest: protocolDigest,
-          candidate_stacks_total: 3,
+          candidate_stacks_total: 4,
           public_seeds_total: 3,
-          workspaces_total: 9,
+          workspaces_total: 12,
           starter_bundle_sha256: "c".repeat(64),
           batch_digest: "2".repeat(64),
           paths_returned: false,
@@ -17243,17 +17590,40 @@ function installTestHarness() {
         integrity: { digest: "7".repeat(64) },
         test_mode: true
       };
+      state.forgeBenchOllamaCandidate = {
+        schema: FORGEBENCH_OLLAMA_CANDIDATE_RESULT_SCHEMA,
+        contract_version: "2026-07-13",
+        run_id: "fbo-demo-local-candidate",
+        benchmark: { id: "signal-maze-v1", track: "local_model_prompt_only_candidate" },
+        batch_ref: { batch_id: "fbsb-demo-signal-maze", experiment_digest: "f".repeat(64), protocol_digest: protocolDigest, stack_key: "ollama-local", public_seed_sha256: "5".repeat(64) },
+        reference_pilot_ref: { pilot_id: "fbp-demo-reference-run", integrity_digest: "7".repeat(64) },
+        host_environment: "linux",
+        selected_backend: "linux-bwrap-native",
+        candidate: { candidate_id: "local-model:ollama_native:hermes3:8b", adapter_kind: "ollama_local_prompt_only_v1", model_ref: "hermes3:8b", runtime: "native", environment: "ollama_native", model_invoked: true, cli_agent_invoked: false },
+        consent: { confirmed: true, scope: "ollama_local_candidate_v1", candidate_model_allowed: true, external_network_access: false, loopback_ollama_allowed: true, paid_api_allowed: false, hidden_suite_allowed: false, generated_code_execution_allowed: false },
+        budget: { max_duration_seconds: 300, max_attempts: 1, max_api_cost_eur: 0, max_output_bytes: 524288 },
+        generation: { started: true, succeeded: true, timed_out: false, attempts: 1, duration_ms: 9321, prompt_sha256: "8".repeat(64), response_sha256: "9".repeat(64), response_chars: 12842, prompt_eval_count: 2140, eval_count: 1620, eval_duration_ms: 8950, total_duration_ms: 9310, raw_response_returned: false, raw_response_persisted: false },
+        submission: { materialized: true, exact_topology_verified: true, files_total: 4, bytes_total: 12706, digest: "a".repeat(64), generated_code_executed: false },
+        evaluator: { kind: "deterministic_visible_static_gate", started: true, succeeded: true, timed_out: false, duration_ms: 142, independent_process: true, workspace_read_only: true, network_namespace_enforced: true, hidden_suite_used: false, visible_checks_total: 7, visible_checks_passed: 7, submission_digest: "a".repeat(64) },
+        security: { candidate_received_public_prompt_only: true, candidate_filesystem_context_supplied: false, candidate_tool_access: false, external_network_requested: false, loopback_ollama_requested: true, source_repository_mounted: false, hidden_suite_mounted: false, credentials_read_by_outilsia: false, raw_model_output_returned: false, raw_model_output_persisted: false, generated_code_executed: false, evaluator_process_isolated: true, temporary_workspace_removed: true, paths_returned: false },
+        cost: { api_cost_eur: 0, api_status: "not_incurred", local_energy_wh: null, energy_status: "not_measured" },
+        readiness: { candidate_generation_verified: true, candidate_submission_structure_verified: true, gameplay_verified: false, hidden_evaluator_verified: false, scientific_eligible: false, winner_declared: false, blockers: ["generated_code_not_executed", "gameplay_not_verified", "hidden_suite_not_evaluated", "multi_seed_not_completed", "peer_candidates_not_run", "local_energy_not_measured"] },
+        integrity: { digest: "b".repeat(64) },
+        test_mode: true
+      };
       forgeBenchError = "";
       forgeBenchVaultError = "";
       forgeBenchSandboxError = "";
       forgeBenchIsolationError = "";
       forgeBenchRunnerError = "";
-      if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "forgebench_reference_pilot_verified";
+      forgeBenchCandidateError = "";
+      if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "forgebench_ollama_candidate_verified";
       renderForgeBenchVaultPanel();
       renderForgeBenchPanel();
       renderForgeBenchSandboxPanel();
       renderForgeBenchIsolationPanel();
       renderForgeBenchRunnerPanel();
+      renderForgeBenchCandidatePanel();
       renderEvidenceLedgerPanel();
       return {
         result: state.forgeBench,
@@ -17261,6 +17631,7 @@ function installTestHarness() {
         sandbox: state.forgeBenchWorkerSandbox,
         isolation: state.forgeBenchIsolation,
         pilot: state.forgeBenchReferencePilot,
+        candidate: state.forgeBenchOllamaCandidate,
         panel: els.forgeBenchBox?.textContent || "",
         markdown: forgeBenchMarkdown()
       };
@@ -18323,26 +18694,55 @@ els.refreshForgeBenchSandboxBtn?.addEventListener("click", () => loadForgeBenchS
 els.clearForgeBenchSandboxBtn?.addEventListener("click", clearForgeBenchSandbox);
 els.probeForgeBenchIsolationBtn?.addEventListener("click", probeForgeBenchIsolation);
 els.runForgeBenchPilotBtn?.addEventListener("click", runForgeBenchReferencePilot);
+els.runForgeBenchCandidateBtn?.addEventListener("click", runForgeBenchOllamaCandidate);
 for (const input of [els.forgeBenchBenchmark, els.forgeBenchClaimLevel, els.forgeBenchSeedCount]) {
   input?.addEventListener("change", () => {
     state.forgeBench = null;
     state.forgeBenchReferencePilot = null;
+    state.forgeBenchOllamaCandidate = null;
     forgeBenchError = "";
+    forgeBenchRunnerError = "";
+    forgeBenchCandidateError = "";
     renderForgeBenchPanel();
     renderForgeBenchSandboxPanel();
     renderForgeBenchIsolationPanel();
     renderForgeBenchRunnerPanel();
+    renderForgeBenchCandidatePanel();
     renderEvidenceLedgerPanel();
   });
 }
 els.forgeBenchStacks?.addEventListener("change", () => {
   state.forgeBench = null;
   state.forgeBenchReferencePilot = null;
+  state.forgeBenchOllamaCandidate = null;
   forgeBenchError = "";
+  forgeBenchRunnerError = "";
+  forgeBenchCandidateError = "";
   renderForgeBenchPanel();
   renderForgeBenchSandboxPanel();
   renderForgeBenchIsolationPanel();
   renderForgeBenchRunnerPanel();
+  renderForgeBenchCandidatePanel();
+  renderEvidenceLedgerPanel();
+});
+els.forgeBenchCandidateModel?.addEventListener("change", () => {
+  state.forgeBench = null;
+  state.forgeBenchReferencePilot = null;
+  state.forgeBenchOllamaCandidate = null;
+  forgeBenchError = "";
+  forgeBenchRunnerError = "";
+  forgeBenchCandidateError = "";
+  renderForgeBenchPanel();
+  renderForgeBenchSandboxPanel();
+  renderForgeBenchIsolationPanel();
+  renderForgeBenchRunnerPanel();
+  renderForgeBenchCandidatePanel();
+  renderEvidenceLedgerPanel();
+});
+els.forgeBenchCandidateDuration?.addEventListener("change", () => {
+  state.forgeBenchOllamaCandidate = null;
+  forgeBenchCandidateError = "";
+  renderForgeBenchCandidatePanel();
   renderEvidenceLedgerPanel();
 });
 els.appendEvidenceBtn?.addEventListener("click", appendSelectedEvidence);
@@ -18678,6 +19078,7 @@ renderForgeBenchPanel();
 renderForgeBenchSandboxPanel();
 renderForgeBenchIsolationPanel();
 renderForgeBenchRunnerPanel();
+renderForgeBenchCandidatePanel();
 renderEvidenceLedgerPanel();
 renderPreparePanel();
 renderReadinessPanel();
