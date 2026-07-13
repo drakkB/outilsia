@@ -89,10 +89,25 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     for forbidden in ["workspace_relative", "hidden_seeds", "/home/", "C:\\Users\\"]:
         if forbidden in isolation_json:
             raise AssertionError(f"{label}: isolation result leaked {forbidden!r}")
+    pilot = proof["pilot"]
+    if pilot["schema"] != "outilsia.forgebench_reference_pilot_result.v1":
+        raise AssertionError(f"{label}: reference pilot schema mismatch")
+    if pilot["worker"]["succeeded"] is not True or pilot["worker"]["candidate_stack_executed"] is not False:
+        raise AssertionError(f"{label}: reference worker claim mismatch")
+    if pilot["evaluator"]["succeeded"] is not True or pilot["evaluator"]["workspace_read_only"] is not True:
+        raise AssertionError(f"{label}: visible evaluator claim mismatch")
+    if pilot["evaluator"]["hidden_suite_used"] is not False:
+        raise AssertionError(f"{label}: reference evaluator claims hidden-suite use")
+    if pilot["readiness"]["candidate_worker_execution_ready"] is not False or pilot["readiness"]["scientific_eligible"] is not False:
+        raise AssertionError(f"{label}: reference pilot unlocked candidate execution or science")
+    pilot_json = json.dumps(pilot, sort_keys=True)
+    for forbidden in ["workspace_path", "forgebench-reference-pilot-v1:", "/home/", "C:\\Users\\"]:
+        if forbidden in pilot_json:
+            raise AssertionError(f"{label}: reference pilot leaked {forbidden!r}")
     if page.locator("#copyForgeBenchJsonBtn").is_disabled() or page.locator("#copyForgeBenchProtocolBtn").is_disabled():
         raise AssertionError(f"{label}: compiled preflight cannot be exported")
-    if page.locator("#evidenceLedgerSource").input_value() != "forgebench_experiment_compiled":
-        raise AssertionError(f"{label}: ForgeBench proof is not offered to Evidence Ledger")
+    if page.locator("#evidenceLedgerSource").input_value() != "forgebench_reference_pilot_verified":
+        raise AssertionError(f"{label}: reference-run proof is not offered to Evidence Ledger")
 
     text = panel.inner_text()
     for expected in [
@@ -108,7 +123,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "Suite cachée locale",
         "scellée localement",
         "stockage local non chiffré",
-        "Suite privée scellée localement, mais non isolée des workers",
+        "Suite privée non montée dans le pilote et pas encore isolée pour les futurs agents",
         "Espaces worker frais",
         "workspaces vérifiés",
         "9 espaces frais liés au préflight",
@@ -120,7 +135,12 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "canari isolé vérifié",
         "Namespaces utilisateur, montage, réseau et processus séparés",
         "aucun worker lancé",
-        "runner et évaluateur encore absents",
+        "pilote technique séparé disponible",
+        "Pilote d'exécution",
+        "transport isolé vérifié",
+        "Worker de référence réussi · évaluateur indépendant 6/6",
+        "soumission montée en lecture seule",
+        "Aucun Codex, Claude, Hermes ou modèle local exécuté",
         "Aucun agent lancé",
         "aucun score calculé",
         "aucun vainqueur déclaré",
@@ -158,7 +178,7 @@ def main() -> None:
         browser.close()
     print(
         f"forgebench_ui_ok desktop={desktop} mobile={mobile} "
-        "starter=sealed hidden=locally-sealed-not-isolated workspaces=9 isolation=canary-only worker=false scores=false winner=false execution=false"
+        "starter=sealed hidden=locally-sealed-not-evaluated workspaces=9 isolation=reference-pilot evaluator=visible-only candidate=false science=false"
     )
 
 

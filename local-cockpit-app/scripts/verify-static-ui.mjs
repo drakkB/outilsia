@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
-const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "evidence_ledger.rs"]
+const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
@@ -188,6 +188,13 @@ const requiredFeatureText = [
   ["html ForgeBench isolation probe", html, "forgeBenchIsolationBox"],
   ["js ForgeBench isolation schema", js, "outilsia.forgebench_isolation_probe_result.v1"],
   ["css ForgeBench isolation probe", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".forgebench-isolation"],
+  ["html ForgeBench reference runner", html, "forgeBenchRunnerBox"],
+  ["js ForgeBench reference runner schema", js, "outilsia.forgebench_reference_pilot_result.v1"],
+  ["rust ForgeBench reference runner schema", rust, "outilsia.forgebench_reference_pilot_result.v1"],
+  ["rust ForgeBench worker process isolation", rust, "network_namespace_enforced"],
+  ["rust ForgeBench evaluator read only", rust, '"workspace_read_only": true'],
+  ["rust ForgeBench candidate remains blocked", rust, '"candidate_worker_execution_ready": false'],
+  ["css ForgeBench reference runner", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".forgebench-runner"],
   ["html evidence ledger", html, "evidenceLedgerBox"],
   ["html evidence source", html, "evidenceLedgerSource"],
   ["js evidence append schema", js, "outilsia.evidence_append_request.v1"],
@@ -195,13 +202,14 @@ const requiredFeatureText = [
   ["rust evidence entry schema", rust, "outilsia.evidence_entry.v1"],
   ["rust evidence append only", rust, "append_only_between_resets"],
   ["rust evidence no raw source", rust, "raw_source_documents_stored\": false"],
-  ["rust evidence no execution", rust, "\"started\": false"],
+  ["rust evidence reference execution", rust, "isolated_reference_run"],
   ["rust evidence isolation preflight", rust, "signed_isolation_preflight"],
   ["css evidence ledger", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".evidence-ledger-box"],
   ["notice Board Observer", workstackNotice, "Board Observer"],
   ["notice Evidence Ledger", workstackNotice, "Ce que prouve l'Evidence Ledger"],
   ["notice ForgeBench", workstackNotice, "Ce que prépare ForgeBench"],
   ["notice ForgeBench workspaces", workstackNotice, "Espaces worker frais"],
+  ["notice ForgeBench reference pilot", workstackNotice, "Pilote d'exécution isolé"],
   ["notice Workstack Arena", workstackNotice, "Workstack Arena"],
   ["notice Strategy Arena boundary", workstackNotice, "OutilsIA ne génère pas de stratégie financière"],
   ["js install safety schema", js, "outilsia.install_safety_preflight.v1"],

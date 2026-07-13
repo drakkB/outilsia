@@ -518,6 +518,18 @@
               <button id="probeForgeBenchIsolationBtn" type="button" disabled>Tester l'isolation</button>
             </div>
           </div>
+          <div class="forgebench-runner">
+            <div class="forgebench-runner-heading">
+              <strong>Pilote d'exécution</strong>
+              <span id="forgeBenchRunnerState">préflight requis</span>
+            </div>
+            <div id="forgeBenchRunnerBox" class="forgebench-runner-box empty">
+              Exécute un worker technique de référence puis un évaluateur séparé. Aucun CLI IA, test caché, réseau ou API payante.
+            </div>
+            <div class="button-row compact">
+              <button id="runForgeBenchPilotBtn" type="button" disabled>Lancer le pilote</button>
+            </div>
+          </div>
           <div id="forgeBenchBox" class="forgebench-box empty">
             Compile d'abord une Workstack puis un routage complet. ForgeBench préparera l'expérience sans l'exécuter.
           </div>
@@ -547,6 +559,7 @@
                 <option value="capability_routing_proposed">Routage proposé</option>
                 <option value="forgebench_experiment_compiled">Expérience ForgeBench préparée</option>
                 <option value="forgebench_isolation_probed">Isolation ForgeBench testée</option>
+                <option value="forgebench_reference_pilot_verified">Pilote ForgeBench vérifié</option>
               </select>
             </label>
           </div>

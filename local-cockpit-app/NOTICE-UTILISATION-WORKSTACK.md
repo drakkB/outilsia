@@ -1,6 +1,6 @@
 # Notice d'utilisation - Workstacks et preuves OutilsIA
 
-Version de la notice : 2026-07-12  
+Version de la notice : 2026-07-13
 Périmètre : OutilsIA Local Cockpit, mode **Détails**
 
 ## Rôle de chaque module
@@ -11,7 +11,7 @@ Périmètre : OutilsIA Local Cockpit, mode **Détails**
 | Workstack Composer | Transformer une carte prête en plan borné avec rôles, budget, permissions et gate humaine. | Aucune exécution, création de worktree, fusion ou publication. |
 | Capability Router | Détecter les CLI et modèles locaux disponibles, puis proposer un planificateur, un exécutant et un vérificateur distinct. | Ne lit pas les jetons, ne vérifie pas les quotas et ne transmet pas la mission aux agents. |
 | Evidence Ledger | Conserver une trace locale chaînée des étapes validées et de leurs empreintes. | Ne stocke ni description brute, prompt, réponse de modèle, credential ou fichier projet. Il ne prouve pas à lui seul la qualité du résultat. |
-| ForgeBench | Préparer un protocole équitable `Signal Maze v1`, sceller localement des seeds privés, matérialiser un espace worker frais par stack et seed, puis tester la disponibilité d'une isolation bubblewrap par canari borné. | Le v0 ne lance aucun agent ou test caché, ne calcule aucun score et ne déclare aucun vainqueur. Un canari réussi ne signifie pas qu'un worker a déjà été exécuté dans la sandbox. |
+| ForgeBench | Préparer un protocole équitable `Signal Maze v1`, sceller localement des seeds privés, matérialiser des espaces frais, tester bubblewrap, puis exécuter un pilote technique isolé avec un évaluateur visible séparé. | Le pilote n'exécute aucun CLI IA ou test caché, ne calcule aucun score de qualité et ne déclare aucun vainqueur. Il valide le transport d'exécution, pas une stack candidate. |
 | Workstack Arena | **Prévu après ForgeBench.** Exécuter une Workstack approuvée dans des espaces isolés et remettre le résultat en revue humaine. | Aucune exécution implicite, aucun partage de worktree entre workers et aucune fusion automatique. |
 | MemoryForge / Obsidian | Conserver les décisions, bilans et connaissances durables du projet. | Ne reçoit pas tous les logs, prompts ou sorties brutes du Ledger. |
 | Strategy Arena | Exploiter les capacités IA locales préparées par OutilsIA pour les workflows quant, puis compiler et backtester. | OutilsIA ne génère pas de stratégie financière et ne lance pas de backtest. |
@@ -33,11 +33,13 @@ Périmètre : OutilsIA Local Cockpit, mode **Détails**
 13. Dans **Espaces worker frais**, cliquer sur **Préparer les espaces**. OutilsIA crée un workspace distinct pour chaque combinaison stack × seed public, hors du dépôt source, et revérifie le starter embarqué.
 14. Contrôler le reçu : nombre de workspaces, empreinte du starter et mention explicite qu'aucun worker n'a été lancé.
 15. Dans **Préflight isolation**, cliquer sur **Tester l'isolation**. Le canari utilise bubblewrap sous Linux ou WSL, sans agent, credential, dépôt source ou contenu de la suite cachée.
-16. Si le canari passe, vérifier les quatre namespaces, l'écriture dans le seul workspace et la racine hôte masquée. Le runner worker et l'évaluateur restent néanmoins bloqués.
-17. Dans **Evidence Ledger**, sélectionner chaque étape disponible, y compris le préflight ForgeBench, puis cliquer sur **Ajouter la preuve**.
-18. Exporter le JSON du Ledger avant une réinitialisation ou un transfert de machine.
+16. Si le canari passe, vérifier les quatre namespaces, l'écriture dans le seul workspace et la racine hôte masquée.
+17. Dans **Pilote d'exécution**, cliquer sur **Lancer le pilote** puis confirmer le périmètre : worker déterministe sans IA, réseau, API payante ou suite cachée.
+18. Contrôler que le worker de référence et l'évaluateur visible séparé sont vérifiés, que la soumission a été montée en lecture seule et que le workspace temporaire a été supprimé.
+19. Dans **Evidence Ledger**, sélectionner chaque étape disponible, y compris **Pilote ForgeBench vérifié**, puis cliquer sur **Ajouter la preuve**.
+20. Exporter le JSON du Ledger avant une réinitialisation ou un transfert de machine.
 
-Le parcours s'arrête ici. Aucun agent n'est lancé dans cette version.
+Le parcours s'arrête ici. Aucun Codex, Claude, Hermes, modèle Ollama ou autre agent candidat n'est lancé dans cette version.
 
 ## Ce que prouve l'Evidence Ledger
 
@@ -46,7 +48,8 @@ Une entrée du Ledger prouve localement que :
 - le document source respectait son contrat au moment de l'ajout ;
 - son empreinte SHA-256 a été enregistrée ;
 - l'entrée est reliée à la précédente par son empreinte ;
-- aucune exécution n'avait commencé pour les étapes v0 ;
+- aucune exécution n'avait commencé pour les étapes de préparation ;
+- pour `isolated_reference_run` uniquement, un worker technique déterministe a réellement été exécuté après consentement, puis vérifié par un second processus isolé ;
 - seuls les claims minimaux et métriques prévus ont été conservés.
 
 Le Ledger refuse :
@@ -62,7 +65,7 @@ Le Ledger **ne prouve pas** :
 
 - que Codex, Claude ou Hermes est connecté à un compte ;
 - qu'un quota ou abonnement est disponible ;
-- qu'un agent a réellement exécuté ou réussi la tâche ;
+- qu'un agent candidat a réellement exécuté ou réussi la tâche ;
 - que la machine appartient à une personne précise ;
 - qu'un benchmark terrain a été réalisé sur une machine physique distincte ;
 - qu'une sortie est correcte sans vérification indépendante.
@@ -75,8 +78,8 @@ Le Ledger **ne prouve pas** :
 4. `signed_benchmark_preflight` : expérience ForgeBench signée, mêmes règles pour chaque stack et aucune exécution commencée.
 5. `signed_workspace_batch` : batch local signé, starter vérifié et espace frais par stack × seed, sans exécution ni isolation OS revendiquée.
 6. `signed_isolation_preflight` : canari bubblewrap signé prouvant la disponibilité de namespaces séparés et d'un montage minimal, sans worker lancé.
-7. `isolated_run_evidence` : **prévu**, résultat d'une exécution worker réellement isolée avec versions, durée et coût.
-8. `independent_verification` : **prévu**, critères relancés par un vérificateur différent du worker.
+7. `isolated_reference_run` : pilote technique réellement isolé, sans IA candidate, avec durée, coût API nul et sortie brute non conservée.
+8. `independent_visible_verification` : vérification dans un second processus isolé, soumission en lecture seule et six contrôles visibles. Les tests cachés restent absents.
 9. `human_decision` : **prévu**, acceptation, rejet ou demande de correction par le propriétaire humain.
 
 ## Ce que prépare ForgeBench
@@ -109,7 +112,15 @@ Le contrat `outilsia.forgebench_isolation_probe_result.v1` exécute uniquement u
 
 Le canari crée des namespaces utilisateur, montage, réseau et processus distincts, monte seulement le workspace de test en écriture, masque la racine hôte et vérifie une sortie déterministe. Il ne tente aucune requête Internet. Le résultat expose uniquement des booléens, une version de backend, des codes de blocage et une empreinte SHA-256 : aucun chemin local ou identifiant de namespace n'est renvoyé.
 
-Ce préflight prouve une **capacité d'isolation disponible au moment du test**. Il ne prouve pas qu'un futur CLI worker a été lancé avec le même plan de montage. `worker_execution_ready=false` et `scientific_eligible=false` restent obligatoires tant que le runner, le consentement, le budget et l'évaluateur isolé ne sont pas implémentés.
+Ce préflight prouve une **capacité d'isolation disponible au moment du test**. Il ne prouve pas à lui seul qu'un worker a utilisé ce backend.
+
+### Pilote d'exécution isolé
+
+Le contrat `outilsia.forgebench_reference_pilot_result.v1` exige un consentement séparé. Le runner copie un workspace déjà vérifié dans un dossier temporaire neuf, lance un worker déterministe de référence sous bubblewrap puis démarre un second processus bubblewrap. Ce dernier monte la soumission en lecture seule, refuse toute ressource externe, vérifie la topologie des fichiers et recalcule une empreinte indépendante.
+
+Le worker ne reçoit ni dépôt source, credential, suite cachée ou accès réseau. L'évaluateur visible ne reçoit pas le vault et ne peut pas écrire dans la soumission. Les sorties brutes et chemins restent hors du résultat ; le dossier temporaire doit être supprimé avant qu'une preuve soit retournée.
+
+Ce pilote ferme la boucle technique **copie fraîche → worker isolé → évaluateur séparé → preuve bornée**. Il ne lance aucune stack candidate, n'évalue pas la qualité du mini-jeu et ne mesure pas encore le coût réel d'un abonnement ou d'une API. `candidate_worker_execution_ready=false` et `scientific_eligible=false` restent donc obligatoires.
 
 Le score équilibré futur reste explicite : `50 % résultat + 20 % efficacité + 15 % vitesse + 15 % coût`. Un coût inconnu n'est jamais transformé en zéro. Le score composite, les podiums par dimension, la frontière de Pareto et un éventuel vainqueur restent absents tant que des runs complets et comparables n'existent pas.
 
@@ -120,7 +131,8 @@ Le score équilibré futur reste explicite : `50 % résultat + 20 % efficacité 
 - Le statut d'authentification et les quotas des CLI restent `not_inspected`.
 - Les modèles Ollama proviennent du scan local déjà effectué.
 - Aucun appel API payant n'est déclenché par Composer, Router, ForgeBench ou Ledger.
-- Un futur passage à l'exécution exigera un consentement distinct et un budget explicite.
+- Le pilote technique exige un consentement distinct et impose réseau coupé, API payante interdite et CLI candidat interdit.
+- Une future exécution de stack candidate exigera un second consentement et un budget explicite.
 
 ## Export et réinitialisation
 
@@ -147,6 +159,8 @@ Le fichier persistant se trouve dans le dossier applicatif Tauri sous le nom `ev
 - `outilsia.forgebench_worker_sandbox_status.v1`
 - `outilsia.forgebench_isolation_probe_request.v1`
 - `outilsia.forgebench_isolation_probe_result.v1`
+- `outilsia.forgebench_reference_pilot_request.v1`
+- `outilsia.forgebench_reference_pilot_result.v1`
 - `outilsia.forgebench_experiment.v1`
 - `outilsia.forgebench_compile_result.v1`
 - `outilsia.evidence_entry.v1`

@@ -8,6 +8,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
 
@@ -80,6 +81,19 @@ struct BatchInput {
     viewports: Value,
     budgets: Value,
     permissions: Value,
+}
+
+#[derive(Debug)]
+pub(crate) struct VerifiedPilotWorkspace {
+    pub(crate) batch_id: String,
+    pub(crate) experiment_digest: String,
+    pub(crate) protocol_digest: String,
+    pub(crate) public_seed: u64,
+}
+
+fn sandbox_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
 }
 
 fn unix_ms() -> u128 {
@@ -880,6 +894,78 @@ fn read_active_manifest(root: &Path) -> Result<Option<Value>, String> {
     }
 }
 
+pub(crate) fn copy_verified_pilot_workspace(
+    app: &AppHandle,
+    destination: &Path,
+) -> Result<VerifiedPilotWorkspace, String> {
+    let _guard = sandbox_lock()
+        .lock()
+        .map_err(|_| "Verrou des workspaces ForgeBench indisponible.".to_string())?;
+    if destination.exists() {
+        return Err("Le workspace pilote doit etre neuf.".to_string());
+    }
+    let root = sandbox_root(app)?;
+    create_private_directory(&root)?;
+    let manifest = read_active_manifest(&root)?
+        .ok_or_else(|| "Aucun batch ForgeBench verifie n'est disponible.".to_string())?;
+    let receipt = validate_manifest(&root, &manifest)?;
+    let run = manifest
+        .get("runs")
+        .and_then(Value::as_array)
+        .and_then(|runs| runs.first())
+        .ok_or_else(|| "Aucun workspace ForgeBench n'est disponible pour le pilote.".to_string())?;
+    let batch_id = receipt
+        .get("batch_id")
+        .and_then(Value::as_str)
+        .filter(|value| safe_id(value, "fbsb-"))
+        .ok_or_else(|| "Identifiant du batch ForgeBench invalide.".to_string())?;
+    let relative = run
+        .get("workspace_relative")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "Workspace pilote relatif absent.".to_string())?;
+    let source = root.join(batch_id).join(relative_workspace_path(relative)?);
+    create_private_directory(destination)?;
+    for name in ["game.js", "index.html", "styles.css", RUN_CONTRACT_FILE] {
+        let source_file = source.join(name);
+        let metadata = fs::symlink_metadata(&source_file)
+            .map_err(|error| format!("Fichier pilote source illisible: {error}"))?;
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            let _ = fs::remove_dir_all(destination);
+            return Err("Le starter pilote contient une entree non fiable.".to_string());
+        }
+        let bytes = fs::read(&source_file)
+            .map_err(|error| format!("Lecture du starter pilote impossible: {error}"))?;
+        if let Err(error) = write_private_file(&destination.join(name), &bytes) {
+            let _ = fs::remove_dir_all(destination);
+            return Err(error);
+        }
+    }
+    let copied_digest = workspace_digest(destination)?;
+    if run.get("workspace_digest").and_then(Value::as_str) != Some(copied_digest.as_str()) {
+        let _ = fs::remove_dir_all(destination);
+        return Err("La copie du workspace pilote est incoherente.".to_string());
+    }
+    Ok(VerifiedPilotWorkspace {
+        batch_id: batch_id.to_string(),
+        experiment_digest: receipt
+            .get("experiment_digest")
+            .and_then(Value::as_str)
+            .filter(|value| is_sha256(value))
+            .ok_or_else(|| "Empreinte d'experience pilote absente.".to_string())?
+            .to_string(),
+        protocol_digest: receipt
+            .get("protocol_digest")
+            .and_then(Value::as_str)
+            .filter(|value| is_sha256(value))
+            .ok_or_else(|| "Empreinte de protocole pilote absente.".to_string())?
+            .to_string(),
+        public_seed: run
+            .get("public_seed")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| "Seed public du pilote absent.".to_string())?,
+    })
+}
+
 fn status_document(receipt: Option<Value>) -> Value {
     json!({
         "schema": STATUS_SCHEMA,
@@ -895,6 +981,9 @@ fn status_document(receipt: Option<Value>) -> Value {
 
 #[tauri::command]
 pub(crate) fn get_forgebench_worker_sandbox_status(app: AppHandle) -> Result<Value, String> {
+    let _guard = sandbox_lock()
+        .lock()
+        .map_err(|_| "Verrou des workspaces ForgeBench indisponible.".to_string())?;
     let root = sandbox_root(&app)?;
     if !root.exists() {
         return Ok(status_document(None));
@@ -915,6 +1004,9 @@ pub(crate) fn prepare_forgebench_worker_sandbox(
         return Err("Contrat de preparation du sandbox ForgeBench invalide.".to_string());
     }
     let input = batch_input(&request.forgebench_result)?;
+    let _guard = sandbox_lock()
+        .lock()
+        .map_err(|_| "Verrou des workspaces ForgeBench indisponible.".to_string())?;
     let root = sandbox_root(&app)?;
     create_private_directory(&root)?;
     let existing = read_active_manifest(&root)?;
@@ -960,6 +1052,9 @@ pub(crate) fn prepare_forgebench_worker_sandbox(
 
 #[tauri::command]
 pub(crate) fn clear_forgebench_worker_sandbox(app: AppHandle) -> Result<Value, String> {
+    let _guard = sandbox_lock()
+        .lock()
+        .map_err(|_| "Verrou des workspaces ForgeBench indisponible.".to_string())?;
     let root = sandbox_root(&app)?;
     if root.exists() {
         let metadata = fs::symlink_metadata(&root)

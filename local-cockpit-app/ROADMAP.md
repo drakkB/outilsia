@@ -217,7 +217,8 @@ Capability Router v0 implémenté dans les sources le 12 juillet 2026, sans publ
 - [x] Router par capacités et type de mission sans verrouiller la proposition sur une marque.
 - [x] Imposer un vérificateur différent de l'exécutant lorsqu'une proposition complète est possible.
 - [x] Garder le panneau dans le mode Détails et fournir JSON, résumé et preuve visuelle desktop/mobile.
-- [ ] Ajouter un consentement d'exécution séparé seulement après ForgeBench, Evidence Ledger et isolation par worktree.
+- [x] Ajouter un consentement séparé et strict pour le pilote technique de référence : aucun CLI candidat, réseau ou crédit payant.
+- [ ] Ajouter un second consentement et un budget explicite avant toute exécution de stack candidate.
 
 Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans publication : le fichier local `evidence-ledger-v1.json` accepte volontairement les preuves Board Observer, Workstack Composer, Capability Router et préflight ForgeBench après validation de leur contrat. Chaque entrée contient uniquement auteur composant, claims bornés, métriques, empreinte source et empreinte précédente. La chaîne complète est revalidée à chaque lecture et écriture, les doublons sont refusés, une rotation de secours protège le remplacement du fichier et aucun contenu brut n'est persisté. Le Ledger ne transforme pas une empreinte en preuve d'identité ou de qualité et ne lance aucune exécution.
 
@@ -226,7 +227,8 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Tester écriture/lecture réelle, restauration vérifiée, corruption, doublon et absence de contenu brut.
 - [x] Ajouter les actions explicites Ajouter, Vérifier, Copier, Télécharger et Réinitialiser dans le mode Détails.
 - [x] Maintenir la notice canonique `NOTICE-UTILISATION-WORKSTACK.md` et vérifier ses responsabilités en CI.
-- [ ] Ajouter `isolated_run_evidence`, `independent_verification` et `human_decision` seulement avec ForgeBench et Workstack Arena.
+- [x] Ajouter `isolated_reference_run` avec exécution réelle, vérification visible indépendante et consentement enregistré, sans contenu brut.
+- [ ] Ajouter les preuves d'exécution candidate, de vérification cachée et de décision humaine seulement avec Workstack Arena.
 
 - Séparer quatre responsabilités : Composer définit la chaîne, Workstack Arena exécute, ForgeBench évalue et Evidence Ledger conserve la preuve.
 - [x] Créer le contrat exploratoire `Signal Maze v1` avec règles déterministes, starter public scellé, trois seeds, checks visibles et viewports desktop/Android.
@@ -237,8 +239,10 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Garder `scientific_ready=false` tant que le vault n'est ni chiffré ni inaccessible aux futurs workers.
 - [x] Matérialiser un workspace frais par stack et seed public, hors dépôt source, avec starter embarqué revérifié, reçu signé sans chemin et aucune exécution.
 - [x] Ajouter un préflight bubblewrap Linux/WSL qui prouve par canari les namespaces processus/montage/réseau, le workspace seul en écriture et la racine hôte masquée, sans lancer de worker.
-- [ ] Enfermer réellement chaque worker dans son workspace avec le backend vérifié, un plan de montage minimal, le réseau conforme au budget et l'accès au vault techniquement bloqué.
-- [ ] Construire un évaluateur isolé capable de consommer la suite privée sans la révéler au worker avant toute affirmation scientifique.
+- [x] Lancer un worker technique déterministe dans une copie fraîche avec le backend vérifié, réseau coupé, montage minimal, racine hôte/vault/dépôt source absents et nettoyage obligatoire.
+- [x] Relire la soumission dans un second processus isolé, monté en lecture seule, puis conserver uniquement six checks visibles, durées et empreintes bornées.
+- [ ] Remplacer le worker technique par des adaptateurs de CLI candidats autorisés, sans élargir implicitement réseau, credentials ou budget.
+- [ ] Construire un évaluateur caché isolé capable de consommer la suite privée sans la révéler au worker avant toute affirmation scientifique.
 - Mesurer séparément résultat, vitesse, efficacité et coût ; toujours publier les valeurs brutes, les sous-scores et le caractère estimé ou inconnu d'une donnée.
 - Utiliser comme score équilibré initial `50 % résultat + 20 % efficacité + 15 % vitesse + 15 % coût`, sans masquer les podiums par dimension ni la frontière de Pareto.
 - Comparer d'abord trois stacks : Codex CLI seul, Claude Code seul et Hermes planification -> Codex construction -> Claude audit.

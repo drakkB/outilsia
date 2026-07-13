@@ -91,7 +91,9 @@ Le Hidden Suite Vault peut générer localement cinq seeds privés et remettre u
 
 Le module **Espaces worker frais** matérialise désormais un workspace neuf par stack et seed public, hors dépôt source. Les trois fichiers du starter embarqué et le contrat public de run sont revérifiés à chaque lecture ; le reçu ne contient aucun chemin. Cette étape ne lance aucun CLI et n'isole encore ni processus, ni réseau, ni accès au vault : `worker_execution_ready=false` et `scientific_eligible=false` restent obligatoires.
 
-Le **Préflight isolation** ajoute un canari bubblewrap borné sous Linux ou WSL. Il vérifie des namespaces utilisateur, montage, réseau et processus distincts, l'écriture dans le seul workspace et une racine hôte masquée. Il ne lit aucun credential, ne reçoit aucun contenu caché et ne lance aucun worker. Un canari vert prouve seulement que le backend est disponible ; le runner et l'évaluateur isolé restent à construire, avec `worker_execution_ready=false` et `scientific_eligible=false`.
+Le **Préflight isolation** ajoute un canari bubblewrap borné sous Linux ou WSL. Il vérifie des namespaces utilisateur, montage, réseau et processus distincts, l'écriture dans le seul workspace et une racine hôte masquée. Il ne lit aucun credential, ne reçoit aucun contenu caché et ne lance aucun worker. Un canari vert prouve seulement que le backend est disponible.
+
+Le **Pilote d'exécution** peut ensuite lancer, sur consentement explicite, un worker technique déterministe dans une copie fraîche puis un second processus évaluateur avec la soumission montée en lecture seule. Le réseau, la racine hôte, le dépôt source, le vault et les credentials restent hors montage ; le workspace temporaire est supprimé avant le retour. Ce pilote prouve le transport isolé et la vérification visible, pas la qualité de Codex, Claude, Hermes ou d'un modèle local : aucun CLI candidat ni test caché n'est exécuté et `scientific_eligible=false` reste obligatoire.
 
 Contrôles dédiés :
 
