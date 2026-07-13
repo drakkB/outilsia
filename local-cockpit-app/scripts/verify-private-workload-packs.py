@@ -26,7 +26,10 @@ def main():
         page.goto(HTML.as_uri(), wait_until="load")
         panel = page.locator(".private-workload-panel")
         assert not panel.is_visible(), "Tests privés must stay out of Essential mode"
-        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('tests')")
+        page.evaluate("""() => {
+          window.__OUTILSIA_TEST__.setWorkspaceTab('tests');
+          window.__OUTILSIA_TEST__.setWorkspaceSection('tests', '.private-workload-panel');
+        }""")
         assert panel.is_visible(), "Tests privés must be available in Details mode"
 
         code_good = page.evaluate(

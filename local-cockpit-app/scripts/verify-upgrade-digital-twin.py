@@ -80,6 +80,7 @@ def main():
         panel = page.locator(".upgrade-digital-twin-panel")
         assert not panel.is_visible()
         page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('machine')")
+        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceSection('machine', '.upgrade-digital-twin-panel')")
         result = page.evaluate("() => window.__OUTILSIA_TEST__.applyUpgradeDigitalTwinState()")
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         assert panel.is_visible()

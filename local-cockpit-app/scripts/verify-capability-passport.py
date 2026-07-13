@@ -17,6 +17,7 @@ def main():
         page = browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(HTML.as_uri(), wait_until="load")
         page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('workflows')")
+        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceSection('workflows', '.capability-passport-panel')")
         result = page.evaluate("() => window.__OUTILSIA_TEST__.applyCapabilityPassportState()")
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         panel = page.locator(".capability-passport-panel")

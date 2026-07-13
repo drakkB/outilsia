@@ -2334,6 +2334,10 @@ dd {
   border-color: rgba(134, 239, 172, 0.22);
 }
 
+.arena-run-result.incomplete-run {
+  border-color: rgba(241, 201, 107, 0.42);
+}
+
 .arena-run-result.bad-run {
   border-color: rgba(255, 145, 136, 0.24);
 }

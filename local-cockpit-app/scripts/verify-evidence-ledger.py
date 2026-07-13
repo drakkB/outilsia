@@ -21,7 +21,9 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     if panel.is_visible():
         raise AssertionError(f"{label}: ledger must remain hidden in Essential mode")
     page.locator("#workspaceWorkflowsBtn").click()
+    page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceSection('workflows', '.evidence-ledger-panel')")
     proof = page.evaluate("() => window.__OUTILSIA_TEST__.applyEvidenceLedgerState()")
+    page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceSection('workflows', '.evidence-ledger-panel')")
     panel.scroll_into_view_if_needed()
 
     ledger = proof["ledger"]

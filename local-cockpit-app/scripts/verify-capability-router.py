@@ -21,7 +21,9 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     if panel.is_visible():
         raise AssertionError(f"{label}: router must remain hidden in Essential mode")
     page.locator("#workspaceWorkflowsBtn").click()
+    page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceSection('workflows', '.capability-router-panel')")
     proof = page.evaluate("() => window.__OUTILSIA_TEST__.applyCapabilityRouterState()")
+    page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceSection('workflows', '.capability-router-panel')")
     panel.scroll_into_view_if_needed()
 
     result = proof["result"]

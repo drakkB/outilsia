@@ -44,7 +44,8 @@ def main():
     assert 'downloads: 0' in run_body
     assert 'protocol: MODEL_AUTOPILOT_PROTOCOL' in run_body
     assert 'tuning: profile.tuning' in run_body
-    assert 'timeout_seconds: 55' in run_body
+    assert 'Math.max(55, benchmarkTimeoutSeconds(model))' in run_body
+    assert 'timeout_seconds: timeoutSeconds' in run_body
 
     for token in (
         "num_ctx: Option<u32>",
@@ -64,7 +65,10 @@ def main():
         page.goto(HTML.as_uri(), wait_until="load")
         panel = page.locator(".model-autopilot-panel")
         assert not panel.is_visible()
-        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('tests')")
+        page.evaluate("""() => {
+          window.__OUTILSIA_TEST__.setWorkspaceTab('tests');
+          window.__OUTILSIA_TEST__.setWorkspaceSection('tests', '.model-autopilot-panel');
+        }""")
         result = page.evaluate("() => window.__OUTILSIA_TEST__.applyModelAutopilotState()")
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         assert panel.is_visible()

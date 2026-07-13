@@ -16,10 +16,12 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     page.on("pageerror", lambda error: errors.append(str(error)))
     page.goto(HTML.as_uri(), wait_until="load")
     page.locator("#workspaceWorkflowsBtn").click()
+    page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceSection('workflows', '.board-observer-panel')")
     page.evaluate("() => window.__OUTILSIA_TEST__.applyBoardObserverState()")
     page.locator('[data-compose-board-card="planka:card-ready-1"]').click()
     if "Construire Signal Maze v1" not in page.locator("#workstackSelectedCard").inner_text():
         raise AssertionError(f"{label}: board card was not transferred to the composer")
+    page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceSection('workflows', '.workstack-composer-panel')")
     proof = page.evaluate("() => window.__OUTILSIA_TEST__.applyWorkstackComposerState()")
     panel = page.locator(".workstack-composer-panel")
     panel.scroll_into_view_if_needed()

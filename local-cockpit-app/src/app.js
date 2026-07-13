@@ -8396,8 +8396,8 @@ function arenaScoreResult(item) {
       speedScore: 0,
       latencyScore: 0,
       answerScore: 0,
-      label: "échec",
-      reason: item?.error || "Le modèle n'a pas répondu correctement."
+      label: benchmarkTimedOut(item) ? "délai dépassé" : "erreur",
+      reason: friendlyBenchmarkError(item)
     };
   }
   if (item.arena_objective) {
@@ -8525,8 +8525,8 @@ function arenaProfileScore(item, profileKey = "compromise") {
   if (!item?.success) {
     return {
       score: 0,
-      label: "échec",
-      reason: item?.error || "Le modèle n'a pas répondu correctement."
+      label: benchmarkTimedOut(item) ? "délai dépassé" : "erreur",
+      reason: friendlyBenchmarkError(item)
     };
   }
   const objectiveProfile = arenaObjectiveProfileScore(item, profileKey);
@@ -8583,6 +8583,7 @@ function arenaRankedResults(results = []) {
 
 function arenaWinners(results = []) {
   const successful = results.filter((item) => item.success);
+  const incomplete = results.filter((item) => !item.success && benchmarkTimedOut(item));
   const rankedSuccessful = arenaRankedResults(successful);
   const bestSuccessful = rankedSuccessful[0] || null;
   const fastest = successful.slice().sort((a, b) => Number(b.estimated_tokens_per_second || 0) - Number(a.estimated_tokens_per_second || 0))[0] || null;
@@ -8610,7 +8611,9 @@ function arenaWinners(results = []) {
     light_laptop: lightLaptop,
     quality,
     successful_count: successful.length,
-    failed_count: results.length - successful.length
+    incomplete_count: incomplete.length,
+    failed_count: results.length - successful.length,
+    error_count: results.length - successful.length - incomplete.length
   };
 }
 
@@ -8670,7 +8673,7 @@ function arenaRunMarkdown(run = readLastArenaRun()) {
     "## Résultats",
     "",
     ...ranked.map((item, index) => [
-      `### ${index + 1}. ${item.model} - ${item.success ? item.arena_meta.label : "échec"}`,
+      `### ${index + 1}. ${benchmarkModelDisplayLabel(item.model)} - ${item.arena_meta.label}`,
       "",
       `- Score Arena: ${item.arena_score}/100`,
       `- Profil vitesse: ${item.arena_profiles?.speed?.score ?? 0}/100`,
@@ -8690,7 +8693,7 @@ function arenaRunMarkdown(run = readLastArenaRun()) {
       `- Tokens: ${item.estimated_tokens}`,
       benchmarkMetricDetails(item) ? `- Détails: ${benchmarkMetricDetails(item)}` : "",
       `- Lecture: ${item.arena_meta.reason}`,
-      item.error ? `- Erreur: ${item.error}` : "",
+      !item.success ? `- Diagnostic: ${friendlyBenchmarkError(item)}` : "",
       "",
       "```text",
       item.output_preview || "",
@@ -8727,13 +8730,13 @@ function renderArenaRun(run = readLastArenaRun()) {
         <div><strong>Rappel de contexte</strong><span>${escapeHtml(arenaWinnerLabel(winners.long_context, "long_context"))}</span></div>
         <div><strong>Qualité</strong><span>${escapeHtml(arenaWinnerLabel(winners.quality, "quality"))}</span></div>
         <div><strong>Meilleur compromis</strong><span>${escapeHtml(arenaWinnerLabel(winners.compromise, "compromise"))}</span></div>
-        <div><strong>Fiabilité</strong><span>${escapeHtml(winners.successful_count)} succès · ${escapeHtml(winners.failed_count)} échec(s)</span></div>
+        <div><strong>Fiabilité</strong><span>${escapeHtml(winners.successful_count)} succès · ${escapeHtml(winners.incomplete_count)} incomplet(s) · ${escapeHtml(winners.error_count)} erreur(s)</span></div>
       </div>
       <div class="arena-run-results">
         ${ranked.map((item) => `
-          <div class="arena-run-result ${item.success ? "ok-run" : "bad-run"}">
-            <strong>${escapeHtml(item.model)}</strong>
-            <span>Score ${escapeHtml(arenaDisplayScore(item))}/100 · ${escapeHtml(item.success ? item.arena_meta.label : "échec")} · ${escapeHtml(item.estimated_tokens_per_second || 0)} tok/s · ${escapeHtml(item.elapsed_ms || 0)} ms</span>
+          <div class="arena-run-result ${item.success ? "ok-run" : benchmarkTimedOut(item) ? "incomplete-run" : "bad-run"}">
+            <strong>${escapeHtml(benchmarkModelDisplayLabel(item.model))}</strong>
+            <span>Score ${escapeHtml(arenaDisplayScore(item))}/100 · ${escapeHtml(item.arena_meta.label)} · ${escapeHtml(item.estimated_tokens_per_second || 0)} tok/s · ${escapeHtml(item.elapsed_ms || 0)} ms</span>
             <span>${item.arena_objective ? `Preuve objective ${escapeHtml(item.arena_objective.passed_count)}/${escapeHtml(item.arena_objective.total_count)} · ${escapeHtml(item.arena_objective.score)}/100` : "Ancien protocole estimatif"}</span>
             ${item.arena_objective ? `<span>${escapeHtml(arenaObjectiveFailureLabel(item.arena_objective))}</span>` : ""}
             ${item.success ? `<span>Profils : assistant ${escapeHtml(arenaDisplayScore(item, "assistant"))}/100 · code ${escapeHtml(arenaDisplayScore(item, "code"))}/100 · mémoire ${escapeHtml(arenaDisplayScore(item, "memory"))}/100 · portable ${escapeHtml(arenaDisplayScore(item, "light_laptop"))}/100 · qualité ${escapeHtml(arenaDisplayScore(item, "quality"))}/100</span>` : ""}
@@ -8846,7 +8849,9 @@ function renderArenaProgress(models, results = [], activeRef = "") {
       ${models.map((model) => {
         const ref = actionableOllamaRef(model);
         const result = results.find((item) => normalizeOllamaRef(item.model) === normalizeOllamaRef(ref));
-        const status = result ? (result.success ? `${result.estimated_tokens_per_second} tok/s` : "échec") : normalizeOllamaRef(ref) === normalizeOllamaRef(activeRef) ? "test en cours" : "en attente";
+        const status = result
+          ? (result.success ? `${result.estimated_tokens_per_second} tok/s` : benchmarkTimedOut(result) ? "délai dépassé" : "erreur")
+          : normalizeOllamaRef(ref) === normalizeOllamaRef(activeRef) ? "test en cours" : "en attente";
         return `
           <div class="arena-candidate">
             <div class="model-card-head">
@@ -8880,15 +8885,17 @@ async function runAutomaticArena() {
   resetOperationConsole(`Arena automatique : ${models.map((model) => actionableOllamaRef(model)).join(", ")}`);
   for (const model of models) {
     const ref = actionableOllamaRef(model);
+    const timeoutSeconds = Math.max(60, benchmarkTimeoutSeconds(ref));
     renderArenaProgress(models, results, ref);
-    appendOperationLine(`Micro-test objectif Arena : ${ref}`, "cmd");
+    appendOperationLine(`Micro-test objectif Arena : ${ref} · délai ${timeoutSeconds} s`, "cmd");
+    const benchmarkStartedAt = Date.now();
     try {
       const result = invoke
         ? await invoke("benchmark_ollama", {
             request: {
               model: ref,
               prompt,
-              timeout_seconds: 60,
+              timeout_seconds: timeoutSeconds,
               protocol: ARENA_OBJECTIVE_PROTOCOL,
               ...ollamaRuntimePayload(ref)
             }
@@ -8902,25 +8909,29 @@ async function runAutomaticArena() {
       results.push(measured);
       state.benchmark = measured;
       saveBenchmarkHistoryEntry(measured);
-      appendOperationLine(`${ref}: ${measured.success ? `${measured.arena_objective.summary}, ${measured.estimated_tokens_per_second} tok/s` : "échec"}`, measured.success ? "ok" : "erreur");
+      appendOperationLine(
+        `${ref}: ${measured.success ? `${measured.arena_objective.summary}, ${measured.estimated_tokens_per_second} tok/s` : friendlyBenchmarkError(measured)}`,
+        measured.success ? "ok" : benchmarkTimedOut(measured) ? "alerte" : "erreur"
+      );
     } catch (error) {
+      const rawError = String(error || "Arena Ollama interrompue.");
       const failed = {
         model: ref,
         prompt,
-        elapsed_ms: 0,
+        elapsed_ms: Math.max(0, Date.now() - benchmarkStartedAt),
         estimated_tokens: 0,
         estimated_tokens_per_second: 0,
         success: false,
-        timed_out: false,
+        timed_out: ["timeout", "timed out", "stopp", "délai", "delai"].some((signal) => rawError.toLowerCase().includes(signal)),
         output_preview: "",
-        error: friendlyOllamaError(error),
+        error: rawError,
         created_at_ms: Date.now(),
         benchmark_protocol: ARENA_OBJECTIVE_PROTOCOL,
         arena_objective: evaluateArenaObjective("")
       };
       results.push(failed);
       saveBenchmarkHistoryEntry(failed);
-      appendOperationLine(`${ref}: ${failed.error}`, "erreur");
+      appendOperationLine(`${ref}: ${friendlyBenchmarkError(failed)}`, failed.timed_out ? "alerte" : "erreur");
     }
   }
   const run = {
@@ -9402,6 +9413,15 @@ async function runPrivateWorkloadPack() {
     setStatus(`Sélectionne entre ${minimum} et ${maximum} modèles installés`, "warn");
     return null;
   }
+  const policyTimeoutSeconds = Number(policy.timeout_seconds_per_model || 60);
+  const oversizedForPolicy = models.filter((ref) => benchmarkTimeoutSeconds(ref) > policyTimeoutSeconds);
+  if (oversizedForPolicy.length) {
+    setStatus(
+      `Le pack privé reste borné à ${policyTimeoutSeconds} s par modèle. Retire ${oversizedForPolicy.map(benchmarkModelDisplayLabel).join(", ")} ou valide-le d'abord avec « Bench long ».`,
+      "warn"
+    );
+    return null;
+  }
   let descriptor;
   try {
     descriptor = privateWorkloadDescriptor();
@@ -9430,7 +9450,7 @@ async function runPrivateWorkloadPack() {
               request: {
                 model: ref,
                 prompt: descriptor.prompt,
-                timeout_seconds: Number(policy.timeout_seconds_per_model || 60),
+                timeout_seconds: policyTimeoutSeconds,
                 protocol: PRIVATE_WORKLOAD_PROTOCOL,
                 ...ollamaRuntimePayload(ref)
               }
@@ -9583,14 +9603,16 @@ async function runRecommendationEngine(profileKey = readUsageProfileKey()) {
     const prompt = recommendationEnginePrompt(profileKey);
     for (const candidate of candidates) {
       if (results.some((item) => sameOllamaModel(item.model, candidate.ref) && !item.success)) continue;
-      appendOperationLine(`Test ${profile.label} : ${candidate.ref}`, "cmd");
+      const timeoutSeconds = Math.max(75, benchmarkTimeoutSeconds(candidate.ref));
+      appendOperationLine(`Test ${profile.label} : ${candidate.ref} · délai ${timeoutSeconds} s`, "cmd");
+      const benchmarkStartedAt = Date.now();
       try {
         const result = invoke
           ? await invoke("benchmark_ollama", {
               request: {
                 model: candidate.ref,
                 prompt,
-                timeout_seconds: 75,
+                timeout_seconds: timeoutSeconds,
                 protocol: RECOMMENDATION_ENGINE_PROTOCOL,
                 ...ollamaRuntimePayload(candidate.ref)
               }
@@ -9606,18 +9628,22 @@ async function runRecommendationEngine(profileKey = readUsageProfileKey()) {
         };
         results.push(measured);
         saveBenchmarkHistoryEntry(measured);
-        appendOperationLine(`${candidate.ref}: ${proof.summary}, ${measured.estimated_tokens_per_second || 0} tok/s`, measured.success ? "ok" : "erreur");
+        appendOperationLine(
+          `${candidate.ref}: ${measured.success ? `${proof.summary}, ${measured.estimated_tokens_per_second || 0} tok/s` : friendlyBenchmarkError(measured)}`,
+          measured.success ? "ok" : benchmarkTimedOut(measured) ? "alerte" : "erreur"
+        );
       } catch (error) {
+        const rawError = String(error || "Recommendation Engine Ollama interrompu.");
         const failed = {
           model: candidate.ref,
           prompt,
-          elapsed_ms: 0,
+          elapsed_ms: Math.max(0, Date.now() - benchmarkStartedAt),
           estimated_tokens: 0,
           estimated_tokens_per_second: 0,
           success: false,
-          timed_out: false,
+          timed_out: ["timeout", "timed out", "stopp", "délai", "delai"].some((signal) => rawError.toLowerCase().includes(signal)),
           output_preview: "",
-          error: friendlyOllamaError(error),
+          error: rawError,
           benchmark_protocol: RECOMMENDATION_ENGINE_PROTOCOL,
           recommendation_proof: evaluateRecommendationProof("", profileKey),
           resource_estimates: recommendationCandidateResources(candidate),
@@ -9625,7 +9651,7 @@ async function runRecommendationEngine(profileKey = readUsageProfileKey()) {
         };
         results.push(failed);
         saveBenchmarkHistoryEntry(failed);
-        appendOperationLine(`${candidate.ref}: ${failed.error}`, "erreur");
+        appendOperationLine(`${candidate.ref}: ${friendlyBenchmarkError(failed)}`, failed.timed_out ? "alerte" : "erreur");
       }
     }
 
@@ -13837,7 +13863,7 @@ function renderModelAutopilot() {
         <div class="autopilot-profile ${item.autopilot_profile === run.recommended?.autopilot_profile ? "recommended" : ""} ${item.success ? "" : "failed"}">
           <strong>${escapeHtml(item.autopilot_label)}${item.autopilot_profile === run.recommended?.autopilot_profile ? " · recommandé" : ""}</strong>
           <span>${escapeHtml(modelAutopilotTuningLabel(item.tuning))}</span>
-          <span>${item.success ? `${escapeHtml(item.estimated_tokens_per_second || 0)} tok/s · score ${escapeHtml(item.autopilot_score || 0)}/100` : escapeHtml(friendlyOllamaError(item.error || "test en erreur"))}</span>
+          <span>${item.success ? `${escapeHtml(item.estimated_tokens_per_second || 0)} tok/s · score ${escapeHtml(item.autopilot_score || 0)}/100` : escapeHtml(friendlyBenchmarkError(item))}</span>
         </div>
       `).join("")}
     </div>
@@ -13869,14 +13895,16 @@ async function runModelAutopilot() {
     renderModelAutopilot();
     return;
   }
+  const candidates = modelAutopilotCandidates(model);
+  const timeoutSeconds = Math.max(55, benchmarkTimeoutSeconds(model));
+  const budgetMinutes = Math.max(1, Math.ceil((candidates.length * timeoutSeconds) / 60));
   const approved = window.confirm(
-    `Tester 3 profils Ollama sur ${model} ?\n\nBudget maximum : 3 minutes. Aucun modèle ne sera téléchargé et aucun réglage ne sera appliqué sans votre confirmation.`
+    `Tester ${candidates.length} profils Ollama sur ${model} ?\n\nBudget maximum : ${budgetMinutes} minute${budgetMinutes > 1 ? "s" : ""}. Aucun modèle ne sera téléchargé et aucun réglage ne sera appliqué sans votre confirmation.`
   );
   if (!approved) {
     setStatus("Campagne Model Autopilot annulée", "warn");
     return;
   }
-  const candidates = modelAutopilotCandidates(model);
   const runtime = defaultOllamaRuntime(model);
   invalidateCapabilityPassport();
   state.modelAutopilotRun = {
@@ -13885,7 +13913,7 @@ async function runModelAutopilot() {
     runtime,
     running: true,
     measured_at: null,
-    budget: { profiles: candidates.length, timeout_seconds_each: 55, downloads: 0 },
+    budget: { profiles: candidates.length, timeout_seconds_each: timeoutSeconds, downloads: 0 },
     results: [],
     recommended: null
   };
@@ -13901,13 +13929,14 @@ async function runModelAutopilot() {
     for (const profile of candidates) {
       appendOperationLine(`${profile.label} · ${modelAutopilotTuningLabel(profile.tuning)}`, "cmd");
       setStatus(`Model Autopilot ${profile.label} : ${model}...`);
+      const benchmarkStartedAt = Date.now();
       try {
         const result = invoke
           ? await invoke("benchmark_ollama", {
               request: {
                 model,
                 prompt: "Réponds uniquement sur une ligne : AUTO-42 | VRAM | benchmark local.",
-                timeout_seconds: 55,
+                timeout_seconds: timeoutSeconds,
                 protocol: MODEL_AUTOPILOT_PROTOCOL,
                 tuning: profile.tuning,
                 ...ollamaRuntimePayload(model)
@@ -13931,18 +13960,22 @@ async function runModelAutopilot() {
           autopilot_proof_ok: /AUTO-42/i.test(result.output_preview || "") && /VRAM/i.test(result.output_preview || "")
         };
         state.modelAutopilotRun.results.push(measured);
-        appendOperationLine(`${profile.label}: ${measured.success ? `${measured.estimated_tokens_per_second} tok/s` : friendlyOllamaError(measured.error)}`, measured.success ? "bench" : "erreur");
+        appendOperationLine(`${profile.label}: ${measured.success ? `${measured.estimated_tokens_per_second} tok/s` : friendlyBenchmarkError(measured)}`, measured.success ? "bench" : benchmarkTimedOut(measured) ? "alerte" : "erreur");
       } catch (error) {
+        const rawError = String(error || "Model Autopilot Ollama interrompu.");
         state.modelAutopilotRun.results.push({
           model,
           success: false,
-          error: friendlyOllamaError(error),
+          timed_out: ["timeout", "timed out", "stopp", "délai", "delai"].some((signal) => rawError.toLowerCase().includes(signal)),
+          elapsed_ms: Math.max(0, Date.now() - benchmarkStartedAt),
+          error: rawError,
           autopilot_profile: profile.key,
           autopilot_label: profile.label,
           tuning: profile.tuning,
           autopilot_score: 0
         });
-        appendOperationLine(`${profile.label}: ${friendlyOllamaError(error)}`, "erreur");
+        const failed = state.modelAutopilotRun.results.at(-1);
+        appendOperationLine(`${profile.label}: ${friendlyBenchmarkError(failed)}`, failed.timed_out ? "alerte" : "erreur");
       }
       renderModelAutopilot();
     }

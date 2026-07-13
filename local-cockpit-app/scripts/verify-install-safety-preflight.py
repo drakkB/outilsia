@@ -31,6 +31,8 @@ def main():
         page.goto(HTML.as_uri(), wait_until="load")
         page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('models')")
         result = page.evaluate("() => window.__OUTILSIA_TEST__.applyInstallSafetyPreflightState()")
+        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('tests')")
+        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceSection('tests', '.operation-panel')")
 
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         page.locator("#operationPanel").screenshot(path=str(ARTIFACTS / "install-safety-preflight-desktop.png"))

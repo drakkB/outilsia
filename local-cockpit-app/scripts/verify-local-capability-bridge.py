@@ -16,6 +16,7 @@ def main():
         page = browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(HTML.as_uri(), wait_until="load")
         page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('workflows')")
+        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceSection('workflows', '.local-capability-bridge-panel')")
         result = page.evaluate("() => window.__OUTILSIA_TEST__.applyLocalCapabilityBridgeState()")
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         panel = page.locator(".local-capability-bridge-panel")

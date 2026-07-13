@@ -6,11 +6,15 @@ from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 HTML = ROOT / "src" / "index.html"
+APP = ROOT / "src" / "app.js"
 ARTIFACTS = ROOT / ".artifacts" / "visual-ui"
 PROFILES = ["polyvalent", "chat", "code", "memory", "french", "portable"]
 
 
 def main():
+    app = APP.read_text(encoding="utf-8")
+    assert "Math.max(75, benchmarkTimeoutSeconds(candidate.ref))" in app
+    assert 'measured.success ? "ok" : benchmarkTimedOut(measured) ? "alerte" : "erreur"' in app
     wrong_usage = (
         '{"instruction":"BLEU-47","memory":"RIVIERE-29",'
         '"calculation":42,"correction":"La VRAM accélère l’inférence locale.",'

@@ -6,9 +6,15 @@ from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 HTML = ROOT / "src" / "index.html"
+APP = ROOT / "src" / "app.js"
 
 
 def main():
+    app = APP.read_text(encoding="utf-8")
+    assert "Math.max(60, benchmarkTimeoutSeconds(ref))" in app
+    assert "incomplete_count: incomplete.length" in app
+    assert 'benchmarkTimedOut(result) ? "délai dépassé" : "erreur"' in app
+    assert 'benchmarkTimedOut(item) ? "incomplete-run" : "bad-run"' in app
     valid = (
         '{"instruction":"BLEU-47","memory":"RIVIERE-29",'
         '"calculation":42,"correction":"La VRAM accélère l’inférence locale.",'
