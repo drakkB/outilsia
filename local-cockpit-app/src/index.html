@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main id="appShell" class="app-shell mode-essential">
+    <main id="appShell" class="app-shell mode-essential" data-workspace-tab="overview">
       <header class="topbar">
         <div class="brand-mark" aria-hidden="true">OI</div>
         <div class="hero-copy">
@@ -157,19 +157,25 @@
         </div>
       </section>
 
-      <section class="grid">
-        <section class="view-mode-strip" aria-label="Mode d'affichage">
-          <div>
-            <span class="label">Affichage</span>
-            <strong id="viewModeTitle">Essentiel</strong>
+      <section class="workspace-region">
+        <nav class="workspace-nav" aria-label="Espaces du cockpit">
+          <div class="workspace-nav-heading">
+            <span class="label">Espace actif</span>
+            <strong id="workspaceTitle">Accueil</strong>
           </div>
-          <div class="view-mode-actions" role="group" aria-label="Choisir le niveau de détail">
-            <button id="viewEssentialBtn" type="button" aria-pressed="true">Essentiel</button>
-            <button id="viewAdvancedBtn" type="button" aria-pressed="false">Détails</button>
+          <div class="workspace-tabs" role="tablist" aria-label="Naviguer dans le cockpit">
+            <button id="workspaceOverviewBtn" type="button" role="tab" aria-selected="true" aria-controls="workspaceContent" data-workspace-tab-target="overview">Accueil</button>
+            <button id="workspaceMachineBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="machine" tabindex="-1">Machine</button>
+            <button id="workspaceModelsBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="models" tabindex="-1">Modèles</button>
+            <button id="workspaceTestsBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="tests" tabindex="-1">Tests</button>
+            <button id="workspaceAssistantBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="assistant" tabindex="-1">Assistant</button>
+            <button id="workspaceWorkflowsBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="workflows" tabindex="-1">Atelier IA</button>
+            <button id="workspaceAccountBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="account" tabindex="-1">Compte</button>
           </div>
-        </section>
+        </nav>
 
-        <article class="panel machine-panel">
+        <section id="workspaceContent" class="grid" role="tabpanel" aria-labelledby="workspaceOverviewBtn">
+        <article class="panel machine-panel" data-workspace="machine">
           <div class="panel-title">
             <h2>Machine</h2>
             <span id="machineKey">non scannée</span>
@@ -200,7 +206,7 @@
           </div>
         </article>
 
-        <article class="panel verdict-panel">
+        <article class="panel verdict-panel" data-workspace="overview machine">
           <div class="panel-title">
             <h2>Potentiel et runtime</h2>
             <span>matériel + preuve</span>
@@ -211,7 +217,7 @@
           <div id="upgradeList" class="upgrade-list"></div>
         </article>
 
-        <article class="panel buying-panel advanced-panel">
+        <article class="panel buying-panel advanced-panel" data-workspace="machine">
           <div class="panel-title">
             <h2>Achats guides</h2>
             <span id="buyingCount">0 lien</span>
@@ -219,7 +225,7 @@
           <div id="buyingList" class="buying-list empty">Les liens utiles apparaîtront après diagnostic.</div>
         </article>
 
-        <article class="panel prepare-panel">
+        <article class="panel prepare-panel" data-workspace="tests">
           <div class="panel-title">
             <h2>Prochaines étapes</h2>
             <span id="prepareState">prêt</span>
@@ -234,7 +240,7 @@
           </div>
         </article>
 
-        <article class="panel first-test-panel">
+        <article class="panel first-test-panel" data-workspace="tests">
           <div class="panel-title">
             <h2>Premier test IA locale</h2>
             <span id="firstTestState">à lancer</span>
@@ -244,7 +250,7 @@
           </div>
         </article>
 
-        <article class="panel arena-panel">
+        <article class="panel arena-panel" data-workspace="tests">
           <div class="panel-title">
             <h2>Arena locale</h2>
             <span id="arenaState">préparation</span>
@@ -257,7 +263,7 @@
           </div>
         </article>
 
-        <article class="panel private-workload-panel advanced-panel">
+        <article class="panel private-workload-panel advanced-panel" data-workspace="tests">
           <div class="panel-title">
             <h2>Tests privés</h2>
             <span id="privateWorkloadState">local uniquement</span>
@@ -293,7 +299,7 @@
           </div>
         </article>
 
-        <article class="panel strategy-bridge-panel advanced-panel">
+        <article class="panel strategy-bridge-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
             <h2>Pont Strategy Arena</h2>
             <span id="strategyBridgeState">scan requis</span>
@@ -306,7 +312,7 @@
           </div>
         </article>
 
-        <article class="panel capability-passport-panel advanced-panel">
+        <article class="panel capability-passport-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
             <h2>AI Capability Passport</h2>
             <span id="capabilityPassportState">scan requis</span>
@@ -321,7 +327,7 @@
           </div>
         </article>
 
-        <article class="panel local-capability-bridge-panel advanced-panel">
+        <article class="panel local-capability-bridge-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
             <h2>Passerelle locale</h2>
             <span id="localCapabilityBridgeState">désactivée</span>
@@ -337,7 +343,7 @@
           </div>
         </article>
 
-        <article class="panel board-observer-panel advanced-panel">
+        <article class="panel board-observer-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
             <h2>Board Observer</h2>
             <span id="boardObserverState">non configuré</span>
@@ -370,7 +376,7 @@
           </div>
         </article>
 
-        <article class="panel workstack-composer-panel advanced-panel">
+        <article class="panel workstack-composer-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
             <h2>Workstack Composer</h2>
             <span id="workstackComposerState">aucune carte</span>
@@ -409,7 +415,7 @@
           </div>
         </article>
 
-        <article class="panel capability-router-panel advanced-panel">
+        <article class="panel capability-router-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
             <h2>Capability Router</h2>
             <span id="capabilityRouterState">plan requis</span>
@@ -441,7 +447,7 @@
           </div>
         </article>
 
-        <article class="panel forgebench-panel advanced-panel">
+        <article class="panel forgebench-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
             <h2>ForgeBench Lab</h2>
             <span id="forgeBenchState">routage requis</span>
@@ -571,7 +577,7 @@
           </div>
         </article>
 
-        <article class="panel evidence-ledger-panel advanced-panel">
+        <article class="panel evidence-ledger-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
             <h2>Evidence Ledger</h2>
             <span id="evidenceLedgerState">chargement local</span>
@@ -606,7 +612,7 @@
           </div>
         </article>
 
-        <article class="panel field-test-panel advanced-panel">
+        <article class="panel field-test-panel advanced-panel" data-workspace="machine">
           <div class="panel-title">
             <h2>Test terrain</h2>
             <span id="fieldTestState">à essayer</span>
@@ -630,7 +636,7 @@
           </div>
         </article>
 
-        <article class="panel upgrade-impact-panel upgrade-digital-twin-panel advanced-panel">
+        <article class="panel upgrade-impact-panel upgrade-digital-twin-panel advanced-panel" data-workspace="machine">
           <div class="panel-title">
             <h2>Upgrade Digital Twin</h2>
             <span id="upgradeImpactState">non calculé</span>
@@ -703,7 +709,7 @@
           </div>
         </article>
 
-        <article class="panel action-panel advanced-panel">
+        <article class="panel action-panel advanced-panel" data-workspace="machine">
           <div class="panel-title">
             <h2>Plan d'action</h2>
             <span id="actionCount">0 action</span>
@@ -711,7 +717,7 @@
           <div id="actionList" class="list empty">Le diagnostic construira une séquence claire : installer, tester, upgrader.</div>
         </article>
 
-        <article class="panel decision-panel advanced-panel">
+        <article class="panel decision-panel advanced-panel" data-workspace="machine">
           <div class="panel-title">
             <h2>Pack décision</h2>
             <span id="decisionPackState">non généré</span>
@@ -724,7 +730,7 @@
           </div>
         </article>
 
-        <article class="panel models-panel advanced-panel">
+        <article class="panel models-panel advanced-panel" data-workspace="models">
           <div class="panel-title">
             <h2>Modèles compatibles</h2>
             <span id="modelCount">0 détecté</span>
@@ -732,7 +738,7 @@
           <div id="modelList" class="list empty">Aucun diagnostic OutilsIA chargé.</div>
         </article>
 
-        <article class="panel next-panel advanced-panel">
+        <article class="panel next-panel advanced-panel" data-workspace="models">
           <div class="panel-title">
             <h2>Prochains paliers</h2>
             <span id="blockedCount">0 bloqué</span>
@@ -740,7 +746,7 @@
           <div id="blockedList" class="list empty">Le diagnostic indiquera les modèles juste hors de portée.</div>
         </article>
 
-        <article class="panel new-models-panel advanced-panel">
+        <article class="panel new-models-panel advanced-panel" data-workspace="models">
           <div class="panel-title">
             <h2>Nouveaux modèles</h2>
             <span id="newModelCount">0 nouveau</span>
@@ -748,7 +754,7 @@
           <div id="newModelList" class="list empty">Les nouveaux modèles compatibles ou proches apparaîtront ici.</div>
         </article>
 
-        <article class="panel catalog-panel advanced-panel">
+        <article class="panel catalog-panel advanced-panel" data-workspace="models">
           <div class="panel-title">
             <h2>Catalogues OutilsIA</h2>
             <span id="catalogState">non chargé</span>
@@ -760,7 +766,7 @@
           </div>
         </article>
 
-        <article class="panel installed-panel advanced-panel">
+        <article class="panel installed-panel advanced-panel" data-workspace="models">
           <div class="panel-title">
             <h2>Ollama installé</h2>
             <span id="installedCount">0 modèle</span>
@@ -768,7 +774,7 @@
           <div id="installedList" class="list empty">Aucun scan local effectué.</div>
         </article>
 
-        <article class="panel commands-panel advanced-panel">
+        <article class="panel commands-panel advanced-panel" data-workspace="models">
           <div class="panel-title">
             <h2>Commandes Ollama</h2>
             <span id="commandCount">0 commande</span>
@@ -776,7 +782,7 @@
           <div id="commandList" class="list empty">Les commandes apparaîtront pour les modèles compatibles avec une référence Ollama.</div>
         </article>
 
-        <article id="operationPanel" class="panel operation-panel advanced-panel">
+        <article id="operationPanel" class="panel operation-panel advanced-panel" data-workspace="tests">
           <div class="panel-title">
             <h2>Console installation</h2>
             <span id="operationState">inactive</span>
@@ -787,7 +793,7 @@
           </div>
         </article>
 
-        <article class="panel readiness-panel">
+        <article class="panel readiness-panel" data-workspace="overview account">
           <div class="panel-title">
             <h2>Rapport machine prête</h2>
             <span id="readinessState">non généré</span>
@@ -805,7 +811,7 @@
           </div>
         </article>
 
-        <article class="panel benchmark-panel">
+        <article class="panel benchmark-panel" data-workspace="tests">
           <div class="panel-title">
             <h2>Benchmark Ollama</h2>
             <button id="benchmarkBtn" type="button">Tester</button>
@@ -828,7 +834,7 @@
           </div>
         </article>
 
-        <article class="panel model-autopilot-panel advanced-panel">
+        <article class="panel model-autopilot-panel advanced-panel" data-workspace="tests">
           <div class="panel-title">
             <h2>Model Autopilot</h2>
             <span id="modelAutopilotState">modèle installé requis</span>
@@ -846,7 +852,7 @@
           </div>
         </article>
 
-        <article class="panel flight-recorder-panel advanced-panel">
+        <article class="panel flight-recorder-panel advanced-panel" data-workspace="tests">
           <div class="panel-title">
             <h2>Flight Recorder</h2>
             <span id="flightRecorderState">benchmark requis</span>
@@ -863,7 +869,7 @@
           </div>
         </article>
 
-        <article class="panel promptforge-panel">
+        <article class="panel promptforge-panel" data-workspace="assistant">
           <div class="panel-title">
             <h2>PromptForge local</h2>
             <span id="promptForgeState">prêt</span>
@@ -883,7 +889,7 @@
           </div>
         </article>
 
-        <article class="panel prompt-library-panel advanced-panel">
+        <article class="panel prompt-library-panel advanced-panel" data-workspace="assistant">
           <div class="panel-title">
             <h2>Mes prompts</h2>
             <span id="promptLibraryState">0 prompt</span>
@@ -895,7 +901,7 @@
           </div>
         </article>
 
-        <article class="panel chat-panel">
+        <article class="panel chat-panel" data-workspace="assistant">
           <div class="panel-title">
             <h2>Dialogue local</h2>
             <button id="chatSendBtn" type="button">Envoyer</button>
@@ -923,7 +929,7 @@
           </div>
         </article>
 
-        <article class="panel benchmark-history-panel advanced-panel">
+        <article class="panel benchmark-history-panel advanced-panel" data-workspace="tests">
           <div class="panel-title">
             <h2>Historique benchmarks</h2>
             <span id="benchmarkHistoryState">0 test</span>
@@ -935,7 +941,7 @@
           </div>
         </article>
 
-        <article class="panel account-panel advanced-panel">
+        <article class="panel account-panel advanced-panel" data-workspace="account">
           <div class="panel-title">
             <h2>Compte OutilsIA</h2>
             <span id="syncState">non connecté</span>
@@ -957,7 +963,7 @@
           <div id="updatesList" class="list empty">Connecte ton compte pour retrouver tes machines.</div>
         </article>
 
-        <article class="panel feedback-panel advanced-panel">
+        <article class="panel feedback-panel advanced-panel" data-workspace="account">
           <div class="panel-title">
           <h2>Retour test</h2>
             <span id="feedbackState">non envoyé</span>
@@ -979,7 +985,7 @@
           <div id="feedbackResult" class="sync-result">Connecte le compte pour envoyer un retour lié au scan visible dans l'app.</div>
         </article>
 
-        <article class="panel history-panel advanced-panel">
+        <article class="panel history-panel advanced-panel" data-workspace="account">
           <div class="panel-title">
             <h2>Historique local</h2>
             <div class="row-actions compact-actions">
@@ -991,7 +997,7 @@
           <div id="historyList" class="list empty">Aucun diagnostic sauvegardé.</div>
         </article>
 
-        <article class="panel memory-panel advanced-panel">
+        <article class="panel memory-panel advanced-panel" data-workspace="assistant">
           <div class="panel-title">
             <h2>MemoryForge / Obsidian</h2>
             <button id="memoryBtn" type="button" disabled>Générer</button>
@@ -1005,6 +1011,7 @@
             <button id="openVaultBtn" type="button" disabled>Ouvrir dossier</button>
           </div>
         </article>
+        </section>
       </section>
     </main>
     <div id="printReportRoot" class="print-report-root" aria-hidden="true"></div>

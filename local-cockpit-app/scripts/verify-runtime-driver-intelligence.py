@@ -14,7 +14,7 @@ def main():
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1366, "height": 1000})
         page.goto(HTML.as_uri(), wait_until="load")
-        page.evaluate("() => window.__OUTILSIA_TEST__.setViewMode('advanced')")
+        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('machine')")
         result = page.evaluate("() => window.__OUTILSIA_TEST__.applyRuntimeDriverIntelligenceState()")
         details = page.locator(".runtime-driver-details")
         assert details.is_visible()
@@ -22,7 +22,7 @@ def main():
         page.locator("#hardwareDoctorBox").screenshot(
             path=str(ARTIFACTS / "runtime-driver-intelligence-desktop.png")
         )
-        page.evaluate("() => window.__OUTILSIA_TEST__.setViewMode('essential')")
+        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('overview')")
         assert not details.is_visible()
         browser.close()
 

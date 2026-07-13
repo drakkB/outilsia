@@ -41,6 +41,11 @@ if (missingIds.length || missingCommands.length) {
 }
 
 const requiredFeatureText = [
+  ["html workspace navigation", html, "data-workspace-tab-target=\"overview\""],
+  ["html workspace ownership", html, "data-workspace=\"workflows\""],
+  ["js workspace routing", js, "setWorkspaceTab"],
+  ["js workspace persistence", js, "WORKSPACE_TAB_STORAGE_KEY"],
+  ["css workspace isolation", readFileSync(resolve(root, "src/styles.css"), "utf8"), "data-workspace-tab=\"workflows\""],
   ["html runtime driver matrix", html, "runtime-driver-matrix.js"],
   ["generated runtime driver matrix schema", runtimeDriverMatrix, "outilsia.runtime_driver_matrix.v1"],
   ["js runtime driver intelligence schema", js, "outilsia.runtime_driver_intelligence.v1"],

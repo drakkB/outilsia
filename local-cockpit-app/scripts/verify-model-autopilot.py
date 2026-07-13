@@ -64,7 +64,7 @@ def main():
         page.goto(HTML.as_uri(), wait_until="load")
         panel = page.locator(".model-autopilot-panel")
         assert not panel.is_visible()
-        page.evaluate("() => window.__OUTILSIA_TEST__.setViewMode('advanced')")
+        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('tests')")
         result = page.evaluate("() => window.__OUTILSIA_TEST__.applyModelAutopilotState()")
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         assert panel.is_visible()

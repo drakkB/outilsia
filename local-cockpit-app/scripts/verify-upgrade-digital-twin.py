@@ -79,7 +79,7 @@ def main():
         page.goto(HTML.as_uri(), wait_until="load")
         panel = page.locator(".upgrade-digital-twin-panel")
         assert not panel.is_visible()
-        page.evaluate("() => window.__OUTILSIA_TEST__.setViewMode('advanced')")
+        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('machine')")
         result = page.evaluate("() => window.__OUTILSIA_TEST__.applyUpgradeDigitalTwinState()")
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         assert panel.is_visible()

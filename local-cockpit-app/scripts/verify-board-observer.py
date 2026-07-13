@@ -15,7 +15,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     page.goto(HTML.as_uri(), wait_until="load")
-    page.locator("#viewAdvancedBtn").click()
+    page.locator("#workspaceWorkflowsBtn").click()
     proof = page.evaluate("() => window.__OUTILSIA_TEST__.applyBoardObserverState()")
     panel = page.locator(".board-observer-panel")
     panel.scroll_into_view_if_needed()

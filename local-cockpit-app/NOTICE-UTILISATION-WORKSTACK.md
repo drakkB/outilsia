@@ -1,7 +1,23 @@
 # Notice d'utilisation - Workstacks et preuves OutilsIA
 
 Version de la notice : 2026-07-13
-Périmètre : OutilsIA Local Cockpit, mode **Détails**
+Périmètre : OutilsIA Local Cockpit, espace **Atelier IA**
+
+## Navigation du cockpit
+
+L'application conserve le matériel détecté en tête de fenêtre, puis répartit le travail dans sept espaces. Changer d'espace ne relance aucune opération et ne vide aucun formulaire.
+
+| Espace | Usage principal |
+|---|---|
+| Accueil | Lire le verdict, le modèle conseillé, la preuve locale et la prochaine action. |
+| Machine | Examiner Hardware Doctor, le runtime, les upgrades, le Digital Twin et la fiche terrain. |
+| Modèles | Voir les modèles compatibles ou installés, le catalogue et les commandes Ollama. |
+| Tests | Lancer benchmark, Arena, tests privés, Autopilot, Flight Recorder et consulter la console technique. |
+| Assistant | Dialoguer localement, optimiser les prompts et conserver MemoryForge. |
+| Atelier IA | Préparer les Workstacks, router les capacités, exécuter ForgeBench et chaîner les preuves. |
+| Compte | Synchroniser, partager, signaler un problème, vérifier la release et retrouver l'historique. |
+
+Les actions transversales ouvrent automatiquement l'espace correspondant. Par exemple, **Bench** ouvre Tests, **Dialogue** ouvre Assistant et **Préparer** depuis Board Observer ouvre Atelier IA.
 
 ## Rôle de chaque module
 
@@ -18,7 +34,7 @@ Périmètre : OutilsIA Local Cockpit, mode **Détails**
 
 ## Parcours disponible aujourd'hui
 
-1. Passer l'application en mode **Détails**.
+1. Ouvrir l'espace **Atelier IA**.
 2. Dans **Board Observer**, renseigner l'URL HTTPS de Planka, l'identifiant du board et une clé API éphémère.
 3. Cliquer sur **Observer**. La clé est effacée du formulaire après la lecture.
 4. Sur une carte `Ready for Agent`, cliquer sur **Préparer**.

@@ -29,7 +29,7 @@ def main():
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 960})
         page.goto(HTML.as_uri(), wait_until="load")
-        page.evaluate("() => window.__OUTILSIA_TEST__.setViewMode('advanced')")
+        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('models')")
         result = page.evaluate("() => window.__OUTILSIA_TEST__.applyInstallSafetyPreflightState()")
 
         ARTIFACTS.mkdir(parents=True, exist_ok=True)

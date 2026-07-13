@@ -15,7 +15,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     page.goto(HTML.as_uri(), wait_until="load")
-    page.locator("#viewAdvancedBtn").click()
+    page.locator("#workspaceWorkflowsBtn").click()
     page.evaluate("() => window.__OUTILSIA_TEST__.applyBoardObserverState()")
     page.locator('[data-compose-board-card="planka:card-ready-1"]').click()
     if "Construire Signal Maze v1" not in page.locator("#workstackSelectedCard").inner_text():

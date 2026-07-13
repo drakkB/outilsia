@@ -336,9 +336,10 @@ const els = {
   appShell: $("appShell"),
   quickDecisionStrip: document.querySelector(".quick-decision-strip"),
   quickMomentCell: document.querySelector(".quick-moment-cell"),
-  viewModeTitle: $("viewModeTitle"),
-  viewEssentialBtn: $("viewEssentialBtn"),
-  viewAdvancedBtn: $("viewAdvancedBtn"),
+  workspaceNav: document.querySelector(".workspace-nav"),
+  workspaceContent: $("workspaceContent"),
+  workspaceTitle: $("workspaceTitle"),
+  workspaceTabButtons: [...document.querySelectorAll("[data-workspace-tab-target]")],
   prepareBtn: $("prepareBtn"),
   preparePanelBtn: $("preparePanelBtn"),
   oldPortablePresetBtn: $("oldPortablePresetBtn"),
@@ -681,6 +682,17 @@ let evidenceLedgerError = "";
 const privateWorkloadSelections = new Set();
 let recipeAutoSaveTimer = null;
 const UI_MODE_STORAGE_KEY = "outilsia-local-cockpit-ui-mode";
+const WORKSPACE_TAB_STORAGE_KEY = "outilsia-local-cockpit-workspace-tab";
+const WORKSPACE_TABS = ["overview", "machine", "models", "tests", "assistant", "workflows", "account"];
+const WORKSPACE_TITLES = {
+  overview: "Accueil",
+  machine: "Machine",
+  models: "Modèles",
+  tests: "Tests",
+  assistant: "Assistant",
+  workflows: "Atelier IA",
+  account: "Compte"
+};
 const readinessProof = {
   copied: false,
   savedAccount: false,
@@ -692,38 +704,67 @@ function setStatus(text, kind = "") {
   els.statusText.className = kind;
 }
 
-function setViewMode(mode = "essential") {
-  const normalized = mode === "advanced" ? "advanced" : "essential";
-  els.appShell?.classList.toggle("mode-essential", normalized === "essential");
-  els.appShell?.classList.toggle("mode-advanced", normalized === "advanced");
-  if (els.viewModeTitle) els.viewModeTitle.textContent = normalized === "advanced" ? "Détails" : "Essentiel";
-  if (els.viewEssentialBtn) els.viewEssentialBtn.setAttribute("aria-pressed", String(normalized === "essential"));
-  if (els.viewAdvancedBtn) els.viewAdvancedBtn.setAttribute("aria-pressed", String(normalized === "advanced"));
-  try {
-    localStorage.setItem(UI_MODE_STORAGE_KEY, normalized);
-  } catch (_) {
-    // LocalStorage can be unavailable in strict WebView contexts; the UI still works for the session.
+function setWorkspaceTab(tab = "overview", { persist = true, focusContent = false } = {}) {
+  const normalized = WORKSPACE_TABS.includes(tab) ? tab : "overview";
+  const essential = normalized === "overview";
+  els.appShell?.classList.toggle("mode-essential", essential);
+  els.appShell?.classList.toggle("mode-advanced", !essential);
+  if (els.appShell) els.appShell.dataset.workspaceTab = normalized;
+  if (els.workspaceTitle) els.workspaceTitle.textContent = WORKSPACE_TITLES[normalized];
+  for (const button of els.workspaceTabButtons) {
+    const selected = button.dataset.workspaceTabTarget === normalized;
+    button.setAttribute("aria-selected", String(selected));
+    button.tabIndex = selected ? 0 : -1;
   }
+  const activeButton = els.workspaceTabButtons.find((button) => button.dataset.workspaceTabTarget === normalized);
+  if (els.workspaceContent && activeButton) {
+    els.workspaceContent.setAttribute("aria-labelledby", activeButton.id);
+  }
+  if (persist) {
+    try {
+      localStorage.setItem(WORKSPACE_TAB_STORAGE_KEY, normalized);
+      localStorage.setItem(UI_MODE_STORAGE_KEY, essential ? "essential" : "advanced");
+    } catch (_) {
+      // LocalStorage can be unavailable in strict WebView contexts; the UI still works for the session.
+    }
+  }
+  if (focusContent) {
+    window.requestAnimationFrame(() => els.workspaceNav?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+  return normalized;
 }
 
-function restoreViewMode() {
-  let saved = "essential";
+// Kept for older test harnesses and stored preferences from pre-tab releases.
+function setViewMode(mode = "essential") {
+  return setWorkspaceTab(mode === "advanced" ? "models" : "overview");
+}
+
+function restoreWorkspaceTab() {
+  let saved = "";
   try {
-    saved = localStorage.getItem(UI_MODE_STORAGE_KEY) || "essential";
+    saved = localStorage.getItem(WORKSPACE_TAB_STORAGE_KEY) || "";
+    if (!WORKSPACE_TABS.includes(saved)) {
+      saved = localStorage.getItem(UI_MODE_STORAGE_KEY) === "advanced" ? "models" : "overview";
+    }
   } catch (_) {
-    saved = "essential";
+    saved = "overview";
   }
-  setViewMode(saved);
+  setWorkspaceTab(saved || "overview", { persist: false });
+}
+
+function revealWorkspacePanel(tab, panel, block = "center") {
+  setWorkspaceTab(tab);
+  window.requestAnimationFrame(() => panel?.scrollIntoView({ behavior: "smooth", block }));
 }
 
 function revealOperationConsole() {
   if (!els.operationPanel) return;
-  setViewMode("advanced");
+  setWorkspaceTab("tests");
   els.operationPanel.classList.add("operation-active");
   if (!operationLive) {
     window.setTimeout(() => els.operationPanel?.classList.remove("operation-active"), 1800);
   }
-  els.operationPanel.scrollIntoView({ behavior: "smooth", block: "center" });
+  window.requestAnimationFrame(() => els.operationPanel?.scrollIntoView({ behavior: "smooth", block: "center" }));
 }
 
 function revealOperationMonitor() {
@@ -6410,9 +6451,9 @@ function premiumReportHtml(report = readinessReport()) {
     report.promptForge ? `PromptForge : ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100` : "PromptForge non utilisé",
     report.arena?.compromise ? `Arena : ${readinessArenaLabel(report)}` : "Arena locale à comparer",
     recommendation?.winner ? `Recommendation Engine : ${recommendation.verdict} (${recommendation.winner.score}/100)` : "Recommendation Engine v2 à lancer",
-    privateWorkload?.winner ? `Tests privés : ${privateWorkload.winner.model} (${privateWorkload.winner.score}/100 · ${privateWorkload.pack})` : "Tests privés à lancer dans Détails",
+    privateWorkload?.winner ? `Tests privés : ${privateWorkload.winner.model} (${privateWorkload.winner.score}/100 · ${privateWorkload.pack})` : "Tests privés à lancer dans l'espace Tests",
     flightRecorder?.comparison ? `Flight Recorder : ${flightRecorder.comparison.headline} · confiance ${flightRecorder.comparison.confidence}` : "Flight Recorder : aucune référence locale",
-    report.capability_passport ? `Capability Passport : SHA-256 ${report.capability_passport.digest}` : "AI Capability Passport à générer dans Détails",
+    report.capability_passport ? `Capability Passport : SHA-256 ${report.capability_passport.digest}` : "AI Capability Passport à générer dans Atelier IA",
     report.local_capability_bridge?.running ? "Passerelle locale : active sur 127.0.0.1 · lecture seule" : "Passerelle locale : désactivée par défaut",
     report.install_safety_preflight ? `Préflight installation : ${report.install_safety_preflight.model} · ${report.install_safety_preflight.verdict}` : "Préflight installation : non lancé",
     model.ref ? `Modèle suivant : ${model.ref}` : "Modèle suivant à déterminer"
@@ -6604,7 +6645,7 @@ function premiumReportHtml(report = readinessReport()) {
         <div class="pdf-card pdf-card-wide">
           <span>Upgrade Digital Twin</span>
           <strong>${escapeHtml(upgradeDigitalTwin?.decision?.label || "Scénario à calculer")}</strong>
-          <p>${escapeHtml(upgradeDigitalTwin ? `Cible ${upgradeDigitalTwin.target.gpu} · ${knownNumberLabel(upgradeDigitalTwin.target.ram_gb, " Go RAM")} · pré-évaluation ${upgradeDigitalTwin.compatibility.status} · confiance ${upgradeDigitalTwin.compatibility.confidence}.` : "Le laboratoire Détails simule GPU, RAM, stockage, alimentation et boîtier sans modifier la machine.")}</p>
+          <p>${escapeHtml(upgradeDigitalTwin ? `Cible ${upgradeDigitalTwin.target.gpu} · ${knownNumberLabel(upgradeDigitalTwin.target.ram_gb, " Go RAM")} · pré-évaluation ${upgradeDigitalTwin.compatibility.status} · confiance ${upgradeDigitalTwin.compatibility.confidence}.` : "L'espace Machine simule GPU, RAM, stockage, alimentation et boîtier sans modifier la machine.")}</p>
           <p>${escapeHtml(upgradeDigitalTwin ? `Budget indicatif non temps réel : ${upgradeDigitalTwin.cost.min}-${upgradeDigitalTwin.cost.max} ${upgradeDigitalTwin.cost.currency} · estimation ${upgradeDigitalTwin.cost.as_of} · ${upgradeDigitalTwin.compatibility.unknown_count} inconnue(s) · ${upgradeDigitalTwin.compatibility.blocked_count} blocage(s).` : "Aucun budget ne doit être utilisé avant vérification des inconnues physiques.")}</p>
           <p>Simulation locale uniquement : aucune preuve terrain physique et aucun achat automatique.</p>
         </div>
@@ -7133,11 +7174,11 @@ function renderReadinessPanel() {
       <span>${report.arena?.compromise ? `Arena : rapide ${escapeHtml(report.arena.fastest || "n/a")} · assistant ${escapeHtml(report.arena.assistant || "n/a")} · compromis ${escapeHtml(report.arena.compromise)} (${escapeHtml(report.arena.compromise_score)}/100)` : "Arena locale non encore lancée."}</span>
       <span>${report.recommendation_engine?.winner ? `Recommandation mesurée : ${escapeHtml(report.recommendation_engine.verdict)} · ${escapeHtml(report.recommendation_engine.winner.score)}/100 · confiance ${escapeHtml(report.recommendation_engine.confidence)}` : "Recommendation Engine v2 non encore lancé."}</span>
       ${report.private_workload_pack?.winner ? `<span>Test privé : ${escapeHtml(report.private_workload_pack.winner.model)} · ${escapeHtml(report.private_workload_pack.winner.score)}/100 · pack ${escapeHtml(report.private_workload_pack.pack)} · contenu brut non conservé.</span>` : ""}
-      <span>${report.model_autopilot?.active ? `Profil Ollama : ${escapeHtml(report.model_autopilot.active.label)} · ${escapeHtml(modelAutopilotTuningLabel(report.model_autopilot.active.tuning))}` : report.model_autopilot?.recommended ? `Autopilot : ${escapeHtml(report.model_autopilot.recommended.label)} recommandé, à appliquer dans Détails.` : "Model Autopilot non encore mesuré."}</span>
+      <span>${report.model_autopilot?.active ? `Profil Ollama : ${escapeHtml(report.model_autopilot.active.label)} · ${escapeHtml(modelAutopilotTuningLabel(report.model_autopilot.active.tuning))}` : report.model_autopilot?.recommended ? `Autopilot : ${escapeHtml(report.model_autopilot.recommended.label)} recommandé, à appliquer dans Tests.` : "Model Autopilot non encore mesuré."}</span>
       <span>${report.flight_recorder?.comparison ? `Flight Recorder : ${escapeHtml(report.flight_recorder.comparison.headline)} · confiance ${escapeHtml(report.flight_recorder.comparison.confidence)}` : "Flight Recorder : aucune référence locale."}</span>
       <span>${report.upgrade_digital_twin ? `Upgrade Digital Twin : ${escapeHtml(report.upgrade_digital_twin.decision.label)} · ${escapeHtml(report.upgrade_digital_twin.compatibility.status)} · confiance ${escapeHtml(report.upgrade_digital_twin.compatibility.confidence)}` : "Upgrade Digital Twin : aucun scénario calculé."}</span>
-      <span>${report.capability_passport ? `Passport : SHA-256 ${escapeHtml(`${report.capability_passport.digest.slice(0, 16)}…`)}` : "AI Capability Passport disponible dans Détails après génération."}</span>
-      <span>${report.local_capability_bridge?.running ? `Passerelle locale : active sur 127.0.0.1 · lecture seule · expiration automatique.` : "Passerelle locale : désactivée par défaut dans Détails."}</span>
+      <span>${report.capability_passport ? `Passport : SHA-256 ${escapeHtml(`${report.capability_passport.digest.slice(0, 16)}…`)}` : "AI Capability Passport disponible dans Atelier IA après génération."}</span>
+      <span>${report.local_capability_bridge?.running ? `Passerelle locale : active sur 127.0.0.1 · lecture seule · expiration automatique.` : "Passerelle locale : désactivée par défaut dans Atelier IA."}</span>
       ${report.install_safety_preflight ? `<span>Préflight installation : ${escapeHtml(report.install_safety_preflight.model)} · ${escapeHtml(report.install_safety_preflight.verdict)} · ${report.install_safety_preflight.storage_free_gb == null ? "espace inconnu" : `${escapeHtml(report.install_safety_preflight.storage_free_gb)} Go libres`} · aucun chemin exporté.</span>` : ""}
       <span>${report.upgrades[0] ? `Upgrade utile : ${escapeHtml(report.upgrades[0].title)}` : "Aucun achat prioritaire pour l'instant."}</span>
       <span>${report.account_ready ? "Compte prêt : rapport partageable disponible après synchronisation." : "Connecte le compte pour sauvegarder et partager ce rapport."}</span>
@@ -7775,11 +7816,13 @@ function usePromptLibraryItem(id, target) {
   if (target === "chat") {
     els.chatPromptInput.value = item.optimized;
     els.chatModelInput.value = item.model || els.chatModelInput.value;
+    revealWorkspacePanel("assistant", els.chatPanel);
     setStatus("Prompt envoyé vers Dialogue", "ok");
     return;
   }
   els.benchmarkPromptInput.value = item.optimized;
   els.benchmarkModelInput.value = item.model || els.benchmarkModelInput.value;
+  revealWorkspacePanel("tests", els.benchmarkPanel);
   setStatus("Prompt envoyé vers Benchmark", "ok");
 }
 
@@ -7823,12 +7866,14 @@ function usePromptForge(target) {
   }
   if (target === "chat") {
     els.chatPromptInput.value = result.optimized;
-    els.chatPromptInput.focus();
+    revealWorkspacePanel("assistant", els.chatPanel);
+    window.requestAnimationFrame(() => els.chatPromptInput.focus());
     setStatus("Prompt optimisé envoyé vers Dialogue local", "ok");
     return;
   }
   els.benchmarkPromptInput.value = result.optimized;
-  els.benchmarkPromptInput.focus();
+  revealWorkspacePanel("tests", els.benchmarkPanel);
+  window.requestAnimationFrame(() => els.benchmarkPromptInput.focus());
   setStatus("Prompt optimisé envoyé vers Benchmark", "ok");
 }
 
@@ -10597,7 +10642,7 @@ function selectWorkstackCard(sourceKey) {
   workstackComposerError = "";
   if (els.workstackLocalContext) els.workstackLocalContext.value = "";
   renderWorkstackComposerPanel();
-  els.workstackComposerBox?.scrollIntoView({ behavior: "smooth", block: "center" });
+  revealWorkspacePanel("workflows", els.workstackComposerBox);
   setStatus(`Carte préparée : ${card.name || sourceKey}`, "ok");
 }
 
@@ -16769,6 +16814,7 @@ function installTestHarness() {
     modelInstallSizeBudget,
     evaluateInstallSafetyPreflight,
     installSafetyPreflightSummary,
+    setWorkspaceTab,
     setViewMode,
     defaultOllamaRuntime,
     ollamaRuntimePayload,
@@ -18558,8 +18604,22 @@ function demoDesktopUpdates() {
 els.prepareBtn.addEventListener("click", handlePrimaryAction);
 els.stickyActionBtn?.addEventListener("click", handlePrimaryAction);
 els.quickActionBtn?.addEventListener("click", handlePrimaryAction);
-if (els.viewEssentialBtn) els.viewEssentialBtn.addEventListener("click", () => setViewMode("essential"));
-if (els.viewAdvancedBtn) els.viewAdvancedBtn.addEventListener("click", () => setViewMode("advanced"));
+for (const button of els.workspaceTabButtons) {
+  button.addEventListener("click", () => setWorkspaceTab(button.dataset.workspaceTabTarget));
+  button.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const current = els.workspaceTabButtons.indexOf(button);
+    const next = event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? els.workspaceTabButtons.length - 1
+        : (current + (event.key === "ArrowRight" ? 1 : -1) + els.workspaceTabButtons.length) % els.workspaceTabButtons.length;
+    const target = els.workspaceTabButtons[next];
+    setWorkspaceTab(target.dataset.workspaceTabTarget);
+    target.focus();
+  });
+}
 els.preparePanelBtn.addEventListener("click", prepareLocalAiFlow);
 els.oldPortablePresetBtn?.addEventListener("click", applyOldPortablePreset);
 els.scanBtn.addEventListener("click", scanMachine);
@@ -18872,7 +18932,8 @@ document.addEventListener("click", async (event) => {
   const feedbackMachineId = Number(event.target?.getAttribute?.("data-feedback-machine") || 0);
   if (feedbackMachineId) {
     lastSyncedMachineId = feedbackMachineId;
-    els.feedbackMessage.focus();
+    revealWorkspacePanel("account", els.feedbackMessage);
+    window.requestAnimationFrame(() => els.feedbackMessage.focus());
     els.feedbackResult.textContent = `Feedback lié à la machine #${feedbackMachineId}. Décris ce qui est faux puis clique sur Envoyer feedback.`;
     setStatus("Feedback machine prêt", "ok");
     return;
@@ -18934,6 +18995,7 @@ document.addEventListener("click", async (event) => {
     const model = ollamaActionRef(cpuRetryModel);
     els.benchmarkModelInput.value = model;
     els.chatModelInput.value = model;
+    revealWorkspacePanel("tests", els.benchmarkPanel);
     await runBenchmark({ source: "cuda-fallback", forceCpu: true });
     return;
   }
@@ -18945,7 +19007,8 @@ document.addEventListener("click", async (event) => {
     if (!els.chatPromptInput.value.trim() || /Explique simplement ce que/.test(els.chatPromptInput.value)) {
       els.chatPromptInput.value = chatPresetPrompt("assistant", model);
     }
-    els.chatPromptInput.focus();
+    revealWorkspacePanel("assistant", els.chatPanel);
+    window.requestAnimationFrame(() => els.chatPromptInput.focus());
     setStatus(`Dialogue prêt avec ${model}`, "ok");
     return;
   }
@@ -18955,6 +19018,7 @@ document.addEventListener("click", async (event) => {
     const model = ollamaActionRef(postInstallArenaModel);
     els.benchmarkModelInput.value = model;
     els.chatModelInput.value = model;
+    revealWorkspacePanel("tests", document.querySelector(".arena-panel"));
     if (arenaInstalledCandidates().length >= 2) {
       await runAutomaticArena();
     } else {
@@ -18973,6 +19037,7 @@ document.addEventListener("click", async (event) => {
   const upgradeSimTarget = upgradeSimButton?.getAttribute?.("data-upgrade-sim-target");
   if (upgradeSimTarget) {
     setUpgradeSimTarget(upgradeSimTarget);
+    revealWorkspacePanel("machine", els.upgradeImpactBox);
     return;
   }
   const modelInfoButton = event.target?.closest?.("[data-model-info]");
@@ -19010,7 +19075,8 @@ document.addEventListener("click", async (event) => {
   if (chatModelRef) {
     const model = ollamaActionRef(chatModelRef);
     els.chatModelInput.value = model;
-    els.chatPromptInput.focus();
+    revealWorkspacePanel("assistant", els.chatPanel);
+    window.requestAnimationFrame(() => els.chatPromptInput.focus());
     setStatus(`Dialogue prêt avec ${model}`, "ok");
     return;
   }
@@ -19040,7 +19106,8 @@ document.addEventListener("click", async (event) => {
   if (focusFeedbackButton) {
     els.feedbackCategory.value = "benchmark";
     els.feedbackMessage.value = `Résultat benchmark à vérifier :\n\n${firstTestReportText()}`;
-    els.feedbackMessage.focus();
+    revealWorkspacePanel("account", els.feedbackMessage);
+    window.requestAnimationFrame(() => els.feedbackMessage.focus());
     setStatus("Feedback benchmark prêt", "ok");
     return;
   }
@@ -19067,6 +19134,7 @@ document.addEventListener("click", async (event) => {
     const model = ollamaActionRef(runModel);
     els.benchmarkModelInput.value = model;
     els.chatModelInput.value = model;
+    revealWorkspacePanel("tests", els.benchmarkPanel);
     setStatus(`Test court ${model}...`);
     await runBenchmark({ source: "model-card" });
     return;
@@ -19077,6 +19145,7 @@ document.addEventListener("click", async (event) => {
     const model = ollamaActionRef(benchmarkModel);
     els.benchmarkModelInput.value = model;
     els.chatModelInput.value = model;
+    revealWorkspacePanel("tests", els.benchmarkPanel);
     setStatus(`Test court ${model}...`);
     await runBenchmark({ source: "arena" });
     return;
@@ -19087,7 +19156,7 @@ if (!invoke) {
   setStatus("Mode navigateur démo: lance l'app Tauri pour scanner le PC", "warn");
 }
 
-restoreViewMode();
+restoreWorkspaceTab();
 loadHistory();
 renderBenchmarkHistory();
 renderModelAutopilot();

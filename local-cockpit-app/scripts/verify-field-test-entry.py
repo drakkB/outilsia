@@ -48,7 +48,7 @@ def main():
         page = browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(HTML.as_uri(), wait_until="load")
         page.evaluate("""() => localStorage.clear()""")
-        page.evaluate("""() => window.__OUTILSIA_TEST__.setViewMode('advanced')""")
+        page.evaluate("""() => window.__OUTILSIA_TEST__.setWorkspaceTab('machine')""")
         disabled_before = page.locator("#copyFieldTestJsonBtn").is_disabled(timeout=5000)
         page.evaluate("""() => window.__OUTILSIA_TEST__.applyDemoState()""")
         entry = page.evaluate("""() => window.__OUTILSIA_TEST__.fieldTestEntry()""")

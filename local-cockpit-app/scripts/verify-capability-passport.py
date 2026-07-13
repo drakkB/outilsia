@@ -16,7 +16,7 @@ def main():
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(HTML.as_uri(), wait_until="load")
-        page.evaluate("() => window.__OUTILSIA_TEST__.setViewMode('advanced')")
+        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('workflows')")
         result = page.evaluate("() => window.__OUTILSIA_TEST__.applyCapabilityPassportState()")
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         panel = page.locator(".capability-passport-panel")

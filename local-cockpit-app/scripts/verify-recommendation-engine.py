@@ -41,7 +41,7 @@ def main():
         rendered = page.evaluate(
             "() => window.__OUTILSIA_TEST__.applyRecommendationEngineState('code')"
         )
-        page.evaluate("() => window.__OUTILSIA_TEST__.setViewMode('advanced')")
+        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('tests')")
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         engine = page.locator(".recommendation-engine-card")
         engine.screenshot(path=str(ARTIFACTS / "recommendation-engine-desktop.png"))

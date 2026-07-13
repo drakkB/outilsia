@@ -56,7 +56,7 @@ def main():
         page.goto(HTML.as_uri(), wait_until="load")
         panel = page.locator(".flight-recorder-panel")
         assert not panel.is_visible()
-        page.evaluate("() => window.__OUTILSIA_TEST__.setViewMode('advanced')")
+        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('tests')")
         result = page.evaluate("() => window.__OUTILSIA_TEST__.applyFlightRecorderState()")
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         assert panel.is_visible()
