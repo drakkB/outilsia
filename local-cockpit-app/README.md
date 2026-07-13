@@ -4,7 +4,9 @@ Application desktop Tauri pour scanner une machine, detecter Ollama et estimer q
 
 ## Navigation
 
-Le cockpit est séparé en sept espaces persistants : **Accueil**, **Machine**, **Modèles**, **Tests**, **Assistant**, **Atelier IA** et **Compte**. Le résumé matériel reste visible en tête, les actions ouvrent automatiquement l'espace pertinent, le menu **Section** atteint les modules longs et les saisies sont conservées lors d'un changement d'onglet.
+Le cockpit est séparé en sept espaces persistants : **Accueil**, **Machine**, **Modèles**, **Tests**, **Assistant**, **Atelier IA** et **Compte**. Le résumé matériel reste visible en tête, les actions ouvrent automatiquement l'espace et le module pertinents, et les saisies sont conservées lors d'un changement d'onglet. Le menu **Section** n'affiche qu'un module à la fois par défaut ; les flèches passent au précédent ou au suivant et **Toutes les sections** restaure la vue complète.
+
+Les modèles Hermes restent distingués par leur référence exacte : `hermes3:8b` est le modèle assistant léger, tandis que `nous-hermes2-mixtral:8x7b` correspond à un artefact Ollama Q4 de 26 Go. Sur une carte 16 Go, ce dernier est présenté comme un test long avec offload RAM, jamais comme un modèle rapide de 14 Go. Le runtime affiché suit l'emplacement réel des modèles (Ollama natif, WSL ou mixte), pas la seule présence d'un client Windows.
 
 Vérification dédiée desktop, mobile et clavier :
 

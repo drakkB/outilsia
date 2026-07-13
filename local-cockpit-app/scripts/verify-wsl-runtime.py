@@ -98,6 +98,7 @@ def main():
             },
         )
         dual_runtime = page.evaluate("""() => window.__OUTILSIA_TEST__.applyDualRuntimeWslModelState()""")
+        rtx_4080_wsl = page.evaluate("""() => window.__OUTILSIA_TEST__.applyRtx4080WslModelState()""")
         browser.close()
 
     if not hidden_in_essential:
@@ -129,6 +130,20 @@ def main():
         raise AssertionError(f"qwen WSL command mismatch: {dual_runtime}")
     if dual_runtime.get("hermesRuntime") != "native" or dual_runtime.get("hermesPayload") != {}:
         raise AssertionError(f"hermes native runtime mismatch: {dual_runtime}")
+    if dual_runtime.get("runtimeLabel") != "Ollama Windows + WSL":
+        raise AssertionError(f"mixed model stores need an explicit runtime label: {dual_runtime}")
+    if rtx_4080_wsl.get("runtimeLabel") != "Ollama WSL · Windows prêt":
+        raise AssertionError(f"WSL-only model store should not be labeled Ollama Windows: {rtx_4080_wsl}")
+    if rtx_4080_wsl.get("fieldClass") != "Très bon PC IA locale" or "16 Go VRAM" not in rtx_4080_wsl.get("fieldVerdict", ""):
+        raise AssertionError(f"RTX 4080 field verdict must use the detected 16 GB: {rtx_4080_wsl}")
+    if rtx_4080_wsl.get("hermesRuntime") != "wsl" or rtx_4080_wsl.get("mixtralRuntime") != "wsl":
+        raise AssertionError(f"WSL model actions must stay in WSL: {rtx_4080_wsl}")
+    if rtx_4080_wsl.get("mixtralTimeout") < 120:
+        raise AssertionError(f"26 GB Mixtral on 16 GB VRAM needs an extended benchmark: {rtx_4080_wsl}")
+    if "26 Go" not in rtx_4080_wsl.get("mixtralSize", ""):
+        raise AssertionError(f"Mixtral size label must expose the real Q4 artifact size: {rtx_4080_wsl}")
+    if rtx_4080_wsl.get("mixtralBudget", {}).get("estimated_download_gb") != 26:
+        raise AssertionError(f"Mixtral install budget must use 26 GB: {rtx_4080_wsl}")
 
     print(
         "wsl_runtime_ok "

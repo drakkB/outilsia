@@ -35,7 +35,7 @@ def assert_no_horizontal_overflow(page, label: str):
 
 def inspect_workspace(page, workspace: str, expected_panels: int, label: str):
     state = page.evaluate(
-        """(workspace) => {
+        r"""(workspace) => {
           const shell = document.querySelector('#appShell');
           const selected = document.querySelector('[data-workspace-tab-target][aria-selected="true"]');
           const visible = [...document.querySelectorAll('#workspaceContent > article.panel')]
@@ -44,11 +44,15 @@ def inspect_workspace(page, workspace: str, expected_panels: int, label: str):
               className: panel.className,
               workspace: panel.dataset.workspace || ''
             }));
+          const owned = [...document.querySelectorAll('#workspaceContent > article.panel')]
+            .filter((panel) => (panel.dataset.workspace || '').split(/\s+/).includes(workspace));
           return {
             active: shell?.dataset.workspaceTab || '',
             selected: selected?.dataset.workspaceTabTarget || '',
             selectedCount: document.querySelectorAll('[data-workspace-tab-target][aria-selected="true"]').length,
             visible,
+            ownedCount: owned.length,
+            section: document.querySelector('#workspaceSectionSelect')?.value || '',
             height: document.documentElement.scrollHeight,
             viewport: window.innerHeight
           };
@@ -57,18 +61,19 @@ def inspect_workspace(page, workspace: str, expected_panels: int, label: str):
     )
     if state["active"] != workspace or state["selected"] != workspace or state["selectedCount"] != 1:
         raise AssertionError(f"{label}: invalid active tab state {state}")
-    if len(state["visible"]) != expected_panels:
+    if state["ownedCount"] != expected_panels:
         raise AssertionError(
-            f"{label}: expected {expected_panels} panels, got {len(state['visible'])}: {state['visible']}"
+            f"{label}: expected {expected_panels} owned panels, got {state['ownedCount']}"
         )
+    if len(state["visible"]) != 1:
+        raise AssertionError(f"{label}: focused view should expose one panel, got {state['visible']}")
     leaked = [panel for panel in state["visible"] if workspace not in panel["workspace"].split()]
     if leaked:
         raise AssertionError(f"{label}: panels leaked from another workspace: {leaked}")
-    expected_sections = 1 if workspace == "overview" else expected_panels
-    section_count = page.locator("#workspaceSectionSelect option").count() - 1
-    if section_count != expected_sections:
+    section_count = page.locator("#workspaceSectionSelect option").count()
+    if section_count != expected_panels + 1:
         raise AssertionError(
-            f"{label}: expected {expected_sections} section shortcuts, got {section_count}"
+            f"{label}: expected {expected_panels + 1} section choices, got {section_count}"
         )
     return state
 
@@ -95,8 +100,19 @@ def check(browser, width: int, height: int, label: str):
         assert_no_horizontal_overflow(page, f"{label}-{workspace}")
         state = inspect_workspace(page, workspace, expected_panels, f"{label}-{workspace}")
         heights[workspace] = round(state["height"] / state["viewport"], 2)
+        page.locator("#workspaceSectionSelect").select_option("__all__")
+        page.wait_for_timeout(60)
+        all_visible = page.locator("#workspaceContent > article.panel:visible").count()
+        if all_visible != expected_panels:
+            raise AssertionError(
+                f"{label}-{workspace}: complete view expected {expected_panels} panels, got {all_visible}"
+            )
+        first_section = page.locator("#workspaceSectionSelect option").first.get_attribute("value")
+        page.locator("#workspaceSectionSelect").select_option(first_section)
+        page.wait_for_timeout(60)
 
     page.locator("#workspaceAssistantBtn").click()
+    page.locator("#workspaceSectionSelect").select_option(".chat-panel")
     page.locator("#chatPromptInput").fill("Saisie conservée entre les espaces")
     page.locator("#workspaceModelsBtn").click()
     page.locator("#workspaceAssistantBtn").click()
@@ -106,15 +122,19 @@ def check(browser, width: int, height: int, label: str):
     page.locator("#workspaceModelsBtn").click()
     page.locator("#modelList [data-chat-model]").first.click()
     routed_chat = page.locator("#appShell").get_attribute("data-workspace-tab")
-    if routed_chat != "assistant":
-        raise AssertionError(f"{label}: model Dialogue action routed to {routed_chat!r}")
+    routed_chat_section = page.locator("#workspaceSectionSelect").input_value()
+    if routed_chat != "assistant" or routed_chat_section != ".chat-panel":
+        raise AssertionError(f"{label}: model Dialogue action routed to {routed_chat!r}/{routed_chat_section!r}")
 
     page.locator("#workspaceModelsBtn").click()
     page.locator("#modelList [data-benchmark-model]").first.click()
     page.wait_for_timeout(100)
     routed_benchmark = page.locator("#appShell").get_attribute("data-workspace-tab")
-    if routed_benchmark != "tests":
-        raise AssertionError(f"{label}: model benchmark action routed to {routed_benchmark!r}")
+    routed_benchmark_section = page.locator("#workspaceSectionSelect").input_value()
+    if routed_benchmark != "tests" or routed_benchmark_section != ".benchmark-panel":
+        raise AssertionError(
+            f"{label}: model benchmark action routed to {routed_benchmark!r}/{routed_benchmark_section!r}"
+        )
 
     page.locator("#workspaceSectionSelect").select_option(".flight-recorder-panel")
     page.wait_for_timeout(1500)
@@ -123,6 +143,14 @@ def check(browser, width: int, height: int, label: str):
     )
     if not section_position["visible"] or section_position["top"] < 60 or section_position["top"] >= height:
         raise AssertionError(f"{label}: section menu did not reveal Flight Recorder: {section_position}")
+
+    page.locator("#workspaceSectionPrevBtn").click()
+    previous_section = page.locator("#workspaceSectionSelect").input_value()
+    if previous_section != ".model-autopilot-panel":
+        raise AssertionError(f"{label}: previous section control selected {previous_section!r}")
+    page.locator("#workspaceSectionNextBtn").click()
+    if page.locator("#workspaceSectionSelect").input_value() != ".flight-recorder-panel":
+        raise AssertionError(f"{label}: next section control did not restore Flight Recorder")
 
     page.locator("#workspaceOverviewBtn").focus()
     page.keyboard.press("ArrowRight")
@@ -165,9 +193,9 @@ def main():
         mobile = check(browser, 390, 844, "mobile")
         browser.close()
 
-    if max(desktop.values()) >= 12:
+    if max(desktop.values()) >= 8:
         raise AssertionError(f"desktop workspace remains too long: {desktop}")
-    if max(mobile.values()) >= 22:
+    if max(mobile.values()) >= 14:
         raise AssertionError(f"mobile workspace remains too long: {mobile}")
     print(f"workspace_navigation_ok desktop={desktop} mobile={mobile}")
 

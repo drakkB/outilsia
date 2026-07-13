@@ -340,6 +340,8 @@ const els = {
   workspaceContent: $("workspaceContent"),
   workspaceTitle: $("workspaceTitle"),
   workspaceSectionSelect: $("workspaceSectionSelect"),
+  workspaceSectionPrevBtn: $("workspaceSectionPrevBtn"),
+  workspaceSectionNextBtn: $("workspaceSectionNextBtn"),
   workspaceTabButtons: [...document.querySelectorAll("[data-workspace-tab-target]")],
   prepareBtn: $("prepareBtn"),
   preparePanelBtn: $("preparePanelBtn"),
@@ -684,6 +686,8 @@ const privateWorkloadSelections = new Set();
 let recipeAutoSaveTimer = null;
 const UI_MODE_STORAGE_KEY = "outilsia-local-cockpit-ui-mode";
 const WORKSPACE_TAB_STORAGE_KEY = "outilsia-local-cockpit-workspace-tab";
+const WORKSPACE_SECTION_STORAGE_KEY = "outilsia-local-cockpit-workspace-sections";
+const WORKSPACE_SECTION_ALL = "__all__";
 const WORKSPACE_TABS = ["overview", "machine", "models", "tests", "assistant", "workflows", "account"];
 const WORKSPACE_TITLES = {
   overview: "Accueil",
@@ -696,7 +700,8 @@ const WORKSPACE_TITLES = {
 };
 const WORKSPACE_SECTIONS = {
   overview: [
-    ["Verdict", ".verdict-panel"]
+    ["Verdict", ".verdict-panel"],
+    ["Rapport machine", ".readiness-panel"]
   ],
   machine: [
     ["Diagnostic matériel", ".machine-panel"],
@@ -749,6 +754,7 @@ const WORKSPACE_SECTIONS = {
     ["Historique local", ".history-panel"]
   ]
 };
+const workspaceSectionState = {};
 const readinessProof = {
   copied: false,
   savedAccount: false,
@@ -760,20 +766,109 @@ function setStatus(text, kind = "") {
   els.statusText.className = kind;
 }
 
-function renderWorkspaceSectionMenu(tab) {
-  if (!els.workspaceSectionSelect) return;
+function restoreWorkspaceSectionState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(WORKSPACE_SECTION_STORAGE_KEY) || "{}");
+    if (!saved || typeof saved !== "object" || Array.isArray(saved)) return;
+    for (const tab of WORKSPACE_TABS) {
+      const selector = String(saved[tab] || "");
+      if (selector === WORKSPACE_SECTION_ALL || (WORKSPACE_SECTIONS[tab] || []).some(([, value]) => value === selector)) {
+        workspaceSectionState[tab] = selector;
+      }
+    }
+  } catch (_) {
+    // A malformed or unavailable local preference must never block the cockpit.
+  }
+}
+
+function persistWorkspaceSectionState() {
+  try {
+    localStorage.setItem(WORKSPACE_SECTION_STORAGE_KEY, JSON.stringify(workspaceSectionState));
+  } catch (_) {
+    // Session navigation still works when localStorage is unavailable.
+  }
+}
+
+function workspacePanels(tab) {
+  return [...(els.workspaceContent?.querySelectorAll("article.panel[data-workspace]") || [])]
+    .filter((panel) => String(panel.dataset.workspace || "").split(/\s+/).includes(tab));
+}
+
+function normalizedWorkspaceSection(tab, selector = "") {
   const entries = WORKSPACE_SECTIONS[tab] || [];
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = "Aller à…";
+  if (selector === WORKSPACE_SECTION_ALL) return selector;
+  return entries.some(([, value]) => value === selector) ? selector : entries[0]?.[1] || WORKSPACE_SECTION_ALL;
+}
+
+function updateWorkspaceSectionControls(tab, selector) {
+  const entries = WORKSPACE_SECTIONS[tab] || [];
+  const index = entries.findIndex(([, value]) => value === selector);
+  const focused = index >= 0;
+  if (els.workspaceSectionPrevBtn) {
+    els.workspaceSectionPrevBtn.disabled = !focused || index === 0;
+    els.workspaceSectionPrevBtn.title = index > 0 ? `Afficher ${entries[index - 1][0]}` : "Première section";
+  }
+  if (els.workspaceSectionNextBtn) {
+    els.workspaceSectionNextBtn.disabled = !focused || index === entries.length - 1;
+    els.workspaceSectionNextBtn.title = focused && index < entries.length - 1 ? `Afficher ${entries[index + 1][0]}` : "Dernière section";
+  }
+}
+
+function setWorkspaceSection(tab, selector = "", { persist = true, focusContent = false, block = "start" } = {}) {
+  const normalized = normalizedWorkspaceSection(tab, selector);
+  workspaceSectionState[tab] = normalized;
+  if (els.workspaceSectionSelect) els.workspaceSectionSelect.value = normalized;
+  if (els.appShell) els.appShell.dataset.workspaceSection = normalized === WORKSPACE_SECTION_ALL ? "all" : normalized;
+
+  let activePanel = null;
+  const owned = new Set(workspacePanels(tab));
+  for (const panel of els.workspaceContent?.querySelectorAll("article.panel[data-workspace]") || []) {
+    const belongsToWorkspace = owned.has(panel);
+    const sectionVisible = normalized === WORKSPACE_SECTION_ALL || panel.matches(normalized);
+    const visible = belongsToWorkspace && sectionVisible;
+    panel.classList.toggle("workspace-section-hidden", belongsToWorkspace && !sectionVisible);
+    panel.setAttribute("aria-hidden", String(!visible));
+    panel.inert = !visible;
+    if (visible && !activePanel) activePanel = panel;
+  }
+  updateWorkspaceSectionControls(tab, normalized);
+  if (persist) persistWorkspaceSectionState();
+  if (focusContent && activePanel) {
+    window.requestAnimationFrame(() => activePanel.scrollIntoView({ behavior: "smooth", block }));
+  }
+  return activePanel;
+}
+
+function renderWorkspaceSectionMenu(tab) {
+  if (!els.workspaceSectionSelect) return normalizedWorkspaceSection(tab, workspaceSectionState[tab]);
+  const entries = WORKSPACE_SECTIONS[tab] || [];
   const options = entries.map(([label, selector]) => {
     const option = document.createElement("option");
     option.value = selector;
     option.textContent = label;
     return option;
   });
-  els.workspaceSectionSelect.replaceChildren(placeholder, ...options);
-  els.workspaceSectionSelect.value = "";
+  if (entries.length > 1) {
+    const allOption = document.createElement("option");
+    allOption.value = WORKSPACE_SECTION_ALL;
+    allOption.textContent = "Toutes les sections";
+    options.push(allOption);
+  }
+  const selected = normalizedWorkspaceSection(tab, workspaceSectionState[tab]);
+  els.workspaceSectionSelect.replaceChildren(...options);
+  els.workspaceSectionSelect.value = selected;
+  return selected;
+}
+
+function stepWorkspaceSection(direction) {
+  const tab = els.appShell?.dataset.workspaceTab || "overview";
+  const entries = WORKSPACE_SECTIONS[tab] || [];
+  const current = normalizedWorkspaceSection(tab, workspaceSectionState[tab]);
+  const index = entries.findIndex(([, selector]) => selector === current);
+  if (index < 0) return;
+  const next = Math.max(0, Math.min(entries.length - 1, index + direction));
+  if (next === index) return;
+  setWorkspaceSection(tab, entries[next][1], { focusContent: true });
 }
 
 function setWorkspaceTab(tab = "overview", { persist = true, focusContent = false } = {}) {
@@ -792,7 +887,8 @@ function setWorkspaceTab(tab = "overview", { persist = true, focusContent = fals
   if (els.workspaceContent && activeButton) {
     els.workspaceContent.setAttribute("aria-labelledby", activeButton.id);
   }
-  renderWorkspaceSectionMenu(normalized);
+  const section = renderWorkspaceSectionMenu(normalized);
+  setWorkspaceSection(normalized, section, { persist: false });
   if (persist) {
     try {
       localStorage.setItem(WORKSPACE_TAB_STORAGE_KEY, normalized);
@@ -830,17 +926,19 @@ function restoreWorkspaceTab() {
 
 function revealWorkspacePanel(tab, panel, block = "center") {
   setWorkspaceTab(tab);
-  window.requestAnimationFrame(() => panel?.scrollIntoView({ behavior: "smooth", block }));
+  const panelElement = panel?.closest?.("article.panel") || panel;
+  const entry = (WORKSPACE_SECTIONS[tab] || []).find(([, selector]) => panelElement?.matches?.(selector));
+  if (entry) setWorkspaceSection(tab, entry[1], { persist: true });
+  window.requestAnimationFrame(() => panelElement?.scrollIntoView({ behavior: "smooth", block }));
 }
 
 function revealOperationConsole() {
   if (!els.operationPanel) return;
-  setWorkspaceTab("tests");
+  revealWorkspacePanel("tests", els.operationPanel);
   els.operationPanel.classList.add("operation-active");
   if (!operationLive) {
     window.setTimeout(() => els.operationPanel?.classList.remove("operation-active"), 1800);
   }
-  window.requestAnimationFrame(() => els.operationPanel?.scrollIntoView({ behavior: "smooth", block: "center" }));
 }
 
 function revealOperationMonitor() {
@@ -1415,6 +1513,14 @@ function hasUsableOllamaRuntime(scan = state.scan) {
 
 function ollamaRuntimeLabel(scan = state.scan) {
   const runtimes = scan?.runtimes || {};
+  const installed = scan?.installed_models || [];
+  const nativeModels = installed.filter((model) => modelRuntimeFromSource(model.source || model.runtime) === "native").length;
+  const wslModels = installed.filter((model) => modelRuntimeFromSource(model.source || model.runtime) === "wsl").length;
+  if (runtimes.ollama?.installed && runtimes.ollama_wsl?.installed) {
+    if (wslModels && !nativeModels) return "Ollama WSL · Windows prêt";
+    if (nativeModels && !wslModels) return "Ollama Windows · WSL prêt";
+    return "Ollama Windows + WSL";
+  }
   if (runtimes.ollama?.installed) return "Ollama Windows";
   if (runtimes.ollama_wsl?.installed) return "Ollama WSL";
   if (runtimes.wsl?.installed) return "WSL détecté, Ollama absent";
@@ -1779,7 +1885,8 @@ function renderModelActions(model, options = {}) {
 }
 
 function benchmarkButtonLabel(ref, installedLabel = "Bench", missingLabel = "Installer + bench") {
-  if (!ref || isOllamaModelInstalled(ref)) return installedLabel;
+  if (!ref) return installedLabel;
+  if (isOllamaModelInstalled(ref)) return benchmarkTimeoutSeconds(ref) > 45 ? "Bench long" : installedLabel;
   if (isOllamaModelInstalling(ref)) return "Téléchargement...";
   return missingLabel;
 }
@@ -1870,6 +1977,10 @@ function modelInfo(ref) {
     info.fit = "Hermes Agent, notes projet, assistant personnel, décisions, synthèses et actions confirmées.";
     info.limit = "Ce n'est pas forcément le premier modèle de test : commencer léger avec Qwen, puis utiliser Hermes pour mémoire/projets.";
     info.next = `Suivre Hermes Agent ${HERMES_AGENT_WATCH.version} : preuves de completion, mémoire visible, /learn et futurs subagents de benchmark.`;
+    if (clean.includes("nous-hermes2-mixtral")) {
+      info.limit = "Le tag Ollama Q4 pèse 26 Go : sous 26 Go VRAM, il bascule en offload RAM et peut dépasser un benchmark court.";
+      info.next = "Avec 16 Go VRAM, préférer Hermes 3 8B. Réserver Mixtral 8x7B à un test long ou à une machine 32 Go+ VRAM.";
+    }
   } else if (clean.includes("mistral")) {
     info.strength = "Bon compromis conversation, français et vitesse selon quantization.";
     info.fit = "Usage général, rédaction, résumé et assistant quotidien.";
@@ -1899,6 +2010,7 @@ function topRecommendedModel() {
   const compatibility = state.compatibility?.compatibility || state.compatibility || {};
   const models = extractModels(compatibility);
   const vram = Number(state.scan?.vram_gb || 0);
+  const availableMemory = effectiveModelMemoryGb(state.scan);
   const candidates = models.filter((model) => actionableOllamaRef(model));
   const starter = candidates.find((model) => isStarterModelRef(actionableOllamaRef(model)));
   if (isConstrainedLegacyMachine() && starter && !hasSuccessfulBenchmarkFor(actionableOllamaRef(starter))) {
@@ -1906,6 +2018,8 @@ function topRecommendedModel() {
   }
   const safeCandidates = candidates.filter((model) => {
     const ref = `${modelTitle(model)} ${actionableOllamaRef(model)}`.toLowerCase();
+    const requiredVram = modelRequiredVram(model);
+    if (requiredVram && availableMemory && requiredVram > availableMemory * 0.9) return false;
     if (vram > 0 && vram < 20 && /\b(32b|70b|72b|120b|235b)\b/.test(ref)) return false;
     if (isConstrainedLegacyMachine() && isAmbitiousForLegacyModel(model)) return false;
     if (isStarterModelRef(actionableOllamaRef(model))) return false;
@@ -5583,6 +5697,7 @@ function unmarkOllamaModelInstalled(model) {
 
 function estimatedModelSizeLabel(model) {
   const clean = String(model || "").toLowerCase();
+  if (clean.includes("nous-hermes2-mixtral") || clean.includes("8x7b")) return "26 Go (Q4_0)";
   if (clean.includes("70b")) return "40 Go ou plus";
   if (clean.includes("32b")) return "18-24 Go";
   if (clean.includes("14b")) return "8-12 Go";
@@ -5608,13 +5723,21 @@ function fallbackInstallModelSizeGb(model) {
   const clean = normalizeOllamaRef(model);
   if (!clean) return null;
   if (/0[._-]?6b|0\.6b/.test(clean)) return 0.6;
-  if (/8x7b/.test(clean)) return 14;
+  if (/8x7b/.test(clean)) return 26;
   const tagged = clean.match(/(?:^|[:/_-])(\d+(?:\.\d+)?)b(?:$|[^a-z0-9])/i)
     || clean.match(/(\d+(?:\.\d+)?)b/i);
   if (!tagged) return null;
   const params = Number(tagged[1]);
   if (!Number.isFinite(params) || params <= 0) return null;
   return Math.max(0.5, Number((params * 0.64).toFixed(1)));
+}
+
+function benchmarkTimeoutSeconds(model) {
+  const sizeGb = Number(modelInstallSizeBudget(model).estimated_download_gb || 0);
+  const availableMemory = effectiveModelMemoryGb(state.scan);
+  if (sizeGb >= 24 && availableMemory > 0 && sizeGb > availableMemory * 0.9) return 120;
+  if (sizeGb >= 20) return 90;
+  return 45;
 }
 
 function modelInstallSizeBudget(model) {
@@ -12659,9 +12782,12 @@ function fieldTestProfile() {
     } else if (vram >= 24) {
       machineClass = "Grosse VRAM";
       verdict = "Machine forte : teste le modèle léger, puis un modèle qualité/Hermes/Qwen plus ambitieux.";
+    } else if (vram >= 16) {
+      machineClass = "Très bon PC IA locale";
+      verdict = `Très bon niveau : ${formatGb(vram)} VRAM ouvrent des 7B/8B confortables et plusieurs 14B quantifiés selon le runtime.`;
     } else if (vram >= 12) {
       machineClass = "Bon PC IA locale";
-      verdict = "Très bon ticket d'entrée : 12 Go VRAM ouvrent des modèles utiles sans acheter tout de suite.";
+      verdict = `Bon ticket d'entrée : ${formatGb(vram)} VRAM ouvrent des modèles utiles sans acheter tout de suite.`;
     } else if (vram > 0) {
       machineClass = "GPU limité mais utile";
       verdict = "GPU détecté mais VRAM limitée : commence léger, évite les gros modèles, regarde si RAM/SSD suffisent.";
@@ -14489,13 +14615,18 @@ async function runBenchmark(options = {}) {
   }
   els.benchmarkBtn.disabled = true;
   const activeTuning = forceCpu ? null : activeModelAutopilotProfile(model);
+  const timeoutSeconds = benchmarkTimeoutSeconds(model);
   resetOperationConsole(`${forceCpu ? "Retest CPU" : "Benchmark Ollama"} lancé : ${model}`);
   setOperationFocus(`${forceCpu ? "Retest CPU sans GPU" : "Benchmark en cours"} : ${model}`, [
     forceCpu ? "Ollama force num_gpu=0 pour isoler le pilote GPU." : "Ollama reçoit un prompt court.",
     activeTuning ? `Profil actif : ${activeTuning.label} · ${modelAutopilotTuningLabel(activeTuning.tuning)}.` : "Réglages Ollama par défaut.",
+    timeoutSeconds > 45 ? `Modèle lourd détecté : fenêtre de mesure étendue à ${timeoutSeconds} secondes.` : "Fenêtre de mesure courte : 45 secondes.",
     "Le résultat séparera chargement, préremplissage et débit de génération quand l'API Ollama les expose.",
     "Reste sur cet écran : le suivi direct apparaît ici."
   ]);
+  if (timeoutSeconds > 45) {
+    appendOperationLine(`Modèle lourd : OutilsIA autorise ${timeoutSeconds} secondes pour le chargement et l'offload RAM.`, "alerte");
+  }
   appendOperationLine(`Prompt : ${els.benchmarkPromptInput.value.trim() || "prompt court par défaut"}`, "info");
   els.benchmarkResult.textContent = forceCpu ? "Retest CPU Ollama en cours..." : "Benchmark Ollama en cours...";
   setStatus(`${forceCpu ? "Retest CPU" : "Benchmark"} ${model} en cours...`);
@@ -14505,7 +14636,7 @@ async function runBenchmark(options = {}) {
           request: {
             model,
             prompt: els.benchmarkPromptInput.value.trim(),
-            timeout_seconds: 45,
+            timeout_seconds: timeoutSeconds,
             force_cpu: forceCpu,
             ...(forceCpu ? {} : modelAutopilotTuningPayload(model)),
             ...ollamaRuntimePayload(model)
@@ -14969,12 +15100,14 @@ async function runPrimaryCommand(command, model = "") {
     case "benchmark-test":
       els.benchmarkModelInput.value = flow.testModel;
       els.chatModelInput.value = flow.testModel;
+      revealWorkspacePanel("tests", els.benchmarkPanel, "start");
       setStatus(`Benchmark du modèle test ${flow.testModel}...`);
       await runBenchmark({ source: "primary-action" });
       break;
     case "benchmark-test-cpu":
       els.benchmarkModelInput.value = flow.testModel;
       els.chatModelInput.value = flow.testModel;
+      revealWorkspacePanel("tests", els.benchmarkPanel, "start");
       setStatus(`Retest CPU du modèle ${flow.testModel}...`);
       await runBenchmark({ source: "primary-action", forceCpu: true });
       break;
@@ -14995,15 +15128,18 @@ async function runPrimaryCommand(command, model = "") {
       if (!nextModel) throw new Error("Aucun modèle recommandé à benchmarker");
       els.benchmarkModelInput.value = nextModel;
       els.chatModelInput.value = nextModel;
+      revealWorkspacePanel("tests", els.benchmarkPanel, "start");
       setStatus(`Benchmark du modèle recommandé ${nextModel}...`);
       await runBenchmark({ source: "primary-action" });
       break;
     case "arena":
+      revealWorkspacePanel("tests", document.querySelector(".arena-panel"), "start");
       setStatus("Comparaison Arena locale en cours...");
       await runAutomaticArena();
       break;
     case "report":
       generateFinalCockpitReport();
+      revealWorkspacePanel("overview", els.readinessPanel, "start");
       break;
     case "save":
       await syncDesktop();
@@ -16891,6 +17027,7 @@ function installTestHarness() {
     evaluateInstallSafetyPreflight,
     installSafetyPreflightSummary,
     setWorkspaceTab,
+    setWorkspaceSection,
     setViewMode,
     defaultOllamaRuntime,
     ollamaRuntimePayload,
@@ -18510,6 +18647,7 @@ function installTestHarness() {
       renderScan(scan);
       renderPrimaryAction();
       return {
+        runtimeLabel: ollamaRuntimeLabel(scan),
         qwenRuntime: installedOllamaRuntimeFor("qwen3:0.6b"),
         qwenDefault: defaultOllamaRuntime("qwen3:0.6b"),
         qwenPayload: ollamaRuntimePayload("qwen3:0.6b"),
@@ -18518,6 +18656,36 @@ function installTestHarness() {
         hermesDefault: defaultOllamaRuntime("hermes3:8b"),
         hermesPayload: ollamaRuntimePayload("hermes3:8b"),
         hermesCommand: ollamaRuntimeCommandLabel("hermes3:8b")
+      };
+    },
+    applyRtx4080WslModelState() {
+      const scan = demoScan();
+      scan.gpu_name = "NVIDIA GeForce RTX 4080 SUPER";
+      scan.vram_gb = 16;
+      scan.ram_gb = 64;
+      scan.runtimes = {
+        ...(scan.runtimes || {}),
+        ollama: { installed: true, version: "ollama windows", source: "ollama-cli" },
+        ollama_wsl: { installed: true, version: "ollama wsl", source: "ollama-wsl" },
+        wsl: { installed: true, state: "wsl_ready", ollama_ready: true }
+      };
+      scan.installed_models = [
+        { model_name: "qwen3", model_tag: "0.6b", size_gb: 0.5, runtime: "ollama-wsl", source: "ollama-wsl" },
+        { model_name: "hermes3", model_tag: "8b", size_gb: 4.7, runtime: "ollama-wsl", source: "ollama-wsl" },
+        { model_name: "nous-hermes2-mixtral", model_tag: "8x7b", size_gb: 26, runtime: "ollama-wsl", source: "ollama-wsl" }
+      ];
+      renderScan(scan);
+      renderCompatibility(demoCompatibility());
+      const field = fieldTestProfile();
+      return {
+        runtimeLabel: ollamaRuntimeLabel(scan),
+        fieldClass: field.machineClass,
+        fieldVerdict: field.verdict,
+        hermesRuntime: defaultOllamaRuntime("hermes3:8b"),
+        mixtralRuntime: defaultOllamaRuntime("nous-hermes2-mixtral:8x7b"),
+        mixtralTimeout: benchmarkTimeoutSeconds("nous-hermes2-mixtral:8x7b"),
+        mixtralSize: estimatedModelSizeLabel("nous-hermes2-mixtral:8x7b"),
+        mixtralBudget: modelInstallSizeBudget("nous-hermes2-mixtral:8x7b")
       };
     },
     applyInstallProgressState() {
@@ -18699,9 +18867,11 @@ for (const button of els.workspaceTabButtons) {
 els.workspaceSectionSelect?.addEventListener("change", () => {
   const selector = els.workspaceSectionSelect.value;
   if (!selector) return;
-  const panel = els.workspaceContent?.querySelector(selector);
-  window.requestAnimationFrame(() => panel?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  const tab = els.appShell?.dataset.workspaceTab || "overview";
+  setWorkspaceSection(tab, selector, { focusContent: true });
 });
+els.workspaceSectionPrevBtn?.addEventListener("click", () => stepWorkspaceSection(-1));
+els.workspaceSectionNextBtn?.addEventListener("click", () => stepWorkspaceSection(1));
 els.preparePanelBtn.addEventListener("click", prepareLocalAiFlow);
 els.oldPortablePresetBtn?.addEventListener("click", applyOldPortablePreset);
 els.scanBtn.addEventListener("click", scanMachine);
@@ -19171,6 +19341,7 @@ document.addEventListener("click", async (event) => {
   const generateCockpitReportButton = event.target?.closest?.("[data-generate-cockpit-report]");
   if (generateCockpitReportButton) {
     generateFinalCockpitReport();
+    revealWorkspacePanel("overview", els.readinessPanel, "start");
     return;
   }
   const scanButton = event.target?.closest?.("[data-run-scan]");
@@ -19238,6 +19409,7 @@ if (!invoke) {
   setStatus("Mode navigateur démo: lance l'app Tauri pour scanner le PC", "warn");
 }
 
+restoreWorkspaceSectionState();
 restoreWorkspaceTab();
 loadHistory();
 renderBenchmarkHistory();

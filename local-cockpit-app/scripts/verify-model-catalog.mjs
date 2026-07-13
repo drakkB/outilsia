@@ -153,6 +153,17 @@ const tierSummary = tiers.map((tier) => {
   return { ...tier, compatible: compatible.length };
 });
 
+const hermesMixtral = allModels.find(({ model }) => String(model.ollama || "") === "nous-hermes2-mixtral:8x7b")?.model;
+if (!hermesMixtral) {
+  fail("Nous Hermes 2 Mixtral 8x7B missing from catalog");
+} else {
+  if (number(hermesMixtral.vram_q4) < 26) fail("Nous Hermes 2 Mixtral Q4 must reflect the official 26 GB Ollama artifact");
+  if (number(hermesMixtral.vram_q8) < 50) fail("Nous Hermes 2 Mixtral Q8 must reflect the official 50 GB Ollama artifact");
+  if (!String(hermesMixtral.source_url || "").startsWith("https://ollama.com/library/nous-hermes2-mixtral")) {
+    fail("Nous Hermes 2 Mixtral requires its official Ollama source");
+  }
+}
+
 for (const tier of tierSummary) {
   if (tier.label === "cpu_8gb" && tier.compatible < 2) {
     fail(`${tier.label}: CPU/RAM fallback should keep at least tiny local models visible`);

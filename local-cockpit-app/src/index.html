@@ -172,10 +172,14 @@
             <button id="workspaceWorkflowsBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="workflows" tabindex="-1">Atelier IA</button>
             <button id="workspaceAccountBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="account" tabindex="-1">Compte</button>
           </div>
-          <label class="workspace-section-picker" for="workspaceSectionSelect">
-            <span>Section</span>
-            <select id="workspaceSectionSelect" aria-label="Aller directement à une section"></select>
-          </label>
+          <div class="workspace-section-nav" aria-label="Naviguer dans les sections de l'espace actif">
+            <button id="workspaceSectionPrevBtn" class="workspace-section-step" type="button" aria-label="Section précédente" title="Section précédente">&#8249;</button>
+            <label class="workspace-section-picker" for="workspaceSectionSelect">
+              <span>Section</span>
+              <select id="workspaceSectionSelect" aria-label="Afficher une section"></select>
+            </label>
+            <button id="workspaceSectionNextBtn" class="workspace-section-step" type="button" aria-label="Section suivante" title="Section suivante">&#8250;</button>
+          </div>
         </nav>
 
         <section id="workspaceContent" class="grid" role="tabpanel" aria-labelledby="workspaceOverviewBtn">

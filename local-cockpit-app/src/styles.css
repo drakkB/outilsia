@@ -523,7 +523,7 @@ h2 {
   border-radius: 8px;
   display: grid;
   gap: 8px;
-  grid-template-columns: auto minmax(0, 1fr) minmax(150px, 190px);
+  grid-template-columns: auto minmax(0, 1fr) minmax(240px, 290px);
   margin-bottom: 8px;
   min-height: 54px;
   padding: 8px 10px;
@@ -576,6 +576,31 @@ h2 {
   min-width: 0;
 }
 
+.workspace-section-nav {
+  align-items: end;
+  display: grid;
+  gap: 5px;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  min-width: 0;
+}
+
+.workspace-section-step {
+  align-items: center;
+  display: inline-flex;
+  font-size: 24px;
+  height: 34px;
+  justify-content: center;
+  line-height: 1;
+  min-height: 34px;
+  padding: 0;
+  width: 34px;
+}
+
+.workspace-section-step:disabled {
+  cursor: default;
+  opacity: 0.28;
+}
+
 .workspace-section-picker span {
   color: var(--muted-2);
   font-size: 9px;
@@ -587,6 +612,10 @@ h2 {
   min-height: 34px;
   min-width: 0;
   width: 100%;
+}
+
+.workspace-section-hidden {
+  display: none !important;
 }
 
 .quick-decision-strip {
@@ -5050,6 +5079,11 @@ dd {
   .workspace-section-picker {
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
+  }
+
+  .workspace-section-nav {
+    align-items: center;
+    grid-template-columns: 34px minmax(0, 1fr) 34px;
   }
 
   .workspace-section-picker span {

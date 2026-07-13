@@ -1,6 +1,6 @@
 {
-  "version": "2026-07-06",
-  "updated_at": "2026-07-06",
+  "version": "2026-07-13",
+  "updated_at": "2026-07-13",
   "categories": [
     {
       "name": "Petits modeles rapides",
@@ -220,13 +220,14 @@
           "name": "Nous Hermes 2 Mixtral",
           "params": "8x7B",
           "kind": "text",
-          "use_case": "assistant/persona, mémoire, workflows Hermes",
-          "vram_q4": 14,
-          "vram_q8": 26,
-          "vram_fp16": 90,
+          "use_case": "assistant/persona, mémoire, workflows Hermes ; modèle lourd avec offload RAM sous 26 Go VRAM",
+          "vram_q4": 26,
+          "vram_q8": 50,
+          "vram_fp16": 93,
           "ollama": "nous-hermes2-mixtral:8x7b",
           "date_added": "2026-06-22",
-          "actionable_text": true
+          "actionable_text": true,
+          "source_url": "https://ollama.com/library/nous-hermes2-mixtral:8x7b"
         }
       ]
     },

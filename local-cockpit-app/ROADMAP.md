@@ -10,17 +10,29 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 
 ## Livré dans les sources - Navigation par espaces
 
-État au 13 juillet 2026 : l'ancienne page unique Essentiel/Détails est remplacée par sept espaces persistants : Accueil, Machine, Modèles, Tests, Assistant, Atelier IA et Compte. Le commit `ff3ed59` passe les pipelines Windows `29259013783` et Linux `29259013856`. Le candidat n'est pas encore déployé comme release publique.
+État au 13 juillet 2026 : l'ancienne page unique Essentiel/Détails est remplacée par sept espaces persistants : Accueil, Machine, Modèles, Tests, Assistant, Atelier IA et Compte. Le commit `ff3ed59` passe les pipelines Windows `29259013783` et Linux `29259013856`. Chaque espace ouvre maintenant un seul module à la fois, avec navigation précédent/suivant et une option **Toutes les sections**. Le candidat n'est pas encore déployé comme release publique.
 
 - [x] Conserver le matériel détecté et l'action d'analyse au sommet de la fenêtre.
 - [x] Attribuer chaque panneau à un ou plusieurs espaces sans changer ses identifiants ou son état.
 - [x] Router automatiquement Dialogue vers Assistant, Bench vers Tests, Upgrade vers Machine et Workstack vers Atelier IA.
-- [x] Ajouter un menu Section contextuel pour atteindre directement les modules d'un espace long.
+- [x] Ajouter un menu Section contextuel qui concentre l'écran sur un module, avec précédent, suivant et vue complète.
 - [x] Afficher les sept onglets sans défilement horizontal sur Android et prendre en charge les flèches, Début et Fin au clavier.
 - [x] Conserver les formulaires et mémoriser l'espace actif entre deux ouvertures.
-- [x] Réduire le pire cas mesuré de 18,1 à 5,4 hauteurs d'écran sur desktop et de 36,5 à 11,2 sur mobile.
+- [x] Réduire le pire cas mesuré de 18,1 à 2,1 hauteurs d'écran sur desktop et de 36,5 à 3,6 sur mobile.
 - [x] Ajouter une recette Playwright dédiée qui contrôle propriété des panneaux, routage, persistance, menu Section, clavier et débordements.
 - [ ] Publier cette interface et la présenter sur le site seulement après validation manuelle du build candidat.
+
+## Correctif validé dans les sources - Hermes, runtime et mémoire réelle
+
+État au 13 juillet 2026 : les traces locales confirment `hermes3:8b` à 121,7 tok/s sur la RTX 4080 SUPER. L'échec observé concernait `nous-hermes2-mixtral:8x7b`, dont l'artefact Ollama Q4 pèse 26 Go et dépassait l'ancienne fenêtre de 45 secondes sur 16 Go VRAM. Le catalogue public a été corrigé, mais l'application candidate reste à valider manuellement avant publication.
+
+- [x] Afficher les 16 Go réellement détectés dans le verdict terrain RTX 4080, sans texte générique « 12 Go ».
+- [x] Distinguer explicitement Hermes 3 8B et Nous Hermes 2 Mixtral 8x7B dans les limites et prochaines actions.
+- [x] Corriger les tailles catalogue Mixtral : 26 Go Q4, 50 Go Q8 et 93 Go FP16, avec source Ollama officielle.
+- [x] Étendre à 120 secondes le benchmark du modèle 26 Go quand il doit utiliser l'offload RAM.
+- [x] Afficher le runtime qui contient réellement les modèles : Windows, WSL ou mixte.
+- [x] Empêcher Mixtral 8x7B de devenir le choix assistant par défaut d'une machine 16 Go.
+- [ ] Confirmer manuellement le nouveau libellé et le benchmark long dans le build Windows candidat.
 
 ## Maintenant - Hardware Doctor 2.0 et AI Capability Passport v1
 
