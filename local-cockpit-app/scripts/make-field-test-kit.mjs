@@ -769,7 +769,7 @@ function writeOperatorChecklist(kitDir, release) {
     "2. Installer/ouvrir l'app avec `INSTALLER-APP.cmd` si besoin.",
     "3. Cliquer `Analyser ce PC`.",
     "4. Produire les 8 preuves ci-dessous.",
-    "5. Exporter la fiche depuis `Détails > Test terrain`.",
+    "5. Exporter la fiche depuis `Machine > Preuve terrain`.",
     "6. Lancer `VALIDER-DERNIERE-FICHE.cmd` avant de quitter la machine.",
     "7. Lancer `EXPORTER-FICHES.cmd` si la fiche part vers la machine principale.",
     "",
@@ -863,7 +863,7 @@ function writeOperatorChecklist(kitDir, release) {
       <li>Ouvrir <code>PROCHAIN-PC.cmd</code> ou le lanceur profil.</li>
       <li>Cliquer <strong>Analyser ce PC</strong> dans OutilsIA.</li>
       <li>Benchmark, PromptForge, dialogue, Arena, rapport.</li>
-      <li>Exporter la fiche depuis <strong>Détails &gt; Test terrain</strong>.</li>
+      <li>Exporter la fiche depuis <strong>Machine &gt; Preuve terrain</strong>.</li>
       <li>Lancer <code>VALIDER-DERNIERE-FICHE.cmd</code> avant de quitter le PC.</li>
       <li>Lancer <code>EXPORTER-FICHES.cmd</code> pour transférer la preuve.</li>
     </ol>
@@ -903,7 +903,7 @@ function writeProfileCards(kitDir, release) {
         <li>Installer ou ouvrir OutilsIA Local Cockpit build <code>${release.build_id || "beta"}</code>.</li>
         <li>Cliquer <strong>Analyser ce PC</strong>.</li>
         <li>Obtenir matériel, score, modele conseille, benchmark, PromptForge, dialogue, Arena et rapport.</li>
-        <li>Aller dans <strong>Details</strong> &gt; <strong>Test terrain</strong>.</li>
+        <li>Aller dans <strong>Machine</strong> &gt; <strong>Preuve terrain</strong>.</li>
         <li>Sélectionner <strong>${profile}</strong>, puis <strong>Telecharger fiche</strong>.</li>
       </ol>
     </article>`;
@@ -1075,7 +1075,7 @@ ${cards}
       <li>Vérifier le haut de l'app : matériel reconnu, score, modele conseille, preuve/benchmark et upgrade utile.</li>
       <li>Lancer un benchmark réel si aucune preuve locale n'est affichée.</li>
       <li>Tester PromptForge, dialogue local, Arena et rapport.</li>
-      <li>Aller dans <strong>Details</strong> &gt; <strong>Test terrain</strong>.</li>
+      <li>Aller dans <strong>Machine</strong> &gt; <strong>Preuve terrain</strong>.</li>
       <li>Optionnel : générer l'<strong>AI Capability Passport</strong> pour joindre son digest à la fiche.</li>
       <li>Sélectionner manuellement <strong>${profile}</strong>.</li>
       <li>Cliquer <strong>Telecharger fiche</strong>.</li>
@@ -1469,7 +1469,7 @@ function writeFiveMinuteRecipe(kitDir, release) {
       <div class="step"><span class="num">2</span><div><strong>Installer ou lancer l'app</strong><p>Utilise <code>INSTALLER-APP.cmd</code> si besoin. Build inclus : <code>${buildId}</code>.</p></div></div>
       <div class="step"><span class="num">3</span><div><strong>Analyser ce PC</strong><p>Dans OutilsIA, clique <strong>Analyser ce PC</strong>. Le haut de l'app doit afficher matériel, score, modèle conseillé, preuve/benchmark et upgrade utile.</p></div></div>
       <div class="step"><span class="num">4</span><div><strong>Obtenir une preuve locale</strong><p>Lance un benchmark réel si aucune preuve n'est visible. Puis teste PromptForge, une question locale, Arena locale et le rapport.</p></div></div>
-      <div class="step"><span class="num">5</span><div><strong>Exporter la fiche terrain</strong><p>Dans <strong>Détails &gt; Test terrain</strong>, force le bon profil physique puis clique <strong>Télécharger fiche</strong>.</p></div></div>
+      <div class="step"><span class="num">5</span><div><strong>Exporter la fiche terrain</strong><p>Dans <strong>Machine &gt; Preuve terrain</strong>, force le bon profil physique puis clique <strong>Télécharger fiche</strong>.</p></div></div>
       <div class="step"><span class="num">6</span><div><strong>Valider avant de quitter</strong><p>Lance <code>VALIDER-DERNIERE-FICHE.cmd</code>. Si ça échoue, retourne dans l'app et complète la preuve avant de passer au PC suivant.</p></div></div>
     </div>
   </section>
@@ -1816,9 +1816,9 @@ function main() {
     "12. Ouvrir `FIELD-PROFILE-EXPECTATIONS.html` pour voir score attendu, modèles à surveiller et pièges à éviter par profil.",
     "13. Double-cliquer `OUVRIR-MISSION.cmd` si tu veux le tableau complet des 5 profils.",
     "14. Sur chaque machine, ouvrir OutilsIA Local Cockpit.",
-    "15. Passer en `Details`.",
-    "16. Optionnel : générer l'`AI Capability Passport` pour joindre son digest à la fiche.",
-    "17. Ouvrir `Test terrain`.",
+    "15. Ouvrir `Atelier IA > Passeport IA` si tu veux joindre un digest de capacité à la fiche.",
+    "16. Optionnel : générer l'`AI Capability Passport`.",
+    "17. Ouvrir `Machine > Preuve terrain`.",
     "18. Choisir le `Profil terrain` attendu par `CENTRE-TERRAIN.html`, `PROCHAIN-PC.html`, `FIELD-PROGRESS.html`, `FIELD-DISPATCH.html`, `FIELD-PROFILE-CARDS.html`, `FIELD-PROFILE-EXPECTATIONS.html`, `FIELD-OPERATOR-CHECKLIST.html` ou `BRIEF-*.html`. Laisser `Auto selon le scan` seulement si l'inférence correspond au profil demandé.",
     "19. Cliquer `Telecharger fiche`.",
     "20. Double-cliquer `VALIDER-DERNIERE-FICHE.cmd` pour vérifier immédiatement que la fiche contient scan, benchmark, PromptForge, dialogue, Arena et rapport.",
@@ -1913,7 +1913,7 @@ function main() {
     "<h1>Mission terrain OutilsIA</h1>",
     "<p>Double-clique <strong>STATUT.cmd</strong> pour generer la mission a jour avec les profils prets, manquants et le prochain PC a tester.</p>",
     "<ol>",
-    "<li>Exporter une fiche depuis OutilsIA : Details &gt; Test terrain &gt; choisir le Profil terrain attendu &gt; Telecharger fiche.</li>",
+    "<li>Exporter une fiche depuis OutilsIA : Machine &gt; Preuve terrain &gt; choisir le Profil terrain attendu &gt; Telecharger fiche.</li>",
     "<li>Lancer <code>COLLECTER.cmd</code>.</li>",
     "<li>Lancer <code>STATUT.cmd</code> pour mettre cette page a jour.</li>",
     "</ol>",
@@ -3202,7 +3202,7 @@ if ($isReady) {
   $lines += "- Tester le prochain profil: $nextLabel."
   $lines += "- Ouvrir PROCHAIN-PC.cmd pour voir les preuves attendues."
   $lines += "- Obtenir scan, benchmark, PromptForge, dialogue, Arena et rapport dans OutilsIA."
-  $lines += "- Exporter la fiche depuis Details > Test terrain avec le bon profil manuel."
+  $lines += "- Exporter la fiche depuis Machine > Preuve terrain avec le bon profil manuel."
   $lines += "- Lancer VALIDER-DERNIERE-FICHE.cmd avant de quitter le PC."
 }
 $lines += @(
@@ -4683,7 +4683,7 @@ $centerHtml = @"
       <li>Dans l'app, cliquer <strong>Analyser ce PC</strong>.</li>
       <li>Obtenir scan, benchmark, PromptForge, dialogue, Arena et rapport.</li>
       <li>Optionnel : generer l'AI Capability Passport avant l'export.</li>
-      <li>Exporter la fiche dans <strong>Details &gt; Test terrain</strong> avec le bon profil manuel.</li>
+      <li>Exporter la fiche dans <strong>Machine &gt; Preuve terrain</strong> avec le bon profil manuel.</li>
       <li>Lancer <code>VALIDER-DERNIERE-FICHE.cmd</code>, puis <code>STATUT.cmd</code>.</li>
     </ol>
   </section>

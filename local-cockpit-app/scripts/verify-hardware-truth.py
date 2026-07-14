@@ -33,6 +33,8 @@ def main():
     assert result["unknownUi"]["topGpu"] == "GPU non déterminé", result["unknownUi"]
 
     field = result["unknownField"]
+    assert field["profile"] == "unmatched", field["profile"]
+    assert field["profile"] != "cpu_only", field["profile"]
     assert field["gpu"] == "GPU non déterminé", field["gpu"]
     assert field["vram_gb"] is None, field["vram_gb"]
     assert field["hardware_provenance"]["vram_gb"] == "not_detected"

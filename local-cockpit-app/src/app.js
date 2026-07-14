@@ -522,6 +522,7 @@ const els = {
   fieldTestState: $("fieldTestState"),
   fieldTestProfileSelect: $("fieldTestProfileSelect"),
   fieldTestBox: $("fieldTestBox"),
+  continueFieldTestBtn: $("continueFieldTestBtn"),
   copyFieldTestBtn: $("copyFieldTestBtn"),
   copyFieldTestJsonBtn: $("copyFieldTestJsonBtn"),
   downloadFieldTestJsonBtn: $("downloadFieldTestJsonBtn"),
@@ -13652,16 +13653,18 @@ function inferFieldTestProfile(scan = state.scan || {}) {
   const gpu = String(scan.gpu_name || "").toLowerCase();
   const cpu = String(scan.cpu_name || "").toLowerCase();
   const os = String(`${scan.os_name || ""} ${scan.os_version || ""}`).toLowerCase();
+  const hasMeasuredVram = scan.vram_gb !== null
+    && scan.vram_gb !== undefined
+    && Number.isFinite(Number(scan.vram_gb));
   const vram = Number(scan.vram_gb || 0);
   const ram = Number(scan.ram_gb || 0);
-  if (!vram || gpu.includes("cpu only") || gpu.includes("aucun")) return "cpu_only";
+  if (gpu.includes("cpu only") || gpu.includes("aucun") || (hasMeasuredVram && vram === 0)) return "cpu_only";
+  if (!hasMeasuredVram) return "unmatched";
   if (gpu.includes("1080 ti") || gpu.includes("1080ti")) return "core_i7_gtx_1080_ti";
   if (gpu.includes("3060") && vram >= 10 && vram <= 13) return "rtx_3060_12gb";
   if (gpu.includes("4080") || gpu.includes("4090")) return "rtx_4080_4090";
   if (os.includes("laptop") || cpu.includes("mobile") || gpu.includes("laptop") || vram <= 6 || ram <= 16) return "old_laptop";
-  if (vram >= 16) return "rtx_4080_4090";
-  if (vram >= 10) return "rtx_3060_12gb";
-  return "old_laptop";
+  return "unmatched";
 }
 
 const FIELD_TEST_PROFILE_LABELS = {
@@ -13670,12 +13673,21 @@ const FIELD_TEST_PROFILE_LABELS = {
   core_i7_gtx_1080_ti: "Core i7 + GTX 1080 Ti 11 Go",
   rtx_3060_12gb: "RTX 3060 12 Go",
   rtx_4080_4090: "RTX 4080 / RTX 4090",
-  cpu_only: "Machine CPU-only"
+  cpu_only: "Machine CPU-only",
+  unmatched: "Hors des cinq profils de campagne"
 };
+const FIELD_TEST_SELECTABLE_PROFILES = new Set([
+  "auto",
+  "old_laptop",
+  "core_i7_gtx_1080_ti",
+  "rtx_3060_12gb",
+  "rtx_4080_4090",
+  "cpu_only"
+]);
 
 function selectedFieldTestProfile() {
   const value = els.fieldTestProfileSelect?.value || localStorage.getItem(FIELD_TEST_PROFILE_KEY) || "auto";
-  return FIELD_TEST_PROFILE_LABELS[value] ? value : "auto";
+  return FIELD_TEST_SELECTABLE_PROFILES.has(value) ? value : "auto";
 }
 
 function effectiveFieldTestProfile(scan = state.scan || {}) {
@@ -13691,7 +13703,7 @@ function effectiveFieldTestProfile(scan = state.scan || {}) {
 }
 
 function setFieldTestProfile(value = "auto") {
-  const next = FIELD_TEST_PROFILE_LABELS[value] ? value : "auto";
+  const next = FIELD_TEST_SELECTABLE_PROFILES.has(value) ? value : "auto";
   if (els.fieldTestProfileSelect) els.fieldTestProfileSelect.value = next;
   localStorage.setItem(FIELD_TEST_PROFILE_KEY, next);
   renderFieldTestPanel();
@@ -13753,6 +13765,7 @@ function fieldTestMachineEntry() {
   const os = [scan.os_name, scan.os_version].filter(Boolean).join(" ").trim();
   return {
     profile: fieldProfile.profile,
+    tested_at: new Date().toISOString(),
     profile_source: fieldProfile.source,
     profile_inferred: fieldProfile.inferred,
     machine_label: scan.name || [scan.gpu_name, scan.cpu_name].filter(Boolean).join(" / ") || "Machine OutilsIA",
@@ -13889,6 +13902,118 @@ function fieldTestEntryPayload() {
   };
 }
 
+function fieldTestProfileIsValid(entry = fieldTestMachineEntry()) {
+  const profile = String(entry.profile || "");
+  const gpu = String(entry.gpu || "").toLowerCase();
+  const cpu = String(entry.cpu || "").toLowerCase();
+  const os = String(entry.os || "").toLowerCase();
+  const vram = Number(entry.vram_gb || 0);
+  const ram = Number(entry.ram_gb || 0);
+  if (profile === "old_laptop") {
+    return vram <= 8 && (ram <= 24 || vram <= 6 || gpu.includes("laptop") || cpu.includes("mobile") || os.includes("laptop"));
+  }
+  if (profile === "core_i7_gtx_1080_ti") {
+    return gpu.includes("1080") && gpu.includes("ti") && vram >= 10 && vram <= 12 && (cpu.includes("i7") || cpu.includes("core"));
+  }
+  if (profile === "rtx_3060_12gb") {
+    return gpu.includes("3060") && vram >= 10 && vram <= 13;
+  }
+  if (profile === "rtx_4080_4090") {
+    return (gpu.includes("4080") || gpu.includes("4090")) && vram >= 16;
+  }
+  if (profile === "cpu_only") {
+    const dedicatedGpu = /\b(?:nvidia|geforce|quadro|tesla|rtx|gtx|radeon\s+(?:rx|pro|vii)|firepro|instinct|arc(?:\(tm\))?\s+(?:pro\s+)?[ab]\d{2,4})\b/i.test(entry.gpu || "");
+    return entry.profile_source === "manual"
+      && entry.benchmark_runtime_processor === "cpu"
+      && entry.benchmark_runtime_evidence_source === "ollama_api_ps"
+      && Number(entry.benchmark_gpu_offload_percent) === 0
+      && (entry.vram_gb == null || vram <= 4)
+      && !dedicatedGpu;
+  }
+  return false;
+}
+
+function fieldTestProofStatus(entry = fieldTestMachineEntry()) {
+  const checks = [
+    {
+      key: "scan",
+      label: "Matériel analysé",
+      actionLabel: "Analyser ce PC",
+      ok: entry.scan_ok === true
+    },
+    {
+      key: "profile",
+      label: "Profil matériel cohérent",
+      actionLabel: "Vérifier le profil terrain",
+      ok: fieldTestProfileIsValid(entry)
+    },
+    {
+      key: "benchmark",
+      label: "Benchmark mesuré",
+      actionLabel: "Ouvrir le benchmark",
+      ok: Number(entry.benchmark_tokens_per_second || 0) > 0 && Number(entry.benchmark_elapsed_ms || 0) >= 200
+    },
+    {
+      key: "promptforge",
+      label: "Prompt amélioré",
+      actionLabel: "Ouvrir PromptForge",
+      ok: entry.promptforge_ok === true
+    },
+    {
+      key: "dialogue",
+      label: "Dialogue local réussi",
+      actionLabel: "Ouvrir le dialogue",
+      ok: entry.dialogue_ok === true
+    },
+    {
+      key: "arena",
+      label: "Comparaison Arena réussie",
+      actionLabel: "Ouvrir Arena",
+      ok: entry.arena_ok === true
+    },
+    {
+      key: "report",
+      label: "Rapport partagé",
+      actionLabel: "Ouvrir le bilan à partager",
+      ok: entry.report_ok === true && /^https:\/\/outilsia\.fr\/r\//.test(String(entry.share_url || ""))
+    }
+  ];
+  const missing = checks.filter((check) => !check.ok);
+  return {
+    checks,
+    missing,
+    complete: missing.length === 0,
+    next: missing[0] || null
+  };
+}
+
+function continueFieldTest() {
+  if (!state.scan) {
+    els.prepareBtn?.click();
+    return;
+  }
+  const next = fieldTestProofStatus().next;
+  if (!next) {
+    setStatus("La fiche terrain est prête à télécharger", "ok");
+    return;
+  }
+  if (next.key === "profile") {
+    revealWorkspacePanel("machine", document.querySelector(".field-test-panel"), "start");
+    window.setTimeout(() => els.fieldTestProfileSelect?.focus({ preventScroll: true }), 260);
+  } else if (next.key === "benchmark") {
+    revealWorkspaceFeature("benchmark");
+  } else if (next.key === "promptforge") {
+    revealWorkspaceFeature("promptforge");
+  } else if (next.key === "dialogue") {
+    revealWorkspacePanel("assistant", document.querySelector(".chat-panel"), "start");
+  } else if (next.key === "arena") {
+    revealWorkspaceFeature("arena");
+  } else {
+    revealWorkspaceFeature("readiness");
+  }
+  setStatus(`${next.label} : ouvre l'étape indiquée pour compléter la fiche terrain`, "warn");
+}
+
 function renderFieldTestPanel() {
   if (!els.fieldTestBox) return;
   const profile = fieldTestProfile();
@@ -13897,12 +14022,19 @@ function renderFieldTestPanel() {
     els.fieldTestState.textContent = "scan requis";
     els.fieldTestBox.className = "field-test-box empty";
     els.fieldTestBox.textContent = "Scanne un portable, un vieux Core i7, une GTX 1080 Ti ou une RTX récente : OutilsIA dira quoi tenter, quoi éviter et quelle preuve locale obtenir.";
+    if (els.continueFieldTestBtn) {
+      els.continueFieldTestBtn.disabled = false;
+      els.continueFieldTestBtn.textContent = "Analyser ce PC";
+    }
     els.copyFieldTestBtn.disabled = true;
     if (els.copyFieldTestJsonBtn) els.copyFieldTestJsonBtn.disabled = true;
     if (els.downloadFieldTestJsonBtn) els.downloadFieldTestJsonBtn.disabled = true;
     return;
   }
-  els.fieldTestState.textContent = profile.benchmarkReady ? "preuve obtenue" : profile.machineClass;
+  const proofStatus = fieldTestProofStatus();
+  els.fieldTestState.textContent = proofStatus.complete
+    ? "fiche prête"
+    : `${proofStatus.missing.length} preuve(s) manquante(s)`;
   els.fieldTestBox.className = "field-test-box";
   const doctor = hardwareDoctorSnapshot(state.scan);
   const doctorLine = doctor
@@ -13924,10 +14056,29 @@ function renderFieldTestPanel() {
         </div>
       `).join("")}
     </div>
+    <div class="field-proof-checks" aria-label="État des preuves terrain requises">
+      ${proofStatus.checks.map((check) => `
+        <div class="${check.ok ? "complete" : "pending"}">
+          <span>${escapeHtml(check.label)}</span>
+          <strong>${check.ok ? "fait" : "à faire"}</strong>
+        </div>
+      `).join("")}
+    </div>
+    <p class="field-proof-gate ${proofStatus.complete ? "complete" : "pending"}">
+      ${proofStatus.complete
+        ? "Les sept contrôles sont validés. La fiche JSON peut être exportée puis vérifiée."
+        : `Export bloqué : prochaine étape, ${escapeHtml(proofStatus.next?.label || "compléter la recette")}.`}
+    </p>
   `;
+  if (els.continueFieldTestBtn) {
+    els.continueFieldTestBtn.disabled = proofStatus.complete;
+    els.continueFieldTestBtn.textContent = proofStatus.complete
+      ? "Toutes les preuves sont prêtes"
+      : proofStatus.next?.actionLabel || "Continuer la recette";
+  }
   els.copyFieldTestBtn.disabled = false;
-  if (els.copyFieldTestJsonBtn) els.copyFieldTestJsonBtn.disabled = false;
-  if (els.downloadFieldTestJsonBtn) els.downloadFieldTestJsonBtn.disabled = false;
+  if (els.copyFieldTestJsonBtn) els.copyFieldTestJsonBtn.disabled = !proofStatus.complete;
+  if (els.downloadFieldTestJsonBtn) els.downloadFieldTestJsonBtn.disabled = !proofStatus.complete;
 }
 
 function fieldTestMarkdown() {
@@ -13982,6 +14133,11 @@ async function copyFieldTestJson() {
     setStatus("Scan requis avant copie de la fiche terrain", "warn");
     return;
   }
+  const proofStatus = fieldTestProofStatus();
+  if (!proofStatus.complete) {
+    setStatus(`Fiche terrain incomplète : ${proofStatus.next?.label || "preuve manquante"}`, "warn");
+    return;
+  }
   await navigator.clipboard.writeText(JSON.stringify(fieldTestEntryPayload(), null, 2));
   setStatus("Fiche terrain JSON copiée", "ok");
 }
@@ -13989,6 +14145,11 @@ async function copyFieldTestJson() {
 function downloadFieldTestJson() {
   if (!state.scan) {
     setStatus("Scan requis avant téléchargement de la fiche terrain", "warn");
+    return;
+  }
+  const proofStatus = fieldTestProofStatus();
+  if (!proofStatus.complete) {
+    setStatus(`Fiche terrain incomplète : ${proofStatus.next?.label || "preuve manquante"}`, "warn");
     return;
   }
   const entry = fieldTestMachineEntry();
@@ -19348,6 +19509,28 @@ function installTestHarness() {
         wsl: wslRuntimeInfo(scan)
       };
     },
+    applyFieldTestReadyState() {
+      this.applyDemoState();
+      const base = state.scan || demoScan();
+      const scan = {
+        ...base,
+        name: "RTX 4080 SUPER / Ryzen 9",
+        gpu_name: "NVIDIA GeForce RTX 4080 SUPER",
+        vram_gb: 16,
+        raw_scan: {
+          ...(base.raw_scan || {}),
+          gpu_probe: {
+            ...(base.raw_scan?.gpu_probe || {}),
+            name: "NVIDIA GeForce RTX 4080 SUPER",
+            vram_gb: 16
+          }
+        }
+      };
+      renderScan(scan);
+      renderCompatibility(demoCompatibility());
+      renderFieldTestPanel();
+      return fieldTestMachineEntry();
+    },
     applyObjectiveArenaState() {
       this.applyDemoState();
       const validOutput = '{"instruction":"BLEU-47","memory":"RIVIERE-29","calculation":42,"correction":"La VRAM accélère l’inférence locale.","action":"Tester le modèle puis comparer les résultats."}';
@@ -20292,6 +20475,7 @@ els.copyEvidenceLedgerBtn?.addEventListener("click", copyEvidenceLedger);
 els.downloadEvidenceLedgerBtn?.addEventListener("click", downloadEvidenceLedger);
 els.clearEvidenceLedgerBtn?.addEventListener("click", clearEvidenceLedger);
 els.evidenceLedgerSource?.addEventListener("change", renderEvidenceLedgerPanel);
+els.continueFieldTestBtn?.addEventListener("click", continueFieldTest);
 els.copyFieldTestBtn.addEventListener("click", copyFieldTestMarkdown);
 els.copyFieldTestJsonBtn?.addEventListener("click", copyFieldTestJson);
 els.downloadFieldTestJsonBtn?.addEventListener("click", downloadFieldTestJson);

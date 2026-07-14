@@ -6,9 +6,19 @@ import { fileURLToPath } from "node:url";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const desktopRoot = existsSync("/mnt/c/Users/chris/Desktop") ? "/mnt/c/Users/chris/Desktop" : join(process.env.HOME || ".", "Desktop");
-const kitDir = join(desktopRoot, "OutilsIA-Local-Cockpit-Field-Test-Kit");
+function argValue(name) {
+  const index = process.argv.indexOf(name);
+  if (index === -1) return "";
+  return process.argv[index + 1] || "";
+}
+
+const kitDir = resolve(
+  argValue("--kit-dir")
+  || process.env.OUTILSIA_FIELD_KIT_DIR
+  || join(desktopRoot, "OutilsIA-Local-Cockpit-Field-Test-Kit")
+);
 const validatorSource = join(kitDir, "VALIDER-FICHE-WINDOWS.ps1");
-const scratch = join(desktopRoot, `OutilsIA-Profile-Lock-VERIFY-${process.pid}-${Date.now()}`);
+const scratch = join(appRoot, ".artifacts", `profile-lock-verify-${process.pid}-${Date.now()}`);
 
 function fail(message) {
   throw new Error(message);

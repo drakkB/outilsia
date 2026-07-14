@@ -36,6 +36,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Harmoniser l'état Compte connecté afin qu'aucun message résiduel ne demande encore de se connecter.
 - [x] Migrer une seule fois les préférences héritées de l'ancienne page longue vers la première section de chaque espace, puis respecter les nouveaux choix persistants.
 - [x] Remplacer le titre générique d'un Bilan incomplet par l'étape réellement manquante : Ollama, modèle test, benchmark, GPU ou confirmation du runtime.
+- [x] Aligner la recette multi-machines sur la navigation par espaces, afficher les sept contrôles bloquants et refuser l'export d'une fiche terrain incomplète ou incohérente avec le matériel.
 - [ ] Publier cette interface et la présenter sur le site seulement après validation manuelle du build candidat.
 
 ## Correctif validé dans les sources - Hermes, runtime et mémoire réelle

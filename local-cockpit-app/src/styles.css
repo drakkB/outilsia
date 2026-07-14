@@ -4062,6 +4062,56 @@ dd {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.field-proof-checks {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.field-proof-checks div {
+  align-items: center;
+  background: rgba(4, 9, 12, 0.50);
+  border: 1px solid rgba(139, 163, 174, 0.16);
+  border-left: 3px solid var(--amber);
+  border-radius: 7px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 9px 10px;
+}
+
+.field-proof-checks div.complete {
+  border-left-color: var(--green);
+}
+
+.field-proof-checks span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.field-proof-checks strong {
+  color: var(--amber);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.field-proof-checks div.complete strong {
+  color: var(--green);
+}
+
+.field-proof-gate {
+  border-left: 3px solid var(--amber);
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+  padding: 8px 10px;
+}
+
+.field-proof-gate.complete {
+  border-left-color: var(--green);
+}
+
 .catalog-box div,
 .list-item,
 .buying-link,
@@ -6478,7 +6528,8 @@ dd {
     justify-self: start;
   }
 
-  .field-test-steps {
+  .field-test-steps,
+  .field-proof-checks {
     grid-template-columns: 1fr;
   }
 

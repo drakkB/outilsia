@@ -454,8 +454,8 @@ function missionHtml(status) {
       <li>Prendre le profil indiqué : <strong>${escapeHtml(nextText)}</strong>.</li>
       <li>Ouvrir OutilsIA Local Cockpit sur cette machine et cliquer <strong>Analyser ce PC</strong>.</li>
       <li>Obtenir au minimum : matériel reconnu, score, modèle conseillé, benchmark, PromptForge, dialogue local, Arena, rapport.</li>
-      <li>Optionnel mais utile : dans <strong>Détails</strong>, générer l’<strong>AI Capability Passport</strong> avant l’export.</li>
-      <li>Ouvrir <strong>Test terrain</strong>, choisir le <strong>Profil terrain</strong> attendu, puis cliquer <strong>Télécharger fiche</strong>.</li>
+      <li>Optionnel mais utile : dans <strong>Atelier IA &gt; Passeport IA</strong>, générer l’<strong>AI Capability Passport</strong> avant l’export.</li>
+      <li>Ouvrir <strong>Machine &gt; Preuve terrain</strong>, choisir le <strong>Profil terrain</strong> attendu, puis cliquer <strong>Télécharger fiche</strong>.</li>
       <li>Revenir sur ce kit et lancer <strong>COLLECTER.cmd</strong>, puis <strong>STATUT.cmd</strong>.</li>
     </ol>
     <p class="muted">Manque actuel du profil suivant : ${escapeHtml(nextMissing)}.</p>
@@ -540,7 +540,7 @@ function nextProfileHtml(status) {
       <li>Copier ce kit sur la machine cible ou l'ouvrir depuis la clé USB.</li>
       <li>Lancer <code>INSTALLER-APP.cmd</code> si OutilsIA Local Cockpit n'est pas installé.</li>
       <li>Dans l'app, cliquer <strong>Analyser ce PC</strong>.</li>
-      <li>Passer en <strong>Détails</strong> puis <strong>Test terrain</strong>.</li>
+      <li>Ouvrir <strong>Machine</strong> puis <strong>Preuve terrain</strong>.</li>
       <li>Sélectionner le profil exact : <code>${escapeHtml(next || "aucun")}</code>.</li>
       <li>Télécharger la fiche attendue : <code>${escapeHtml(expectedFilename)}</code>.</li>
       <li>Revenir sur la machine principale et lancer <code>COLLECTER.cmd</code>, puis <code>PROCHAIN-PC.cmd</code>.</li>
@@ -645,7 +645,7 @@ function commandCenterHtml(status) {
       <li>Tester le profil indiqué : <strong>${escapeHtml(nextTitle)}</strong>.</li>
       <li>Sur ce PC, ouvrir OutilsIA et cliquer <strong>Analyser ce PC</strong>.</li>
       <li>Obtenir matériel, score, modèle conseillé, benchmark, PromptForge, dialogue, Arena et rapport.</li>
-      <li>Exporter la fiche depuis <strong>Détails</strong> &gt; <strong>Test terrain</strong> avec le bon profil manuel.</li>
+      <li>Exporter la fiche depuis <strong>Machine</strong> &gt; <strong>Preuve terrain</strong> avec le bon profil manuel.</li>
       <li>Lancer <code>VALIDER-DERNIERE-FICHE.cmd</code>, puis <code>EXPORTER-FICHES.cmd</code> si le PC est distant.</li>
     </ol>
   </section>
