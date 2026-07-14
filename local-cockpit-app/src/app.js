@@ -697,6 +697,8 @@ let recipeAutoSaveTimer = null;
 const UI_MODE_STORAGE_KEY = "outilsia-local-cockpit-ui-mode";
 const WORKSPACE_TAB_STORAGE_KEY = "outilsia-local-cockpit-workspace-tab";
 const WORKSPACE_SECTION_STORAGE_KEY = "outilsia-local-cockpit-workspace-sections";
+const WORKSPACE_LAYOUT_VERSION_KEY = "outilsia-local-cockpit-workspace-layout-version";
+const WORKSPACE_LAYOUT_VERSION = "focused-workspaces-2026-07-14";
 const WORKSPACE_SECTION_ALL = "__all__";
 const WORKSPACE_TABS = ["overview", "machine", "models", "tests", "assistant", "workflows", "account"];
 const WORKSPACE_TITLES = {
@@ -961,6 +963,13 @@ function restoreWorkspaceSectionState() {
   try {
     const saved = JSON.parse(localStorage.getItem(WORKSPACE_SECTION_STORAGE_KEY) || "{}");
     if (!saved || typeof saved !== "object" || Array.isArray(saved)) return;
+    if (localStorage.getItem(WORKSPACE_LAYOUT_VERSION_KEY) !== WORKSPACE_LAYOUT_VERSION) {
+      for (const tab of WORKSPACE_TABS) {
+        workspaceSectionState[tab] = WORKSPACE_SECTIONS[tab]?.[0]?.[1] || WORKSPACE_SECTION_ALL;
+      }
+      persistWorkspaceSectionState();
+      return;
+    }
     for (const tab of WORKSPACE_TABS) {
       const selector = String(saved[tab] || "");
       if (selector === WORKSPACE_SECTION_ALL || (WORKSPACE_SECTIONS[tab] || []).some(([, value]) => value === selector)) {
@@ -975,6 +984,7 @@ function restoreWorkspaceSectionState() {
 function persistWorkspaceSectionState() {
   try {
     localStorage.setItem(WORKSPACE_SECTION_STORAGE_KEY, JSON.stringify(workspaceSectionState));
+    localStorage.setItem(WORKSPACE_LAYOUT_VERSION_KEY, WORKSPACE_LAYOUT_VERSION);
   } catch (_) {
     // Session navigation still works when localStorage is unavailable.
   }

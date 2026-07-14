@@ -51,6 +51,16 @@ HUMAN_PANEL_TITLES = {
     ".flight-recorder-panel": ("Suivre les performances", "Flight Recorder"),
 }
 
+WORKSPACE_FIRST_SELECTORS = {
+    "overview": ".readiness-panel",
+    "machine": ".machine-panel",
+    "models": ".models-panel",
+    "tests": ".prepare-panel",
+    "assistant": ".promptforge-panel",
+    "workflows": ".workstack-composer-panel",
+    "account": ".account-panel",
+}
+
 
 def assert_no_horizontal_overflow(page, label: str):
     metrics = page.evaluate(
@@ -170,6 +180,39 @@ def assert_feature_route(page, source_tab: str, source_section: str, button: str
     }
     if state != expected:
         raise AssertionError(f"{label}: prerequisite route mismatch {state}, expected {expected}")
+
+
+def assert_legacy_layout_migration(browser):
+    page = browser.new_page(viewport={"width": 1180, "height": 780}, device_scale_factor=1)
+    page.goto(HTML.as_uri(), wait_until="load")
+    page.evaluate(
+        """(tabs) => {
+          const legacy = Object.fromEntries(tabs.map((tab) => [tab, '__all__']));
+          localStorage.setItem('outilsia-local-cockpit-workspace-sections', JSON.stringify(legacy));
+          localStorage.removeItem('outilsia-local-cockpit-workspace-layout-version');
+          localStorage.setItem('outilsia-local-cockpit-workspace-tab', 'models');
+        }""",
+        list(WORKSPACES),
+    )
+    page.reload(wait_until="load")
+    migrated = page.evaluate(
+        """() => ({
+          active: document.querySelector('#appShell')?.dataset.workspaceTab || '',
+          section: document.querySelector('#workspaceSectionSelect')?.value || '',
+          version: localStorage.getItem('outilsia-local-cockpit-workspace-layout-version') || '',
+          sections: JSON.parse(localStorage.getItem('outilsia-local-cockpit-workspace-sections') || '{}')
+        })"""
+    )
+    if migrated["active"] != "models" or migrated["section"] != ".models-panel" or not migrated["version"]:
+        raise AssertionError(f"legacy layout did not migrate to the focused model view: {migrated}")
+    if migrated["sections"] != WORKSPACE_FIRST_SELECTORS:
+        raise AssertionError(f"legacy all-sections preferences were not reset once: {migrated}")
+
+    page.locator("#workspaceSectionSelect").select_option("__all__")
+    page.reload(wait_until="load")
+    if page.locator("#workspaceSectionSelect").input_value() != "__all__":
+        raise AssertionError("the current layout no longer preserves an explicit all-sections choice")
+    page.close()
 
 
 def check(browser, width: int, height: int, label: str):
@@ -366,6 +409,7 @@ def check(browser, width: int, height: int, label: str):
 def main():
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
+        assert_legacy_layout_migration(browser)
         desktop = check(browser, 1440, 900, "desktop")
         mobile = check(browser, 390, 844, "mobile")
         browser.close()
