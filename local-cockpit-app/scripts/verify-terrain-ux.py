@@ -55,7 +55,7 @@ def assert_no_horizontal_overflow(page, label: str):
         raise AssertionError(f"{label}: horizontal overflow {overflow}px {metrics}")
 
 
-def assert_first_screen_contract(page, label: str):
+def assert_first_screen_contract(page, label: str, scanned: bool = False):
     if not visible(page, "#prepareBtn"):
         raise AssertionError(f"{label}: main analysis button must be visible")
     primary = text(page, "#prepareBtn")
@@ -64,8 +64,11 @@ def assert_first_screen_contract(page, label: str):
 
     if not visible(page, ".machine-summary-strip"):
         raise AssertionError(f"{label}: machine summary must be immediately visible")
-    if not visible(page, ".quick-decision-strip"):
-        raise AssertionError(f"{label}: quick decision strip must be immediately visible")
+    quick_visible = visible(page, ".quick-decision-strip")
+    if scanned and not quick_visible:
+        raise AssertionError(f"{label}: scanned action strip must remain available")
+    if not scanned and quick_visible:
+        raise AssertionError(f"{label}: duplicate prescan decision must stay hidden")
 
     machine = text(page, ".machine-summary-strip")
     machine_lower = machine.lower()
@@ -73,11 +76,10 @@ def assert_first_screen_contract(page, label: str):
     if missing_machine:
         raise AssertionError(f"{label}: machine summary missing {missing_machine}: {machine}")
 
-    quick = text(page, ".quick-decision-strip")
-    quick_lower = quick.lower()
-    missing_quick = [item for item in REQUIRED_QUICK_LABELS if item.lower() not in quick_lower]
-    if missing_quick:
-        raise AssertionError(f"{label}: quick strip missing {missing_quick}: {quick}")
+    if not scanned:
+        readiness = text(page, "#readinessBox")
+        if "Ce PC n'a pas encore été analysé" not in readiness:
+            raise AssertionError(f"{label}: prescan Bilan is not the single decision surface: {readiness}")
 
     noisy_visible = [
         selector
@@ -99,14 +101,25 @@ def assert_first_screen_contract(page, label: str):
 def assert_scanned_contract(page, label: str):
     result = page.evaluate("""() => window.__OUTILSIA_TEST__.applyDemoState()""")
     page.wait_for_timeout(250)
-    assert_first_screen_contract(page, label)
+    assert_first_screen_contract(page, label, scanned=True)
 
     machine = text(page, ".machine-summary-strip")
     for needle in ["RTX", "64 Go", "24 Go", "Prêt"]:
         if needle not in machine:
             raise AssertionError(f"{label}: scanned machine summary missing {needle!r}: {machine}")
 
+    readiness = text(page, "#readinessBox")
+    for needle in ["Machine prête pour l'IA locale", "Hermes 3 8B", "37.5 tok/s", "Gros LLM"]:
+        if needle not in readiness:
+            raise AssertionError(f"{label}: scanned Bilan missing {needle!r}: {readiness}")
+
+    page.locator("#workspaceSectionSelect").select_option(".verdict-panel")
+    page.wait_for_timeout(80)
     quick = text(page, ".quick-decision-strip")
+    quick_lower = quick.lower()
+    missing_quick_labels = [item for item in REQUIRED_QUICK_LABELS if item.lower() not in quick_lower]
+    if missing_quick_labels:
+        raise AssertionError(f"{label}: expanded quick strip missing {missing_quick_labels}: {quick}")
     required = [
         "Générer le rapport final",
         "Potentiel matériel",
@@ -145,6 +158,7 @@ def assert_scanned_contract(page, label: str):
 
     if "qwen3:0.6b" not in result["quick"]["proof"]:
         raise AssertionError(f"{label}: harness proof state not aligned: {result['quick']}")
+    page.locator("#workspaceSectionSelect").select_option(".readiness-panel")
 
 
 def check(browser, width: int, height: int, label: str):
@@ -152,7 +166,7 @@ def check(browser, width: int, height: int, label: str):
     page.goto(HTML.as_uri(), wait_until="load")
     page.wait_for_timeout(250)
     assert_no_horizontal_overflow(page, f"{label}-initial")
-    assert_first_screen_contract(page, f"{label}-initial")
+    assert_first_screen_contract(page, f"{label}-initial", scanned=False)
     screenshot_initial = OUT / f"terrain-ux-{label}-initial.png"
     page.screenshot(path=screenshot_initial, full_page=True)
 

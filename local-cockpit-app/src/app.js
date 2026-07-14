@@ -727,8 +727,8 @@ const WORKSPACE_PREREQUISITES = {
 };
 const WORKSPACE_SECTIONS = {
   overview: [
-    ["Verdict immédiat", ".verdict-panel"],
-    ["Bilan machine", ".readiness-panel"]
+    ["Bilan machine", ".readiness-panel"],
+    ["Verdict immédiat", ".verdict-panel"]
   ],
   machine: [
     ["Matériel détecté", ".machine-panel"],
@@ -765,18 +765,18 @@ const WORKSPACE_SECTIONS = {
     ["Exporter la mémoire", ".memory-panel"]
   ],
   workflows: [
-    ["Préparer Strategy Arena", ".strategy-bridge-panel"],
-    ["Créer le passeport IA", ".capability-passport-panel"],
-    ["Partager localement", ".local-capability-bridge-panel"],
-    ["Lire un board", ".board-observer-panel"],
     ["Composer le plan", ".workstack-composer-panel"],
+    ["Lire un board", ".board-observer-panel"],
     ["Affecter les rôles", ".capability-router-panel"],
     ["Comparer des stacks", ".forgebench-panel"],
-    ["Vérifier les preuves", ".evidence-ledger-panel"]
+    ["Vérifier les preuves", ".evidence-ledger-panel"],
+    ["Créer le passeport IA", ".capability-passport-panel"],
+    ["Partager localement", ".local-capability-bridge-panel"],
+    ["Préparer Strategy Arena", ".strategy-bridge-panel"]
   ],
   account: [
-    ["Bilan machine", ".readiness-panel"],
     ["Sauvegarde OutilsIA", ".account-panel"],
+    ["Bilan machine", ".readiness-panel"],
     ["Signaler un problème", ".feedback-panel"],
     ["Historique local", ".history-panel"]
   ]
@@ -2155,14 +2155,17 @@ function renderModelCard(model, index = 0, extraClass = "") {
         <span>${escapeHtml(actionability.detail)}</span>
       </div>
       <span>${escapeHtml(modelLine(model))}</span>
-      <div class="model-card-profile">
-        <div><strong>Force</strong><span>${escapeHtml(info.strength)}</span></div>
-        <div><strong>Usage</strong><span>${escapeHtml(info.fit)}</span></div>
-        <div><strong>Limite</strong><span>${escapeHtml(info.limit)}</span></div>
-      </div>
       <span>${escapeHtml(benchText)}</span>
       ${highlight}
       ${renderModelActions(model, { primaryLabel: index === 0 ? "Installer recommandé" : "Installer" })}
+      <details class="model-card-details">
+        <summary>Force, usage et limites</summary>
+        <div class="model-card-profile">
+          <div><strong>Force</strong><span>${escapeHtml(info.strength)}</span></div>
+          <div><strong>Usage</strong><span>${escapeHtml(info.fit)}</span></div>
+          <div><strong>Limite</strong><span>${escapeHtml(info.limit)}</span></div>
+        </div>
+      </details>
     </div>
   `;
 }
@@ -3588,29 +3591,37 @@ function renderHardwareDoctor(scan) {
       <span class="doctor-source">${escapeHtml(source)} · confiance ${escapeHtml(analysis.confidence)}</span>
       ${analysis.actions.length ? `<span>${escapeHtml(analysis.actions[0])}</span>` : "<span>Aucune action urgente détectée.</span>"}
     </div>
-    <div class="doctor-checks">
-      ${analysis.checks.slice(0, 8).map((check) => `
-        <div class="doctor-check ${escapeHtml(check.state)}">
-          <strong>${escapeHtml(check.label)}</strong>
-          <span>${escapeHtml(check.detail)}</span>
+    <details id="hardwareDoctorDetails" class="hardware-doctor-details">
+      <summary>
+        <span>Voir les contrôles, le runtime et le pilote</span>
+        <small>${escapeHtml(`${analysis.checks.length} contrôles · ${rows.length} mesures`)}</small>
+      </summary>
+      <div class="hardware-doctor-detail-content">
+        <div class="doctor-checks">
+          ${analysis.checks.slice(0, 8).map((check) => `
+            <div class="doctor-check ${escapeHtml(check.state)}">
+              <strong>${escapeHtml(check.label)}</strong>
+              <span>${escapeHtml(check.detail)}</span>
+            </div>
+          `).join("")}
         </div>
-      `).join("")}
-    </div>
-    <div class="runtime-driver-details advanced-panel">
-      <strong>Runtime & Driver Intelligence v1</strong>
-      <span>${escapeHtml(analysis.runtimeDriver.vendor_label)}${analysis.runtimeDriver.family ? ` · ${escapeHtml(analysis.runtimeDriver.family.label)}` : ""} · ${escapeHtml(analysis.runtimeDriver.backend.label)} · ${escapeHtml(analysis.runtimeDriver.backend.ollama_support_tier)}</span>
-      <span>${escapeHtml(analysis.runtimeDriver.api_signal.status === "reported" ? `${analysis.runtimeDriver.api_signal.label || analysis.runtimeDriver.backend.label} ${analysis.runtimeDriver.api_signal.value} signalé, offload non prouvé` : "API GPU non confirmée")}</span>
-      <span>${escapeHtml(analysis.runtimeDriver.memory.note)}</span>
-      <small>Matrice ${escapeHtml(analysis.runtimeDriver.matrix_version)} · revue ${escapeHtml(analysis.runtimeDriver.matrix_updated_at)} · installation pilote automatique désactivée</small>
-    </div>
-    ${driverLink ? `
-      <div class="row-actions compact-actions doctor-actions">
-        <button type="button" data-open-url="${escapeHtml(driverLink.url)}">${escapeHtml(driverLink.label)}</button>
+        <div class="runtime-driver-details">
+          <strong>Runtime & Driver Intelligence v1</strong>
+          <span>${escapeHtml(analysis.runtimeDriver.vendor_label)}${analysis.runtimeDriver.family ? ` · ${escapeHtml(analysis.runtimeDriver.family.label)}` : ""} · ${escapeHtml(analysis.runtimeDriver.backend.label)} · ${escapeHtml(analysis.runtimeDriver.backend.ollama_support_tier)}</span>
+          <span>${escapeHtml(analysis.runtimeDriver.api_signal.status === "reported" ? `${analysis.runtimeDriver.api_signal.label || analysis.runtimeDriver.backend.label} ${analysis.runtimeDriver.api_signal.value} signalé, offload non prouvé` : "API GPU non confirmée")}</span>
+          <span>${escapeHtml(analysis.runtimeDriver.memory.note)}</span>
+          <small>Matrice ${escapeHtml(analysis.runtimeDriver.matrix_version)} · revue ${escapeHtml(analysis.runtimeDriver.matrix_updated_at)} · installation pilote automatique désactivée</small>
+        </div>
+        ${driverLink ? `
+          <div class="row-actions compact-actions doctor-actions">
+            <button type="button" data-open-url="${escapeHtml(driverLink.url)}">${escapeHtml(driverLink.label)}</button>
+          </div>
+        ` : ""}
+        ${rows.length ? `<dl class="doctor-grid">${rows.map(([label, value]) => `
+          <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>
+        `).join("")}</dl>` : ""}
       </div>
-    ` : ""}
-    ${rows.length ? `<dl class="doctor-grid">${rows.map(([label, value]) => `
-      <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>
-    `).join("")}</dl>` : ""}
+    </details>
   `;
 }
 
@@ -3873,7 +3884,7 @@ function renderRecommendationEngine(profileKey = readUsageProfileKey()) {
       <div class="recommendation-engine-head">
         <div>
           <span class="label">Comparaison par usage · moteur v2</span>
-          <strong>Quel modèle convient le mieux à ${escapeHtml(profile.label)} ?</strong>
+          <strong>Quel modèle pour le profil ${escapeHtml(profile.label)} ?</strong>
           <p>Deux modèles passent le même test local. OutilsIA mesure la qualité, la vitesse et les ressources avant de proposer un gagnant.</p>
         </div>
         <em>${decision ? `confiance ${escapeHtml(decision.confidence)}` : "pas encore comparé"}</em>
@@ -6515,15 +6526,6 @@ function renderPreparePanel() {
   ];
   els.prepareState.textContent = flow.status;
   els.prepareBox.innerHTML = `
-    <div class="prepare-journey" aria-label="Parcours principal">
-      ${journey.map((step, index) => `
-        <div class="prepare-journey-step ${step.ok ? "ok-step" : ""}">
-          <strong>${escapeHtml(`${index + 1}. ${step.label}`)}</strong>
-          <span>${escapeHtml(step.text)}</span>
-        </div>
-      `).join("")}
-    </div>
-    ${renderModelOfMomentCard()}
     <div class="usage-profile-box" aria-label="Profil d'usage">
       <div class="usage-profile-head">
         <div>
@@ -6540,90 +6542,112 @@ function renderPreparePanel() {
           </button>
         `).join("")}
       </div>
-      <div class="usage-pack-card">
-        <div class="usage-pack-head">
-          <div>
-            <span class="label">Pack conseillé</span>
-            <strong>${escapeHtml(usagePack.action.label)}</strong>
-            <p>${escapeHtml(usagePack.action.detail)}</p>
-          </div>
-          <em>${escapeHtml(usagePack.benchmarked ? "mesuré" : usagePack.installed ? "installé" : "à préparer")}</em>
+      <div class="usage-decision-strip">
+        <div>
+          <span class="label">Plan conseillé</span>
+          <strong>${escapeHtml(usagePack.action.label)}</strong>
+          <p>${escapeHtml(usagePack.action.detail)}</p>
         </div>
-        <div class="usage-pack-grid">
-          <div>
-            <strong>Modèle</strong>
-            <span>${escapeHtml(usagePack.model || "après scan")}</span>
-          </div>
-          <div>
-            <strong>Test</strong>
-            <span>${escapeHtml(usagePack.test.label)}</span>
-          </div>
-          <div>
-            <strong>Contexte</strong>
-            <span>${escapeHtml(usagePack.context)}</span>
-          </div>
-          <div>
-            <strong>Quantization</strong>
-            <span>${escapeHtml(usagePack.quantization)}</span>
-          </div>
-        </div>
-        <div class="row-actions compact-actions usage-pack-actions">
-          <button type="button" data-usage-pack="benchmark">Utiliser pour benchmark</button>
-          <button type="button" data-usage-pack="chat">Utiliser pour dialogue</button>
-          ${usagePack.model
-            ? usagePack.installed
-              ? `<button type="button" data-benchmark-model="${escapeHtml(usagePack.model)}">${usagePack.benchmarked ? "Retester le pack" : "Benchmarker le pack"}</button>`
-              : `<button type="button" data-install-model="${escapeHtml(usagePack.model)}">Installer le pack</button>`
-            : ""}
-        </div>
+        <span>${escapeHtml(usagePack.benchmarked ? "mesuré" : usagePack.installed ? "installé" : "à préparer")}</span>
       </div>
       ${renderRecommendationEngine(usage.key)}
     </div>
-    <div class="cockpit-focus">
-      <div class="cockpit-focus-card ${flow.benchmarkReady ? "ok-step" : ""}">
-        <strong>Preuve locale</strong>
-        <span>${escapeHtml(flow.testModel)} · ${escapeHtml(testSpeed)}</span>
-      </div>
-      <div class="cockpit-focus-card ${recommended.installed ? "ok-step" : ""}">
-        <strong>Prochain modèle</strong>
-        <span>${escapeHtml(secondLabel)}</span>
-        <div class="compact-actions">${secondAction}</div>
-      </div>
-      <div class="cockpit-focus-card ${flow.reportReady ? "ok-step" : ""}">
-        <strong>Rapport</strong>
-        <span>${escapeHtml(reportLabel)}</span>
-        <div class="compact-actions">
-          <button type="button" data-generate-cockpit-report="true" ${flow.benchmarkReady ? "" : "disabled"}>Générer</button>
+    <details class="prepare-support-details">
+      <summary>
+        <span>Voir le parcours complet et les réglages</span>
+        <small>preuve locale · pack conseillé · rapport</small>
+      </summary>
+      <div class="prepare-support-content">
+        <div class="prepare-journey" aria-label="Parcours principal">
+          ${journey.map((step, index) => `
+            <div class="prepare-journey-step ${step.ok ? "ok-step" : ""}">
+              <strong>${escapeHtml(`${index + 1}. ${step.label}`)}</strong>
+              <span>${escapeHtml(step.text)}</span>
+            </div>
+          `).join("")}
         </div>
-      </div>
-    </div>
-    <details class="prepare-details">
-      <summary>Détails techniques du parcours</summary>
-      <div class="prepare-steps">
-        ${flow.steps.map((step) => `
-          <div class="prepare-step ${step.ok ? "ok-step" : ""}">
-            <strong>${escapeHtml(step.label)}</strong>
-            <span>${escapeHtml(step.text)}</span>
+        ${renderModelOfMomentCard()}
+        <div class="usage-pack-card">
+          <div class="usage-pack-head">
+            <div>
+              <span class="label">Pack conseillé</span>
+              <strong>${escapeHtml(usagePack.action.label)}</strong>
+              <p>${escapeHtml(usagePack.action.detail)}</p>
+            </div>
+            <em>${escapeHtml(usagePack.benchmarked ? "mesuré" : usagePack.installed ? "installé" : "à préparer")}</em>
           </div>
-        `).join("")}
+          <div class="usage-pack-grid">
+            <div>
+              <strong>Modèle</strong>
+              <span>${escapeHtml(usagePack.model || "après scan")}</span>
+            </div>
+            <div>
+              <strong>Test</strong>
+              <span>${escapeHtml(usagePack.test.label)}</span>
+            </div>
+            <div>
+              <strong>Contexte</strong>
+              <span>${escapeHtml(usagePack.context)}</span>
+            </div>
+            <div>
+              <strong>Quantization</strong>
+              <span>${escapeHtml(usagePack.quantization)}</span>
+            </div>
+          </div>
+          <div class="row-actions compact-actions usage-pack-actions">
+            <button type="button" data-usage-pack="benchmark">Utiliser pour benchmark</button>
+            <button type="button" data-usage-pack="chat">Utiliser pour dialogue</button>
+            ${usagePack.model
+              ? usagePack.installed
+                ? `<button type="button" data-benchmark-model="${escapeHtml(usagePack.model)}">${usagePack.benchmarked ? "Retester le pack" : "Benchmarker le pack"}</button>`
+                : `<button type="button" data-install-model="${escapeHtml(usagePack.model)}">Installer le pack</button>`
+              : ""}
+          </div>
+        </div>
+        <div class="cockpit-focus">
+          <div class="cockpit-focus-card ${flow.benchmarkReady ? "ok-step" : ""}">
+            <strong>Preuve locale</strong>
+            <span>${escapeHtml(flow.testModel)} · ${escapeHtml(testSpeed)}</span>
+          </div>
+          <div class="cockpit-focus-card ${recommended.installed ? "ok-step" : ""}">
+            <strong>Prochain modèle</strong>
+            <span>${escapeHtml(secondLabel)}</span>
+            <div class="compact-actions">${secondAction}</div>
+          </div>
+          <div class="cockpit-focus-card ${flow.reportReady ? "ok-step" : ""}">
+            <strong>Rapport</strong>
+            <span>${escapeHtml(reportLabel)}</span>
+            <div class="compact-actions">
+              <button type="button" data-generate-cockpit-report="true" ${flow.benchmarkReady ? "" : "disabled"}>Générer</button>
+            </div>
+          </div>
+        </div>
+        <div class="prepare-steps" aria-label="Étapes techniques du parcours">
+          ${flow.steps.map((step) => `
+            <div class="prepare-step ${step.ok ? "ok-step" : ""}">
+              <strong>${escapeHtml(step.label)}</strong>
+              <span>${escapeHtml(step.text)}</span>
+            </div>
+          `).join("")}
+        </div>
+        <div class="prepare-next">
+          <strong>Action conseillée</strong>
+          <span>${escapeHtml(flow.next)}</span>
+        </div>
+        ${recommended.ref ? `
+          <div class="prepare-next recommended-next">
+            <strong>Deuxième modèle recommandé</strong>
+            <span>${escapeHtml(recommended.title)} · ${escapeHtml(recommended.ref)}</span>
+            <span>${escapeHtml(recommended.info?.fit || "Modèle conseillé après le test léger.")}</span>
+            <div class="row-actions compact-actions">
+              ${recommended.installed
+                ? `<button type="button" data-benchmark-model="${escapeHtml(recommended.ref)}">${recommended.benchmarked ? "Retester ce modèle" : "Benchmarker ce modèle"}</button>`
+                : `<button type="button" data-install-model="${escapeHtml(recommended.ref)}">Installer ce modèle</button>`}
+            </div>
+          </div>
+        ` : ""}
       </div>
     </details>
-    <div class="prepare-next">
-      <strong>Action conseillée</strong>
-      <span>${escapeHtml(flow.next)}</span>
-    </div>
-    ${recommended.ref ? `
-      <div class="prepare-next recommended-next">
-        <strong>Deuxième modèle recommandé</strong>
-        <span>${escapeHtml(recommended.title)} · ${escapeHtml(recommended.ref)}</span>
-        <span>${escapeHtml(recommended.info?.fit || "Modèle conseillé après le test léger.")}</span>
-        <div class="row-actions compact-actions">
-          ${recommended.installed
-            ? `<button type="button" data-benchmark-model="${escapeHtml(recommended.ref)}">${recommended.benchmarked ? "Retester ce modèle" : "Benchmarker ce modèle"}</button>`
-            : `<button type="button" data-install-model="${escapeHtml(recommended.ref)}">Installer ce modèle</button>`}
-        </div>
-      </div>
-    ` : ""}
   `;
   renderPrimaryAction();
 }
@@ -7835,7 +7859,7 @@ function renderReadinessPanel() {
   const actionCards = [
     {
       eyebrow: "Choisir le meilleur modèle",
-      title: recommendationWinner ? recommendation.verdict : `Comparer pour ${report.usage_profile.label}`,
+      title: recommendationWinner ? recommendation.verdict : `Comparer pour le profil ${report.usage_profile.label}`,
       detail: recommendationWinner
         ? `${recommendationWinner.model} · ${recommendationWinner.score}/100 · confiance ${recommendation.confidence}`
         : "OutilsIA soumet deux modèles au même test local et explique son choix.",
@@ -14327,6 +14351,7 @@ async function scanMachine() {
     const scan = invoke ? await invoke("scan_machine") : demoScan();
     if (invoke) state.optimisticInstalledModels = [];
     renderScan(scan);
+    await refreshAuthState().catch(() => {});
     setStatus("Scan termine", "ok");
     renderPrimaryAction();
   } catch (error) {
@@ -17249,6 +17274,18 @@ async function refreshAuthState() {
       <strong>Connecté</strong>
       <span>${escapeHtml(accountLabel)}</span>
     `;
+    if (/connecte ton compte|compte non connecté|analyse ce pc avant/i.test(els.syncResult?.textContent || "")) {
+      els.syncResult.textContent = state.scan
+        ? "Compte connecté. Sauvegarde ce PC pour le retrouver sur OutilsIA.fr."
+        : "Compte connecté. Analyse ce PC avant de le sauvegarder.";
+    }
+    if (/connecte (?:le|ton) compte/i.test(els.feedbackResult?.textContent || "")) {
+      els.feedbackResult.textContent = "Compte connecté. Décris le problème observé puis envoie le retour.";
+    }
+    if (/connecte ton compte/i.test(els.updatesList?.textContent || "")) {
+      els.updatesList.className = "list empty";
+      els.updatesList.textContent = "Compte connecté. Actualise pour retrouver tes machines.";
+    }
   } else {
     els.syncState.textContent = pendingPairingUrl ? "en attente" : "non connecté";
     if (els.topAccountBtn) els.topAccountBtn.textContent = pendingPairingUrl ? "En attente" : "Compte";
@@ -17266,6 +17303,10 @@ async function refreshAuthState() {
         <strong>Compte non connecté</strong>
         <span>Sauvegarde ce PC, tes modèles et tes benchmarks.</span>
       `;
+      els.syncResult.textContent = "Connecte ton compte pour retrouver ce PC sur OutilsIA.fr.";
+      els.updatesList.className = "list empty";
+      els.updatesList.textContent = "Connecte ton compte pour retrouver tes machines.";
+      els.feedbackResult.textContent = "Connecte le compte pour envoyer un retour lié au scan visible dans l'app.";
     }
   }
 }

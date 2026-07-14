@@ -1,6 +1,6 @@
 # Notice d'utilisation - Workstacks et preuves OutilsIA
 
-Version de la notice : 2026-07-13
+Version de la notice : 2026-07-14
 Périmètre : OutilsIA Local Cockpit, espace **Atelier IA**
 
 ## Navigation du cockpit
@@ -11,11 +11,11 @@ L'application conserve le matériel détecté en tête de fenêtre, puis répart
 |---|---|
 | Accueil | Lire le verdict, le modèle conseillé, la preuve locale et la prochaine action. |
 | Machine | Examiner Hardware Doctor, le runtime, les upgrades, le Digital Twin et la fiche terrain. |
-| Modèles | Voir les modèles compatibles ou installés, le catalogue et les commandes Ollama. |
+| Modèles | Voir les modèles compatibles ou installés, agir immédiatement, puis déplier Force/Usage/Limite si nécessaire. |
 | Tests | Lancer benchmark, Arena, tests privés, Autopilot, Flight Recorder et consulter la console technique. |
 | Assistant | Dialoguer localement, optimiser les prompts et conserver MemoryForge. |
-| Atelier IA | Préparer les Workstacks, router les capacités, exécuter ForgeBench et chaîner les preuves. |
-| Compte | Synchroniser, partager, signaler un problème, vérifier la release et retrouver l'historique. |
+| Atelier IA | Composer d'abord une Workstack, router les capacités, exécuter ForgeBench et chaîner les preuves. |
+| Compte | Connecter et sauvegarder d'abord la machine, puis partager, signaler un problème et retrouver l'historique. |
 
 Les actions transversales ouvrent automatiquement l'espace correspondant. Par exemple, **Bench** ouvre Tests, **Dialogue** ouvre Assistant et **Préparer** depuis Board Observer ouvre Atelier IA. Le menu **Section** mène directement au module choisi dans l'espace actif.
 
@@ -34,8 +34,8 @@ Les actions transversales ouvrent automatiquement l'espace correspondant. Par ex
 
 ## Parcours disponible aujourd'hui
 
-1. Ouvrir l'espace **Atelier IA**.
-2. Dans **Board Observer**, renseigner l'URL HTTPS de Planka, l'identifiant du board et une clé API éphémère.
+1. Ouvrir l'espace **Atelier IA**. La première section, **Composer le plan**, indique qu'une carte est nécessaire.
+2. Cliquer sur **Choisir une carte** pour ouvrir **Board Observer**, puis renseigner l'URL HTTPS de Planka, l'identifiant du board et une clé API éphémère.
 3. Cliquer sur **Observer**. La clé est effacée du formulaire après la lecture.
 4. Sur une carte `Ready for Agent`, cliquer sur **Préparer**.
 5. Dans **Workstack Composer**, choisir la priorité et compiler le plan.

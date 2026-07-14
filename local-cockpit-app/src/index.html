@@ -245,17 +245,20 @@
 
         <article class="panel prepare-panel" data-workspace="tests">
           <div class="panel-title">
-            <h2>Prochaines étapes</h2>
+            <h2>Choisir le meilleur modèle</h2>
             <span id="prepareState">prêt</span>
           </div>
           <div id="prepareBox" class="prepare-box">
             Un seul parcours pour préparer la machine : scan, Ollama, modèle test, benchmark visible, puis dialogue local.
           </div>
-          <div class="row-actions">
-            <button id="oldPortablePresetBtn" type="button">Test portable ancien</button>
-            <button id="preparePanelBtn" type="button">Parcours guidé test + rapport</button>
-            <button id="pdfReportBtn" type="button" disabled>Rapport PDF modèle/upgrade</button>
-          </div>
+          <details class="prepare-tools-details">
+            <summary>Autres parcours et exports</summary>
+            <div class="row-actions">
+              <button id="oldPortablePresetBtn" type="button">Test portable ancien</button>
+              <button id="preparePanelBtn" type="button">Parcours guidé test + rapport</button>
+              <button id="pdfReportBtn" type="button" disabled>Rapport PDF modèle/upgrade</button>
+            </div>
+          </details>
         </article>
 
         <article class="panel first-test-panel" data-workspace="tests">
@@ -768,6 +771,7 @@
             <h2>Modèles compatibles</h2>
             <span id="modelCount">0 détecté</span>
           </div>
+          <p class="model-list-hint">Fais défiler les modèles. Les actions utiles restent visibles ; les détails techniques se déplient à la demande.</p>
           <div id="modelList" class="list empty">Aucun diagnostic OutilsIA chargé.</div>
         </article>
 

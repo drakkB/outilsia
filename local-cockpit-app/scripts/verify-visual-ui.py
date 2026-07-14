@@ -59,10 +59,14 @@ def assert_button_text_fits(page, label: str):
 
 
 def assert_primary_hover(page, label: str):
+    checked = 0
     for selector in ["#prepareBtn", "#quickActionBtn"]:
         button = page.locator(selector)
+        if selector == "#quickActionBtn" and not button.is_visible():
+            continue
         if not button.is_visible() or button.is_disabled():
             raise AssertionError(f"{label}: primary action is not available: {selector}")
+        checked += 1
         button.hover()
         appearance = button.evaluate(
             """(node) => ({
@@ -72,6 +76,8 @@ def assert_primary_hover(page, label: str):
         )
         if "linear-gradient" not in appearance["backgroundImage"] or appearance["color"] != "rgb(2, 21, 17)":
             raise AssertionError(f"{label}: primary hover loses contrast: {selector} {appearance}")
+    if not checked:
+        raise AssertionError(f"{label}: no primary action was available for hover verification")
     page.mouse.move(0, 0)
 
 
@@ -182,7 +188,7 @@ def check_viewport(browser, width: int, height: int, label: str):
     assert_visible(page, "#prepareBtn", f"{label} primary analysis")
     assert_hidden(page, "#scanBtn", f"{label} legacy scan button")
     assert_visible(page, ".machine-summary-strip", f"{label} machine summary")
-    assert_visible(page, ".quick-decision-strip", f"{label} quick decision")
+    assert_hidden(page, ".quick-decision-strip", f"{label} duplicate prescan decision")
     assert_no_horizontal_overflow(page, label)
     assert_button_text_fits(page, label)
     assert_primary_hover(page, label)

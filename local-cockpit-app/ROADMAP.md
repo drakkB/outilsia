@@ -19,10 +19,10 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Donner toute la largeur disponible au module isolé par le menu Section, notamment au Benchmark.
 - [x] Conserver les sept onglets sur une ligne défilable sur Android, recentrer l'onglet actif et prendre en charge les flèches, Début et Fin au clavier.
 - [x] Conserver les formulaires et mémoriser l'espace actif entre deux ouvertures.
-- [x] Réduire le pire cas mesuré de 18,1 à 2,1 hauteurs d'écran sur desktop et de 36,5 à 3,6 sur mobile.
+- [x] Réduire le pire cas focalisé mesuré de 18,1 à 1,9 hauteur d'écran sur desktop et de 36,5 à 3,2 sur mobile.
 - [x] Ajouter une recette Playwright dédiée qui contrôle propriété des panneaux, routage, persistance, menu Section, clavier et débordements.
 - [x] Remplacer le journal technique de l'Accueil par un Bilan machine : quatre preuves, trois actions utiles et détails avancés repliés.
-- [x] Donner à chaque statut avancé un bouton de navigation exact ; `Choisir le meilleur modèle` ouvre `Tests > Parcours et choix du modèle` et focalise le bouton de comparaison sans lancer de téléchargement.
+- [x] Donner à chaque statut avancé un bouton de navigation exact ; `Choisir le meilleur modèle` ouvre `Tests > Choisir le meilleur modèle` et focalise le bouton de comparaison sans lancer de téléchargement.
 - [x] Empêcher les panneaux Tests actifs de masquer une section Accueil choisie et compacter les onglets mobiles sur une seule ligne défilable.
 - [x] Donner une identité visuelle sobre à chaque espace, transformer les états de panneau en badges et distinguer les commandes principales des exports secondaires.
 - [x] Relier les prérequis Model Autopilot, Flight Recorder, Passerelle locale, Workstack Composer, Capability Router et ForgeBench à leur écran source sans exécution automatique.
@@ -31,6 +31,9 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Transformer l'échec d'analyse en parcours de reprise visible, sans exposer de chemin personnel dans l'interface.
 - [x] Replier les cinq étapes techniques de ForgeBench tout en gardant leur synthèse et leur état accessibles.
 - [x] Garantir des cibles tactiles d'au moins 44 px, un focus clavier visible, des statuts mobiles non tronqués et un contraste lisible au survol.
+- [x] Faire du Bilan machine la première vue Accueil et replier les preuves secondaires du choix de modèle et du Hardware Doctor.
+- [x] Ouvrir Atelier IA sur Composer le plan, Compte sur la sauvegarde et placer les actions modèles avant Force/Usage/Limite.
+- [x] Harmoniser l'état Compte connecté afin qu'aucun message résiduel ne demande encore de se connecter.
 - [ ] Publier cette interface et la présenter sur le site seulement après validation manuelle du build candidat.
 
 ## Correctif validé dans les sources - Hermes, runtime et mémoire réelle

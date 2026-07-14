@@ -2116,6 +2116,79 @@ summary:focus-visible,
   grid-template-columns: 1fr;
 }
 
+.hardware-doctor-details,
+.prepare-support-details,
+.prepare-tools-details {
+  background: rgba(4, 9, 12, 0.38);
+  border: 1px solid rgba(139, 163, 174, 0.20);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.hardware-doctor-details > summary,
+.prepare-support-details > summary,
+.prepare-tools-details > summary {
+  align-items: center;
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  list-style: none;
+  min-height: 48px;
+  padding: 9px 11px;
+}
+
+.hardware-doctor-details > summary::-webkit-details-marker,
+.prepare-support-details > summary::-webkit-details-marker,
+.prepare-tools-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.hardware-doctor-details > summary::after,
+.prepare-support-details > summary::after,
+.prepare-tools-details > summary::after {
+  color: var(--workspace-accent);
+  content: "›";
+  font-size: 20px;
+  line-height: 1;
+  transform: rotate(90deg);
+  transition: transform 160ms ease;
+}
+
+.hardware-doctor-details[open] > summary::after,
+.prepare-support-details[open] > summary::after,
+.prepare-tools-details[open] > summary::after {
+  transform: rotate(-90deg);
+}
+
+.hardware-doctor-details > summary > span,
+.prepare-support-details > summary > span,
+.prepare-tools-details > summary {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.hardware-doctor-details > summary small,
+.prepare-support-details > summary small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 750;
+  text-align: right;
+}
+
+.hardware-doctor-detail-content,
+.prepare-support-content {
+  border-top: 1px solid rgba(139, 163, 174, 0.16);
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.hardware-doctor-detail-content .runtime-driver-details {
+  margin-top: 0;
+}
+
 .hardware-doctor-box.is-ready {
   border-color: rgba(134, 239, 172, 0.34);
 }
@@ -4350,6 +4423,13 @@ dd {
   border-color: rgba(134, 239, 172, 0.22);
 }
 
+.model-list-hint {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  margin: 0 0 8px;
+}
+
 .list-section-title {
   color: #9fb0c7;
   font-size: 0.75rem;
@@ -4500,6 +4580,34 @@ dd {
 .model-actions button[data-delete-model] {
   border-color: rgba(255, 145, 136, 0.34);
   color: #ffb4ae;
+}
+
+.model-card-details {
+  border-top: 1px solid rgba(139, 163, 174, 0.16);
+  margin-top: 9px;
+  padding-top: 2px;
+}
+
+.model-card-details > summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 850;
+  min-height: 36px;
+  padding: 9px 2px 7px;
+}
+
+.model-card-details[open] > summary {
+  color: var(--cyan);
+}
+
+.model-card-details .model-card-profile {
+  margin-top: 3px;
+}
+
+.account-panel .row-actions button:disabled,
+.feedback-panel .row-actions button:disabled {
+  display: none;
 }
 
 .model-actions button[data-delete-model]:hover {
@@ -4914,6 +5022,46 @@ dd {
   color: var(--text);
 }
 
+.usage-decision-strip {
+  align-items: start;
+  background: rgba(120, 220, 232, 0.06);
+  border: 1px solid rgba(120, 220, 232, 0.18);
+  border-radius: 7px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 9px;
+}
+
+.usage-decision-strip strong,
+.usage-decision-strip p {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.usage-decision-strip strong {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.usage-decision-strip p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  margin: 4px 0 0;
+}
+
+.usage-decision-strip > span {
+  background: rgba(255,255,255,.045);
+  border: 1px solid rgba(139, 163, 174, 0.16);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  padding: 4px 7px;
+  white-space: nowrap;
+}
+
 .usage-pack-card {
   background:
     radial-gradient(circle at 100% 0%, rgba(134, 239, 172, 0.10), transparent 36%),
@@ -5111,6 +5259,21 @@ dd {
 
 .recommendation-engine-actions {
   gap: 7px;
+}
+
+.prepare-support-details,
+.prepare-tools-details {
+  margin-top: 2px;
+}
+
+.prepare-tools-details > summary {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.prepare-tools-details > .row-actions {
+  border-top: 1px solid rgba(139, 163, 174, 0.16);
+  margin: 0;
+  padding: 10px;
 }
 
 .readiness-box {
@@ -6254,8 +6417,40 @@ dd {
     grid-template-columns: 1fr;
   }
 
+  .model-card-details > summary {
+    min-height: 44px;
+  }
+
   .usage-pack-grid {
     grid-template-columns: 1fr;
+  }
+
+  .usage-profile-head,
+  .usage-decision-strip,
+  .recommendation-engine-head {
+    grid-template-columns: 1fr;
+  }
+
+  .usage-profile-head > span,
+  .usage-decision-strip > span,
+  .recommendation-engine-head em {
+    justify-self: start;
+    max-width: 100%;
+  }
+
+  .hardware-doctor-details > summary,
+  .prepare-support-details > summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .hardware-doctor-details > summary small,
+  .prepare-support-details > summary small {
+    display: none;
+  }
+
+  .hardware-doctor-detail-content,
+  .prepare-support-content {
+    padding: 9px;
   }
 
   .readiness-hero,

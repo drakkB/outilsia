@@ -16,7 +16,12 @@ def main():
         page.goto(HTML.as_uri(), wait_until="load")
         page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('machine')")
         result = page.evaluate("() => window.__OUTILSIA_TEST__.applyRuntimeDriverIntelligenceState()")
+        disclosure = page.locator("#hardwareDoctorDetails")
         details = page.locator(".runtime-driver-details")
+        assert disclosure.is_visible()
+        assert disclosure.get_attribute("open") is None
+        assert not details.is_visible()
+        page.locator("#hardwareDoctorDetails > summary").click()
         assert details.is_visible()
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         page.locator("#hardwareDoctorBox").screenshot(

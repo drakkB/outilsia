@@ -30,13 +30,13 @@ WORKSPACE_SUBTITLES = {
 }
 
 WORKSPACE_FIRST_SECTIONS = {
-    "overview": "Verdict immédiat",
+    "overview": "Bilan machine",
     "machine": "Matériel détecté",
     "models": "Modèles compatibles",
     "tests": "Choisir un modèle",
     "assistant": "Améliorer un prompt",
-    "workflows": "Préparer Strategy Arena",
-    "account": "Bilan machine",
+    "workflows": "Composer le plan",
+    "account": "Sauvegarde OutilsIA",
 }
 
 HUMAN_PANEL_TITLES = {
@@ -179,6 +179,42 @@ def check(browser, width: int, height: int, label: str):
     page.evaluate("() => window.__OUTILSIA_TEST__.applyDemoState()")
     page.wait_for_timeout(250)
 
+    page.locator("#workspaceTestsBtn").click()
+    page.locator("#workspaceSectionSelect").select_option(".prepare-panel")
+    prepare_disclosures = page.evaluate(
+        """() => ({
+          supportOpen: document.querySelector('.prepare-support-details')?.open,
+          toolsOpen: document.querySelector('.prepare-tools-details')?.open,
+          engineVisible: !!document.querySelector('.recommendation-engine-card')?.offsetParent,
+          profileVisible: !!document.querySelector('.usage-profile-actions')?.offsetParent,
+          panelHeight: Math.round(document.querySelector('.prepare-panel')?.getBoundingClientRect().height || 0)
+        })"""
+    )
+    if prepare_disclosures["supportOpen"] or prepare_disclosures["toolsOpen"] or page.locator(".prepare-support-content").is_visible():
+        raise AssertionError(f"{label}: supporting test details should be closed by default: {prepare_disclosures}")
+    if not prepare_disclosures["engineVisible"] or not prepare_disclosures["profileVisible"]:
+        raise AssertionError(f"{label}: the model decision controls are not immediately visible: {prepare_disclosures}")
+    max_prepare_height = 1500 if width <= 760 else 1050
+    if prepare_disclosures["panelHeight"] > max_prepare_height:
+        raise AssertionError(f"{label}: first model decision view remains too tall: {prepare_disclosures}")
+    page.locator(".prepare-panel").screenshot(path=OUT / f"workspace-{label}-model-choice.png")
+
+    page.locator("#workspaceMachineBtn").click()
+    page.locator("#workspaceSectionSelect").select_option(".machine-panel")
+    doctor_disclosure = page.evaluate(
+        """() => ({
+          open: document.querySelector('#hardwareDoctorDetails')?.open,
+          visible: !!document.querySelector('#hardwareDoctorDetails')?.offsetParent,
+          scoreVisible: !!document.querySelector('.doctor-score')?.offsetParent
+        })"""
+    )
+    if doctor_disclosure != {"open": False, "visible": True, "scoreVisible": True} or page.locator(".hardware-doctor-detail-content").is_visible():
+        raise AssertionError(f"{label}: Hardware Doctor disclosure state is unclear: {doctor_disclosure}")
+    page.locator(".machine-panel").screenshot(path=OUT / f"workspace-{label}-machine-summary.png")
+    page.locator("#hardwareDoctorDetails > summary").click()
+    if not page.locator(".runtime-driver-details").is_visible():
+        raise AssertionError(f"{label}: opening Hardware Doctor did not reveal the runtime evidence")
+
     for selector, (task_label, technical_label) in HUMAN_PANEL_TITLES.items():
         title = page.locator(f"{selector} .panel-title h2").inner_text().strip()
         if not title.startswith(task_label) or technical_label not in title:
@@ -191,6 +227,25 @@ def check(browser, width: int, height: int, label: str):
     )
     if orphaned:
         raise AssertionError(f"{label}: panels without workspace ownership: {orphaned}")
+
+    page.locator("#workspaceAccountBtn").click()
+    page.locator("#workspaceSectionSelect").select_option(".account-panel")
+    if page.locator("#syncState").inner_text().strip() == "connecté":
+        account_text = page.locator(".account-panel").inner_text().lower()
+        if "connecte ton compte" in account_text:
+            raise AssertionError(f"{label}: connected account still asks the user to connect: {account_text}")
+
+    page.locator("#prepareBtn").click()
+    page.wait_for_function("() => !document.querySelector('#prepareBtn')?.disabled")
+    page.locator("#workspaceAccountBtn").click()
+    page.locator("#workspaceSectionSelect").select_option(".account-panel")
+    assert_account = page.locator("#syncResult").inner_text().strip().lower()
+    if "sauvegarde ce pc" not in assert_account or "analyse ce pc" in assert_account:
+        raise AssertionError(f"{label}: account status was not refreshed after analysis: {assert_account}")
+    page.locator("#workspaceSectionSelect").select_option(".feedback-panel")
+    feedback_text = page.locator("#feedbackResult").inner_text().strip().lower()
+    if "connecte" in feedback_text or "décris le problème" not in feedback_text:
+        raise AssertionError(f"{label}: connected feedback state is contradictory: {feedback_text}")
 
     heights = {}
     for workspace, (button_id, expected_panels) in WORKSPACES.items():
