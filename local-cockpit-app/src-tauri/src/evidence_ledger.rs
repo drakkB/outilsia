@@ -5,6 +5,7 @@ use crate::forgebench_isolation::validate_forgebench_isolation_result;
 use crate::forgebench_runner::validate_forgebench_reference_pilot_result;
 use crate::workstack_arena::validate_workstack_arena_result;
 use crate::workstack_composer::{canonical_sha256, validate_workstack_plan};
+use crate::workstack_review::validate_workstack_human_review_result;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::fs;
@@ -146,6 +147,7 @@ fn verify_entry(
     let is_reference_run = event_type == "forgebench_reference_pilot_verified";
     let is_candidate_run = event_type == "forgebench_ollama_candidate_verified";
     let is_arena_run = event_type == "workstack_arena_codex_pilot_verified";
+    let is_human_review = event_type == "workstack_human_review_recorded";
     let is_executed_run = is_reference_run || is_candidate_run || is_arena_run;
     let invalid_execution_contract = if is_reference_run {
         entry
@@ -188,6 +190,20 @@ fn verify_entry(
     } else {
         false
     };
+    let invalid_human_review = is_human_review
+        && (!matches!(
+            entry
+                .pointer("/human_decision/status")
+                .and_then(Value::as_str),
+            Some("accepted_for_future_comparison" | "revision_requested" | "rejected_by_human")
+        ) || entry
+            .pointer("/execution/api_cost_eur")
+            .and_then(Value::as_u64)
+            != Some(0)
+            || entry
+                .pointer("/execution/cost_status")
+                .and_then(Value::as_str)
+                != Some("not_incurred"));
     if entry
         .pointer("/privacy/raw_source_stored")
         .and_then(Value::as_bool)
@@ -198,6 +214,7 @@ fn verify_entry(
             .and_then(Value::as_bool)
             != Some(is_executed_run)
         || (is_executed_run && invalid_execution_contract)
+        || invalid_human_review
     {
         return Err("Entree Evidence Ledger non conforme a la politique locale.".to_string());
     }
@@ -593,6 +610,76 @@ fn source_contract(event_type: &str, source: &Value) -> Result<Value, String> {
                 "human_decision": {"status": "explicitly_confirmed_codex_cli_pilot"}
             }))
         }
+        "workstack_human_review_recorded" => {
+            validate_workstack_human_review_result(source)?;
+            let workstack_id = workstack_id_claim(source, "/source_ref/workstack_id")?;
+            let decision = required_enum_claim(
+                source,
+                "/review/decision",
+                &[
+                    "accept_for_future_comparison",
+                    "request_correction",
+                    "reject_run",
+                ],
+                "Decision humaine",
+            )?;
+            let status = required_enum_claim(
+                source,
+                "/review/status",
+                &[
+                    "accepted_for_future_comparison",
+                    "revision_requested",
+                    "rejected_by_human",
+                ],
+                "Statut de revue humaine",
+            )?;
+            let candidate_id = safe_candidate_id(
+                source
+                    .pointer("/source_ref/candidate_id")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default(),
+            )?;
+            Ok(json!({
+                "actor": {"kind": "human_operator", "id": "local_owner"},
+                "workstack_id": workstack_id,
+                "proof_level": "explicit_local_human_review",
+                "source_integrity_sha256": source.pointer("/integrity/digest").cloned().unwrap_or(Value::Null),
+                "claims": {
+                    "review_id": source.get("review_id").cloned().unwrap_or(Value::Null),
+                    "source_run_id": source.pointer("/source_ref/run_id").cloned().unwrap_or(Value::Null),
+                    "source_arena_integrity_sha256": source.pointer("/source_ref/arena_integrity_digest").cloned().unwrap_or(Value::Null),
+                    "candidate_id": candidate_id,
+                    "submission_digest": source.pointer("/source_ref/submission_digest").cloned().unwrap_or(Value::Null),
+                    "review_scope": source.pointer("/review/scope").cloned().unwrap_or(Value::Null),
+                    "decision": decision,
+                    "status": status,
+                    "comparison_eligible": source.pointer("/consequences/comparison_eligible").cloned().unwrap_or(json!(false)),
+                    "rerun_recommended": source.pointer("/consequences/rerun_recommended").cloned().unwrap_or(json!(false)),
+                    "run_rejected": source.pointer("/consequences/run_rejected").cloned().unwrap_or(json!(false)),
+                    "artifact_visual_inspected": false,
+                    "artifact_quality_approved": false,
+                    "delivery_authorized": false,
+                    "winner_authorized": false
+                },
+                "execution": {
+                    "started": false,
+                    "latency_ms": 0,
+                    "api_cost_eur": 0,
+                    "cost_status": "not_incurred"
+                },
+                "validation": {
+                    "source_contract_valid": true,
+                    "independent_run_verification": false
+                },
+                "human_decision": {
+                    "status": status,
+                    "scope": "signed_public_receipt_only",
+                    "artifact_quality_approved": false,
+                    "delivery_authorized": false,
+                    "winner_authorized": false
+                }
+            }))
+        }
         "forgebench_experiment_compiled" => {
             validate_forgebench_result(source)?;
             let workstack_id =
@@ -809,6 +896,24 @@ fn append_to_ledger(
         .get("entries")
         .and_then(Value::as_array)
         .ok_or_else(|| "Entrees Evidence Ledger absentes.".to_string())?;
+    if event_type == "workstack_human_review_recorded" {
+        let source_arena_digest = contract
+            .pointer("/claims/source_arena_integrity_sha256")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if entries.iter().any(|entry| {
+            entry.get("event_type").and_then(Value::as_str)
+                == Some("workstack_human_review_recorded")
+                && entry
+                    .pointer("/evidence/claims/source_arena_integrity_sha256")
+                    .and_then(Value::as_str)
+                    == Some(source_arena_digest)
+        }) {
+            return Err(
+                "Une decision humaine existe deja pour ce run Workstack Arena.".to_string(),
+            );
+        }
+    }
     if entries.iter().any(|entry| {
         entry.get("event_type").and_then(Value::as_str) == Some(event_type)
             && entry
@@ -1356,6 +1461,37 @@ mod tests {
         assert!(!serialized.contains("raw_cli_output"));
         assert!(!serialized.contains("disposable workspace"));
         assert!(!serialized.contains("workspace_path"));
+    }
+
+    #[test]
+    fn appends_one_explicit_human_review_without_delivery_or_visual_claims() {
+        let source = crate::workstack_review::tests::signed_review();
+        let (ledger, appended) = append_to_ledger(
+            empty_ledger().expect("empty"),
+            "workstack_human_review_recorded",
+            &source,
+            6_000,
+        )
+        .expect("human review entry");
+        assert!(appended);
+        verify_ledger(&ledger).expect("verified human review ledger");
+        let entry = &ledger["entries"][0];
+        assert_eq!(entry["actor"]["kind"], "human_operator");
+        assert_eq!(
+            entry["evidence"]["proof_level"],
+            "explicit_local_human_review"
+        );
+        assert_eq!(
+            entry["human_decision"]["status"],
+            "accepted_for_future_comparison"
+        );
+        assert_eq!(entry["human_decision"]["artifact_quality_approved"], false);
+        assert_eq!(entry["human_decision"]["delivery_authorized"], false);
+        assert_eq!(entry["human_decision"]["winner_authorized"], false);
+        assert_eq!(entry["execution"]["started"], false);
+        assert_eq!(entry["execution"]["api_cost_eur"], 0);
+        let duplicate = append_to_ledger(ledger, "workstack_human_review_recorded", &source, 7_000);
+        assert!(duplicate.is_err());
     }
 
     #[test]

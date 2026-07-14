@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
-const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_candidate.rs", "workstack_arena.rs", "evidence_ledger.rs"]
+const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_candidate.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
@@ -244,6 +244,16 @@ const requiredFeatureText = [
   ["rust Workstack Arena no winner", rust, '"winner_declared": false'],
   ["css Workstack Arena", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".workstack-arena-box"],
   ["rust evidence Workstack Arena", rust, "workstack_arena_codex_pilot_verified"],
+  ["html Workstack human review", html, "workstackReviewBox"],
+  ["html Workstack human review acknowledgements", html, "workstackReviewReceiptAck"],
+  ["js Workstack human review request schema", js, "outilsia.workstack_human_review_request.v1"],
+  ["js Workstack human review result schema", js, "outilsia.workstack_human_review_result.v1"],
+  ["rust Workstack human review receipt scope", rust, "signed_public_receipt_only"],
+  ["rust Workstack human review no visual approval", rust, '"artifact_quality_approved": false'],
+  ["rust Workstack human review no delivery", rust, '"delivery_authorized": false'],
+  ["rust Workstack human review no winner", rust, '"winner_authorized": false'],
+  ["rust evidence human review", rust, "explicit_local_human_review"],
+  ["css Workstack human review", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".workstack-review-box"],
   ["html evidence ledger", html, "evidenceLedgerBox"],
   ["html evidence source", html, "evidenceLedgerSource"],
   ["js evidence append schema", js, "outilsia.evidence_append_request.v1"],
@@ -263,6 +273,8 @@ const requiredFeatureText = [
   ["notice ForgeBench isolated generated code", workstackNotice, "il autorise l'exécution du code généré dans Chromium sous bubblewrap sans réseau"],
   ["notice ForgeBench public gate limit", workstackNotice, "suite cachée, score scientifique et vainqueur restent obligatoirement faux"],
   ["notice Workstack Arena", workstackNotice, "Workstack Arena"],
+  ["notice Workstack human review", workstackNotice, "Revue humaine du reçu signé"],
+  ["notice Workstack human review scope", workstackNotice, "artifact_visual_inspected=false"],
   ["notice Strategy Arena boundary", workstackNotice, "OutilsIA ne génère pas de stratégie financière"],
   ["js install safety schema", js, "outilsia.install_safety_preflight.v1"],
   ["js install safety before pull", js, "runInstallSafetyPreflight(clean)"],

@@ -28,7 +28,7 @@ Les actions transversales ouvrent automatiquement l'espace correspondant. Par ex
 | Capability Router | Détecter les CLI et modèles locaux disponibles, puis proposer un planificateur, un exécutant et un vérificateur distinct. | Ne lit pas les jetons, ne vérifie pas les quotas et ne transmet pas la mission aux agents. |
 | Evidence Ledger | Conserver une trace locale chaînée des étapes validées et de leurs empreintes. | Ne stocke ni description brute, prompt, réponse de modèle, credential ou fichier projet. Il ne prouve pas à lui seul la qualité du résultat. |
 | ForgeBench | Préparer un protocole équitable `Signal Maze v1`, publier un contrat de gameplay observable, vérifier une référence clavier/souris/tactile, sceller localement des seeds privés, tester bubblewrap, exécuter un pilote technique, puis appeler facultativement un modèle Ollama local sur le seul contrat public. | Après consentement, le code candidat peut être contrôlé statiquement puis joué dans Chromium isolé. Ce test public ne valide aucun cas caché, score scientifique ou vainqueur. ForgeBench ne lance pas seul un agent CLI. |
-| Workstack Arena | Dans le candidat source, lancer **Codex CLI uniquement sur Signal Maze public** dans un workspace jetable, avec un seul essai borné, puis remettre le résultat à ForgeBench et à la revue humaine. | Aucun projet utilisateur, board, test caché, fusion ou publication. Claude Code, Hermes et l'exécution d'une carte arbitraire restent indisponibles. Le build public actuel ne contient pas encore ce pilote. |
+| Workstack Arena | Dans le candidat source, lancer **Codex CLI uniquement sur Signal Maze public** dans un workspace jetable, avec un seul essai borné, puis enregistrer une décision humaine structurée sur le reçu signé. | Aucun projet utilisateur, board, test caché, fusion ou publication. La revue n'inspecte ni capture ni code et n'autorise ni livraison ni gagnant. Claude Code, Hermes et l'exécution d'une carte arbitraire restent indisponibles. Le build public actuel ne contient pas encore ce pilote. |
 | MemoryForge / Obsidian | Conserver les décisions, bilans et connaissances durables du projet. | Ne reçoit pas tous les logs, prompts ou sorties brutes du Ledger. |
 | Strategy Arena | Exploiter les capacités IA locales préparées par OutilsIA pour les workflows quant, puis compiler et backtester. | OutilsIA ne génère pas de stratégie financière et ne lance pas de backtest. |
 
@@ -61,10 +61,12 @@ Les actions transversales ouvrent automatiquement l'espace correspondant. Par ex
 25. Cocher séparément l'autorisation d'utiliser la connexion et le quota ou coût du CLI, puis l'autorisation d'écrire et d'exécuter le mini-jeu dans le workspace jetable. Ces consentements ne valent que pour ce run.
 26. Lancer le pilote. Codex reçoit la spécification, le starter et le contrat visible publics sur l'entrée standard. OutilsIA ne lui transmet et ne monte ni dépôt utilisateur, board, suite cachée ou credential. Le mode `workspace-write` appartient toutefois à la sandbox du fournisseur : OutilsIA ne prétend pas auditer indépendamment toute la portée de lecture du processus hôte.
 27. Contrôler le reçu : CLI réellement invoqué, un essai, trois fichiers bornés, `7/7` contrôles statiques, `39/39` contrôles Chromium, workspace supprimé, coût ou quota **inconnu**, aucun gagnant et revue humaine obligatoire.
-28. Dans **Evidence Ledger**, sélectionner chaque étape disponible, notamment **Pilote ForgeBench vérifié**, **Candidat Ollama vérifié** ou **Pilote Codex vérifié**, puis cliquer sur **Ajouter la preuve**.
-29. Exporter le JSON du Ledger avant une réinitialisation ou un transfert de machine.
+28. Ouvrir **Revue humaine du reçu**. Choisir **Accepter pour comparaison**, **Demander une correction** ou **Rejeter ce run**, puis lire les deux accusés obligatoires : la décision porte seulement sur le reçu public signé et n'autorise aucun nouveau run, livraison, gagnant, board, merge ou publication.
+29. Enregistrer la décision. Le résultat signé ne conserve ni texte libre, capture, code, sortie CLI brute ou credential ; une correction recommande un nouveau run explicite mais ne le démarre pas. Une décision effacée avant ajout peut être remplacée, mais l'Evidence Ledger n'accepte qu'une revue par run.
+30. Dans **Evidence Ledger**, sélectionner chaque étape disponible, notamment **Pilote ForgeBench vérifié**, **Candidat Ollama vérifié**, **Pilote Codex vérifié** ou **Revue humaine enregistrée**, puis cliquer sur **Ajouter la preuve**.
+31. Exporter le JSON du Ledger avant une réinitialisation ou un transfert de machine.
 
-Le parcours s'arrête ici. Un modèle Ollama local ou, dans le candidat source, Codex CLI peut produire une soumission puis la faire jouer contre la recette publique visible dans Chromium isolé. Claude Code, Hermes, les cartes arbitraires et les dépôts utilisateur ne sont pas exécutés. Aucun test caché, score comparatif ou vainqueur n'existe à ce stade.
+Le parcours s'arrête ici. Un modèle Ollama local ou, dans le candidat source, Codex CLI peut produire une soumission puis la faire jouer contre la recette publique visible dans Chromium isolé. Le propriétaire peut ensuite qualifier le reçu pour une future comparaison, demander un nouveau run ou le rejeter, sans transformer cette décision en validation visuelle ou livraison. Claude Code, Hermes, les cartes arbitraires et les dépôts utilisateur ne sont pas exécutés. Aucun test caché, score comparatif ou vainqueur n'existe à ce stade.
 
 ## Ce que prouve l'Evidence Ledger
 
@@ -77,6 +79,7 @@ Une entrée du Ledger prouve localement que :
 - pour `isolated_reference_run` uniquement, un worker technique déterministe a réellement été exécuté après consentement, puis vérifié par un second processus isolé ;
 - pour `isolated_visible_browser_candidate`, le modèle Ollama identifié a réellement répondu après un second consentement, puis sa soumission a passé sept contrôles statiques et 39 contrôles de gameplay publics dans des processus isolés ;
 - pour `isolated_codex_visible_browser_pilot`, le Codex CLI identifié a réellement été invoqué une fois sur Signal Maze public, sa sortie bornée a été matérialisée dans un workspace jetable, puis la soumission a passé les mêmes sept contrôles statiques et 39 contrôles Chromium publics ;
+- pour `explicit_local_human_review`, le propriétaire local a choisi une décision structurée sur l'empreinte exacte du reçu public, après avoir reconnu ses limites ; cette preuve ne signifie jamais que le code ou les captures ont été inspectés ;
 - seuls les claims minimaux et métriques prévus ont été conservés.
 
 Le Ledger refuse :
@@ -86,7 +89,8 @@ Le Ledger refuse :
 - un worker identique au vérificateur indépendant ;
 - un type d'événement qui ne correspond pas au schéma source ;
 - une chaîne locale altérée ;
-- le même document source ajouté deux fois sous le même type d'événement.
+- le même document source ajouté deux fois sous le même type d'événement ;
+- une seconde décision humaine pour le même run Workstack Arena.
 
 Le Ledger **ne prouve pas** :
 
@@ -109,7 +113,7 @@ Le Ledger **ne prouve pas** :
 8. `independent_visible_verification` : vérification dans un second processus isolé, soumission en lecture seule et six contrôles visibles. Les tests cachés restent absents.
 9. `isolated_visible_browser_candidate` : modèle Ollama installé appelé sur la seule tâche publique, sortie brute non conservée, sept checks statiques puis 39 checks publics Chromium sur trois seeds, desktop et Android, clavier, souris et tactile. Ce niveau prouve le gameplay visible de ce run, pas les cas cachés, la qualité scientifique ou une victoire comparative.
 10. `isolated_codex_visible_browser_pilot` : Codex CLI invoqué une fois sur la seule tâche Signal Maze publique, workspace jetable, sortie bornée, sept checks statiques et 39 checks Chromium publics. Le coût fournisseur reste inconnu et ce niveau ne vaut ni accès à un projet, ni test caché, ni victoire comparative.
-11. `human_decision` : **prévu**, acceptation, rejet ou demande de correction par le propriétaire humain.
+11. `explicit_local_human_review` : acceptation pour comparaison, demande de correction ou rejet du reçu public signé par le propriétaire humain. Cette décision ne conserve pas de texte libre, ne prouve aucune inspection du code ou des captures et n'autorise jamais livraison, gagnant, board, fusion ou publication.
 
 ## Ce que prépare ForgeBench
 
@@ -183,6 +187,12 @@ La réponse brute du CLI n'entre jamais dans le résultat ou le Ledger. OutilsIA
 
 Ce palier démontre qu'un worker CLI réel peut participer à une expérience publique traçable. Il ne démontre ni l'accès sûr à un dépôt utilisateur, ni la capacité à traiter une carte Planka, ni l'indépendance d'un audit multi-agent, ni la qualité cachée, ni un coût exact. Toute livraison ou déclaration de gagnant reste bloquée par `review_required_before_any_winner_or_delivery`.
 
+### Revue humaine du reçu signé
+
+Les contrats `outilsia.workstack_human_review_request.v1` et `outilsia.workstack_human_review_result.v1` lient une décision locale à l'empreinte exacte d'un résultat Workstack Arena valide. Les trois choix sont bornés : accepter le reçu pour une future comparaison, recommander un nouveau run corrigé ou rejeter ce run. Aucun champ libre n'est accepté et le Ledger refuse une seconde décision sur le même run.
+
+Cette gate ne voit que le reçu public signé. Les captures, le DOM, les trois fichiers et la sortie brute ont déjà été supprimés ; `artifact_visual_inspected=false` et `artifact_quality_approved=false` restent donc obligatoires. Quelle que soit la décision, `delivery_authorized`, `winner_authorized`, `board_write_authorized`, `merge_authorized` et `publish_authorized` restent faux. Une demande de correction ne relance aucun worker : elle indique seulement qu'un nouveau run explicite est recommandé.
+
 ## Confidentialité et coûts
 
 - Les clés Planka restent éphémères et ne sont jamais placées dans le Ledger.
@@ -193,6 +203,7 @@ Ce palier démontre qu'un worker CLI réel peut participer à une expérience pu
 - Le pilote technique exige un consentement distinct et impose réseau coupé, API payante interdite et CLI candidat interdit.
 - Le candidat Ollama exige un second consentement et un budget explicite. Seule la boucle locale Ollama est ouverte pendant la génération ; le code n'est exécuté qu'après contrôle statique, dans Chromium sous bubblewrap sans réseau, puis intégralement supprimé.
 - Le pilote Codex exige deux consentements par run, un budget borné et une stack Signal Maze exacte. Il ignore les règles utilisateur et filtre l'environnement enfant par allowlist, sans transmettre les clés API tierces. La connexion, le quota et la facturation appartiennent au CLI utilisateur et restent non inspectés ; aucun coût inconnu n'est converti en zéro.
+- La revue humaine exige deux accusés explicites, ne stocke aucun commentaire libre et ne peut ni relancer un worker ni élargir les permissions du run.
 - Tout autre CLI candidat, toute carte arbitraire et tout accès à un dépôt exigeront un nouveau contrat de permissions, un consentement et un budget séparés.
 
 ## Export et réinitialisation
@@ -228,6 +239,8 @@ Le fichier persistant se trouve dans le dossier applicatif Tauri sous le nom `ev
 - `outilsia.forgebench_ollama_candidate_result.v2`
 - `outilsia.workstack_arena_run_request.v1`
 - `outilsia.workstack_arena_run_result.v1`
+- `outilsia.workstack_human_review_request.v1`
+- `outilsia.workstack_human_review_result.v1`
 - `outilsia.forgebench_experiment.v1`
 - `outilsia.forgebench_compile_result.v1`
 - `outilsia.evidence_entry.v1`

@@ -3442,6 +3442,136 @@ dd {
   font-size: 11px;
 }
 
+.workstack-review-panel {
+  border-top: 1px solid rgba(240, 190, 92, 0.22);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
+.workstack-review-panel[hidden] {
+  display: none;
+}
+
+.workstack-review-panel > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 38px;
+}
+
+.workstack-review-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.workstack-review-panel > summary > span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.workstack-review-panel > summary small,
+.workstack-review-body > p,
+.workstack-review-summary span,
+.workstack-review-acks span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.workstack-review-panel > summary > span:last-child {
+  background: rgba(240, 190, 92, 0.1);
+  border: 1px solid rgba(240, 190, 92, 0.25);
+  border-radius: 999px;
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 900;
+  padding: 4px 8px;
+}
+
+.workstack-review-body {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.workstack-review-body > p {
+  margin: 0;
+}
+
+.workstack-review-controls {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workstack-review-acks {
+  border: 1px solid rgba(94, 193, 225, 0.2);
+  border-radius: 8px;
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 9px 10px 10px;
+}
+
+.workstack-review-acks legend {
+  color: var(--muted-2);
+  font-size: 11px;
+  padding: 0 5px;
+}
+
+.workstack-review-acks label {
+  align-items: start;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 18px minmax(0, 1fr);
+}
+
+.workstack-review-acks input {
+  margin-top: 2px;
+}
+
+.workstack-review-box {
+  background: rgba(8, 16, 19, 0.9);
+  border: 1px solid rgba(94, 193, 225, 0.24);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  min-height: 72px;
+  padding: 10px;
+}
+
+.workstack-review-box.empty span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.workstack-review-summary {
+  display: grid;
+  gap: 3px;
+}
+
+.workstack-review-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.workstack-review-flags span {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(139, 163, 174, 0.16);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+  padding: 4px 7px;
+}
+
+.workstack-review-flags strong {
+  color: var(--text);
+}
+
 .forgebench-intro,
 .forgebench-box {
   background: rgba(9, 17, 20, 0.94);
@@ -6481,7 +6611,8 @@ dd {
   .forgebench-stacks,
   .forgebench-stack,
   .workstack-arena-controls,
-  .workstack-arena-proof-grid {
+  .workstack-arena-proof-grid,
+  .workstack-review-controls {
     grid-template-columns: 1fr;
   }
 

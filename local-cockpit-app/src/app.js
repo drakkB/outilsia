@@ -59,6 +59,7 @@ const state = {
   workstackSelectedCard: null,
   capabilityRouter: null,
   workstackArena: null,
+  workstackHumanReview: null,
   forgeBench: null,
   forgeBenchHiddenSuite: null,
   forgeBenchWorkerSandbox: null,
@@ -110,6 +111,8 @@ const CAPABILITY_ROUTER_RESULT_SCHEMA = "outilsia.capability_router_result.v1";
 const WORKSTACK_ARENA_RUN_REQUEST_SCHEMA = "outilsia.workstack_arena_run_request.v1";
 const WORKSTACK_ARENA_RUN_RESULT_SCHEMA = "outilsia.workstack_arena_run_result.v1";
 const WORKSTACK_ARENA_CONSENT_SCOPE = "codex_cli_signal_maze_pilot_v1";
+const WORKSTACK_HUMAN_REVIEW_REQUEST_SCHEMA = "outilsia.workstack_human_review_request.v1";
+const WORKSTACK_HUMAN_REVIEW_RESULT_SCHEMA = "outilsia.workstack_human_review_result.v1";
 const FORGEBENCH_COMPILE_REQUEST_SCHEMA = "outilsia.forgebench_compile_request.v1";
 const FORGEBENCH_COMPILE_RESULT_SCHEMA = "outilsia.forgebench_compile_result.v1";
 const FORGEBENCH_EXPERIMENT_SCHEMA = "outilsia.forgebench_experiment.v1";
@@ -492,6 +495,16 @@ const els = {
   runWorkstackArenaBtn: $("runWorkstackArenaBtn"),
   copyWorkstackArenaBtn: $("copyWorkstackArenaBtn"),
   clearWorkstackArenaBtn: $("clearWorkstackArenaBtn"),
+  workstackReviewPanel: $("workstackReviewPanel"),
+  workstackReviewState: $("workstackReviewState"),
+  workstackReviewDecision: $("workstackReviewDecision"),
+  workstackReviewReason: $("workstackReviewReason"),
+  workstackReviewReceiptAck: $("workstackReviewReceiptAck"),
+  workstackReviewLimitsAck: $("workstackReviewLimitsAck"),
+  workstackReviewBox: $("workstackReviewBox"),
+  recordWorkstackReviewBtn: $("recordWorkstackReviewBtn"),
+  copyWorkstackReviewBtn: $("copyWorkstackReviewBtn"),
+  clearWorkstackReviewBtn: $("clearWorkstackReviewBtn"),
   forgeBenchState: $("forgeBenchState"),
   forgeBenchBenchmark: $("forgeBenchBenchmark"),
   forgeBenchClaimLevel: $("forgeBenchClaimLevel"),
@@ -695,6 +708,8 @@ let capabilityRouterBusy = false;
 let capabilityRouterError = "";
 let workstackArenaBusy = false;
 let workstackArenaError = "";
+let workstackReviewBusy = false;
+let workstackReviewError = "";
 let forgeBenchBusy = false;
 let forgeBenchError = "";
 let forgeBenchVaultBusy = false;
@@ -13561,6 +13576,7 @@ function renderWorkstackArenaPanel() {
   if (!els.workstackArenaBox) return;
   const candidateId = syncWorkstackArenaCandidateControl();
   const result = workstackArenaResult();
+  renderWorkstackHumanReviewPanel();
   const missing = workstackArenaMissingSteps();
   const nativeOrTest = Boolean(invoke || result?.test_mode);
   els.runWorkstackArenaBtn.disabled = workstackArenaBusy || !invoke || missing.length > 0;
@@ -13621,6 +13637,7 @@ async function runWorkstackArenaCodexPilot() {
   workstackArenaBusy = true;
   workstackArenaError = "";
   state.workstackArena = null;
+  clearWorkstackHumanReview(true);
   renderWorkstackArenaPanel();
   renderEvidenceLedgerPanel();
   setStatus("Pilote Workstack Arena : Codex construit Signal Maze...");
@@ -13688,12 +13705,227 @@ async function copyWorkstackArenaReceipt() {
 function clearWorkstackArena(silent = false) {
   state.workstackArena = null;
   workstackArenaError = "";
+  clearWorkstackHumanReview(true);
   if (els.workstackArenaQuotaConsent) els.workstackArenaQuotaConsent.checked = false;
   if (els.workstackArenaExecutionConsent) els.workstackArenaExecutionConsent.checked = false;
   if (!silent && els.workstackArenaDuration) els.workstackArenaDuration.value = "300";
   renderWorkstackArenaPanel();
   renderEvidenceLedgerPanel();
   if (!silent) setStatus("Workstack Arena effacée", "ok");
+}
+
+function workstackReviewDecisionContract(decision = els.workstackReviewDecision?.value) {
+  return ({
+    accept_for_future_comparison: {
+      reason: "signed_public_receipt_accepted",
+      reasonLabel: "Reçu public accepté",
+      status: "accepted_for_future_comparison",
+      comparisonEligible: true,
+      rerunRecommended: false,
+      runRejected: false
+    },
+    request_correction: {
+      reason: "new_public_run_requested",
+      reasonLabel: "Nouveau run public demandé",
+      status: "revision_requested",
+      comparisonEligible: false,
+      rerunRecommended: true,
+      runRejected: false
+    },
+    reject_run: {
+      reason: "signed_public_receipt_rejected",
+      reasonLabel: "Reçu public rejeté",
+      status: "rejected_by_human",
+      comparisonEligible: false,
+      rerunRecommended: false,
+      runRejected: true
+    }
+  })[String(decision || "")] || null;
+}
+
+function syncWorkstackReviewReasonControl() {
+  if (!els.workstackReviewReason) return "";
+  const contract = workstackReviewDecisionContract();
+  els.workstackReviewReason.innerHTML = contract
+    ? `<option value="${escapeHtml(contract.reason)}">${escapeHtml(contract.reasonLabel)}</option>`
+    : '<option value="">Décision invalide</option>';
+  els.workstackReviewReason.value = contract?.reason || "";
+  return els.workstackReviewReason.value;
+}
+
+function workstackHumanReviewResult(result = state.workstackHumanReview) {
+  const arena = workstackArenaResult();
+  const decision = String(result?.review?.decision || "");
+  const contract = workstackReviewDecisionContract(decision);
+  if (
+    !arena
+    || !contract
+    || result?.schema !== WORKSTACK_HUMAN_REVIEW_RESULT_SCHEMA
+    || result?.contract_version !== "2026-07-14"
+    || !/^wsr-[A-Za-z0-9_-]{1,76}$/.test(String(result?.review_id || ""))
+    || !(Number(result?.recorded_at_ms) > 0)
+    || result?.source_ref?.schema !== WORKSTACK_ARENA_RUN_RESULT_SCHEMA
+    || result?.source_ref?.run_id !== arena.run_id
+    || result?.source_ref?.arena_integrity_digest !== arena.integrity?.digest
+    || result?.source_ref?.workstack_id !== arena.workstack_ref?.workstack_id
+    || result?.source_ref?.candidate_id !== arena.candidate?.id
+    || result?.source_ref?.submission_digest !== arena.submission?.digest
+    || result?.source_ref?.static_checks_passed !== 7
+    || result?.source_ref?.browser_checks_passed !== 39
+    || result?.review?.scope !== "signed_public_receipt_only"
+    || result?.review?.reviewer_role !== "local_human_operator"
+    || result?.review?.reason_code !== contract.reason
+    || result?.review?.status !== contract.status
+    || result?.review?.receipt_metrics_reviewed !== true
+    || result?.review?.limitations_reviewed !== true
+    || result?.review?.artifact_visual_inspected !== false
+    || result?.review?.artifact_quality_approved !== false
+    || result?.consequences?.comparison_eligible !== contract.comparisonEligible
+    || result?.consequences?.rerun_recommended !== contract.rerunRecommended
+    || result?.consequences?.run_rejected !== contract.runRejected
+    || result?.consequences?.delivery_authorized !== false
+    || result?.consequences?.winner_authorized !== false
+    || result?.consequences?.board_write_authorized !== false
+    || result?.consequences?.merge_authorized !== false
+    || result?.consequences?.publish_authorized !== false
+    || result?.security?.source_result_stored !== false
+    || result?.security?.raw_cli_output_stored !== false
+    || result?.security?.screenshot_stored !== false
+    || result?.security?.free_text_stored !== false
+    || result?.security?.execution_started !== false
+    || result?.security?.credentials_read !== false
+    || !/^[a-f0-9]{64}$/i.test(String(result?.integrity?.digest || ""))
+  ) return null;
+  return result;
+}
+
+function workstackReviewStatusLabel(status) {
+  return ({
+    accepted_for_future_comparison: "Accepté pour comparaison",
+    revision_requested: "Nouveau run demandé",
+    rejected_by_human: "Reçu rejeté"
+  })[status] || "Décision inconnue";
+}
+
+function renderWorkstackHumanReviewPanel() {
+  if (!els.workstackReviewPanel || !els.workstackReviewBox) return;
+  const arena = workstackArenaResult();
+  const result = workstackHumanReviewResult();
+  const nativeOrTest = Boolean(invoke || result?.test_mode || arena?.test_mode);
+  const reason = syncWorkstackReviewReasonControl();
+  const acknowledged = els.workstackReviewReceiptAck?.checked && els.workstackReviewLimitsAck?.checked;
+  els.workstackReviewPanel.hidden = !arena && !result;
+  if (els.workstackReviewPanel.hidden) return;
+  els.workstackReviewDecision.disabled = workstackReviewBusy || Boolean(result);
+  els.workstackReviewReason.disabled = true;
+  els.workstackReviewReceiptAck.disabled = workstackReviewBusy || Boolean(result);
+  els.workstackReviewLimitsAck.disabled = workstackReviewBusy || Boolean(result);
+  els.recordWorkstackReviewBtn.disabled = !invoke || workstackReviewBusy || !arena || Boolean(result) || !reason || !acknowledged;
+  els.copyWorkstackReviewBtn.disabled = !result;
+  els.clearWorkstackReviewBtn.disabled = workstackReviewBusy || !result;
+
+  if (!nativeOrTest) {
+    els.workstackReviewState.textContent = "app native requise";
+    els.workstackReviewBox.className = "workstack-review-box empty";
+    els.workstackReviewBox.textContent = "La décision signée est disponible uniquement dans l'application Windows/Linux.";
+    return;
+  }
+  if (workstackReviewBusy) {
+    els.workstackReviewState.textContent = "signature locale";
+    els.workstackReviewBox.className = "workstack-review-box empty";
+    els.workstackReviewBox.textContent = "Validation du reçu et création de la décision bornée. Aucun worker n'est relancé.";
+    return;
+  }
+  if (workstackReviewError) {
+    els.workstackReviewState.textContent = "revue refusée";
+    els.workstackReviewBox.className = "workstack-review-box empty";
+    els.workstackReviewBox.innerHTML = `<strong>Aucune décision enregistrée</strong><span>${escapeHtml(workstackReviewError)}</span>`;
+    return;
+  }
+  if (result) {
+    const status = workstackReviewStatusLabel(result.review.status);
+    els.workstackReviewPanel.open = true;
+    els.workstackReviewState.textContent = status.toLowerCase();
+    els.workstackReviewBox.className = "workstack-review-box";
+    els.workstackReviewBox.innerHTML = `
+      <div class="workstack-review-summary">
+        <strong>${escapeHtml(status)}</strong>
+        <span>Portée : reçu public signé uniquement · aucune capture ou code conservé</span>
+      </div>
+      <div class="workstack-review-flags">
+        <span>Comparaison <strong>${result.consequences.comparison_eligible ? "autorisée" : "bloquée"}</strong></span>
+        <span>Livraison <strong>interdite</strong></span>
+        <span>Gagnant <strong>non déclaré</strong></span>
+      </div>
+    `;
+    return;
+  }
+  els.workstackReviewState.textContent = acknowledged ? "prête à signer" : "2 accusés requis";
+  els.workstackReviewBox.className = "workstack-review-box empty";
+  els.workstackReviewBox.innerHTML = "<strong>Décision sans effet automatique</strong><span>Elle qualifie seulement ce reçu pour une comparaison future, un nouveau run manuel ou un rejet.</span>";
+}
+
+async function recordWorkstackHumanReview() {
+  const arena = workstackArenaResult();
+  const contract = workstackReviewDecisionContract();
+  if (!invoke || workstackReviewBusy || !arena || !contract) return null;
+  if (!els.workstackReviewReceiptAck?.checked || !els.workstackReviewLimitsAck?.checked) return null;
+  workstackReviewBusy = true;
+  workstackReviewError = "";
+  state.workstackHumanReview = null;
+  renderWorkstackHumanReviewPanel();
+  try {
+    const result = await invoke("record_workstack_human_review", {
+      request: {
+        schema: WORKSTACK_HUMAN_REVIEW_REQUEST_SCHEMA,
+        arena_result: arena,
+        decision: els.workstackReviewDecision.value,
+        reason_code: contract.reason,
+        acknowledgements: {
+          receipt_metrics_reviewed: true,
+          limitations_reviewed: true,
+          no_visual_artifact_claimed: true,
+          no_delivery_or_winner_authorized: true
+        }
+      }
+    });
+    state.workstackHumanReview = result;
+    if (!workstackHumanReviewResult(result)) throw new Error("décision native de revue non conforme");
+    if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "workstack_human_review_recorded";
+    setStatus(`Revue humaine : ${workstackReviewStatusLabel(result.review.status)}`, "ok");
+    return result;
+  } catch (error) {
+    state.workstackHumanReview = null;
+    workstackReviewError = String(error || "Revue humaine impossible");
+    setStatus(`Revue humaine : ${workstackReviewError}`, "error");
+    return null;
+  } finally {
+    workstackReviewBusy = false;
+    renderWorkstackHumanReviewPanel();
+    renderEvidenceLedgerPanel();
+  }
+}
+
+async function copyWorkstackHumanReview() {
+  const result = workstackHumanReviewResult();
+  if (!result) return;
+  try {
+    await navigator.clipboard.writeText(`${JSON.stringify(result, null, 2)}\n`);
+    setStatus("Décision humaine copiée", "ok");
+  } catch (error) {
+    setStatus(`Copie de la décision impossible : ${error}`, "error");
+  }
+}
+
+function clearWorkstackHumanReview(silent = false) {
+  state.workstackHumanReview = null;
+  workstackReviewError = "";
+  if (els.workstackReviewDecision) els.workstackReviewDecision.value = "accept_for_future_comparison";
+  if (els.workstackReviewReceiptAck) els.workstackReviewReceiptAck.checked = false;
+  if (els.workstackReviewLimitsAck) els.workstackReviewLimitsAck.checked = false;
+  renderWorkstackHumanReviewPanel();
+  renderEvidenceLedgerPanel();
+  if (!silent) setStatus("Revue humaine effacée", "ok");
 }
 
 function evidenceEventLabel(value) {
@@ -13705,7 +13937,8 @@ function evidenceEventLabel(value) {
     forgebench_isolation_probed: "Isolation ForgeBench testée",
     forgebench_reference_pilot_verified: "Pilote ForgeBench vérifié",
     forgebench_ollama_candidate_verified: "Candidat Ollama vérifié",
-    workstack_arena_codex_pilot_verified: "Pilote Codex vérifié"
+    workstack_arena_codex_pilot_verified: "Pilote Codex vérifié",
+    workstack_human_review_recorded: "Décision humaine enregistrée"
   })[value] || value;
 }
 
@@ -13718,7 +13951,8 @@ function evidenceActorLabel(value) {
     forgebench_isolation: "ForgeBench Isolation",
     forgebench_runner: "ForgeBench Runner",
     forgebench_candidate_runner: "ForgeBench Candidat local",
-    workstack_arena: "Workstack Arena"
+    workstack_arena: "Workstack Arena",
+    local_owner: "Propriétaire local"
   })[value] || value;
 }
 
@@ -13731,11 +13965,12 @@ function evidenceSourceDocument(eventType) {
   if (eventType === "forgebench_reference_pilot_verified") return forgeBenchReferencePilotResult() || null;
   if (eventType === "forgebench_ollama_candidate_verified") return forgeBenchOllamaCandidateResult() || null;
   if (eventType === "workstack_arena_codex_pilot_verified") return workstackArenaResult() || null;
+  if (eventType === "workstack_human_review_recorded") return workstackHumanReviewResult() || null;
   return null;
 }
 
 function evidenceAvailableTypes() {
-  return ["workstack_arena_codex_pilot_verified", "forgebench_ollama_candidate_verified", "forgebench_reference_pilot_verified", "forgebench_isolation_probed", "forgebench_experiment_compiled", "capability_routing_proposed", "workstack_compiled", "board_observed"]
+  return ["workstack_human_review_recorded", "workstack_arena_codex_pilot_verified", "forgebench_ollama_candidate_verified", "forgebench_reference_pilot_verified", "forgebench_isolation_probed", "forgebench_experiment_compiled", "capability_routing_proposed", "workstack_compiled", "board_observed"]
     .filter((eventType) => Boolean(evidenceSourceDocument(eventType)));
 }
 
@@ -19668,6 +19903,72 @@ function installTestHarness() {
         receipt: workstackArenaReceiptMarkdown()
       };
     },
+    applyWorkstackHumanReviewState() {
+      this.applyWorkstackArenaState();
+      if (els.workstackReviewDecision) els.workstackReviewDecision.value = "accept_for_future_comparison";
+      syncWorkstackReviewReasonControl();
+      if (els.workstackReviewReceiptAck) els.workstackReviewReceiptAck.checked = true;
+      if (els.workstackReviewLimitsAck) els.workstackReviewLimitsAck.checked = true;
+      state.workstackHumanReview = {
+        schema: WORKSTACK_HUMAN_REVIEW_RESULT_SCHEMA,
+        contract_version: "2026-07-14",
+        review_id: "wsr-demo-human-review",
+        recorded_at_ms: Date.now(),
+        source_ref: {
+          schema: WORKSTACK_ARENA_RUN_RESULT_SCHEMA,
+          run_id: state.workstackArena.run_id,
+          arena_integrity_digest: state.workstackArena.integrity.digest,
+          workstack_id: state.workstackArena.workstack_ref.workstack_id,
+          candidate_id: state.workstackArena.candidate.id,
+          submission_digest: state.workstackArena.submission.digest,
+          static_checks_passed: 7,
+          browser_checks_passed: 39
+        },
+        review: {
+          scope: "signed_public_receipt_only",
+          reviewer_role: "local_human_operator",
+          decision: "accept_for_future_comparison",
+          reason_code: "signed_public_receipt_accepted",
+          status: "accepted_for_future_comparison",
+          receipt_metrics_reviewed: true,
+          limitations_reviewed: true,
+          artifact_visual_inspected: false,
+          artifact_quality_approved: false
+        },
+        consequences: {
+          comparison_eligible: true,
+          rerun_recommended: false,
+          run_rejected: false,
+          delivery_authorized: false,
+          winner_authorized: false,
+          board_write_authorized: false,
+          merge_authorized: false,
+          publish_authorized: false
+        },
+        security: {
+          source_result_stored: false,
+          raw_cli_output_stored: false,
+          screenshot_stored: false,
+          free_text_stored: false,
+          execution_started: false,
+          credentials_read: false
+        },
+        integrity: {
+          algorithm: "SHA-256",
+          canonicalization: "recursive-key-sort-json-v1",
+          scope: "canonical_document_without_integrity",
+          digest: "2".repeat(64)
+        }
+      };
+      workstackReviewError = "";
+      if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "workstack_human_review_recorded";
+      renderWorkstackHumanReviewPanel();
+      renderEvidenceLedgerPanel();
+      return {
+        result: state.workstackHumanReview,
+        panel: els.workstackReviewBox?.textContent || ""
+      };
+    },
     applyEvidenceLedgerState() {
       this.applyCapabilityRouterState();
       state.evidenceLedger = {
@@ -21071,6 +21372,18 @@ els.runForgeBenchCandidateBtn?.addEventListener("click", runForgeBenchOllamaCand
 els.runWorkstackArenaBtn?.addEventListener("click", runWorkstackArenaCodexPilot);
 els.copyWorkstackArenaBtn?.addEventListener("click", copyWorkstackArenaReceipt);
 els.clearWorkstackArenaBtn?.addEventListener("click", () => clearWorkstackArena(false));
+els.recordWorkstackReviewBtn?.addEventListener("click", recordWorkstackHumanReview);
+els.copyWorkstackReviewBtn?.addEventListener("click", copyWorkstackHumanReview);
+els.clearWorkstackReviewBtn?.addEventListener("click", () => clearWorkstackHumanReview(false));
+els.workstackReviewDecision?.addEventListener("change", () => {
+  state.workstackHumanReview = null;
+  workstackReviewError = "";
+  syncWorkstackReviewReasonControl();
+  renderWorkstackHumanReviewPanel();
+});
+for (const input of [els.workstackReviewReceiptAck, els.workstackReviewLimitsAck]) {
+  input?.addEventListener("change", renderWorkstackHumanReviewPanel);
+}
 for (const input of [els.workstackArenaQuotaConsent, els.workstackArenaExecutionConsent]) {
   input?.addEventListener("change", renderWorkstackArenaPanel);
 }

@@ -94,7 +94,39 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     if not page.locator("#copyWorkstackArenaBtn").is_enabled():
         raise AssertionError(f"{label}: verified receipt cannot be copied")
 
-    text = panel.inner_text()
+    review_proof = page.evaluate(
+        "() => window.__OUTILSIA_TEST__.applyWorkstackHumanReviewState()"
+    )
+    page.evaluate(
+        "() => window.__OUTILSIA_TEST__.setWorkspaceSection('workflows', '.workstack-arena-panel')"
+    )
+    page.locator("#workstackReviewPanel").evaluate("panel => { panel.open = true; }")
+    review = review_proof["result"]
+    if review["schema"] != "outilsia.workstack_human_review_result.v1":
+        raise AssertionError(f"{label}: human review schema mismatch")
+    if review["source_ref"]["arena_integrity_digest"] != result["integrity"]["digest"]:
+        raise AssertionError(f"{label}: review is not bound to the signed arena receipt")
+    if review["review"]["scope"] != "signed_public_receipt_only":
+        raise AssertionError(f"{label}: human review scope is too broad")
+    if review["review"]["status"] != "accepted_for_future_comparison":
+        raise AssertionError(f"{label}: expected comparison-only decision")
+    if review["review"]["artifact_visual_inspected"] or review["review"]["artifact_quality_approved"]:
+        raise AssertionError(f"{label}: receipt review overclaims visual inspection")
+    for forbidden_review_flag in [
+        "delivery_authorized",
+        "winner_authorized",
+        "board_write_authorized",
+        "merge_authorized",
+        "publish_authorized",
+    ]:
+        if review["consequences"][forbidden_review_flag]:
+            raise AssertionError(f"{label}: human review authorizes {forbidden_review_flag}")
+    if page.locator("#evidenceLedgerSource").input_value() != "workstack_human_review_recorded":
+        raise AssertionError(f"{label}: human review evidence is not selected")
+    if not page.locator("#copyWorkstackReviewBtn").is_enabled():
+        raise AssertionError(f"{label}: signed human decision cannot be copied")
+
+    text = " ".join(panel.inner_text().split())
     for expected in [
         "pilote Codex vérifié",
         "Codex exécuté",
@@ -105,6 +137,11 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "Inconnu",
         "Revue humaine obligatoire",
         "sans clé API tierce",
+        "Revue humaine du reçu",
+        "Accepté pour comparaison",
+        "aucune capture ou code conservé",
+        "Livraison interdite",
+        "Gagnant non déclaré",
     ]:
         if expected not in text:
             raise AssertionError(f"{label}: missing Workstack Arena proof {expected!r}")
@@ -149,7 +186,8 @@ def main() -> None:
         browser.close()
     print(
         f"workstack_arena_ui_ok desktop={desktop} mobile={mobile} "
-        "codex=true static=7/7 browser=39/39 cost=unknown repo=false winner=false"
+        "codex=true static=7/7 browser=39/39 review=human-receipt-only "
+        "cost=unknown repo=false delivery=false winner=false"
     )
 
 

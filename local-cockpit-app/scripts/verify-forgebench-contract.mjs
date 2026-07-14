@@ -131,7 +131,7 @@ for (const marker of [
   if (!referenceSource.includes(marker)) throw new Error(`visible reference marker missing: ${marker}`);
 }
 
-const rust = ["forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_candidate.rs", "evidence_ledger.rs"]
+const rust = ["forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_candidate.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri", "src", name), "utf8"))
   .join("\n");
 const js = readFileSync(resolve(root, "src", "app.js"), "utf8");
@@ -183,6 +183,10 @@ for (const needle of [
   "outilsia.forgebench_visible_gameplay_contract.v1",
   "__SIGNAL_MAZE_VISIBLE_API__",
   "signal-maze-visible-snapshot.v1",
+  "outilsia.workstack_human_review_result.v1",
+  "signed_public_receipt_only",
+  '"delivery_authorized": false',
+  '"winner_authorized": false',
 ]) {
   if (!rust.includes(needle)) throw new Error(`missing Rust ForgeBench guard: ${needle}`);
 }
@@ -200,17 +204,20 @@ for (const needle of [
   "Aucun Codex, Claude, Hermes ou modèle local exécuté",
   "gameplay visible vérifié",
   "code exécuté sans réseau · gameplay visible 39/39",
+  "Accepté pour comparaison",
+  "aucune capture ou code conservé",
+  "workstack_human_review_recorded",
 ]) {
   if (!js.includes(needle)) throw new Error(`missing UI truth label: ${needle}`);
 }
 for (const [label, text, needles] of [
-  ["hub", hub, ["forgebench-workspaces-stacks-ia", "ForgeBench + Workstack Arena · source, non public", "modèle Ollama déjà installé", "Codex CLI une fois", "Contrôle statique 7/7", "Gameplay visible 39/39", "Chromium sous bubblewrap", "ne transmet ni ne monte un dépôt utilisateur", "coût inconnu", "Claude Code, Hermes et les projets arbitraires restent indisponibles", "build public actuel", "ForgeBench peut-il déjà tester un modèle Ollama local ou lancer Codex, Claude Code et Hermes ?"]],
-  ["download", download, ["forgebench-workspaces-stacks-ia", "ForgeBench + Workstack Arena · source, non public", "boucle locale Ollama", "Codex CLI une fois", "Contrôle statique 7/7", "Gameplay visible 39/39", "copie éphémère Chromium", "ne transmet ni ne monte un dépôt utilisateur", "pas une note scientifique ou un vainqueur", "absente du téléchargement disponible aujourd'hui", "Claude Code, Hermes, les projets arbitraires et les tests cachés restent indisponibles", "ForgeBench peut-il déjà tester un modèle Ollama local ou lancer Codex, Claude Code et Hermes ?"]],
-  ["llms", llms, ["ForgeBench Ollama Browser v1 (source candidate, not in the current public build)", "Visible Gameplay Contract v1", "ephemeral instrumented copy in headless Chromium", "three seeds", "desktop plus Android portrait/landscape", "39 public checks", "public recipe is gameable", "multi-stack comparison and winner remain unavailable", "Workstack Arena Codex pilot v0 (source candidate, not in the current public build)", "512 KiB", "does not transmit or mount a user repository", "human review is required", "Claude Code, Hermes, hidden scoring, delivery and winner selection remain unavailable"]],
+  ["hub", hub, ["forgebench-workspaces-stacks-ia", "ForgeBench + Workstack Arena · source, non public", "modèle Ollama déjà installé", "Codex CLI une fois", "Contrôle statique 7/7", "Gameplay visible 39/39", "Décision humaine signée", "les captures et le code n'étant pas conservés", "ne transmet ni ne monte un dépôt utilisateur", "coût inconnu", "Claude Code, Hermes et les projets arbitraires restent indisponibles", "build public actuel", "ForgeBench peut-il déjà tester un modèle Ollama local ou lancer Codex, Claude Code et Hermes ?"]],
+  ["download", download, ["forgebench-workspaces-stacks-ia", "ForgeBench + Workstack Arena · source, non public", "boucle locale Ollama", "Codex CLI une fois", "Contrôle statique 7/7", "Gameplay visible 39/39", "Revue humaine bornée", "le code et les captures ne sont pas conservés", "copie éphémère Chromium", "ne transmet ni ne monte un dépôt utilisateur", "pas une note scientifique ou un vainqueur", "absente du téléchargement disponible aujourd'hui", "Claude Code, Hermes, les projets arbitraires et les tests cachés restent indisponibles", "ForgeBench peut-il déjà tester un modèle Ollama local ou lancer Codex, Claude Code et Hermes ?"]],
+  ["llms", llms, ["ForgeBench Ollama Browser v1 (source candidate, not in the current public build)", "Visible Gameplay Contract v1", "ephemeral instrumented copy in headless Chromium", "three seeds", "desktop plus Android portrait/landscape", "39 public checks", "public recipe is gameable", "multi-stack comparison and winner remain unavailable", "Workstack Arena Codex pilot v0 (source candidate, not in the current public build)", "512 KiB", "does not transmit or mount a user repository", "One signed local human review", "never claims visual or code inspection", "cannot authorize delivery, winner selection, board writes, merge or publication", "Arbitrary project execution, Claude Code, Hermes and hidden scoring remain unavailable"]],
 ]) {
   for (const needle of needles) {
     if (!text.includes(needle)) throw new Error(`missing ForgeBench SEO/GEO truth on ${label}: ${needle}`);
   }
 }
 
-console.log(`forgebench_contract_ok benchmark=${benchmark.id} seeds=${benchmark.determinism.default_seeds.length} starter=${bundleDigest} visible-contract=${visibleContract.contract_version} reference=${referenceDigest} hidden=absent isolation=reference-plus-static-plus-browser candidate=ollama-visible-browser codex=public-pilot-only generated-code=true gameplay-visible=true checks=39 science=false winner=false seo=hub-download-llms`);
+console.log(`forgebench_contract_ok benchmark=${benchmark.id} seeds=${benchmark.determinism.default_seeds.length} starter=${bundleDigest} visible-contract=${visibleContract.contract_version} reference=${referenceDigest} hidden=absent isolation=reference-plus-static-plus-browser candidate=ollama-visible-browser codex=public-pilot-only human-review=receipt-only generated-code=true gameplay-visible=true checks=39 science=false winner=false seo=hub-download-llms`);

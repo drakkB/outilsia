@@ -279,6 +279,8 @@ Capability Router v0 implémenté dans les sources le 12 juillet 2026, sans publ
 
 Workstack Arena Local v0 implémenté dans les sources le 14 juillet 2026, sans publication : le premier adaptateur réel lance uniquement le candidat Codex CLI exact sur le benchmark public `Signal Maze v1`, dans une copie jetable du workspace ForgeBench vérifié. Deux consentements par run couvrent séparément le quota ou coût fournisseur inconnu et l'écriture/exécution du mini-jeu. Une tentative, un budget exact de 3, 5 ou 10 minutes et 512 Kio de sortie maximum sont imposés. Les règles externes sont ignorées et une allowlist d'environnement exclut clés API tierces, tokens cloud et socket SSH. Le dépôt utilisateur, le board, la suite cachée, les credentials, la fusion et la publication ne sont ni transmis ni montés. La soumission passe les mêmes `7/7` contrôles statiques et `39/39` contrôles Chromium publics, puis requiert une revue humaine. Le mode `workspace-write` reste une propriété de la sandbox Codex et n'est pas présenté comme une preuve OutilsIA d'isolation de lecture de tout l'hôte.
 
+Revue humaine du reçu v0 implémentée dans les sources le 14 juillet 2026, sans publication : après un run Codex signé, le propriétaire peut accepter le reçu pour une future comparaison, demander un nouveau run corrigé ou rejeter le run. La décision est structurée, signée, liée à l'empreinte exacte du run et ajoutable une seule fois à l'Evidence Ledger. Elle porte uniquement sur les métriques et limites du reçu public : aucune capture ni code n'étant conservé, elle ne revendique jamais une inspection visuelle, une approbation de qualité, une livraison, un gagnant, une écriture board, une fusion ou une publication.
+
 - [x] Détecter les CLI officielles par commande de version bornée, sans retourner leur chemin.
 - [x] Distinguer Windows natif, Linux natif, WSL par défaut, Ollama natif et Ollama WSL.
 - [x] Router par capacités et type de mission sans verrouiller la proposition sur une marque.
@@ -300,7 +302,8 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Ajouter `isolated_visible_browser_candidate` pour une génération Ollama locale, une vérification structurelle puis une exécution Chromium visible et isolée, sans sortie brute ni claim scientifique.
 - [x] Ajouter la preuve de gameplay visible seulement après 39 contrôles publics, trois seeds, trois viewports et trois captures signées.
 - [x] Ajouter `isolated_codex_visible_browser_pilot` après invocation réelle et bornée de Codex CLI, sans sortie brute, coût inventé, dépôt utilisateur ou claim de gagnant.
-- [ ] Ajouter les preuves de vérification cachée et de décision humaine seulement après les gates correspondantes de Workstack Arena.
+- [x] Ajouter `explicit_local_human_review` pour une décision humaine structurée sur le reçu public signé, sans approbation visuelle, livraison ou gagnant.
+- [ ] Ajouter la preuve de vérification cachée seulement après un évaluateur réellement isolé du worker et les gates correspondantes de Workstack Arena.
 
 - Séparer quatre responsabilités : Composer définit la chaîne, Workstack Arena exécute, ForgeBench évalue et Evidence Ledger conserve la preuve.
 - [x] Créer le contrat exploratoire `Signal Maze v1` avec règles déterministes, starter public scellé, trois seeds, checks visibles et viewports desktop/Android.

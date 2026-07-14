@@ -652,6 +652,42 @@
             <button id="copyWorkstackArenaBtn" type="button" disabled>Copier le reçu</button>
             <button id="clearWorkstackArenaBtn" type="button" disabled>Effacer</button>
           </div>
+          <details id="workstackReviewPanel" class="workstack-review-panel" hidden>
+            <summary>
+              <span><strong>Revue humaine du reçu</strong><small>Décision locale, bornée et sans livraison</small></span>
+              <span id="workstackReviewState">run requis</span>
+            </summary>
+            <div class="workstack-review-body">
+              <p id="workstackReviewPrivacy">Cette revue porte uniquement sur les métriques et limites du reçu signé. Les captures et le code ne sont pas conservés : leur qualité visuelle n'est donc jamais déclarée approuvée.</p>
+              <div class="workstack-review-controls">
+                <label>
+                  <span class="field-label">Décision</span>
+                  <select id="workstackReviewDecision" aria-describedby="workstackReviewPrivacy">
+                    <option value="accept_for_future_comparison">Accepter pour comparaison</option>
+                    <option value="request_correction">Demander un nouveau run</option>
+                    <option value="reject_run">Rejeter ce reçu</option>
+                  </select>
+                </label>
+                <label>
+                  <span class="field-label">Motif structuré</span>
+                  <select id="workstackReviewReason" aria-describedby="workstackReviewPrivacy">
+                    <option value="signed_public_receipt_accepted">Reçu public accepté</option>
+                  </select>
+                </label>
+              </div>
+              <fieldset class="workstack-review-acks" aria-describedby="workstackReviewPrivacy">
+                <legend>Accusés obligatoires</legend>
+                <label><input id="workstackReviewReceiptAck" type="checkbox"> <span>J'ai relu les métriques du reçu public et je n'affirme pas avoir inspecté le code ou les captures.</span></label>
+                <label><input id="workstackReviewLimitsAck" type="checkbox"> <span>Cette décision n'autorise ni nouveau run automatique, ni livraison, ni gagnant, ni écriture sur le board.</span></label>
+              </fieldset>
+              <div id="workstackReviewBox" class="workstack-review-box empty">Choisis une décision après avoir relu le reçu signé.</div>
+              <div class="row-actions">
+                <button id="recordWorkstackReviewBtn" type="button" disabled>Enregistrer la décision</button>
+                <button id="copyWorkstackReviewBtn" type="button" disabled>Copier JSON</button>
+                <button id="clearWorkstackReviewBtn" type="button" disabled>Effacer la revue</button>
+              </div>
+            </div>
+          </details>
         </article>
 
         <article class="panel evidence-ledger-panel advanced-panel" data-workspace="workflows">
@@ -675,6 +711,7 @@
                 <option value="forgebench_reference_pilot_verified">Pilote ForgeBench vérifié</option>
                 <option value="forgebench_ollama_candidate_verified">Candidat Ollama vérifié</option>
                 <option value="workstack_arena_codex_pilot_verified">Pilote Codex vérifié</option>
+                <option value="workstack_human_review_recorded">Décision humaine enregistrée</option>
               </select>
             </label>
           </div>

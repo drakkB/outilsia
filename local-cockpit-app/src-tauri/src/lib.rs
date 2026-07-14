@@ -11,6 +11,7 @@ mod forgebench_vault;
 mod local_capability_bridge;
 mod workstack_arena;
 mod workstack_composer;
+mod workstack_review;
 
 use board_observer::observe_planka_board;
 use capability_router::route_workstack_capabilities;
@@ -45,6 +46,7 @@ use sysinfo::{Disks, System};
 use tauri::{AppHandle, Emitter, Manager, State};
 use workstack_arena::run_workstack_arena_codex_pilot;
 use workstack_composer::compile_work_card;
+use workstack_review::record_workstack_human_review;
 
 const OUTILSIA_ENDPOINT: &str = "https://outilsia.fr";
 const DETECTION_COMMAND_TIMEOUT: Duration = Duration::from_secs(12);
@@ -5164,6 +5166,7 @@ pub fn run() {
             compile_work_card,
             route_workstack_capabilities,
             run_workstack_arena_codex_pilot,
+            record_workstack_human_review,
             append_evidence_entry,
             get_evidence_ledger,
             clear_evidence_ledger,
