@@ -28,6 +28,15 @@ const PRIVATE_CHECKS: [&str; 5] = [
     "invalid-input-rejection",
 ];
 
+#[derive(Debug, Clone)]
+pub(crate) struct HiddenSuiteMaterial {
+    pub(crate) suite_id: String,
+    pub(crate) suite_digest: String,
+    pub(crate) receipt_digest: String,
+    pub(crate) hidden_seeds: Vec<u64>,
+    pub(crate) private_checks_total: usize,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) struct SealHiddenSuiteRequest {
@@ -452,6 +461,48 @@ pub(crate) fn hidden_suite_receipt(app: &AppHandle) -> Result<Option<Value>, Str
     read_suite_path(&vault_path(app)?)?
         .map(|suite| receipt_for_suite(&suite))
         .transpose()
+}
+
+pub(crate) fn hidden_suite_material(
+    app: &AppHandle,
+) -> Result<Option<HiddenSuiteMaterial>, String> {
+    let _guard = vault_lock()
+        .lock()
+        .map_err(|_| "Verrou Hidden Suite indisponible.".to_string())?;
+    let Some(suite) = read_suite_path(&vault_path(app)?)? else {
+        return Ok(None);
+    };
+    validate_hidden_suite(&suite)?;
+    let receipt = receipt_for_suite(&suite)?;
+    let hidden_seeds = suite
+        .get("hidden_seeds")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "Seeds prives Hidden Suite absents.".to_string())?
+        .iter()
+        .map(|seed| {
+            seed.as_u64()
+                .ok_or_else(|| "Seed prive Hidden Suite invalide.".to_string())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Some(HiddenSuiteMaterial {
+        suite_id: suite
+            .get("suite_id")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        suite_digest: suite
+            .pointer("/integrity/digest")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        receipt_digest: receipt
+            .pointer("/integrity/digest")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        hidden_seeds,
+        private_checks_total: PRIVATE_CHECKS.len(),
+    }))
 }
 
 fn status_document(receipt: Option<Value>) -> Value {

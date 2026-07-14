@@ -109,7 +109,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         if forbidden in pilot_json:
             raise AssertionError(f"{label}: reference pilot leaked {forbidden!r}")
     candidate = proof["candidate"]
-    if candidate["schema"] != "outilsia.forgebench_ollama_candidate_result.v2":
+    if candidate["schema"] != "outilsia.forgebench_ollama_candidate_result.v3":
         raise AssertionError(f"{label}: Ollama candidate schema mismatch")
     if candidate["candidate"]["model_invoked"] is not True or candidate["candidate"]["cli_agent_invoked"] is not False:
         raise AssertionError(f"{label}: Ollama invocation claim mismatch")
@@ -122,7 +122,18 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         raise AssertionError(f"{label}: browser evaluator claim mismatch")
     if browser["seeds_total"] != 3 or browser["viewports_total"] != 3 or len(browser["screenshots"]) != 3:
         raise AssertionError(f"{label}: browser evidence is incomplete")
-    if candidate["readiness"]["visible_browser_execution_verified"] is not True or candidate["readiness"]["gameplay_verified"] is not True:
+    hidden = candidate["hidden_evaluator"]
+    if hidden["kind"] != "chromium_hidden_holdout_gate_v1" or hidden["controller_kind"] != "trusted_local_holdout_controller_v1":
+        raise AssertionError(f"{label}: hidden evaluator contract mismatch")
+    if hidden["private_checks_passed"] != 5 or hidden["private_checks_total"] != 5 or hidden["viewports_total"] != 3:
+        raise AssertionError(f"{label}: hidden holdout evidence is incomplete")
+    if hidden["worker_generation_completed_before_suite_read"] is not True or hidden["vault_file_mounted"] is not False:
+        raise AssertionError(f"{label}: hidden holdout ordering or vault boundary mismatch")
+    if hidden["hidden_seeds_returned"] is not False or hidden["observations_returned"] is not False or hidden["screenshots_returned"] is not False:
+        raise AssertionError(f"{label}: private holdout material escaped")
+    if hidden["check_families_public_in_source"] is not True or hidden["same_user_process_isolation_enforced"] is not False:
+        raise AssertionError(f"{label}: hidden holdout limitations are concealed")
+    if candidate["readiness"]["visible_browser_execution_verified"] is not True or candidate["readiness"]["gameplay_verified"] is not True or candidate["readiness"]["hidden_evaluator_verified"] is not True:
         raise AssertionError(f"{label}: candidate visible gameplay proof missing")
     if candidate["readiness"]["scientific_eligible"] is not False or candidate["readiness"]["winner_declared"] is not False:
         raise AssertionError(f"{label}: candidate overclaims science or winner")
@@ -167,7 +178,8 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "Suite cachée locale",
         "scellée localement",
         "stockage local non chiffré",
-        "Suite privée non montée dans le pilote et pas encore isolée pour les futurs agents",
+        "Suite privée réservée au holdout Ollama après gel du code",
+        "Familles de checks publiques et vault même-utilisateur",
         "Espaces worker frais",
         "workspaces vérifiés",
         "12 espaces frais liés au préflight",
@@ -186,11 +198,12 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "soumission montée en lecture seule",
         "Aucun Codex, Claude, Hermes ou modèle local exécuté",
         "Candidat Ollama local",
-        "gameplay visible vérifié",
-        "hermes3:8b · code exécuté sans réseau · gameplay visible 39/39",
+        "holdout vérifié",
+        "hermes3:8b · visible 39/39 · holdout 5/5",
+        "seeds absents du prompt",
         "3 captures vérifiées",
         "3 seeds · desktop + Android portrait/paysage · clavier, souris, tactile",
-        "aucun score caché ni vainqueur",
+        "pas encore de score scientifique ni de vainqueur",
         "Aucun agent lancé",
         "aucun score calculé",
         "aucun vainqueur déclaré",
@@ -228,7 +241,7 @@ def main() -> None:
         browser.close()
     print(
         f"forgebench_ui_ok desktop={desktop} mobile={mobile} "
-        "starter=sealed hidden=locally-sealed-not-evaluated stacks=4 workspaces=12 isolation=reference-pilot candidate=ollama-local structure=true code-executed=false gameplay=false science=false winner=false"
+        "starter=sealed hidden=ui-fixture-holdout-verified stacks=4 workspaces=12 isolation=reference-pilot candidate=ollama-ui-fixture-v3 structure=true code-executed=true visible=39/39 holdout=5/5 science=false winner=false"
     )
 
 

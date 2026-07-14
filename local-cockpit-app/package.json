@@ -45,7 +45,7 @@
     "verify:board-observer": "python3 scripts/verify-board-observer.py",
     "verify:workstack-composer": "python3 scripts/verify-workstack-composer.py",
     "verify:capability-router": "python3 scripts/verify-capability-router.py",
-    "verify:forgebench:runtime": "node scripts/verify-forgebench-contract.mjs && node scripts/test-forgebench-reference-run.mjs && node scripts/test-forgebench-candidate-run.mjs && node scripts/test-forgebench-browser-run.mjs",
+    "verify:forgebench:runtime": "node scripts/verify-forgebench-contract.mjs && node scripts/test-forgebench-reference-run.mjs && node scripts/test-forgebench-candidate-run.mjs && node scripts/test-forgebench-browser-run.mjs && node scripts/test-forgebench-hidden-run.mjs",
     "verify:forgebench:visible": "python3 scripts/verify-forgebench-visible-gameplay.py",
     "verify:forgebench": "npm run verify:forgebench:runtime && npm run verify:forgebench:visible && python3 scripts/verify-forgebench.py",
     "verify:workstack-arena": "python3 scripts/verify-workstack-arena.py",

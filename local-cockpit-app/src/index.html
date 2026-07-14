@@ -592,9 +592,9 @@
               </label>
             </div>
             <div id="forgeBenchCandidateBox" class="forgebench-candidate-box empty">
-              Ajoute la stack Ollama locale à l'expérience. Le modèle recevra uniquement la tâche publique et rendra trois fichiers bornés.
+              Ajoute la stack Ollama locale et scelle cinq seeds. Le modèle reçoit la tâche publique ; le holdout ne commence qu'après le gel de ses trois fichiers.
             </div>
-            <small id="forgeBenchCandidatePrivacy">Ollama local uniquement · coût API 0 € · aucune lecture de fichier par le modèle · code exécuté dans Chromium isolé sans réseau · tests visibles uniquement.</small>
+            <small id="forgeBenchCandidatePrivacy">Ollama local uniquement · coût API 0 € · aucun fichier fourni au modèle · visible 39 checks puis holdout 5 familles · Chromium isolé sans réseau · aucun score scientifique automatique.</small>
             <div class="button-row compact">
               <button id="runForgeBenchCandidateBtn" type="button" disabled>Lancer le candidat local</button>
             </div>

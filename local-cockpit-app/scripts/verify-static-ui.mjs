@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
-const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_candidate.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
+const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_hidden.rs", "forgebench_candidate.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
@@ -211,10 +211,10 @@ const requiredFeatureText = [
   ["html ForgeBench Ollama candidate", html, "forgeBenchCandidateBox"],
   ["html ForgeBench Ollama model selector", html, "forgeBenchCandidateModel"],
   ["html ForgeBench Ollama consent action", html, "runForgeBenchCandidateBtn"],
-  ["js ForgeBench Ollama request schema", js, "outilsia.forgebench_ollama_candidate_request.v2"],
-  ["js ForgeBench Ollama result schema", js, "outilsia.forgebench_ollama_candidate_result.v2"],
+  ["js ForgeBench Ollama request schema", js, "outilsia.forgebench_ollama_candidate_request.v3"],
+  ["js ForgeBench Ollama result schema", js, "outilsia.forgebench_ollama_candidate_result.v3"],
   ["js ForgeBench Ollama exact identity", js, "isForgeBenchOllamaCandidateId"],
-  ["rust ForgeBench Ollama result schema", rust, "outilsia.forgebench_ollama_candidate_result.v2"],
+  ["rust ForgeBench Ollama result schema", rust, "outilsia.forgebench_ollama_candidate_result.v3"],
   ["rust ForgeBench Ollama loopback only", rust, "http://127.0.0.1:11434/api/chat"],
   ["rust ForgeBench Ollama proxy bypass", rust, ".no_proxy()"],
   ["rust ForgeBench Ollama generated code executed", rust, '"generated_code_executed": true'],
@@ -222,7 +222,9 @@ const requiredFeatureText = [
   ["rust ForgeBench Ollama static evaluator", rust, "deterministic_visible_static_gate"],
   ["rust ForgeBench Chromium evaluator", rust, "chromium_visible_gameplay_gate"],
   ["rust ForgeBench visible controller", rust, "trusted_public_contract_controller_v1"],
-  ["rust evidence local candidate", rust, "isolated_visible_browser_candidate"],
+  ["rust ForgeBench hidden holdout", rust, "chromium_hidden_holdout_gate_v1"],
+  ["rust ForgeBench holdout seeds not returned", rust, '"hidden_seeds_returned": false'],
+  ["rust evidence local candidate", rust, "isolated_visible_and_hidden_holdout_candidate"],
   ["css ForgeBench Ollama candidate", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".forgebench-candidate"],
   ["html Workstack Arena", html, "workstackArenaBox"],
   ["html Workstack Arena explicit quota consent", html, "workstackArenaQuotaConsent"],
@@ -270,8 +272,9 @@ const requiredFeatureText = [
   ["notice ForgeBench workspaces", workstackNotice, "Espaces worker frais"],
   ["notice ForgeBench reference pilot", workstackNotice, "Pilote d'exécution isolé"],
   ["notice ForgeBench Ollama candidate", workstackNotice, "Candidat Ollama local"],
-  ["notice ForgeBench isolated generated code", workstackNotice, "il autorise l'exécution du code généré dans Chromium sous bubblewrap sans réseau"],
-  ["notice ForgeBench public gate limit", workstackNotice, "suite cachée, score scientifique et vainqueur restent obligatoirement faux"],
+  ["notice ForgeBench isolated generated code", workstackNotice, "les deux évaluateurs Chromium restent sans réseau"],
+  ["notice ForgeBench hidden holdout", workstackNotice, "cinq familles de holdout dans un second Chromium"],
+  ["notice ForgeBench public gate limit", workstackNotice, "score scientifique et vainqueur restent obligatoirement faux"],
   ["notice Workstack Arena", workstackNotice, "Workstack Arena"],
   ["notice Workstack human review", workstackNotice, "Revue humaine du reçu signé"],
   ["notice Workstack human review scope", workstackNotice, "artifact_visual_inspected=false"],

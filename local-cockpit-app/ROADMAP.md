@@ -281,13 +281,15 @@ Workstack Arena Local v0 implémenté dans les sources le 14 juillet 2026, sans 
 
 Revue humaine du reçu v0 implémentée dans les sources le 14 juillet 2026, sans publication : après un run Codex signé, le propriétaire peut accepter le reçu pour une future comparaison, demander un nouveau run corrigé ou rejeter le run. La décision est structurée, signée, liée à l'empreinte exacte du run et ajoutable une seule fois à l'Evidence Ledger. Elle porte uniquement sur les métriques et limites du reçu public : aucune capture ni code n'étant conservé, elle ne revendique jamais une inspection visuelle, une approbation de qualité, une livraison, un gagnant, une écriture board, une fusion ou une publication.
 
+Holdout Ollama v1 implémenté dans les sources le 15 juillet 2026, sans publication : le candidat termine sa génération, sa soumission est gelée et les 39 contrôles visibles passent avant toute lecture du vault. Un second processus bubblewrap/Chromium reçoit ensuite cinq seeds comme entrées runtime et vérifie cinq familles de holdout sur desktop et Android. Le vault n'est pas monté ; seeds, identifiants privés, observations, DOM et captures ne sortent pas. Cette preuve reste non scientifique parce que les familles de checks sont publiques dans le code, le vault n'est ni chiffré ni inaccessible aux processus du même compte, les candidats pairs n'ont pas tourné et l'énergie n'est pas mesurée.
+
 - [x] Détecter les CLI officielles par commande de version bornée, sans retourner leur chemin.
 - [x] Distinguer Windows natif, Linux natif, WSL par défaut, Ollama natif et Ollama WSL.
 - [x] Router par capacités et type de mission sans verrouiller la proposition sur une marque.
 - [x] Imposer un vérificateur différent de l'exécutant lorsqu'une proposition complète est possible.
 - [x] Garder le panneau dans Atelier IA et fournir JSON, résumé et preuve visuelle desktop/mobile.
 - [x] Ajouter un consentement séparé et strict pour le pilote technique de référence : aucun CLI candidat, réseau ou crédit payant.
-- [x] Ajouter un second consentement et un budget explicite avant l'appel d'un modèle Ollama local déjà installé, sans accès fichier, Internet, API payante ou suite cachée ; l'exécution du code requiert une autorisation explicite distincte dans ce consentement.
+- [x] Ajouter un second consentement et un budget explicite avant l'appel d'un modèle Ollama local déjà installé, sans accès fichier, Internet ou API payante ; la suite cachée n'est lue qu'après gel du code et l'exécution du candidat comme du holdout requiert une autorisation explicite.
 - [x] Ajouter un premier adaptateur CLI borné à Codex + Signal Maze public, avec contrat strict, budget, consentements, sortie limitée, workspace jetable et coût fournisseur inconnu.
 - [ ] Étendre ce mécanisme à Claude Code, Hermes et aux cartes arbitraires seulement après un contrat de permissions et de budget propre à chaque adaptateur.
 
@@ -299,16 +301,17 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Ajouter les actions explicites Ajouter, Vérifier, Copier, Télécharger et Réinitialiser dans Atelier IA.
 - [x] Maintenir la notice canonique `NOTICE-UTILISATION-WORKSTACK.md` et vérifier ses responsabilités en CI.
 - [x] Ajouter `isolated_reference_run` avec exécution réelle, vérification visible indépendante et consentement enregistré, sans contenu brut.
-- [x] Ajouter `isolated_visible_browser_candidate` pour une génération Ollama locale, une vérification structurelle puis une exécution Chromium visible et isolée, sans sortie brute ni claim scientifique.
+- [x] Ajouter `isolated_visible_and_hidden_holdout_candidate` pour une génération Ollama locale, une vérification structurelle, une exécution Chromium visible puis un holdout Chromium séparé, sans sortie brute ni claim scientifique.
 - [x] Ajouter la preuve de gameplay visible seulement après 39 contrôles publics, trois seeds, trois viewports et trois captures signées.
 - [x] Ajouter `isolated_codex_visible_browser_pilot` après invocation réelle et bornée de Codex CLI, sans sortie brute, coût inventé, dépôt utilisateur ou claim de gagnant.
 - [x] Ajouter `explicit_local_human_review` pour une décision humaine structurée sur le reçu public signé, sans approbation visuelle, livraison ou gagnant.
-- [ ] Ajouter la preuve de vérification cachée seulement après un évaluateur réellement isolé du worker et les gates correspondantes de Workstack Arena.
+- [x] Ajouter une preuve de holdout Ollama après gel de la soumission, dans un évaluateur séparé du worker, avec uniquement compteurs et empreintes dans le Ledger.
+- [ ] Durcir ce holdout pour une prétention scientifique : logique de checks non publique, vault chiffré et inaccessible au même utilisateur, candidats pairs complets et énergie mesurée.
 
 - Séparer quatre responsabilités : Composer définit la chaîne, Workstack Arena exécute, ForgeBench évalue et Evidence Ledger conserve la preuve.
 - [x] Créer le contrat exploratoire `Signal Maze v1` avec règles déterministes, starter public scellé, trois seeds, checks visibles et viewports desktop/Android.
 - [x] Compiler un préflight signé qui valide Workstack, Router, disponibilité des stacks, équité du protocole et absence d'exécution.
-- [x] Afficher séparément readiness exploratoire et scientifique, sans inventer les tests cachés encore absents.
+- [x] Afficher séparément readiness exploratoire et scientifique, avec holdout local explicitement distinct d'une validation scientifique.
 - [x] Conserver volontairement le préflight ForgeBench dans l'Evidence Ledger sans contenu brut.
 - [x] Générer et sceller localement une suite privée avec seeds aléatoires, manifeste interne, reçu sans contenu, stockage atomique et permissions utilisateur.
 - [x] Garder `scientific_ready=false` tant que le vault n'est ni chiffré ni inaccessible aux futurs workers.
@@ -322,13 +325,14 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Livrer une implémentation de référence scellée et réellement jouée sur trois seeds, desktop, Android portrait/paysage, clavier, souris et tactile, sans ressource réseau.
 - [x] Exiger statiquement l'API visible et les marqueurs DOM dans les soumissions Ollama avant d'autoriser `generated_code_executed=true`.
 - [x] Câbler les tests Bubblewrap de référence et du candidat dans `verify:ci-source` : exécution réelle sur Linux, contrat vérifié sans faux claim sur Windows.
-- [x] Conserver dans l'Evidence Ledger uniquement génération, structure, métriques et empreintes ; y ajouter l'attestation de gameplay visible sans image ni DOM brut, garder suite cachée, science et vainqueur à faux, et l'énergie locale inconnue.
+- [x] Conserver dans l'Evidence Ledger uniquement génération, structure, métriques et empreintes ; y ajouter les attestations visible et holdout sans image, DOM, seed ou observation brute, garder science et vainqueur à faux, et l'énergie locale inconnue.
 - [x] Exécuter le code candidat dans Chromium réellement isolé par bubblewrap, avec tests visibles et captures éphémères, avant toute affirmation de gameplay visible.
 - [x] Lancer Codex CLI en session éphémère sur la seule tâche Signal Maze publique, avec un essai borné, contrôle de la taille de sortie, vérification des références amont et suppression obligatoire du workspace.
 - [x] Afficher le reçu Codex desktop/mobile : worker invoqué, structure `7/7`, gameplay `39/39`, coût inconnu, absence de livraison et gate humaine.
 - [ ] Fournir un préflight/installateur guidé de Chromium dans Linux/WSL sans installation silencieuse ni élargissement du réseau du worker.
 - [ ] Généraliser les adaptateurs CLI au-delà du pilote Codex public sans élargir implicitement réseau, credentials, accès dépôt ou budget.
-- [ ] Construire un évaluateur caché isolé capable de consommer la suite privée sans la révéler au worker avant toute affirmation scientifique.
+- [x] Construire un évaluateur holdout Ollama séparé capable de consommer les seeds privés après gel du code sans les révéler au worker ni les retourner.
+- [ ] Remplacer les familles publiques et le vault même-utilisateur par une isolation et une politique de secret suffisantes avant toute affirmation scientifique.
 - Mesurer séparément résultat, vitesse, efficacité et coût ; toujours publier les valeurs brutes, les sous-scores et le caractère estimé ou inconnu d'une donnée.
 - Utiliser comme score équilibré initial `50 % résultat + 20 % efficacité + 15 % vitesse + 15 % coût`, sans masquer les podiums par dimension ni la frontière de Pareto.
 - Comparer d'abord trois stacks : Codex CLI seul, Claude Code seul et Hermes planification -> Codex construction -> Claude audit.

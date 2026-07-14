@@ -1,6 +1,6 @@
 # Notice d'utilisation - Workstacks et preuves OutilsIA
 
-Version de la notice : 2026-07-14
+Version de la notice : 2026-07-15
 Périmètre : OutilsIA Local Cockpit, espace **Atelier IA**
 
 ## Navigation du cockpit
@@ -27,7 +27,7 @@ Les actions transversales ouvrent automatiquement l'espace correspondant. Par ex
 | Workstack Composer | Transformer une carte prête en plan borné avec rôles, budget, permissions et gate humaine. | Aucune exécution, création de worktree, fusion ou publication. |
 | Capability Router | Détecter les CLI et modèles locaux disponibles, puis proposer un planificateur, un exécutant et un vérificateur distinct. | Ne lit pas les jetons, ne vérifie pas les quotas et ne transmet pas la mission aux agents. |
 | Evidence Ledger | Conserver une trace locale chaînée des étapes validées et de leurs empreintes. | Ne stocke ni description brute, prompt, réponse de modèle, credential ou fichier projet. Il ne prouve pas à lui seul la qualité du résultat. |
-| ForgeBench | Préparer un protocole équitable `Signal Maze v1`, publier un contrat de gameplay observable, vérifier une référence clavier/souris/tactile, sceller localement des seeds privés, tester bubblewrap, exécuter un pilote technique, puis appeler facultativement un modèle Ollama local sur le seul contrat public. | Après consentement, le code candidat peut être contrôlé statiquement puis joué dans Chromium isolé. Ce test public ne valide aucun cas caché, score scientifique ou vainqueur. ForgeBench ne lance pas seul un agent CLI. |
+| ForgeBench | Préparer un protocole équitable `Signal Maze v1`, publier un contrat de gameplay observable, vérifier une référence clavier/souris/tactile, sceller localement des seeds privés, tester bubblewrap, exécuter un pilote technique, puis appeler facultativement un modèle Ollama local sur le seul contrat public. | Après consentement, le code candidat est gelé, contrôlé publiquement puis soumis à un second Chromium holdout sans réseau. Cette preuve locale ne vaut encore ni score scientifique ni vainqueur : familles de checks publiques, vault non chiffré, pairs et énergie restent des blocages. ForgeBench ne lance pas seul un agent CLI. |
 | Workstack Arena | Dans le candidat source, lancer **Codex CLI uniquement sur Signal Maze public** dans un workspace jetable, avec un seul essai borné, puis enregistrer une décision humaine structurée sur le reçu signé. | Aucun projet utilisateur, board, test caché, fusion ou publication. La revue n'inspecte ni capture ni code et n'autorise ni livraison ni gagnant. Claude Code, Hermes et l'exécution d'une carte arbitraire restent indisponibles. Le build public actuel ne contient pas encore ce pilote. |
 | MemoryForge / Obsidian | Conserver les décisions, bilans et connaissances durables du projet. | Ne reçoit pas tous les logs, prompts ou sorties brutes du Ledger. |
 | Strategy Arena | Exploiter les capacités IA locales préparées par OutilsIA pour les workflows quant, puis compiler et backtester. | OutilsIA ne génère pas de stratégie financière et ne lance pas de backtest. |
@@ -45,7 +45,7 @@ Les actions transversales ouvrent automatiquement l'espace correspondant. Par ex
 9. Dans **ForgeBench Lab**, utiliser facultativement **Sceller 5 seeds privés**. Le reçu ne contient ni seed, ni identifiant de check privé, ni chemin du vault.
 10. Choisir le niveau de preuve, le nombre de seeds publics et au moins deux stacks candidates.
 11. Cliquer sur **Préparer l'expérience**, puis vérifier que chaque stack reçoit la même empreinte de protocole.
-12. Lire séparément les readiness exploratoire et scientifique. Une suite locale scellée reste non scientifique tant que les workers ne sont pas isolés du dossier applicatif et que l'évaluateur n'est pas indépendant.
+12. Lire séparément les readiness exploratoire et scientifique. Une suite locale scellée permet le holdout Ollama borné, mais reste non scientifique tant que les familles de checks sont publiques, que le vault du même compte n'est pas durci et que pairs et énergie manquent.
 13. Dans **Espaces worker frais**, cliquer sur **Préparer les espaces**. OutilsIA crée un workspace distinct pour chaque combinaison stack × seed public, hors du dépôt source, et revérifie le starter embarqué.
 14. Contrôler le reçu : nombre de workspaces, empreinte du starter et mention explicite qu'aucun worker n'a été lancé.
 15. Dans **Préflight isolation**, cliquer sur **Tester l'isolation**. Le canari utilise bubblewrap sous Linux ou WSL, sans agent, credential, dépôt source ou contenu de la suite cachée.
@@ -54,8 +54,8 @@ Les actions transversales ouvrent automatiquement l'espace correspondant. Par ex
 18. Contrôler que le worker de référence et l'évaluateur visible séparé sont vérifiés, que la soumission a été montée en lecture seule et que le workspace temporaire a été supprimé.
 19. Pour tester un modèle local, cocher **Modèle Ollama local**, choisir un modèle déjà installé remonté par Capability Router, puis recréer l'expérience et les workspaces afin de signer cette identité exacte.
 20. Rejouer le préflight isolation et le pilote de référence sur ce batch. Le candidat local ne peut pas réutiliser une ancienne preuve ou un autre backend.
-21. Dans **Candidat Ollama local**, choisir un budget de 3, 5 ou 10 minutes, puis confirmer le second consentement. Il autorise uniquement le modèle local, l'API Ollama de boucle locale et une tentative ; après le contrôle statique, il autorise l'exécution du code généré dans Chromium sous bubblewrap sans réseau. Internet, API payante et suite cachée restent interdits.
-22. Contrôler le résultat : génération locale terminée, trois fichiers matérialisés, topologie exacte, API du contrat visible présente, sept groupes de checks statiques puis 39 contrôles de gameplay dans Chromium isolé sur trois seeds et trois viewports. Le résultat doit encore afficher explicitement qu'il ne vaut ni score caché ni classement scientifique.
+21. Dans **Candidat Ollama local**, choisir un budget de 3, 5 ou 10 minutes, puis confirmer le second consentement. Il autorise uniquement le modèle local, l'API Ollama de boucle locale, une tentative et le holdout après gel du code. Le modèle ne reçoit jamais le vault ; les deux évaluateurs Chromium restent sans réseau.
+22. Contrôler le résultat : génération locale terminée, trois fichiers matérialisés, topologie exacte, API visible présente, sept groupes de checks statiques, 39 contrôles de gameplay visibles, puis cinq familles de holdout dans un second Chromium. Le reçu doit indiquer que les seeds étaient absents du prompt, que le vault n'a pas été monté et qu'aucune observation privée n'est sortie. Il doit aussi refuser score scientifique et vainqueur.
 23. Pour le pilote Codex du candidat source, recréer le routage et l'expérience avec le candidat Codex exact et la stack `codex-solo`, puis revérifier workspaces, isolation et pilote de référence. Une preuve produite avec une autre identité est refusée.
 24. Ouvrir **Lancer le pilote**, sélectionner le Codex CLI détecté et choisir un budget de 3, 5 ou 10 minutes. Un seul essai est autorisé et la sortie combinée est limitée à 512 Kio.
 25. Cocher séparément l'autorisation d'utiliser la connexion et le quota ou coût du CLI, puis l'autorisation d'écrire et d'exécuter le mini-jeu dans le workspace jetable. Ces consentements ne valent que pour ce run.
@@ -66,7 +66,7 @@ Les actions transversales ouvrent automatiquement l'espace correspondant. Par ex
 30. Dans **Evidence Ledger**, sélectionner chaque étape disponible, notamment **Pilote ForgeBench vérifié**, **Candidat Ollama vérifié**, **Pilote Codex vérifié** ou **Revue humaine enregistrée**, puis cliquer sur **Ajouter la preuve**.
 31. Exporter le JSON du Ledger avant une réinitialisation ou un transfert de machine.
 
-Le parcours s'arrête ici. Un modèle Ollama local ou, dans le candidat source, Codex CLI peut produire une soumission puis la faire jouer contre la recette publique visible dans Chromium isolé. Le propriétaire peut ensuite qualifier le reçu pour une future comparaison, demander un nouveau run ou le rejeter, sans transformer cette décision en validation visuelle ou livraison. Claude Code, Hermes, les cartes arbitraires et les dépôts utilisateur ne sont pas exécutés. Aucun test caché, score comparatif ou vainqueur n'existe à ce stade.
+Le parcours s'arrête ici. Un modèle Ollama local peut produire une soumission, passer la recette publique puis un holdout local borné après gel du code. Codex CLI reste limité à la recette publique, car sa portée de lecture hôte n'est pas vérifiée indépendamment. Le propriétaire peut qualifier le reçu pour une future comparaison, demander un nouveau run ou le rejeter, sans transformer cette décision en validation visuelle ou livraison. Claude Code, Hermes, les cartes arbitraires et les dépôts utilisateur ne sont pas exécutés. Aucun score comparatif ou vainqueur n'existe à ce stade.
 
 ## Ce que prouve l'Evidence Ledger
 
@@ -77,7 +77,7 @@ Une entrée du Ledger prouve localement que :
 - l'entrée est reliée à la précédente par son empreinte ;
 - aucune exécution n'avait commencé pour les étapes de préparation ;
 - pour `isolated_reference_run` uniquement, un worker technique déterministe a réellement été exécuté après consentement, puis vérifié par un second processus isolé ;
-- pour `isolated_visible_browser_candidate`, le modèle Ollama identifié a réellement répondu après un second consentement, puis sa soumission a passé sept contrôles statiques et 39 contrôles de gameplay publics dans des processus isolés ;
+- pour `isolated_visible_and_hidden_holdout_candidate`, le modèle Ollama identifié a réellement répondu après un second consentement, puis sa soumission gelée a passé sept contrôles statiques, 39 contrôles publics et cinq familles de holdout dans des processus isolés ; le Ledger ne conserve aucun seed ou résultat privé détaillé ;
 - pour `isolated_codex_visible_browser_pilot`, le Codex CLI identifié a réellement été invoqué une fois sur Signal Maze public, sa sortie bornée a été matérialisée dans un workspace jetable, puis la soumission a passé les mêmes sept contrôles statiques et 39 contrôles Chromium publics ;
 - pour `explicit_local_human_review`, le propriétaire local a choisi une décision structurée sur l'empreinte exacte du reçu public, après avoir reconnu ses limites ; cette preuve ne signifie jamais que le code ou les captures ont été inspectés ;
 - seuls les claims minimaux et métriques prévus ont été conservés.
@@ -111,7 +111,7 @@ Le Ledger **ne prouve pas** :
 6. `signed_isolation_preflight` : canari bubblewrap signé prouvant la disponibilité de namespaces séparés et d'un montage minimal, sans worker lancé.
 7. `isolated_reference_run` : pilote technique réellement isolé, sans IA candidate, avec durée, coût API nul et sortie brute non conservée.
 8. `independent_visible_verification` : vérification dans un second processus isolé, soumission en lecture seule et six contrôles visibles. Les tests cachés restent absents.
-9. `isolated_visible_browser_candidate` : modèle Ollama installé appelé sur la seule tâche publique, sortie brute non conservée, sept checks statiques puis 39 checks publics Chromium sur trois seeds, desktop et Android, clavier, souris et tactile. Ce niveau prouve le gameplay visible de ce run, pas les cas cachés, la qualité scientifique ou une victoire comparative.
+9. `isolated_visible_and_hidden_holdout_candidate` : modèle Ollama installé appelé sur la seule tâche publique, sortie brute non conservée, sept checks statiques, 39 checks publics Chromium puis cinq familles de holdout sur des seeds injectés seulement après gel du code. Seuls compteurs et empreintes sortent du second évaluateur. Ce niveau prouve ce run borné, pas une qualité scientifique ou une victoire comparative.
 10. `isolated_codex_visible_browser_pilot` : Codex CLI invoqué une fois sur la seule tâche Signal Maze publique, workspace jetable, sortie bornée, sept checks statiques et 39 checks Chromium publics. Le coût fournisseur reste inconnu et ce niveau ne vaut ni accès à un projet, ni test caché, ni victoire comparative.
 11. `explicit_local_human_review` : acceptation pour comparaison, demande de correction ou rejet du reçu public signé par le propriétaire humain. Cette décision ne conserve pas de texte libre, ne prouve aucune inspection du code ou des captures et n'autorise jamais livraison, gagnant, board, fusion ou publication.
 
@@ -133,11 +133,11 @@ Le fichier public `forgebench/signal-maze-v1/visible-contract.json` supprime les
 
 L'implémentation `reference/` est scellée par `reference-manifest.json`. La recette `verify-forgebench-visible-gameplay.py` la joue sur les trois seeds publics, vérifie victoire et reset, exerce clavier, souris et événements tactiles, puis contrôle desktop, Android portrait/paysage et l'absence de requête externe.
 
-Cette recette autonome est une **preuve de la référence visible uniquement**. Le contrat porte explicitement `candidate_execution_enabled_by_this_contract=false` : lire ou importer le contrat ne suffit jamais à autoriser du code candidat. Lors d'un run Ollama distinct et explicitement consenti, ForgeBench vérifie d'abord la structure, puis exécute une copie éphémère instrumentée dans Chromium sous bubblewrap. `gameplay_verified=true` n'est alors admis que si les 39 contrôles publics réussissent ; suite cachée, score scientifique et vainqueur restent obligatoirement faux.
+Cette recette autonome est une **preuve de la référence visible uniquement**. Le contrat porte explicitement `candidate_execution_enabled_by_this_contract=false` : lire ou importer le contrat ne suffit jamais à autoriser du code candidat. Lors d'un run Ollama distinct et explicitement consenti, ForgeBench vérifie d'abord la structure, puis exécute une copie éphémère instrumentée dans Chromium sous bubblewrap. `gameplay_verified=true` n'est admis que si les 39 contrôles publics réussissent. Le holdout distinct peut ensuite vérifier cinq familles privées ; score scientifique et vainqueur restent obligatoirement faux.
 
 Le starter public de `Signal Maze v1` est scellé par un manifeste de fichiers et une empreinte SHA-256. Le vault peut maintenant générer cinq seeds privés et cinq familles de checks dans `forgebench-hidden-suite-v1.json`, sous le dossier applicatif Tauri. L'interface reçoit seulement un reçu signé avec identifiant, compteurs et empreinte.
 
-Le vault utilise les permissions du compte système mais **n'est pas chiffré au repos**. Aucun agent n'étant encore lancé, les données restent hors des Workstacks v0 ; toutefois un futur worker ne sera considéré comme aveugle à la suite qu'après mise en place d'une vraie sandbox d'exécution et d'un évaluateur isolé. Jusque-là, `scientific_ready` reste faux.
+Le vault utilise les permissions du compte système mais **n'est pas chiffré au repos**. Pour Ollama v3, le modèle termine sa réponse et les fichiers sont gelés avant lecture du vault. Un évaluateur Chromium séparé reçoit ensuite uniquement les seeds comme entrées runtime ; le fichier du vault n'est jamais monté et seules les preuves agrégées sortent. Les familles de checks restent toutefois lisibles dans le code et un processus compromis du même compte pourrait lire le vault : `scientific_ready` reste donc faux.
 
 ### Espaces worker frais
 
@@ -163,9 +163,9 @@ Le worker ne reçoit ni dépôt source, credential, suite cachée ou accès rés
 
 Ce pilote ferme la boucle technique **copie fraîche → worker isolé → évaluateur séparé → preuve bornée**. Le pilote lui-même ne lance aucune stack candidate, n'évalue pas la qualité du mini-jeu et ne mesure pas encore le coût réel d'un abonnement ou d'une API. `candidate_worker_execution_ready=false` et `scientific_eligible=false` restent donc obligatoires dans son contrat.
 
-### Candidat Ollama local et navigateur visible
+### Candidat Ollama local, navigateur visible et holdout
 
-Le contrat `outilsia.forgebench_ollama_candidate_result.v2` ajoute un adaptateur local borné, distinct du pilote. L'expérience signe l'identifiant exact `local-model:ollama_native:<modèle>` ou `local-model:ollama_wsl:<modèle>`. Le modèle doit déjà être installé dans ce runtime ; ForgeBench ne lance aucun téléchargement implicite.
+Le contrat `outilsia.forgebench_ollama_candidate_result.v3` ajoute un adaptateur local borné, distinct du pilote. L'expérience signe l'identifiant exact `local-model:ollama_native:<modèle>` ou `local-model:ollama_wsl:<modèle>`. Le modèle doit déjà être installé dans ce runtime ; ForgeBench ne lance aucun téléchargement implicite.
 
 Après consentement, OutilsIA interroge uniquement l'API Ollama sur `127.0.0.1`, ou cette même boucle locale depuis WSL. Le modèle reçoit la spécification publique, le starter public et un seed public. Il ne reçoit ni chemin, dépôt, fichier utilisateur, outil, credential, suite privée ou accès Internet. Une seule tentative est permise, avec durée et taille de réponse bornées et coût API maximal de 0 €.
 
@@ -173,7 +173,9 @@ La réponse JSON doit contenir exactement `index.html`, `styles.css` et `game.js
 
 Après un préflight Chromium réussi et un consentement qui autorise explicitement le code généré, un troisième processus bubblewrap monte encore la soumission originale en lecture seule. Il crée uniquement dans le dossier d'évaluation une copie instrumentée éphémère, lance Chromium headless sans réseau et applique le contrat visible public sur trois seeds et trois viewports : desktop 1440 x 900, Android portrait 390 x 844 et Android paysage 844 x 390. Clavier, souris et tactile font partie des 39 groupes de contrôles. Trois captures PNG bornées sont vérifiées ; seules leurs dimensions, tailles et empreintes SHA-256 rejoignent le résultat. Les images, le DOM, la réponse brute, les chemins et le workspace sont supprimés avant le retour.
 
-Ce palier peut donc attester `generated_code_executed=true`, `visible_browser_execution_verified=true` et `gameplay_verified=true` pour **ce run visible signé**. La recette étant publique et rejouable par le candidat, elle ne vaut pas test caché ni classement scientifique : `hidden_evaluator_verified=false`, `scientific_eligible=false` et `winner_declared=false` restent obligatoires. Le coût API est réellement nul ; la consommation électrique locale reste inconnue, jamais transformée en zéro.
+Une fois le code gelé et les contrôles visibles réussis, ForgeBench lit le reçu courant du vault, vérifie qu'il correspond exactement au protocole compilé, puis lance un **second** processus bubblewrap/Chromium. Les cinq seeds deviennent des entrées runtime de cinq familles : bornes et déterminisme, collisions de chemins, pureté du reset, résilience mobile et refus d'entrées invalides. Le vault n'est pas monté. Le DOM, les captures, les observations, les seeds et les identifiants privés ne sortent pas ; seuls compteurs, durée, empreinte de soumission et attestation sont signés.
+
+Ce palier peut donc attester `generated_code_executed=true`, `visible_browser_execution_verified=true`, `gameplay_verified=true` et `hidden_evaluator_verified=true` pour **ce run signé**. Il ne constitue pas encore un benchmark scientifique : les familles de checks sont publiques dans les sources, le vault n'est ni chiffré ni isolé d'un autre processus du même utilisateur, aucun pair comparable n'a tourné et l'énergie locale n'est pas mesurée. `scientific_eligible=false` et `winner_declared=false` restent obligatoires. Le coût API est réellement nul ; la consommation électrique locale reste inconnue, jamais transformée en zéro.
 
 Le score équilibré futur reste explicite : `50 % résultat + 20 % efficacité + 15 % vitesse + 15 % coût`. Un coût inconnu n'est jamais transformé en zéro. Le score composite, les podiums par dimension, la frontière de Pareto et un éventuel vainqueur restent absents tant que des runs complets et comparables n'existent pas.
 
@@ -201,7 +203,7 @@ Cette gate ne voit que le reçu public signé. Les captures, le DOM, les trois f
 - Les modèles Ollama proviennent du scan local déjà effectué.
 - Aucun appel API payant n'est déclenché par Composer, Router, ForgeBench ou Ledger.
 - Le pilote technique exige un consentement distinct et impose réseau coupé, API payante interdite et CLI candidat interdit.
-- Le candidat Ollama exige un second consentement et un budget explicite. Seule la boucle locale Ollama est ouverte pendant la génération ; le code n'est exécuté qu'après contrôle statique, dans Chromium sous bubblewrap sans réseau, puis intégralement supprimé.
+- Le candidat Ollama exige un second consentement et un budget explicite. Seule la boucle locale Ollama est ouverte pendant la génération ; le code gelé est exécuté après contrôle statique dans un Chromium visible, puis dans un second Chromium holdout, tous deux sous bubblewrap sans réseau. Le vault n'est pas monté et aucune observation privée n'est conservée.
 - Le pilote Codex exige deux consentements par run, un budget borné et une stack Signal Maze exacte. Il ignore les règles utilisateur et filtre l'environnement enfant par allowlist, sans transmettre les clés API tierces. La connexion, le quota et la facturation appartiennent au CLI utilisateur et restent non inspectés ; aucun coût inconnu n'est converti en zéro.
 - La revue humaine exige deux accusés explicites, ne stocke aucun commentaire libre et ne peut ni relancer un worker ni élargir les permissions du run.
 - Tout autre CLI candidat, toute carte arbitraire et tout accès à un dépôt exigeront un nouveau contrat de permissions, un consentement et un budget séparés.
@@ -235,8 +237,8 @@ Le fichier persistant se trouve dans le dossier applicatif Tauri sous le nom `ev
 - `outilsia.forgebench_isolation_probe_result.v1`
 - `outilsia.forgebench_reference_pilot_request.v1`
 - `outilsia.forgebench_reference_pilot_result.v1`
-- `outilsia.forgebench_ollama_candidate_request.v2`
-- `outilsia.forgebench_ollama_candidate_result.v2`
+- `outilsia.forgebench_ollama_candidate_request.v3`
+- `outilsia.forgebench_ollama_candidate_result.v3`
 - `outilsia.workstack_arena_run_request.v1`
 - `outilsia.workstack_arena_run_result.v1`
 - `outilsia.workstack_human_review_request.v1`

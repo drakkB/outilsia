@@ -4,6 +4,7 @@ mod evidence_ledger;
 mod forgebench;
 mod forgebench_browser;
 mod forgebench_candidate;
+mod forgebench_hidden;
 mod forgebench_isolation;
 mod forgebench_runner;
 mod forgebench_sandbox;
