@@ -294,6 +294,7 @@ const ARENA_USAGE_PROFILES = {
 };
 
 const ARENA_OBJECTIVE_PROTOCOL = "outilsia.arena.objective.v1";
+const ARENA_PREFLIGHT_SCHEMA = "outilsia.arena.preflight.v1";
 const RECOMMENDATION_ENGINE_PROTOCOL = "outilsia.recommendation.v2";
 const ARENA_OBJECTIVE_PROMPT = `Micro-test objectif OutilsIA. Lis toutes les consignes avant de répondre.
 1. Mémorise le code RIVIERE-29.
@@ -6503,6 +6504,7 @@ function readinessReport() {
     arena: arenaRun ? {
       protocol: arenaRun.protocol || "legacy_estimate",
       objective: arenaRun.protocol === ARENA_OBJECTIVE_PROTOCOL,
+      preflight: arenaRun.preflight?.schema === ARENA_PREFLIGHT_SCHEMA ? arenaRun.preflight : null,
       recommended: arena?.recommended?.model || "",
       recommended_score: arena?.recommended ? arenaDisplayScore(arena.recommended, "compromise") : 0,
       compromise: arena?.compromise?.model || "",
@@ -6532,7 +6534,11 @@ function readinessReport() {
       proof_results: (arenaRun.results || []).map((item) => ({
         model: item.model,
         score: item.arena_objective?.score ?? null,
-        checks: item.arena_objective ? `${item.arena_objective.passed_count}/${item.arena_objective.total_count}` : null
+        checks: item.arena_objective ? `${item.arena_objective.passed_count}/${item.arena_objective.total_count}` : null,
+        runtime: item.arena_runtime || "",
+        runtime_label: item.arena_runtime_label || "",
+        installed_size_gb: item.arena_installed_size_gb || null,
+        timeout_seconds: Number(item.arena_timeout_seconds || 0)
       }))
     } : null,
     recommendation_engine: recommendationEngine,
@@ -7265,6 +7271,7 @@ function memoryBenchmarkCards() {
       `- Tokens: ${item.estimated_tokens || 0}`,
       item.arena_objective ? `- Preuve Arena objective: ${item.arena_objective.passed_count}/${item.arena_objective.total_count} (${item.arena_objective.score}/100)` : "",
       item.arena_objective ? `- Vérifications: ${item.arena_objective.checks.map((check) => `${check.label} ${check.passed ? "OK" : "NON"}`).join(" · ")}` : "",
+      item.arena_preflight_schema === ARENA_PREFLIGHT_SCHEMA ? `- Runtime Arena: ${item.arena_runtime_label} · ${item.arena_installed_size_label} · délai ${item.arena_timeout_seconds} s` : "",
       item.recommendation_proof ? `- Recommendation Engine ${item.recommendation_proof.profile_label}: ${item.recommendation_proof.passed_count}/${item.recommendation_proof.total_count} (${item.recommendation_proof.score}/100)` : "",
       item.resource_estimates ? `- Ressources: ${item.resource_estimates.vram_required_q4_gb || "?"} Go VRAM Q4 estimés · ${item.resource_estimates.machine_ram_gb || "?"} Go RAM disponibles · ${item.resource_estimates.storage_label || "stockage à confirmer"}` : "",
       item.error ? `- Erreur: ${item.error}` : "",
@@ -8316,6 +8323,41 @@ function arenaPreflightState(limit = 3) {
   };
 }
 
+function arenaPreflightEvidence(preflight = arenaPreflightState()) {
+  return {
+    schema: ARENA_PREFLIGHT_SCHEMA,
+    model_count: preflight.model_count,
+    budget_minutes: preflight.budget_minutes,
+    total_timeout_seconds: preflight.total_timeout_seconds,
+    downloads: 0,
+    sequential: true,
+    candidates: preflight.candidates.map((candidate) => ({
+      model: candidate.ref,
+      label: candidate.label,
+      runtime: candidate.runtime,
+      runtime_label: candidate.runtime_label,
+      installed_size_gb: candidate.size_gb,
+      installed_size_label: candidate.size_label,
+      timeout_seconds: candidate.arena_timeout_seconds,
+      memory_tone: candidate.tone,
+      memory_detail: candidate.detail
+    }))
+  };
+}
+
+function arenaResultPreflightFields(candidate) {
+  return {
+    arena_preflight_schema: ARENA_PREFLIGHT_SCHEMA,
+    arena_runtime: candidate?.runtime || "",
+    arena_runtime_label: candidate?.runtime_label || "Runtime non confirmé",
+    arena_installed_size_gb: candidate?.size_gb || null,
+    arena_installed_size_label: candidate?.size_label || "Taille non confirmée",
+    arena_timeout_seconds: Number(candidate?.arena_timeout_seconds || 0),
+    arena_memory_tone: candidate?.tone || "neutral",
+    arena_memory_detail: candidate?.detail || ""
+  };
+}
+
 function arenaConfirmationText(preflight = arenaPreflightState()) {
   const lines = preflight.candidates.map((candidate) => (
     `- ${candidate.label} · ${candidate.runtime_label} · ${candidate.size_label} · ${candidate.arena_timeout_seconds} s max`
@@ -8859,6 +8901,9 @@ function arenaRunMarkdown(run = readLastArenaRun()) {
     `- GPU: ${run.machine?.gpu_name || "non détecté"} (${formatVram(run.machine?.vram_gb)})`,
     `- RAM: ${run.machine?.ram_gb || 0} Go`,
     `- Protocole: ${objectiveProtocol ? "Arena objective v1 (6 vérifications reproductibles)" : "ancien protocole estimatif"}`,
+    run.preflight?.schema === ARENA_PREFLIGHT_SCHEMA
+      ? `- Préflight: ${run.preflight.model_count} modèles installés · ${run.preflight.budget_minutes} min max · ${run.preflight.downloads} téléchargement · exécution séquentielle`
+      : "- Préflight: non conservé dans cet ancien run",
     `- Prompt: ${run.prompt}`,
     `- Meilleur compromis: ${winners.compromise ? `${winners.compromise.model} (score ${arenaDisplayScore(winners.compromise, "compromise")}/100)` : "aucun succès"}`,
     `- Plus rapide: ${winners.fastest ? `${winners.fastest.model} (${winners.fastest.estimated_tokens_per_second} tok/s)` : "aucun succès"}`,
@@ -8889,6 +8934,10 @@ function arenaRunMarkdown(run = readLastArenaRun()) {
       `- Profil qualité: ${item.arena_profiles?.quality?.score ?? 0}/100`,
       item.arena_objective ? `- Preuve objective: ${item.arena_objective.passed_count}/${item.arena_objective.total_count} (${item.arena_objective.score}/100)` : "- Preuve: ancien protocole estimatif",
       item.arena_objective ? `- Vérifications: ${item.arena_objective.checks.map((check) => `${check.label} ${check.passed ? "OK" : "NON"}`).join(" · ")}` : "",
+      item.arena_preflight_schema === ARENA_PREFLIGHT_SCHEMA
+        ? `- Exécution: ${item.arena_runtime_label} · ${item.arena_installed_size_label} · délai ${item.arena_timeout_seconds} s`
+        : "- Exécution: runtime non conservé dans cet ancien run",
+      item.arena_memory_detail ? `- Mémoire: ${item.arena_memory_detail}` : "",
       `- Temps: ${item.elapsed_ms} ms`,
       `- ${benchmarkSpeedLabel(item)}: ${item.estimated_tokens_per_second} tok/s`,
       `- Méthode: ${benchmarkMeasurementLabel(item)}`,
@@ -8940,6 +8989,7 @@ function renderArenaRun(run = readLastArenaRun()) {
             <strong>${escapeHtml(benchmarkModelDisplayLabel(item.model))}</strong>
             <span>Score ${escapeHtml(arenaDisplayScore(item))}/100 · ${escapeHtml(item.arena_meta.label)} · ${escapeHtml(item.estimated_tokens_per_second || 0)} tok/s · ${escapeHtml(item.elapsed_ms || 0)} ms</span>
             <span>${item.arena_objective ? `Preuve objective ${escapeHtml(item.arena_objective.passed_count)}/${escapeHtml(item.arena_objective.total_count)} · ${escapeHtml(item.arena_objective.score)}/100` : "Ancien protocole estimatif"}</span>
+            <span>${item.arena_preflight_schema === ARENA_PREFLIGHT_SCHEMA ? `${escapeHtml(item.arena_runtime_label)} · ${escapeHtml(item.arena_installed_size_label)} · délai ${escapeHtml(item.arena_timeout_seconds)} s` : "Runtime non conservé dans cet ancien run"}</span>
             ${item.arena_objective ? `<span>${escapeHtml(arenaObjectiveFailureLabel(item.arena_objective))}</span>` : ""}
             ${item.success ? `<span>Profils : assistant ${escapeHtml(arenaDisplayScore(item, "assistant"))}/100 · code ${escapeHtml(arenaDisplayScore(item, "code"))}/100 · mémoire ${escapeHtml(arenaDisplayScore(item, "memory"))}/100 · portable ${escapeHtml(arenaDisplayScore(item, "light_laptop"))}/100 · qualité ${escapeHtml(arenaDisplayScore(item, "quality"))}/100</span>` : ""}
           </div>
@@ -9091,6 +9141,7 @@ async function runAutomaticArena() {
     return;
   }
   const models = preflight.candidates.map((candidate) => candidate.definition);
+  const preflightEvidence = arenaPreflightEvidence(preflight);
   arenaBusy = true;
   try {
   const prompt = ARENA_OBJECTIVE_PROMPT;
@@ -9102,6 +9153,8 @@ async function runAutomaticArena() {
   resetOperationConsole(`Arena automatique : ${models.map((model) => actionableOllamaRef(model)).join(", ")}`);
   for (const model of models) {
     const ref = actionableOllamaRef(model);
+    const candidate = preflight.candidates.find((item) => sameOllamaModel(item.ref, ref));
+    const preflightFields = arenaResultPreflightFields(candidate);
     const timeoutSeconds = Math.max(60, benchmarkTimeoutSeconds(ref));
     renderArenaProgress(models, results, ref);
     appendOperationLine(`Micro-test objectif Arena : ${ref} · délai ${timeoutSeconds} s`, "cmd");
@@ -9120,6 +9173,7 @@ async function runAutomaticArena() {
         : demoBenchmark(ref);
       const measured = {
         ...result,
+        ...preflightFields,
         benchmark_protocol: ARENA_OBJECTIVE_PROTOCOL,
         arena_objective: evaluateArenaObjective(result.output_preview)
       };
@@ -9143,6 +9197,7 @@ async function runAutomaticArena() {
         output_preview: "",
         error: rawError,
         created_at_ms: Date.now(),
+        ...preflightFields,
         benchmark_protocol: ARENA_OBJECTIVE_PROTOCOL,
         arena_objective: evaluateArenaObjective("")
       };
@@ -9156,6 +9211,7 @@ async function runAutomaticArena() {
     created_at_ms: Date.now(),
     protocol: ARENA_OBJECTIVE_PROTOCOL,
     protocol_label: "Arena objective v1",
+    preflight: preflightEvidence,
     prompt,
     machine: {
       name: state.scan.name || "Machine IA locale",
@@ -13320,6 +13376,10 @@ function fieldTestMachineEntry() {
     arena_ok: Boolean(successfulArena),
     arena_protocol: arena?.protocol || "legacy_estimate",
     arena_objective: arena?.protocol === ARENA_OBJECTIVE_PROTOCOL,
+    arena_preflight_schema: arena?.preflight?.schema || "",
+    arena_preflight_budget_minutes: Number(arena?.preflight?.budget_minutes || 0),
+    arena_preflight_downloads: Number(arena?.preflight?.downloads || 0),
+    arena_preflight_runtimes: (arena?.preflight?.candidates || []).map((item) => `${item.model}:${item.runtime || "unknown"}`).join(","),
     arena_objective_best_model: bestObjectiveArena?.model || "",
     arena_objective_best_score: Number(bestObjectiveArena?.arena_objective?.score || 0),
     arena_objective_best_checks: bestObjectiveArena ? `${bestObjectiveArena.arena_objective.passed_count}/${bestObjectiveArena.arena_objective.total_count}` : "",
@@ -16204,6 +16264,14 @@ function benchmarkHistoryEntry(result) {
     tuning: result.tuning || null,
     benchmark_protocol: result.benchmark_protocol || "",
     arena_objective: result.arena_objective || null,
+    arena_preflight_schema: result.arena_preflight_schema || "",
+    arena_runtime: result.arena_runtime || "",
+    arena_runtime_label: result.arena_runtime_label || "",
+    arena_installed_size_gb: result.arena_installed_size_gb || null,
+    arena_installed_size_label: result.arena_installed_size_label || "",
+    arena_timeout_seconds: Number(result.arena_timeout_seconds || 0),
+    arena_memory_tone: result.arena_memory_tone || "",
+    arena_memory_detail: result.arena_memory_detail || "",
     recommendation_proof: result.recommendation_proof || null,
     resource_estimates: result.resource_estimates || null,
     machine: {
@@ -16274,6 +16342,7 @@ function renderBenchmarkHistory(items = readBenchmarkHistory()) {
         <div class="list-item">
           <strong>${escapeHtml(benchmarkModelDisplayLabel(item.model))} ${item.success ? "" : `· ${escapeHtml(benchmarkTimedOut(item) ? "test incomplet" : "erreur")}`}</strong>
           <span>${escapeHtml(new Date(Number(item.created_at_ms || Date.now())).toLocaleString("fr-FR"))} · ${escapeHtml(item.estimated_tokens_per_second || 0)} tok/s · ${escapeHtml(item.elapsed_ms || 0)} ms</span>
+          ${item.arena_preflight_schema === ARENA_PREFLIGHT_SCHEMA ? `<span>${escapeHtml(item.arena_runtime_label)} · ${escapeHtml(item.arena_installed_size_label)} · délai ${escapeHtml(item.arena_timeout_seconds)} s</span>` : ""}
           <span>${escapeHtml(item.success ? item.output_preview || "Sortie vide" : friendlyBenchmarkError(item))}</span>
         </div>
       `).join("")}
@@ -16309,6 +16378,7 @@ function benchmarkHistoryMarkdown(items = readBenchmarkHistory()) {
       `- ${benchmarkSpeedLabel(item)}: ${item.estimated_tokens_per_second} tok/s`,
       `- Méthode: ${benchmarkMeasurementLabel(item)}`,
       `- Tokens: ${item.estimated_tokens}`,
+      item.arena_preflight_schema === ARENA_PREFLIGHT_SCHEMA ? `- Runtime Arena: ${item.arena_runtime_label} · ${item.arena_installed_size_label} · délai ${item.arena_timeout_seconds} s` : "",
       !item.success ? `- Diagnostic: ${friendlyBenchmarkError(item)}` : "",
       "",
       "```text",
@@ -18830,7 +18900,13 @@ function installTestHarness() {
           busy: arenaBusy,
           buttonDisabled: Boolean(els.runArenaBtn?.disabled),
           button: els.runArenaBtn?.textContent || "",
-          state: els.arenaState?.textContent || ""
+          state: els.arenaState?.textContent || "",
+          panel: els.arenaBox?.textContent || "",
+          markdown: arenaRunMarkdown(acceptedRun),
+          memory: memoryBenchmarkCards(),
+          history: benchmarkHistoryMarkdown(),
+          reportArena: readinessReport().arena,
+          fieldEntry: fieldTestMachineEntry()
         };
       } finally {
         window.confirm = originalConfirm;

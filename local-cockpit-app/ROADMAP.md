@@ -41,6 +41,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Préparer l'Arena avec trois rôles distincts : baseline légère, un assistant Hermes prioritaire, puis un autre candidat installé hors Hermes avant un second Hermes lourd.
 - [x] Afficher avant l'Arena les runtimes, tailles, délais individuels, offload probable, budget global et garantie de zéro téléchargement.
 - [x] Exiger une confirmation chiffrée avant la campagne et empêcher deux exécutions Arena concurrentes.
+- [x] Conserver la preuve Arena Preflight v1 dans le run, l'historique, le rapport, MemoryForge et la fiche terrain.
 - [ ] Confirmer manuellement le nouveau libellé et le benchmark long dans le build Windows candidat.
 
 ## Maintenant - Hardware Doctor 2.0 et AI Capability Passport v1

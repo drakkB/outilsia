@@ -25,6 +25,9 @@ def main():
     assert "Préflight Arena · candidat source" in download
     assert "Benchmark and Arena Preflight (source candidate, not in the current public build)" in llms
     assert "zéro téléchargement" in hub and "zéro téléchargement" in download
+    assert "La preuve versionnée reste attachée" in hub
+    assert "Le runtime et le budget restent visibles" in download
+    assert "versioned preflight proof remains attached" in llms
     valid = (
         '{"instruction":"BLEU-47","memory":"RIVIERE-29",'
         '"calculation":42,"correction":"La VRAM accélère l’inférence locale.",'
@@ -121,6 +124,22 @@ def main():
     assert all("Téléchargements : 0" in prompt and "4 minutes" in prompt for prompt in arena_run_guard["confirmations"]), arena_run_guard
     assert arena_run_guard["acceptedRun"]["protocol"] == "outilsia.arena.objective.v1", arena_run_guard
     assert [item["model"] for item in arena_run_guard["acceptedRun"]["results"]] == arena_preflight["heavy"]["refs"], arena_run_guard
+    saved_preflight = arena_run_guard["acceptedRun"]["preflight"]
+    assert saved_preflight["schema"] == "outilsia.arena.preflight.v1", arena_run_guard
+    assert saved_preflight["budget_minutes"] == 4 and saved_preflight["downloads"] == 0, arena_run_guard
+    assert saved_preflight["sequential"] is True, arena_run_guard
+    assert [item["runtime"] for item in saved_preflight["candidates"]] == ["wsl", "wsl", "wsl"], arena_run_guard
+    assert all(item["arena_preflight_schema"] == "outilsia.arena.preflight.v1" for item in arena_run_guard["acceptedRun"]["results"]), arena_run_guard
+    assert all(item["arena_runtime"] == "wsl" and item["arena_runtime_label"] == "Ollama WSL" for item in arena_run_guard["acceptedRun"]["results"]), arena_run_guard
+    assert [item["arena_timeout_seconds"] for item in arena_run_guard["acceptedRun"]["results"]] == [60, 60, 120], arena_run_guard
+    assert arena_run_guard["reportArena"]["preflight"]["schema"] == "outilsia.arena.preflight.v1", arena_run_guard
+    assert [item["runtime"] for item in arena_run_guard["reportArena"]["proof_results"]] == ["wsl", "wsl", "wsl"], arena_run_guard
+    assert arena_run_guard["fieldEntry"]["arena_preflight_schema"] == "outilsia.arena.preflight.v1", arena_run_guard
+    assert arena_run_guard["fieldEntry"]["arena_preflight_budget_minutes"] == 4, arena_run_guard
+    assert arena_run_guard["fieldEntry"]["arena_preflight_downloads"] == 0, arena_run_guard
+    assert "qwen3:0.6b:wsl" in arena_run_guard["fieldEntry"]["arena_preflight_runtimes"], arena_run_guard
+    for proof_text in (arena_run_guard["panel"], arena_run_guard["markdown"], arena_run_guard["memory"], arena_run_guard["history"]):
+        assert "Ollama WSL" in proof_text and "taille installée" in proof_text, arena_run_guard
     assert arena_run_guard["busy"] is False and arena_run_guard["buttonDisabled"] is False, arena_run_guard
     assert arena_run_guard["button"] == "Lancer Arena · ≤ 4 min", arena_run_guard
     print("arena_objective_ok protocol=outilsia.arena.objective.v1 checks=6 preflight=3-models/4-min mobile=ok")
