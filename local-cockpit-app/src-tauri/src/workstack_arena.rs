@@ -510,14 +510,10 @@ fn codex_command(
 ) -> Result<Command, String> {
     match environment {
         "windows_native" => {
+            let shell_command = format!("codex {}", codex_exec_args().join(" "));
             let mut command = Command::new("cmd.exe");
             command
-                .args([
-                    "/D",
-                    "/S",
-                    "/C",
-                    "codex exec --sandbox workspace-write --ephemeral --ignore-user-config --ignore-rules --skip-git-repo-check --json --cd . -",
-                ])
+                .args(["/D", "/S", "/C", &shell_command])
                 .current_dir(workspace);
             apply_codex_environment_allowlist(&mut command, environment);
             Ok(command)
