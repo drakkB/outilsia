@@ -68,7 +68,13 @@ def main():
         page.evaluate("""() => {
           window.__OUTILSIA_TEST__.setWorkspaceTab('tests');
           window.__OUTILSIA_TEST__.setWorkspaceSection('tests', '.model-autopilot-panel');
+          window.__OUTILSIA_TEST__.applyDemoState();
+          const input = document.querySelector('#benchmarkModelInput');
+          input.value = '';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
         }""")
+        assert page.locator("#modelAutopilotState").inner_text() == "choix du modèle requis"
+        assert "Choisissez un modèle Ollama déjà installé dans Benchmark." in page.locator("#modelAutopilotBox").inner_text()
         result = page.evaluate("() => window.__OUTILSIA_TEST__.applyModelAutopilotState()")
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         assert panel.is_visible()

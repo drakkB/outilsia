@@ -144,10 +144,63 @@ textarea {
 }
 
 .app-shell {
+  --workspace-accent: #78dce8;
+  --workspace-accent-soft: rgba(120, 220, 232, 0.12);
+  --workspace-accent-border: rgba(120, 220, 232, 0.34);
+  --workspace-accent-shadow: rgba(120, 220, 232, 0.10);
   margin: 0 auto;
   max-width: 1460px;
   padding: 12px;
   width: 100%;
+}
+
+.app-shell[data-workspace-tab="overview"] {
+  --workspace-accent: #86efac;
+  --workspace-accent-soft: rgba(134, 239, 172, 0.11);
+  --workspace-accent-border: rgba(134, 239, 172, 0.34);
+  --workspace-accent-shadow: rgba(134, 239, 172, 0.10);
+}
+
+.app-shell[data-workspace-tab="machine"] {
+  --workspace-accent: #f1c96b;
+  --workspace-accent-soft: rgba(241, 201, 107, 0.11);
+  --workspace-accent-border: rgba(241, 201, 107, 0.34);
+  --workspace-accent-shadow: rgba(241, 201, 107, 0.10);
+}
+
+.app-shell[data-workspace-tab="models"] {
+  --workspace-accent: #86c8ff;
+  --workspace-accent-soft: rgba(134, 200, 255, 0.11);
+  --workspace-accent-border: rgba(134, 200, 255, 0.34);
+  --workspace-accent-shadow: rgba(134, 200, 255, 0.10);
+}
+
+.app-shell[data-workspace-tab="tests"] {
+  --workspace-accent: #72e1d1;
+  --workspace-accent-soft: rgba(114, 225, 209, 0.11);
+  --workspace-accent-border: rgba(114, 225, 209, 0.34);
+  --workspace-accent-shadow: rgba(114, 225, 209, 0.10);
+}
+
+.app-shell[data-workspace-tab="assistant"] {
+  --workspace-accent: #ffb48a;
+  --workspace-accent-soft: rgba(255, 180, 138, 0.11);
+  --workspace-accent-border: rgba(255, 180, 138, 0.34);
+  --workspace-accent-shadow: rgba(255, 180, 138, 0.10);
+}
+
+.app-shell[data-workspace-tab="workflows"] {
+  --workspace-accent: #c6adff;
+  --workspace-accent-soft: rgba(198, 173, 255, 0.11);
+  --workspace-accent-border: rgba(198, 173, 255, 0.34);
+  --workspace-accent-shadow: rgba(198, 173, 255, 0.10);
+}
+
+.app-shell[data-workspace-tab="account"] {
+  --workspace-accent: #b8c7ce;
+  --workspace-accent-soft: rgba(184, 199, 206, 0.10);
+  --workspace-accent-border: rgba(184, 199, 206, 0.30);
+  --workspace-accent-shadow: rgba(184, 199, 206, 0.08);
 }
 
 .topbar {
@@ -518,9 +571,10 @@ h2 {
 
 .workspace-nav {
   align-items: center;
-  background: linear-gradient(180deg, rgba(255,255,255,.024), rgba(255,255,255,.008)), var(--surface);
-  border: 1px solid rgba(120, 220, 232, 0.24);
+  background: linear-gradient(90deg, var(--workspace-accent-soft), transparent 34%), var(--surface);
+  border: 1px solid var(--workspace-accent-border);
   border-radius: 8px;
+  box-shadow: 0 12px 30px var(--workspace-accent-shadow);
   display: grid;
   gap: 8px;
   grid-template-columns: auto minmax(0, 1fr) minmax(240px, 290px);
@@ -541,7 +595,7 @@ h2 {
 }
 
 .workspace-nav strong {
-  color: var(--cyan);
+  color: var(--workspace-accent);
   display: block;
   font-size: 13px;
 }
@@ -565,9 +619,10 @@ h2 {
 }
 
 .workspace-tabs button[aria-selected="true"] {
-  background: linear-gradient(180deg, rgba(120, 220, 232, 0.24), rgba(120, 220, 232, 0.10));
-  border-color: rgba(120, 220, 232, 0.42);
-  color: var(--cyan);
+  background: var(--workspace-accent-soft);
+  border-color: var(--workspace-accent-border);
+  color: var(--workspace-accent);
+  box-shadow: inset 0 0 0 1px var(--workspace-accent-soft);
 }
 
 .workspace-section-picker {
@@ -601,6 +656,11 @@ h2 {
   opacity: 0.28;
 }
 
+.workspace-section-step:not(:disabled) {
+  border-color: var(--workspace-accent-border);
+  color: var(--workspace-accent);
+}
+
 .workspace-section-picker span {
   color: var(--muted-2);
   font-size: 9px;
@@ -614,12 +674,40 @@ h2 {
   width: 100%;
 }
 
+.workspace-section-picker select:focus-visible,
+#workspaceContent input:focus-visible,
+#workspaceContent select:focus-visible,
+#workspaceContent textarea:focus-visible {
+  border-color: var(--workspace-accent);
+  box-shadow: 0 0 0 3px var(--workspace-accent-soft);
+  outline: none;
+}
+
 .workspace-section-hidden {
   display: none !important;
 }
 
 .app-shell:not([data-workspace-section="all"]) #workspaceContent > article.panel:not(.workspace-section-hidden) {
   grid-column: 1 / -1;
+}
+
+#workspaceContent > article.panel:not(.workspace-section-hidden) {
+  background: linear-gradient(180deg, var(--workspace-accent-soft), transparent 104px), var(--surface);
+  border-color: var(--workspace-accent-border);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.30), 0 0 28px var(--workspace-accent-shadow);
+}
+
+#workspaceContent > article.panel:not(.workspace-section-hidden)::before {
+  background: linear-gradient(90deg, var(--workspace-accent), transparent 76%);
+  content: "";
+  display: block;
+  height: 2px;
+  margin: -12px -12px 10px;
+}
+
+#workspaceContent .label,
+#workspaceContent .panel-title h2 {
+  color: var(--workspace-accent);
 }
 
 .app-shell[data-workspace-tab="tests"][data-workspace-section=".operation-panel"] #operationJumpBtn,
@@ -1760,13 +1848,78 @@ h2 {
   padding-bottom: 8px;
 }
 
-.panel-title span {
-  color: var(--muted-2);
+.panel-title h2 {
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.panel-title > span {
+  background: var(--workspace-accent-soft);
+  border: 1px solid var(--workspace-accent-border);
+  border-radius: 999px;
+  color: var(--workspace-accent);
   font-size: 11px;
   font-weight: 800;
   overflow: hidden;
+  padding: 4px 8px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.path-action {
+  background: var(--workspace-accent-soft);
+  border-color: var(--workspace-accent-border);
+  color: var(--workspace-accent);
+}
+
+.path-action::before {
+  content: "→";
+}
+
+#workspaceContent :is(
+  #benchmarkBtn,
+  #runArenaBtn,
+  #runPrivateWorkloadBtn,
+  #promptForgeOptimizeBtn,
+  #chatSendBtn,
+  #memoryBtn,
+  #generateCapabilityPassportBtn,
+  #startLocalCapabilityBridgeBtn,
+  #observeBoardBtn,
+  #compileWorkstackBtn,
+  #routeCapabilitiesBtn,
+  #compileForgeBenchBtn,
+  #simulateDigitalTwinBtn,
+  #runModelAutopilotBtn,
+  #saveFlightReferenceBtn,
+  [data-run-recommendation]
+) {
+  background: var(--workspace-accent);
+  border-color: var(--workspace-accent);
+  color: #071114;
+}
+
+#workspaceContent :is(
+  #benchmarkBtn,
+  #runArenaBtn,
+  #runPrivateWorkloadBtn,
+  #promptForgeOptimizeBtn,
+  #chatSendBtn,
+  #memoryBtn,
+  #generateCapabilityPassportBtn,
+  #startLocalCapabilityBridgeBtn,
+  #observeBoardBtn,
+  #compileWorkstackBtn,
+  #routeCapabilitiesBtn,
+  #compileForgeBenchBtn,
+  #simulateDigitalTwinBtn,
+  #runModelAutopilotBtn,
+  #saveFlightReferenceBtn,
+  [data-run-recommendation]
+):disabled {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--line);
+  color: var(--muted-2);
 }
 
 .machine-panel { grid-column: span 4; order: 10; }

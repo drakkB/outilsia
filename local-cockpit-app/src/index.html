@@ -344,6 +344,7 @@
             Génère d'abord l'AI Capability Passport. Tu pourras ensuite ouvrir pendant 15 minutes une API strictement en lecture seule sur 127.0.0.1.
           </div>
           <div class="row-actions">
+            <button class="path-action" type="button" data-open-feature="passport">Préparer le Passport</button>
             <button id="startLocalCapabilityBridgeBtn" type="button" disabled>Démarrer 15 min</button>
             <button id="copyLocalCapabilityBridgeBtn" type="button" disabled>Copier connexion</button>
             <button id="refreshLocalCapabilityBridgeBtn" type="button" disabled>Vérifier</button>
@@ -416,6 +417,7 @@
             Le plan restera bloqué si les critères d'acceptation ou les limites d'autorisation manquent dans la carte.
           </div>
           <div class="row-actions">
+            <button class="path-action" type="button" data-open-feature="board">Choisir une carte</button>
             <button id="compileWorkstackBtn" type="button" disabled>Compiler le plan</button>
             <button id="copyWorkstackJsonBtn" type="button" disabled>Copier JSON</button>
             <button id="copyWorkstackMarkdownBtn" type="button" disabled>Copier résumé</button>
@@ -448,6 +450,7 @@
             Compile d'abord une Workstack. Le routeur vérifiera ensuite les exécutants disponibles sans leur transmettre la mission.
           </div>
           <div class="row-actions">
+            <button class="path-action" type="button" data-open-feature="workstack">Préparer le plan</button>
             <button id="routeCapabilitiesBtn" type="button" disabled>Détecter et proposer</button>
             <button id="copyCapabilityRouterJsonBtn" type="button" disabled>Copier JSON</button>
             <button id="copyCapabilityRouterMarkdownBtn" type="button" disabled>Copier résumé</button>
@@ -578,6 +581,7 @@
             Compile d'abord une Workstack puis un routage complet. ForgeBench préparera l'expérience sans l'exécuter.
           </div>
           <div class="row-actions">
+            <button class="path-action" type="button" data-open-feature="router">Préparer le routage</button>
             <button id="compileForgeBenchBtn" type="button" disabled>Préparer l'expérience</button>
             <button id="copyForgeBenchJsonBtn" type="button" disabled>Copier JSON</button>
             <button id="copyForgeBenchProtocolBtn" type="button" disabled>Copier protocole</button>
@@ -863,6 +867,7 @@
           </div>
           <div id="modelAutopilotBox" class="model-autopilot-box empty">Choisissez un modèle Ollama déjà installé dans le benchmark.</div>
           <div class="row-actions">
+            <button class="path-action" type="button" data-open-feature="benchmark">Choisir le modèle</button>
             <button id="runModelAutopilotBtn" type="button" disabled>Tester 3 profils</button>
             <button id="applyModelAutopilotBtn" type="button" disabled>Appliquer le profil</button>
             <button id="rollbackModelAutopilotBtn" type="button" disabled>Restaurer</button>
@@ -878,6 +883,7 @@
             Enregistrez explicitement une mesure de référence, puis vérifiez si un pilote, Ollama ou un réglage a dégradé les performances locales.
           </div>
           <div class="row-actions">
+            <button class="path-action" type="button" data-open-feature="benchmark">Lancer un benchmark</button>
             <button id="saveFlightReferenceBtn" type="button" disabled>Définir la référence</button>
             <button id="compareFlightReferenceBtn" type="button" disabled>Comparer maintenant</button>
             <button id="restoreFlightReferenceBtn" type="button" disabled>Référence précédente</button>

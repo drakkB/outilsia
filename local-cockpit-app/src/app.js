@@ -787,6 +787,13 @@ const WORKSPACE_FEATURES = Object.freeze({
     focus: "#saveFlightReferenceBtn",
     label: "Suivi des performances"
   },
+  benchmark: {
+    tab: "tests",
+    panel: ".benchmark-panel",
+    target: ".benchmark-panel",
+    focus: "#benchmarkModelInput",
+    label: "Benchmark local"
+  },
   digital_twin: {
     tab: "machine",
     panel: ".upgrade-digital-twin-panel",
@@ -807,6 +814,34 @@ const WORKSPACE_FEATURES = Object.freeze({
     target: ".local-capability-bridge-panel",
     focus: "#startLocalCapabilityBridgeBtn",
     label: "Passerelle locale"
+  },
+  board: {
+    tab: "workflows",
+    panel: ".board-observer-panel",
+    target: ".board-observer-panel",
+    focus: "#boardObserverUrl",
+    label: "Board Observer"
+  },
+  workstack: {
+    tab: "workflows",
+    panel: ".workstack-composer-panel",
+    target: ".workstack-composer-panel",
+    focus: "#workstackPriority",
+    label: "Workstack Composer"
+  },
+  router: {
+    tab: "workflows",
+    panel: ".capability-router-panel",
+    target: ".capability-router-panel",
+    focus: "#capabilityRouterObjective",
+    label: "Capability Router"
+  },
+  forgebench: {
+    tab: "workflows",
+    panel: ".forgebench-panel",
+    target: ".forgebench-panel",
+    focus: "#forgeBenchBenchmark",
+    label: "ForgeBench"
   }
 });
 const workspaceSectionState = {};
@@ -14351,12 +14386,16 @@ function renderModelAutopilot() {
     els.modelAutopilotBox.textContent = "Scannez la machine avant de mesurer les réglages Ollama.";
     return;
   }
-  if (!model || !installed) {
-    els.modelAutopilotState.textContent = "modèle installé requis";
+  if (!model) {
+    els.modelAutopilotState.textContent = "choix du modèle requis";
     els.modelAutopilotBox.className = "model-autopilot-box empty";
-    els.modelAutopilotBox.textContent = model
-      ? `${model} doit déjà être installé. Model Autopilot ne télécharge aucun modèle.`
-      : "Choisissez un modèle Ollama déjà installé dans le benchmark.";
+    els.modelAutopilotBox.textContent = "Choisissez un modèle Ollama déjà installé dans Benchmark.";
+    return;
+  }
+  if (!installed) {
+    els.modelAutopilotState.textContent = "modèle non installé";
+    els.modelAutopilotBox.className = "model-autopilot-box empty";
+    els.modelAutopilotBox.textContent = `${model} doit déjà être installé. Model Autopilot ne télécharge aucun modèle.`;
     return;
   }
 

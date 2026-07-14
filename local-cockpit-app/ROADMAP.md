@@ -24,6 +24,8 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Remplacer le journal technique de l'Accueil par un Bilan machine : quatre preuves, trois actions utiles et détails avancés repliés.
 - [x] Donner à chaque statut avancé un bouton de navigation exact ; `Choisir le meilleur modèle` ouvre `Tests > Parcours et choix du modèle` et focalise le bouton de comparaison sans lancer de téléchargement.
 - [x] Empêcher les panneaux Tests actifs de masquer une section Accueil choisie et compacter les onglets mobiles sur une seule ligne défilable.
+- [x] Donner une identité visuelle sobre à chaque espace, transformer les états de panneau en badges et distinguer les commandes principales des exports secondaires.
+- [x] Relier les prérequis Model Autopilot, Flight Recorder, Passerelle locale, Workstack Composer, Capability Router et ForgeBench à leur écran source sans exécution automatique.
 - [ ] Publier cette interface et la présenter sur le site seulement après validation manuelle du build candidat.
 
 ## Correctif validé dans les sources - Hermes, runtime et mémoire réelle

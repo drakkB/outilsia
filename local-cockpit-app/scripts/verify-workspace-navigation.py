@@ -78,6 +78,37 @@ def inspect_workspace(page, workspace: str, expected_panels: int, label: str):
     return state
 
 
+def assert_feature_route(page, source_tab: str, source_section: str, button: str, expected_tab: str, expected_section: str, expected_focus: str, label: str):
+    page.locator(f'[data-workspace-tab-target="{source_tab}"]').click()
+    page.locator("#workspaceSectionSelect").select_option(source_section)
+    route_button = page.locator(button)
+    if not route_button.is_visible() or route_button.is_disabled():
+        raise AssertionError(f"{label}: prerequisite route is not actionable: {button}")
+    route_button.click()
+    page.wait_for_timeout(400)
+    state = page.evaluate(
+        """({ expectedTab, expectedSection, expectedFocus }) => ({
+          tab: document.querySelector('#appShell')?.dataset.workspaceTab,
+          section: document.querySelector('#workspaceSectionSelect')?.value,
+          panelVisible: !!document.querySelector(expectedSection)?.offsetParent,
+          focused: document.activeElement?.matches(expectedFocus) || false
+        })""",
+        {
+            "expectedTab": expected_tab,
+            "expectedSection": expected_section,
+            "expectedFocus": expected_focus,
+        },
+    )
+    expected = {
+        "tab": expected_tab,
+        "section": expected_section,
+        "panelVisible": True,
+        "focused": True,
+    }
+    if state != expected:
+        raise AssertionError(f"{label}: prerequisite route mismatch {state}, expected {expected}")
+
+
 def check(browser, width: int, height: int, label: str):
     page = browser.new_page(viewport={"width": width, "height": height}, device_scale_factor=1)
     page.goto(HTML.as_uri(), wait_until="load")
@@ -136,6 +167,18 @@ def check(browser, width: int, height: int, label: str):
             f"{label}: model benchmark action routed to {routed_benchmark!r}/{routed_benchmark_section!r}"
         )
 
+    prerequisite_routes = [
+        ("tests", ".model-autopilot-panel", '.model-autopilot-panel [data-open-feature="benchmark"]', "tests", ".benchmark-panel", "#benchmarkModelInput", "autopilot-to-benchmark"),
+        ("tests", ".flight-recorder-panel", '.flight-recorder-panel [data-open-feature="benchmark"]', "tests", ".benchmark-panel", "#benchmarkModelInput", "flight-to-benchmark"),
+        ("workflows", ".local-capability-bridge-panel", '.local-capability-bridge-panel [data-open-feature="passport"]', "workflows", ".capability-passport-panel", "#generateCapabilityPassportBtn", "bridge-to-passport"),
+        ("workflows", ".workstack-composer-panel", '.workstack-composer-panel [data-open-feature="board"]', "workflows", ".board-observer-panel", "#boardObserverUrl", "workstack-to-board"),
+        ("workflows", ".capability-router-panel", '.capability-router-panel [data-open-feature="workstack"]', "workflows", ".workstack-composer-panel", "#workstackPriority", "router-to-workstack"),
+        ("workflows", ".forgebench-panel", '.forgebench-panel [data-open-feature="router"]', "workflows", ".capability-router-panel", "#capabilityRouterObjective", "forgebench-to-router"),
+    ]
+    for route in prerequisite_routes:
+        assert_feature_route(page, *route[:-1], f"{label}-{route[-1]}")
+
+    page.locator("#workspaceTestsBtn").click()
     page.locator("#workspaceSectionSelect").select_option(".flight-recorder-panel")
     page.wait_for_timeout(1500)
     section_position = page.locator(".flight-recorder-panel").evaluate(
