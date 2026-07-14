@@ -87,6 +87,18 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Publier le build Windows/Linux contenant Hardware Truth v1 avant les essais physiques.
 - [ ] Confirmer l'offload réel sur les machines physiques de la campagne terrain.
 
+## Candidat en validation - Machine Replay Lab v1
+
+État au 14 juillet 2026 : une matrice synthétique versionnée rejoue dix profils dans le vrai front du Cockpit. Elle traverse Hardware Doctor, Runtime & Driver Intelligence, Recommendation Engine, décisions d'upgrade et preuve terrain. Elle bloque les régressions de cohérence mais reste explicitement distincte d'un test physique.
+
+- [x] Rejouer vieux portable, Core i7 + GTX 1080 Ti, RTX 3060, RTX 4080, RTX 3090, CPU-only, Strix Halo, GPU inconnu, Intel Arc et RX 7900 XTX.
+- [x] Vérifier GPU/VRAM affichés, mémoire effective, backend, famille de pilote, modèle recommandé, score et profil terrain.
+- [x] Imposer le modèle test léger tant que le GPU est inconnu, CPU-only ou sur une machine legacy contrainte.
+- [x] Afficher explicitement `VRAM non déterminée` et traiter la mémoire unifiée sans la convertir en VRAM dédiée.
+- [x] Produire un rapport JSON/HTML local sans prompts bruts, fichiers personnels, credentials ni télémétrie.
+- [x] Ajouter un workflow GitHub dédié avec matrice et version Playwright épinglées.
+- [ ] Ajouter les vrais Capability Passports anonymisés seulement après les tests physiques ; une fixture ne devient jamais une preuve terrain.
+
 ## Candidat validé - Runtime & Driver Intelligence v1
 
 État au 12 juillet 2026 : Runtime & Driver Intelligence est inclus avec Tests privés, Local Capability Bridge et Install Safety Preflight dans le candidat cross-platform le plus récent `291904395671`, commit `655281d`, run GitHub Actions `29190439567` terminé avec succès. Le build public reste `291439601671` et ne revendique pas encore ces capacités. Les cinq artefacts candidats et leurs SHA-256 ont été vérifiés hors production ; le terrain reste `0/5`.

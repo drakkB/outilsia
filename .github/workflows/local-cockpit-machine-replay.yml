@@ -1,0 +1,67 @@
+name: Local Cockpit Machine Replay
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "local-cockpit-app/src/**"
+      - "local-cockpit-app/scripts/fixtures/machine-replay-matrix.json"
+      - "local-cockpit-app/scripts/verify-machine-replay-*"
+      - "local-cockpit-app/package.json"
+      - "server-work/static/pages/scanner-ia-local.html"
+      - "server-work/static/pages/telecharger-scanner-ia-local.html"
+      - "server-work/static/llms.txt"
+      - ".github/workflows/local-cockpit-machine-replay.yml"
+
+jobs:
+  replay-machine-matrix:
+    name: Replay ten hardware profiles
+    runs-on: ubuntu-24.04
+
+    defaults:
+      run:
+        working-directory: local-cockpit-app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: local-cockpit-app/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned Playwright client
+        run: python -m pip install playwright==1.58.0
+
+      - name: Resolve system Chromium
+        shell: bash
+        run: |
+          for browser in /opt/google/chrome/chrome /usr/bin/google-chrome /usr/bin/chromium /usr/lib/chromium/chromium; do
+            if [ -x "$browser" ]; then
+              echo "OUTILSIA_CHROMIUM_EXECUTABLE=$browser" >> "$GITHUB_ENV"
+              "$browser" --version
+              exit 0
+            fi
+          done
+          echo "No supported system Chromium found" >&2
+          exit 1
+
+      - name: Verify Machine Replay Lab
+        run: npm run verify:machine-replay
+
+      - name: Upload replay report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: outilsia-machine-replay-report
+          path: |
+            local-cockpit-app/.artifacts/machine-replay/*
+          if-no-files-found: warn

@@ -88,6 +88,7 @@ const FLIGHT_RECORDER_STORE_KEY = "outilsia.localCockpit.flightRecorder.v1";
 const PROMPT_LIBRARY_KEY = "outilsia.localCockpit.promptLibrary.v1";
 const CHAT_HISTORY_KEY = "outilsia.localCockpit.chatHistory.v1";
 const FIELD_TEST_PROFILE_KEY = "outilsia.localCockpit.fieldTestProfile.v1";
+const MACHINE_REPLAY_SNAPSHOT_SCHEMA = "outilsia.machine_replay_snapshot.v1";
 const USAGE_PROFILE_KEY = "outilsia.localCockpit.usageProfile.v1";
 const UPGRADE_SIM_TARGET_KEY = "outilsia.localCockpit.upgradeSimTarget.v1";
 const UPGRADE_DIGITAL_TWIN_STORE_KEY = "outilsia.localCockpit.upgradeDigitalTwin.v1";
@@ -1968,6 +1969,17 @@ function isConstrainedLegacyMachine(scan = state.scan) {
   return isLegacyPascalMachine(scan) || (ram > 0 && ram <= 16 && (!vram || vram <= 6));
 }
 
+function requiresStarterModelProof(scan = state.scan) {
+  if (!scan) return true;
+  const probe = scan.raw_scan?.gpu_probe || {};
+  const category = String(scan.gpu_category || probe.category || "").toLowerCase();
+  const cpuOnly = category === "cpu-only"
+    || (scan.vram_gb === 0 && !scan.gpu_name);
+  return isConstrainedLegacyMachine(scan)
+    || gpuProbeIsUnknown(scan, probe)
+    || cpuOnly;
+}
+
 function effectiveModelMemoryGb(scan = state.scan) {
   const vram = Number(scan?.vram_gb || 0);
   const ram = Number(scan?.ram_gb || 0);
@@ -1981,6 +1993,7 @@ function effectiveModelMemoryGb(scan = state.scan) {
 
 function memoryDisplayLabel(scan = {}) {
   if (scan?.unified_memory) return `${formatGb(scan.ram_gb)} unifiée`;
+  if (scan?.vram_gb == null) return "VRAM non déterminée";
   return formatGb(scan.vram_gb);
 }
 
@@ -2261,7 +2274,7 @@ function topRecommendedModel() {
   const availableMemory = effectiveModelMemoryGb(state.scan);
   const candidates = models.filter((model) => actionableOllamaRef(model));
   const starter = candidates.find((model) => isStarterModelRef(actionableOllamaRef(model)));
-  if (isConstrainedLegacyMachine() && starter && !hasSuccessfulBenchmarkFor(actionableOllamaRef(starter))) {
+  if (requiresStarterModelProof() && starter && !hasSuccessfulBenchmarkFor(actionableOllamaRef(starter))) {
     return starter;
   }
   const safeCandidates = candidates.filter((model) => {
@@ -2320,7 +2333,7 @@ function modelOfMomentState() {
     if (modelSignalText(model)) score += 35;
     if (newLabels.some((label) => label && (label.includes(text.split(":")[0]) || text.includes(label.split(":")[0])))) score += 20;
     if (profile.key === "portable" && /0\.6b|mini|3b|7b|8b|qwen|phi/i.test(text)) score += 30;
-    if (isConstrainedLegacyMachine() && isStarterModelRef(ref) && !hasSuccessfulBenchmarkFor(ref)) score += 130;
+    if (requiresStarterModelProof() && isStarterModelRef(ref) && !hasSuccessfulBenchmarkFor(ref)) score += 130;
     if (isConstrainedLegacyMachine() && isAmbitiousForLegacyModel(model)) score -= 95;
     if (profile.key === "memory" && /hermes/i.test(text)) score += 30;
     if (profile.key === "code" && /qwen|deepseek|code|coder/i.test(text)) score += 25;
@@ -13604,7 +13617,11 @@ function fieldTestProfile() {
   let machineClass = "Machine à scanner";
   let verdict = "Scanne la machine pour obtenir un plan d'essai.";
   if (state.scan) {
-    if (gpu.includes("1080 ti") || gpu.includes("1080ti")) {
+    if (scan.unified_memory) {
+      const effectiveMemory = effectiveModelMemoryGb(scan);
+      machineClass = "Mémoire unifiée IA locale";
+      verdict = `${formatGb(ram)} de mémoire unifiée détectés · enveloppe modèle prudente ${formatGb(effectiveMemory)} selon le runtime. Le benchmark doit confirmer le backend et la vitesse.`;
+    } else if (gpu.includes("1080 ti") || gpu.includes("1080ti")) {
       machineClass = "Vieux GPU intéressant";
       verdict = "GTX 1080 Ti : très bon cas de test terrain. Vise d'abord les petits modèles et compare CPU/GPU selon Ollama.";
     } else if (vram >= 24) {
@@ -13984,6 +14001,103 @@ function fieldTestProofStatus(entry = fieldTestMachineEntry()) {
     missing,
     complete: missing.length === 0,
     next: missing[0] || null
+  };
+}
+
+function machineReplaySnapshot(scenarioKey = "") {
+  const scan = state.scan || {};
+  const doctor = hardwareDoctorSnapshot(scan);
+  const runtime = doctor?.runtime?.driver_intelligence || runtimeDriverIntelligence(scan);
+  const recommended = recommendedModelState();
+  const candidates = recommendationEngineCandidates("polyvalent", 4).map((candidate) => ({
+    ref: candidate.ref,
+    score: candidate.score,
+    installed: isOllamaModelInstalled(candidate.ref),
+    resources: recommendationCandidateResources(candidate)
+  }));
+  const fieldProfile = effectiveFieldTestProfile(scan);
+  const fieldSummary = fieldTestProfile();
+  const fieldEntry = fieldTestMachineEntry();
+  const fieldProof = fieldTestProofStatus(fieldEntry);
+  const report = readinessReport();
+  const gpuUnknown = gpuProbeIsUnknown(scan, scan.raw_scan?.gpu_probe || {});
+  return {
+    schema: MACHINE_REPLAY_SNAPSHOT_SCHEMA,
+    scenario_key: String(scenarioKey || ""),
+    machine: {
+      machine_key: scan.machine_key || "",
+      cpu: scan.cpu_name || "",
+      ram_gb: numberOrNull(scan.ram_gb),
+      gpu: gpuDisplayLabel(scan),
+      gpu_vendor: runtime?.vendor || "unknown",
+      vram_gb: numberOrNull(scan.vram_gb),
+      vram_display: memoryDisplayLabel(scan),
+      unified_memory: Boolean(scan.unified_memory),
+      effective_model_memory_gb: effectiveModelMemoryGb(scan),
+      os: runtime?.os || runtimeDriverOsKey(scan)
+    },
+    doctor: doctor ? {
+      schema: doctor.schema,
+      score: doctor.score,
+      headline: doctor.headline,
+      gpu_confidence: doctor.gpu?.confidence || "",
+      ram_channel: doctor.ram?.channel_mode || "",
+      ram_clock: doctor.ram?.effective_clock_label || ""
+    } : null,
+    runtime: runtime ? {
+      schema: runtime.schema,
+      vendor: runtime.vendor,
+      family: runtime.family?.id || "",
+      backend: runtime.backend?.recommended || "",
+      support_tier: runtime.backend?.ollama_support_tier || "unknown",
+      memory_model: runtime.memory?.model || "unknown",
+      dedicated_vram_gb: runtime.memory?.dedicated_vram_gb ?? null,
+      shared_system_memory_gb: runtime.memory?.shared_system_memory_gb ?? null,
+      estimated_model_budget_gb: runtime.memory?.estimated_model_budget_gb ?? null,
+      dedicated_vram_claimed_from_shared_memory: Boolean(runtime.memory?.dedicated_vram_claimed_from_shared_memory),
+      verdict: runtime.verdict?.key || "unknown",
+      automatic_driver_install_supported: Boolean(runtime.driver?.automatic_install_supported)
+    } : null,
+    recommendation: {
+      starter_proof_required: requiresStarterModelProof(scan),
+      ref: recommended.ref || "",
+      title: recommended.title || "",
+      installed: Boolean(recommended.installed),
+      candidates
+    },
+    field: {
+      inferred_profile: fieldProfile.inferred,
+      effective_profile: fieldProfile.profile,
+      profile_source: fieldProfile.source,
+      profile_valid: fieldTestProfileIsValid(fieldEntry),
+      machine_class: fieldSummary.machineClass,
+      verdict: fieldSummary.verdict,
+      export_ready: fieldProof.complete,
+      next_proof: fieldProof.next?.key || ""
+    },
+    decision: {
+      score: report.score,
+      title: report.title,
+      verdict: report.verdict,
+      primary_action: primaryActionState().key,
+      primary_action_label: primaryActionState().label,
+      upgrade: report.upgrades?.[0]?.title || ""
+    },
+    ui: {
+      gpu: els.topGpuText?.textContent || "",
+      vram: els.topVramText?.textContent || "",
+      ram: els.topRamText?.textContent || "",
+      runtime: els.topRuntimeKey?.textContent || "",
+      field: els.fieldTestBox?.textContent || ""
+    },
+    truth: {
+      gpu_unknown: gpuUnknown,
+      unknown_gpu_not_cpu_only: !gpuUnknown || fieldProfile.inferred !== "cpu_only",
+      shared_memory_not_claimed_as_dedicated_vram: !scan.unified_memory || !runtime?.memory?.dedicated_vram_claimed_from_shared_memory,
+      raw_prompts_included: false,
+      personal_files_read: false,
+      physical_proof: false
+    }
   };
 }
 
@@ -18040,6 +18154,52 @@ function demoCompatibility() {
   };
 }
 
+function machineReplayScan(overrides = {}) {
+  const base = demoScan();
+  const overrideRuntimes = overrides.runtimes || {};
+  const overrideRaw = overrides.raw_scan || {};
+  return {
+    ...base,
+    ...overrides,
+    installed_models: Array.isArray(overrides.installed_models) ? overrides.installed_models : [],
+    runtimes: {
+      ...base.runtimes,
+      ...overrideRuntimes,
+      ollama: { ...base.runtimes.ollama, ...(overrideRuntimes.ollama || {}) },
+      ollama_wsl: { ...base.runtimes.ollama_wsl, ...(overrideRuntimes.ollama_wsl || {}) },
+      wsl: { ...base.runtimes.wsl, ...(overrideRuntimes.wsl || {}) }
+    },
+    raw_scan: {
+      ...base.raw_scan,
+      ...overrideRaw,
+      gpu_probe: Object.prototype.hasOwnProperty.call(overrideRaw, "gpu_probe")
+        ? { ...(overrideRaw.gpu_probe || {}) }
+        : { ...base.raw_scan.gpu_probe },
+      memory_probe: Object.prototype.hasOwnProperty.call(overrideRaw, "memory_probe")
+        ? { ...(overrideRaw.memory_probe || {}) }
+        : { ...base.raw_scan.memory_probe },
+      motherboard_probe: Object.prototype.hasOwnProperty.call(overrideRaw, "motherboard_probe")
+        ? { ...(overrideRaw.motherboard_probe || {}) }
+        : { ...base.raw_scan.motherboard_probe }
+    }
+  };
+}
+
+function machineReplayCompatibility(overrides = {}, catalog = []) {
+  const base = demoCompatibility().compatibility;
+  return {
+    compatibility: {
+      ...base,
+      ...overrides,
+      model_recommendations: Array.isArray(catalog) && catalog.length
+        ? catalog
+        : base.model_recommendations,
+      blocked_next: Array.isArray(overrides.blocked_next) ? overrides.blocked_next : base.blocked_next,
+      upgrades: Array.isArray(overrides.upgrades) ? overrides.upgrades : []
+    }
+  };
+}
+
 function demoMarkdown() {
   return "# Machine IA locale\n\n- Demo RTX 3090\n- Qwen3 / Hermes / Ollama\n";
 }
@@ -18137,6 +18297,7 @@ function installTestHarness() {
     memoryChannelLabel,
     hardwareDoctorAnalysis,
     hardwareDoctorSnapshot,
+    machineReplaySnapshot,
     runtimeDriverIntelligence,
     runtimeDriverAccelerationExpected,
     primaryActionState,
@@ -19452,6 +19613,46 @@ function installTestHarness() {
         fourModuleDoctor,
         fourModuleUi
       };
+    },
+    applyMachineReplayScenario(input = {}) {
+      for (const key of [
+        BENCHMARK_HISTORY_KEY,
+        ARENA_RUN_KEY,
+        RECOMMENDATION_RUN_KEY,
+        FIELD_TEST_PROFILE_KEY,
+        USAGE_PROFILE_KEY,
+        CHAT_HISTORY_KEY,
+        PROMPT_LIBRARY_KEY
+      ]) {
+        window.localStorage?.removeItem(key);
+      }
+      state.benchmark = null;
+      state.chatResult = null;
+      state.markdown = "";
+      state.promptForge = null;
+      state.recommendationRun = null;
+      state.capabilityPassport = null;
+      state.modelAutopilotRun = null;
+      state.upgradeDigitalTwinRun = null;
+      state.optimisticInstalledModels = [];
+      lastShareReportUrl = "";
+      lastSyncedMachineId = null;
+      readinessProof.copied = false;
+      readinessProof.savedAccount = false;
+      readinessProof.shared = false;
+      writeRecommendationRun(null);
+      writeLastArenaRun(null);
+      writeBenchmarkHistory([]);
+
+      const scan = machineReplayScan(input.scan || {});
+      renderScan(scan);
+      renderCompatibility(machineReplayCompatibility(input.compatibility || {}, input.catalog || []));
+      setFieldTestProfile("auto");
+      renderPreparePanel();
+      renderReadinessPanel();
+      renderFieldTestPanel();
+      renderPrimaryAction();
+      return machineReplaySnapshot(input.key || "");
     },
     applyDemoState() {
       writeRecommendationRun(null);

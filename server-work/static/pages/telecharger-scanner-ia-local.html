@@ -88,6 +88,19 @@
       </div>
     </section>
 
+    <section class="wrap panel" id="machine-replay-lab" style="margin-bottom:18px;border-color:rgba(103,232,249,.36);background:linear-gradient(135deg,rgba(103,232,249,.10),rgba(15,23,42,.92),rgba(34,197,94,.06))">
+      <span class="pill">Machine Replay Lab v1 · candidat source</span>
+      <h2>Le parcours complet est rejoué sur 10 profils matériels avant publication.</h2>
+      <p class="muted">Dans le candidat source postérieur au build public actuel, une matrice synthétique de non-régression vérifie Hardware Doctor, le runtime GPU, la mémoire disponible, le modèle recommandé et la porte d'export terrain. Une VRAM inconnue reste inconnue et la mémoire unifiée n'est jamais transformée en VRAM dédiée.</p>
+      <div class="proof" style="margin-top:14px">
+        <div><strong>PC anciens</strong><span>Core i7 + 940MX et tour Z97 + GTX 1080 Ti doivent commencer par une preuve légère.</span></div>
+        <div><strong>NVIDIA moderne</strong><span>RTX 3060, RTX 4080 SUPER et RTX 3090 couvrent les paliers 12, 16 et 24 Go.</span></div>
+        <div><strong>AMD + Intel</strong><span>Strix Halo, RX 7900 XTX et Intel Arc B580 gardent leur backend et leur modèle mémoire explicites.</span></div>
+        <div><strong>0 preuve terrain fabriquée</strong><span>CPU only et GPU inconnu testent aussi les états prudents, sans devenir des machines physiques validées.</span></div>
+      </div>
+      <p class="fine">Le Machine Replay Lab détecte les régressions de décision dans le code. Cette matrice synthétique ne mesure pas ces machines et ne compte jamais comme preuve terrain physique.</p>
+    </section>
+
     <section class="wrap panel" style="margin-bottom:18px;border-color:rgba(34,197,94,.32)">
       <h2>Ce que mesure réellement le benchmark Ollama</h2>
       <p class="muted">Le build courant utilise l'API locale Ollama avec <code>think:false</code>. Le rapport distingue les métriques natives de l'API d'un éventuel repli estimé.</p>

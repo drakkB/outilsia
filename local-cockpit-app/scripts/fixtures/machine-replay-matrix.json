@@ -1,0 +1,580 @@
+{
+  "schema": "outilsia.machine_replay_matrix.v1",
+  "version": "2026-07-14.1",
+  "catalog": [
+    {
+      "name": "Qwen3 test léger",
+      "params": "0.6B",
+      "kind": "text",
+      "vram_q4": 1,
+      "ollama": "qwen3:0.6b",
+      "reason": "Preuve légère du runtime avant toute recommandation ambitieuse.",
+      "use_case": "Validation rapide Ollama",
+      "date_added": "2026-07-01"
+    },
+    {
+      "name": "Hermes 3 8B",
+      "params": "8B",
+      "kind": "text",
+      "vram_q4": 5,
+      "ollama": "hermes3:8b",
+      "reason": "Assistant local et mémoire projet.",
+      "use_case": "Chat, mémoire et synthèse",
+      "date_added": "2026-06-01"
+    },
+    {
+      "name": "Qwen 3 14B",
+      "params": "14B",
+      "kind": "text",
+      "vram_q4": 9,
+      "ollama": "qwen3:14b",
+      "reason": "Palier qualité pour machine intermédiaire.",
+      "use_case": "Raisonnement et code léger",
+      "date_added": "2026-06-01"
+    },
+    {
+      "name": "Qwen 3 32B",
+      "params": "32B",
+      "kind": "text",
+      "vram_q4": 20,
+      "ollama": "qwen3:32b",
+      "reason": "Gros modèle quantifié à réserver aux machines adaptées.",
+      "use_case": "Qualité et contexte",
+      "date_added": "2026-06-01"
+    },
+    {
+      "name": "Qwen 3 70B",
+      "params": "70B",
+      "kind": "text",
+      "vram_q4": 42,
+      "ollama": "qwen3:70b",
+      "reason": "Très gros modèle hors machines grand public ordinaires.",
+      "use_case": "Expérimentation lourde",
+      "date_added": "2026-06-01"
+    }
+  ],
+  "scenarios": [
+    {
+      "key": "old_laptop",
+      "label": "Vieux portable Core i7",
+      "scan": {
+        "name": "Portable Core i7 + GeForce 940MX",
+        "machine_key": "replay-old-laptop",
+        "os_name": "Windows 10",
+        "os_version": "22H2 laptop",
+        "cpu_name": "Intel Core i7-7500U Mobile",
+        "cpu_cores": 2,
+        "ram_gb": 16,
+        "gpu_name": "NVIDIA GeForce 940MX Laptop",
+        "gpu_vendor": "NVIDIA",
+        "gpu_category": "legacy-mobile",
+        "vram_gb": 2,
+        "unified_memory": false,
+        "storage_free_gb": 80,
+        "installed_models": [
+          { "model_name": "qwen3", "model_tag": "0.6b", "size_gb": 0.5, "runtime": "ollama" }
+        ],
+        "raw_scan": {
+          "gpu_probe": {
+            "name": "NVIDIA GeForce 940MX Laptop",
+            "vendor": "NVIDIA",
+            "category": "legacy-mobile",
+            "vram_gb": 2,
+            "vram_confidence": "measured_nvidia_smi",
+            "source": "nvidia-smi",
+            "driver_version": "576.80",
+            "cuda_version": "12.9"
+          },
+          "memory_probe": {
+            "total_gb": 16,
+            "module_count": 2,
+            "memory_type": "DDR4",
+            "configured_clock_mhz": 2133,
+            "speed_mhz": 2133,
+            "channel_mode": "multiple_modules_detected",
+            "confidence": "module_layout_only",
+            "source": "synthetic_fixture"
+          },
+          "motherboard_probe": { "manufacturer": "OEM", "product": "Laptop board", "source": "synthetic_fixture" }
+        }
+      },
+      "compatibility": {
+        "score": 42,
+        "summary": "Machine modeste : commencer par un modèle léger et mesurer avant tout achat.",
+        "upgrades": [
+          { "name": "SSD et RAM selon compatibilité OEM", "reason": "Vérifier d'abord les limites du portable." }
+        ]
+      },
+      "expect": {
+        "field_profile": "old_laptop",
+        "field_valid": true,
+        "machine_class_contains": "GPU limité",
+        "runtime_vendor": "nvidia",
+        "runtime_family": "",
+        "runtime_backend": "cuda",
+        "memory_model": "dedicated",
+        "effective_memory_gb": 2,
+        "recommended_one_of": ["qwen3:0.6b"],
+        "starter_required": true,
+        "score": 42,
+        "gpu_contains": "940MX",
+        "vram_contains": "2 Go"
+      }
+    },
+    {
+      "key": "core_i7_gtx_1080_ti",
+      "label": "Tour Core i7 + GTX 1080 Ti",
+      "scan": {
+        "name": "Core i7 Z97 + GTX 1080 Ti",
+        "machine_key": "replay-core-i7-1080ti",
+        "os_name": "Windows 10",
+        "os_version": "22H2",
+        "cpu_name": "Intel Core i7-4790K",
+        "cpu_cores": 4,
+        "ram_gb": 16,
+        "gpu_name": "NVIDIA GeForce GTX 1080 Ti",
+        "gpu_vendor": "NVIDIA",
+        "gpu_category": "legacy",
+        "vram_gb": 11,
+        "unified_memory": false,
+        "storage_free_gb": 160,
+        "installed_models": [
+          { "model_name": "qwen3", "model_tag": "0.6b", "size_gb": 0.5, "runtime": "ollama" }
+        ],
+        "raw_scan": {
+          "gpu_probe": {
+            "name": "NVIDIA GeForce GTX 1080 Ti",
+            "vendor": "NVIDIA",
+            "category": "legacy",
+            "vram_gb": 11,
+            "vram_confidence": "measured_nvidia_smi",
+            "source": "nvidia-smi",
+            "driver_version": "576.80",
+            "cuda_version": "12.9",
+            "pcie_link_width_current": 16,
+            "pcie_link_width_max": 16
+          },
+          "memory_probe": {
+            "total_gb": 16,
+            "module_count": 4,
+            "memory_type": "DDR3",
+            "configured_clock_mhz": 1600,
+            "speed_mhz": 1600,
+            "channel_mode": "multiple_modules_detected",
+            "confidence": "module_layout_only",
+            "source": "synthetic_fixture"
+          },
+          "motherboard_probe": {
+            "manufacturer": "ASUS",
+            "product": "Z97-A",
+            "max_memory_gb": 32,
+            "memory_slots": 4,
+            "source": "synthetic_fixture"
+          }
+        }
+      },
+      "compatibility": {
+        "score": 54,
+        "summary": "GTX 1080 Ti encore utile : valider le pilote et l'offload avant une upgrade.",
+        "upgrades": [
+          { "name": "Nouvelle plateforme AM5", "reason": "Éviter un investissement lourd dans la DDR3 si une nouvelle tour est prévue." }
+        ]
+      },
+      "expect": {
+        "field_profile": "core_i7_gtx_1080_ti",
+        "field_valid": true,
+        "machine_class_contains": "Vieux GPU",
+        "runtime_vendor": "nvidia",
+        "runtime_family": "pascal",
+        "runtime_backend": "cuda",
+        "memory_model": "dedicated",
+        "effective_memory_gb": 11,
+        "recommended_one_of": ["qwen3:0.6b"],
+        "starter_required": true,
+        "score": 54,
+        "gpu_contains": "1080 Ti",
+        "vram_contains": "11 Go"
+      }
+    },
+    {
+      "key": "rtx_3060_12gb",
+      "label": "RTX 3060 12 Go",
+      "scan": {
+        "name": "Ryzen 5 + RTX 3060 12 Go",
+        "machine_key": "replay-rtx-3060",
+        "os_name": "Windows 11",
+        "os_version": "24H2",
+        "cpu_name": "AMD Ryzen 5 5600X",
+        "ram_gb": 32,
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "gpu_vendor": "NVIDIA",
+        "gpu_category": "mainstream",
+        "vram_gb": 12,
+        "unified_memory": false,
+        "storage_free_gb": 300,
+        "installed_models": [
+          { "model_name": "qwen3", "model_tag": "0.6b", "size_gb": 0.5, "runtime": "ollama" },
+          { "model_name": "hermes3", "model_tag": "8b", "size_gb": 4.7, "runtime": "ollama" }
+        ],
+        "raw_scan": {
+          "gpu_probe": { "name": "NVIDIA GeForce RTX 3060", "vendor": "NVIDIA", "category": "mainstream", "vram_gb": 12, "vram_confidence": "measured_nvidia_smi", "source": "nvidia-smi", "driver_version": "576.80", "cuda_version": "12.9" },
+          "memory_probe": { "total_gb": 32, "module_count": 2, "memory_type": "DDR4", "configured_clock_mhz": 3200, "speed_mhz": 3200, "channel_mode": "multiple_modules_detected", "confidence": "module_layout_only", "source": "synthetic_fixture" },
+          "motherboard_probe": { "manufacturer": "MSI", "product": "B550", "source": "synthetic_fixture" }
+        }
+      },
+      "compatibility": {
+        "score": 72,
+        "summary": "Bon ticket d'entrée pour les modèles 7B-14B quantifiés.",
+        "upgrades": [{ "name": "Gros LLM 24 Go", "reason": "Seulement si les futurs usages exigent des 32B." }]
+      },
+      "expect": {
+        "field_profile": "rtx_3060_12gb",
+        "field_valid": true,
+        "machine_class_contains": "Bon PC",
+        "runtime_vendor": "nvidia",
+        "runtime_family": "modern_cuda",
+        "runtime_backend": "cuda",
+        "memory_model": "dedicated",
+        "effective_memory_gb": 12,
+        "recommended_one_of": ["hermes3:8b", "qwen3:14b"],
+        "starter_required": false,
+        "score": 72,
+        "gpu_contains": "RTX 3060",
+        "vram_contains": "12 Go"
+      }
+    },
+    {
+      "key": "rtx_4080_16gb",
+      "label": "RTX 4080 SUPER 16 Go",
+      "scan": {
+        "name": "Ryzen 7 + RTX 4080 SUPER",
+        "machine_key": "replay-rtx-4080",
+        "os_name": "Windows 11",
+        "os_version": "24H2",
+        "cpu_name": "AMD Ryzen 7 7800X3D",
+        "ram_gb": 64,
+        "gpu_name": "NVIDIA GeForce RTX 4080 SUPER",
+        "gpu_vendor": "NVIDIA",
+        "gpu_category": "performance",
+        "vram_gb": 16,
+        "unified_memory": false,
+        "storage_free_gb": 600,
+        "installed_models": [
+          { "model_name": "qwen3", "model_tag": "0.6b", "size_gb": 0.5, "runtime": "ollama-wsl", "source": "ollama-wsl" },
+          { "model_name": "hermes3", "model_tag": "8b", "size_gb": 4.7, "runtime": "ollama-wsl", "source": "ollama-wsl" }
+        ],
+        "runtimes": {
+          "ollama": { "installed": true, "version": "ollama windows", "source": "ollama-cli" },
+          "ollama_wsl": { "installed": true, "version": "ollama wsl", "source": "ollama-wsl" },
+          "wsl": { "installed": true, "state": "wsl_ready", "ollama_ready": true, "gpu_bridge": "available", "gpu_bridge_source": "wsl_dev_dxg" }
+        },
+        "raw_scan": {
+          "gpu_probe": { "name": "NVIDIA GeForce RTX 4080 SUPER", "vendor": "NVIDIA", "category": "performance", "vram_gb": 16, "vram_confidence": "measured_nvidia_smi", "source": "nvidia-smi", "driver_version": "576.80", "cuda_version": "12.9", "temperature_c": 48, "pcie_link_width_current": 16, "pcie_link_width_max": 16 },
+          "memory_probe": { "total_gb": 64, "module_count": 2, "memory_type": "DDR5", "configured_clock_mhz": 6000, "speed_mhz": 6000, "channel_mode": "multiple_modules_detected", "confidence": "module_layout_only", "source": "synthetic_fixture" },
+          "motherboard_probe": { "manufacturer": "MSI", "product": "X670E", "source": "synthetic_fixture" }
+        }
+      },
+      "compatibility": {
+        "score": 80,
+        "summary": "Très bonne machine IA locale pour 7B-14B et certains modèles plus ambitieux.",
+        "upgrades": [{ "name": "Aucun achat prioritaire", "reason": "Mesurer les usages avant de remplacer une RTX 4080 SUPER." }]
+      },
+      "expect": {
+        "field_profile": "rtx_4080_4090",
+        "field_valid": true,
+        "machine_class_contains": "Très bon PC",
+        "runtime_vendor": "nvidia",
+        "runtime_family": "modern_cuda",
+        "runtime_backend": "cuda",
+        "memory_model": "dedicated",
+        "effective_memory_gb": 16,
+        "recommended_one_of": ["hermes3:8b", "qwen3:14b"],
+        "starter_required": false,
+        "score": 80,
+        "gpu_contains": "RTX 4080 SUPER",
+        "vram_contains": "16 Go"
+      }
+    },
+    {
+      "key": "rtx_3090_24gb",
+      "label": "RTX 3090 24 Go",
+      "scan": {
+        "name": "Ryzen 9 + RTX 3090",
+        "machine_key": "replay-rtx-3090",
+        "os_name": "Windows 11",
+        "os_version": "24H2",
+        "cpu_name": "AMD Ryzen 9 5900X",
+        "ram_gb": 64,
+        "gpu_name": "NVIDIA GeForce RTX 3090",
+        "gpu_vendor": "NVIDIA",
+        "gpu_category": "high-end",
+        "vram_gb": 24,
+        "unified_memory": false,
+        "storage_free_gb": 500,
+        "installed_models": [
+          { "model_name": "qwen3", "model_tag": "0.6b", "size_gb": 0.5, "runtime": "ollama" },
+          { "model_name": "hermes3", "model_tag": "8b", "size_gb": 4.7, "runtime": "ollama" },
+          { "model_name": "qwen3", "model_tag": "14b", "size_gb": 9, "runtime": "ollama" }
+        ],
+        "raw_scan": {
+          "gpu_probe": { "name": "NVIDIA GeForce RTX 3090", "vendor": "NVIDIA", "category": "high-end", "vram_gb": 24, "vram_confidence": "measured_nvidia_smi", "source": "nvidia-smi", "driver_version": "576.80", "cuda_version": "12.9" },
+          "memory_probe": { "total_gb": 64, "module_count": 2, "memory_type": "DDR4", "configured_clock_mhz": 3600, "speed_mhz": 3600, "channel_mode": "multiple_modules_detected", "confidence": "module_layout_only", "source": "synthetic_fixture" },
+          "motherboard_probe": { "manufacturer": "ASUS", "product": "X570", "source": "synthetic_fixture" }
+        }
+      },
+      "compatibility": {
+        "score": 88,
+        "summary": "Grosse VRAM adaptée aux 32B quantifiés avec validation locale.",
+        "upgrades": [{ "name": "Aucun achat prioritaire", "reason": "La VRAM est déjà au palier 24 Go." }]
+      },
+      "expect": {
+        "field_profile": "unmatched",
+        "field_valid": false,
+        "machine_class_contains": "Grosse VRAM",
+        "runtime_vendor": "nvidia",
+        "runtime_family": "modern_cuda",
+        "runtime_backend": "cuda",
+        "memory_model": "dedicated",
+        "effective_memory_gb": 24,
+        "recommended_one_of": ["hermes3:8b", "qwen3:14b", "qwen3:32b"],
+        "starter_required": false,
+        "score": 88,
+        "gpu_contains": "RTX 3090",
+        "vram_contains": "24 Go"
+      }
+    },
+    {
+      "key": "cpu_only",
+      "label": "Machine CPU-only",
+      "scan": {
+        "name": "Core i7 CPU-only",
+        "machine_key": "replay-cpu-only",
+        "os_name": "Windows 11",
+        "os_version": "24H2",
+        "cpu_name": "Intel Core i7-8700",
+        "ram_gb": 32,
+        "gpu_name": null,
+        "gpu_vendor": null,
+        "gpu_category": "cpu-only",
+        "vram_gb": 0,
+        "unified_memory": false,
+        "storage_free_gb": 220,
+        "installed_models": [
+          { "model_name": "qwen3", "model_tag": "0.6b", "size_gb": 0.5, "runtime": "ollama" }
+        ],
+        "raw_scan": {
+          "gpu_probe": { "name": null, "vendor": null, "category": "cpu-only", "vram_gb": 0, "vram_confidence": "cpu_only_declared", "source": "cpu-only-declared" },
+          "memory_probe": { "total_gb": 32, "module_count": 2, "memory_type": "DDR4", "configured_clock_mhz": 2666, "speed_mhz": 2666, "channel_mode": "multiple_modules_detected", "confidence": "module_layout_only", "source": "synthetic_fixture" },
+          "motherboard_probe": { "manufacturer": "OEM", "product": "Desktop board", "source": "synthetic_fixture" }
+        }
+      },
+      "compatibility": {
+        "score": 38,
+        "summary": "Chemin CPU valide pour les petits modèles, vitesse à mesurer.",
+        "upgrades": [{ "name": "GPU avec 12 Go VRAM", "reason": "Seulement si l'usage interactif CPU est trop lent." }]
+      },
+      "expect": {
+        "field_profile": "cpu_only",
+        "field_valid": false,
+        "machine_class_contains": "CPU/RAM",
+        "runtime_vendor": "cpu",
+        "runtime_family": "",
+        "runtime_backend": "cpu",
+        "memory_model": "none",
+        "effective_memory_gb": 0,
+        "recommended_one_of": ["qwen3:0.6b"],
+        "starter_required": true,
+        "score": 38,
+        "gpu_contains": "Aucun GPU",
+        "vram_contains": "0 Go"
+      }
+    },
+    {
+      "key": "strix_halo_128gb",
+      "label": "AMD Strix Halo 128 Go",
+      "scan": {
+        "name": "Ryzen AI Max+ 395 128 Go",
+        "machine_key": "replay-strix-halo",
+        "os_name": "Windows 11",
+        "os_version": "24H2",
+        "cpu_name": "AMD Ryzen AI Max+ 395",
+        "ram_gb": 128,
+        "gpu_name": "AMD Radeon 8060S",
+        "gpu_vendor": "AMD",
+        "gpu_category": "unified-memory",
+        "vram_gb": null,
+        "unified_memory": true,
+        "storage_free_gb": 700,
+        "installed_models": [
+          { "model_name": "qwen3", "model_tag": "0.6b", "size_gb": 0.5, "runtime": "ollama" },
+          { "model_name": "qwen3", "model_tag": "14b", "size_gb": 9, "runtime": "ollama" }
+        ],
+        "raw_scan": {
+          "gpu_probe": { "name": "AMD Radeon 8060S", "vendor": "AMD", "category": "unified-memory", "vram_gb": null, "vram_confidence": "unified_memory_not_dedicated_vram", "source": "powershell-win32-videocontroller", "driver_version": "32.0.21031.1005", "rocm_version": "7.2.1", "vulkan_version": "1.3.290" },
+          "memory_probe": { "total_gb": 128, "module_count": 0, "memory_type": "LPDDR5X", "configured_clock_mhz": 8000, "speed_mhz": 8000, "channel_mode": "onboard_memory", "confidence": "platform_reported", "source": "synthetic_fixture" },
+          "motherboard_probe": { "manufacturer": "Minisforum", "product": "Strix Halo", "source": "synthetic_fixture" }
+        }
+      },
+      "compatibility": {
+        "score": 86,
+        "summary": "Mémoire unifiée importante, backend Windows à benchmarker sans la présenter comme VRAM dédiée.",
+        "upgrades": [{ "name": "Aucun achat avant benchmark", "reason": "Valider Vulkan/ROCm et la bande passante réelle." }]
+      },
+      "expect": {
+        "field_profile": "unmatched",
+        "field_valid": false,
+        "machine_class_contains": "Mémoire unifiée",
+        "runtime_vendor": "amd",
+        "runtime_family": "strix_halo",
+        "runtime_backend": "vulkan",
+        "memory_model": "unified",
+        "effective_memory_gb": 48,
+        "recommended_one_of": ["qwen3:14b", "hermes3:8b", "qwen3:32b"],
+        "starter_required": false,
+        "score": 86,
+        "gpu_contains": "Radeon 8060S",
+        "vram_contains": "128 Go unifiée"
+      }
+    },
+    {
+      "key": "unknown_gpu",
+      "label": "GPU et VRAM inconnus",
+      "scan": {
+        "name": "Machine partiellement détectée",
+        "machine_key": "replay-unknown-gpu",
+        "os_name": "Windows 11",
+        "os_version": "24H2",
+        "cpu_name": "AMD Ryzen 7",
+        "ram_gb": 64,
+        "gpu_name": null,
+        "gpu_vendor": null,
+        "gpu_category": "unknown",
+        "vram_gb": null,
+        "unified_memory": false,
+        "storage_free_gb": 400,
+        "installed_models": [
+          { "model_name": "qwen3", "model_tag": "0.6b", "size_gb": 0.5, "runtime": "ollama" }
+        ],
+        "raw_scan": {
+          "gpu_probe": { "name": null, "vendor": null, "category": "unknown", "vram_gb": null, "vram_confidence": "not_detected", "source": "not_detected" },
+          "memory_probe": { "total_gb": 64, "module_count": 2, "memory_type": "DDR5", "configured_clock_mhz": 5600, "speed_mhz": 5600, "channel_mode": "multiple_modules_detected", "confidence": "module_layout_only", "source": "synthetic_fixture" },
+          "motherboard_probe": { "manufacturer": "Unknown", "product": "Unknown", "source": "not_detected" }
+        }
+      },
+      "compatibility": {
+        "score": 50,
+        "summary": "Diagnostic incomplet : ne pas inventer le GPU, la VRAM ou un achat.",
+        "upgrades": []
+      },
+      "expect": {
+        "field_profile": "unmatched",
+        "field_valid": false,
+        "machine_class_contains": "CPU/RAM",
+        "runtime_vendor": "unknown",
+        "runtime_family": "",
+        "runtime_backend": "cpu",
+        "memory_model": "unknown",
+        "effective_memory_gb": 0,
+        "recommended_one_of": ["qwen3:0.6b"],
+        "starter_required": true,
+        "score": 50,
+        "gpu_contains": "GPU non déterminé",
+        "vram_contains": "VRAM non déterminée"
+      }
+    },
+    {
+      "key": "intel_arc_b580",
+      "label": "Intel Arc B580 12 Go",
+      "scan": {
+        "name": "Intel Arc B580 12 Go",
+        "machine_key": "replay-intel-arc",
+        "os_name": "Windows 11",
+        "os_version": "24H2",
+        "cpu_name": "Intel Core Ultra 7",
+        "ram_gb": 32,
+        "gpu_name": "Intel Arc B580",
+        "gpu_vendor": "Intel",
+        "gpu_category": "entry-local-ai",
+        "vram_gb": 12,
+        "unified_memory": false,
+        "storage_free_gb": 350,
+        "installed_models": [
+          { "model_name": "qwen3", "model_tag": "0.6b", "size_gb": 0.5, "runtime": "ollama" },
+          { "model_name": "hermes3", "model_tag": "8b", "size_gb": 4.7, "runtime": "ollama" }
+        ],
+        "raw_scan": {
+          "gpu_probe": { "name": "Intel Arc B580", "vendor": "Intel", "category": "entry-local-ai", "vram_gb": 12, "vram_confidence": "estimated_win32_adapter_ram", "source": "powershell-win32-videocontroller", "driver_version": "32.0.101.6739", "vulkan_version": "1.3.290" },
+          "memory_probe": { "total_gb": 32, "module_count": 2, "memory_type": "DDR5", "configured_clock_mhz": 5600, "speed_mhz": 5600, "channel_mode": "multiple_modules_detected", "confidence": "module_layout_only", "source": "synthetic_fixture" },
+          "motherboard_probe": { "manufacturer": "ASUS", "product": "B860", "source": "synthetic_fixture" }
+        }
+      },
+      "compatibility": {
+        "score": 65,
+        "summary": "VRAM utile, backend Vulkan expérimental à confirmer par benchmark.",
+        "upgrades": [{ "name": "Aucun achat avant preuve Vulkan", "reason": "Mesurer d'abord le GPU réellement utilisé." }]
+      },
+      "expect": {
+        "field_profile": "unmatched",
+        "field_valid": false,
+        "machine_class_contains": "Bon PC",
+        "runtime_vendor": "intel",
+        "runtime_family": "arc",
+        "runtime_backend": "vulkan",
+        "memory_model": "dedicated",
+        "effective_memory_gb": 12,
+        "recommended_one_of": ["hermes3:8b", "qwen3:14b"],
+        "starter_required": false,
+        "score": 65,
+        "gpu_contains": "Arc B580",
+        "vram_contains": "12 Go"
+      }
+    },
+    {
+      "key": "amd_rx_7900_xtx",
+      "label": "AMD Radeon RX 7900 XTX",
+      "scan": {
+        "name": "Ryzen 9 + RX 7900 XTX",
+        "machine_key": "replay-amd-7900-xtx",
+        "os_name": "Windows 11",
+        "os_version": "24H2",
+        "cpu_name": "AMD Ryzen 9 7950X",
+        "ram_gb": 64,
+        "gpu_name": "AMD Radeon RX 7900 XTX",
+        "gpu_vendor": "AMD",
+        "gpu_category": "high-end",
+        "vram_gb": 24,
+        "unified_memory": false,
+        "storage_free_gb": 600,
+        "installed_models": [
+          { "model_name": "qwen3", "model_tag": "0.6b", "size_gb": 0.5, "runtime": "ollama" },
+          { "model_name": "qwen3", "model_tag": "14b", "size_gb": 9, "runtime": "ollama" }
+        ],
+        "raw_scan": {
+          "gpu_probe": { "name": "AMD Radeon RX 7900 XTX", "vendor": "AMD", "category": "high-end", "vram_gb": 24, "vram_confidence": "estimated_win32_adapter_ram", "source": "powershell-win32-videocontroller", "driver_version": "32.0.21031.1005", "rocm_version": "7.2.1", "vulkan_version": "1.3.290" },
+          "memory_probe": { "total_gb": 64, "module_count": 2, "memory_type": "DDR5", "configured_clock_mhz": 6000, "speed_mhz": 6000, "channel_mode": "multiple_modules_detected", "confidence": "module_layout_only", "source": "synthetic_fixture" },
+          "motherboard_probe": { "manufacturer": "MSI", "product": "X870E", "source": "synthetic_fixture" }
+        }
+      },
+      "compatibility": {
+        "score": 82,
+        "summary": "24 Go VRAM AMD : ROCm signalé, offload à confirmer par Ollama.",
+        "upgrades": [{ "name": "Aucun achat prioritaire", "reason": "Valider d'abord le backend ROCm et les performances." }]
+      },
+      "expect": {
+        "field_profile": "unmatched",
+        "field_valid": false,
+        "machine_class_contains": "Grosse VRAM",
+        "runtime_vendor": "amd",
+        "runtime_family": "radeon_discrete",
+        "runtime_backend": "rocm",
+        "memory_model": "dedicated",
+        "effective_memory_gb": 24,
+        "recommended_one_of": ["qwen3:14b", "hermes3:8b", "qwen3:32b"],
+        "starter_required": false,
+        "score": 82,
+        "gpu_contains": "RX 7900 XTX",
+        "vram_contains": "24 Go"
+      }
+    }
+  ]
+}
