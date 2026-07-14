@@ -15,7 +15,7 @@ WORKSPACES = {
     "models": ("workspaceModelsBtn", 6),
     "tests": ("workspaceTestsBtn", 9),
     "assistant": ("workspaceAssistantBtn", 4),
-    "workflows": ("workspaceWorkflowsBtn", 8),
+    "workflows": ("workspaceWorkflowsBtn", 9),
     "account": ("workspaceAccountBtn", 4),
 }
 
@@ -46,6 +46,7 @@ HUMAN_PANEL_TITLES = {
     ".workstack-composer-panel": ("Composer le plan", "Workstack Composer"),
     ".capability-router-panel": ("Affecter les rôles", "Capability Router"),
     ".forgebench-panel": ("Comparer des stacks", "ForgeBench"),
+    ".workstack-arena-panel": ("Lancer le pilote", "Workstack Arena"),
     ".evidence-ledger-panel": ("Vérifier les preuves", "Evidence Ledger"),
     ".model-autopilot-panel": ("Optimiser les réglages", "Model Autopilot"),
     ".flight-recorder-panel": ("Suivre les performances", "Flight Recorder"),
@@ -342,6 +343,7 @@ def check(browser, width: int, height: int, label: str):
         ("workflows", ".workstack-composer-panel", '.workstack-composer-panel [data-open-feature="board"]', "workflows", ".board-observer-panel", "#boardObserverUrl", "workstack-to-board"),
         ("workflows", ".capability-router-panel", '.capability-router-panel [data-open-feature="workstack"]', "workflows", ".workstack-composer-panel", "#workstackPriority", "router-to-workstack"),
         ("workflows", ".forgebench-panel", '.forgebench-panel [data-open-feature="router"]', "workflows", ".capability-router-panel", "#capabilityRouterObjective", "forgebench-to-router"),
+        ("workflows", ".workstack-arena-panel", '.workstack-arena-panel [data-open-feature="forgebench"]', "workflows", ".forgebench-panel", "#forgeBenchBenchmark", "arena-to-forgebench"),
         ("assistant", ".prompt-library-panel", '.prompt-library-panel [data-open-feature="promptforge"]', "assistant", ".promptforge-panel", "#promptForgeInput", "library-to-promptforge"),
     ]
     for route in prerequisite_routes:

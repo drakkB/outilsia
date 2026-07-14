@@ -613,6 +613,47 @@
           </div>
         </article>
 
+        <article class="panel workstack-arena-panel advanced-panel" data-workspace="workflows">
+          <div class="panel-title">
+            <h2>Lancer le pilote <small>Workstack Arena</small></h2>
+            <span id="workstackArenaState">préflight requis</span>
+          </div>
+          <div class="workstack-arena-intro">
+            <strong>Premier worker réel, dans un workspace jetable</strong>
+            <span id="workstackArenaPrivacy">Codex CLI reçoit uniquement la tâche publique Signal Maze et une allowlist minimale de variables système, sans clé API tierce. OutilsIA ne lui transmet ni ne monte un dépôt utilisateur, un board ou des tests cachés. Merge et publication sont interdits. Le quota ou coût du CLI reste inconnu.</span>
+          </div>
+          <div class="workstack-arena-controls">
+            <label>
+              <span class="field-label">Worker Codex détecté</span>
+              <select id="workstackArenaCandidate" aria-describedby="workstackArenaPrivacy">
+                <option value="">Aucun Codex CLI routé</option>
+              </select>
+            </label>
+            <label>
+              <span class="field-label">Budget maximal</span>
+              <select id="workstackArenaDuration" aria-describedby="workstackArenaPrivacy">
+                <option value="180">3 minutes</option>
+                <option value="300" selected>5 minutes</option>
+                <option value="600">10 minutes</option>
+              </select>
+            </label>
+          </div>
+          <fieldset class="workstack-arena-consents" aria-describedby="workstackArenaPrivacy">
+            <legend>Autorisation pour ce run uniquement</legend>
+            <label><input id="workstackArenaQuotaConsent" type="checkbox"> <span>J'autorise Codex CLI à utiliser sa connexion et son quota ou coût configuré, que l'app ne peut pas vérifier.</span></label>
+            <label><input id="workstackArenaExecutionConsent" type="checkbox"> <span>J'autorise l'écriture puis l'exécution du mini-jeu dans le workspace jetable.</span></label>
+          </fieldset>
+          <div id="workstackArenaBox" class="workstack-arena-box empty">
+            Prépare ForgeBench, ses workspaces, l'isolation et le pilote de référence. Workstack Arena pourra ensuite lancer Codex sur la seule tâche publique Signal Maze.
+          </div>
+          <div class="row-actions">
+            <button class="path-action" type="button" data-open-feature="forgebench">Préparer ForgeBench</button>
+            <button id="runWorkstackArenaBtn" type="button" disabled>Lancer le pilote Codex</button>
+            <button id="copyWorkstackArenaBtn" type="button" disabled>Copier le reçu</button>
+            <button id="clearWorkstackArenaBtn" type="button" disabled>Effacer</button>
+          </div>
+        </article>
+
         <article class="panel evidence-ledger-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
             <h2>Vérifier les preuves <small>Evidence Ledger</small></h2>
@@ -633,6 +674,7 @@
                 <option value="forgebench_isolation_probed">Isolation ForgeBench testée</option>
                 <option value="forgebench_reference_pilot_verified">Pilote ForgeBench vérifié</option>
                 <option value="forgebench_ollama_candidate_verified">Candidat Ollama vérifié</option>
+                <option value="workstack_arena_codex_pilot_verified">Pilote Codex vérifié</option>
               </select>
             </label>
           </div>

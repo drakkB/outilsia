@@ -277,6 +277,8 @@ Workstack Composer v0 implémenté dans les sources le 12 juillet 2026 : une car
 
 Capability Router v0 implémenté dans les sources le 12 juillet 2026, sans publication : il valide l'empreinte du Workstack, sonde en parallèle et avec timeout Codex CLI, Claude Code et Hermes Agent dans l'environnement natif et le WSL par défaut, ajoute les modèles Ollama déjà remontés par le scan, puis propose Planificateur, Exécutant et Vérificateur indépendant selon leurs capacités déclarées. Il ne lit aucun jeton, ne vérifie ni compte ni quota, ne scanne aucun dépôt, ne lance aucun agent et ne dépense aucun crédit API. Le résultat `outilsia.capability_router_result.v1` est signé, étiqueté dry-run et invalidé après un nouveau scan, une installation ou une suppression de modèle.
 
+Workstack Arena Local v0 implémenté dans les sources le 14 juillet 2026, sans publication : le premier adaptateur réel lance uniquement le candidat Codex CLI exact sur le benchmark public `Signal Maze v1`, dans une copie jetable du workspace ForgeBench vérifié. Deux consentements par run couvrent séparément le quota ou coût fournisseur inconnu et l'écriture/exécution du mini-jeu. Une tentative, un budget exact de 3, 5 ou 10 minutes et 512 Kio de sortie maximum sont imposés. Les règles externes sont ignorées et une allowlist d'environnement exclut clés API tierces, tokens cloud et socket SSH. Le dépôt utilisateur, le board, la suite cachée, les credentials, la fusion et la publication ne sont ni transmis ni montés. La soumission passe les mêmes `7/7` contrôles statiques et `39/39` contrôles Chromium publics, puis requiert une revue humaine. Le mode `workspace-write` reste une propriété de la sandbox Codex et n'est pas présenté comme une preuve OutilsIA d'isolation de lecture de tout l'hôte.
+
 - [x] Détecter les CLI officielles par commande de version bornée, sans retourner leur chemin.
 - [x] Distinguer Windows natif, Linux natif, WSL par défaut, Ollama natif et Ollama WSL.
 - [x] Router par capacités et type de mission sans verrouiller la proposition sur une marque.
@@ -284,7 +286,8 @@ Capability Router v0 implémenté dans les sources le 12 juillet 2026, sans publ
 - [x] Garder le panneau dans Atelier IA et fournir JSON, résumé et preuve visuelle desktop/mobile.
 - [x] Ajouter un consentement séparé et strict pour le pilote technique de référence : aucun CLI candidat, réseau ou crédit payant.
 - [x] Ajouter un second consentement et un budget explicite avant l'appel d'un modèle Ollama local déjà installé, sans accès fichier, Internet, API payante ou suite cachée ; l'exécution du code requiert une autorisation explicite distincte dans ce consentement.
-- [ ] Étendre ce mécanisme aux CLI candidats seulement après un contrat de permissions et de budget propre à chaque adaptateur.
+- [x] Ajouter un premier adaptateur CLI borné à Codex + Signal Maze public, avec contrat strict, budget, consentements, sortie limitée, workspace jetable et coût fournisseur inconnu.
+- [ ] Étendre ce mécanisme à Claude Code, Hermes et aux cartes arbitraires seulement après un contrat de permissions et de budget propre à chaque adaptateur.
 
 Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans publication : le fichier local `evidence-ledger-v1.json` accepte volontairement les preuves Board Observer, Workstack Composer, Capability Router et préflight ForgeBench après validation de leur contrat. Chaque entrée contient uniquement auteur composant, claims bornés, métriques, empreinte source et empreinte précédente. La chaîne complète est revalidée à chaque lecture et écriture, les doublons sont refusés, une rotation de secours protège le remplacement du fichier et aucun contenu brut n'est persisté. Le Ledger ne transforme pas une empreinte en preuve d'identité ou de qualité et ne lance aucune exécution.
 
@@ -296,6 +299,7 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Ajouter `isolated_reference_run` avec exécution réelle, vérification visible indépendante et consentement enregistré, sans contenu brut.
 - [x] Ajouter `isolated_visible_browser_candidate` pour une génération Ollama locale, une vérification structurelle puis une exécution Chromium visible et isolée, sans sortie brute ni claim scientifique.
 - [x] Ajouter la preuve de gameplay visible seulement après 39 contrôles publics, trois seeds, trois viewports et trois captures signées.
+- [x] Ajouter `isolated_codex_visible_browser_pilot` après invocation réelle et bornée de Codex CLI, sans sortie brute, coût inventé, dépôt utilisateur ou claim de gagnant.
 - [ ] Ajouter les preuves de vérification cachée et de décision humaine seulement après les gates correspondantes de Workstack Arena.
 
 - Séparer quatre responsabilités : Composer définit la chaîne, Workstack Arena exécute, ForgeBench évalue et Evidence Ledger conserve la preuve.
@@ -317,8 +321,10 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Câbler les tests Bubblewrap de référence et du candidat dans `verify:ci-source` : exécution réelle sur Linux, contrat vérifié sans faux claim sur Windows.
 - [x] Conserver dans l'Evidence Ledger uniquement génération, structure, métriques et empreintes ; y ajouter l'attestation de gameplay visible sans image ni DOM brut, garder suite cachée, science et vainqueur à faux, et l'énergie locale inconnue.
 - [x] Exécuter le code candidat dans Chromium réellement isolé par bubblewrap, avec tests visibles et captures éphémères, avant toute affirmation de gameplay visible.
+- [x] Lancer Codex CLI en session éphémère sur la seule tâche Signal Maze publique, avec un essai borné, contrôle de la taille de sortie, vérification des références amont et suppression obligatoire du workspace.
+- [x] Afficher le reçu Codex desktop/mobile : worker invoqué, structure `7/7`, gameplay `39/39`, coût inconnu, absence de livraison et gate humaine.
 - [ ] Fournir un préflight/installateur guidé de Chromium dans Linux/WSL sans installation silencieuse ni élargissement du réseau du worker.
-- [ ] Ajouter des adaptateurs de CLI candidats autorisés, sans élargir implicitement réseau, credentials ou budget.
+- [ ] Généraliser les adaptateurs CLI au-delà du pilote Codex public sans élargir implicitement réseau, credentials, accès dépôt ou budget.
 - [ ] Construire un évaluateur caché isolé capable de consommer la suite privée sans la révéler au worker avant toute affirmation scientifique.
 - Mesurer séparément résultat, vitesse, efficacité et coût ; toujours publier les valeurs brutes, les sous-scores et le caractère estimé ou inconnu d'une donnée.
 - Utiliser comme score équilibré initial `50 % résultat + 20 % efficacité + 15 % vitesse + 15 % coût`, sans masquer les podiums par dimension ni la frontière de Pareto.

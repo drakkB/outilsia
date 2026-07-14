@@ -41,6 +41,13 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         raise AssertionError(f"{label}: ledger contains raw source")
     if page.locator("#evidenceLedgerSource").input_value() != "capability_routing_proposed":
         raise AssertionError(f"{label}: latest available proof is not selected")
+    arena_option = page.locator(
+        '#evidenceLedgerSource option[value="workstack_arena_codex_pilot_verified"]'
+    )
+    if arena_option.count() != 1:
+        raise AssertionError(f"{label}: Workstack Arena evidence option is missing")
+    if not arena_option.evaluate("option => option.disabled"):
+        raise AssertionError(f"{label}: unavailable Workstack Arena evidence must stay disabled")
     if not page.locator("#copyEvidenceLedgerBtn").is_enabled():
         raise AssertionError(f"{label}: verified ledger cannot be copied")
     if not page.locator("#downloadEvidenceLedgerBtn").is_enabled():

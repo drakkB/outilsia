@@ -119,6 +119,8 @@ Le **Pilote d'exécution** peut ensuite lancer, sur consentement explicite, un w
 
 Le **Candidat Ollama local** est le premier adaptateur de modèle réellement exécutable dans les sources. Après un second consentement, un modèle déjà installé reçoit seulement la tâche, le starter et le `Visible Gameplay Contract v1` publics via l'API de boucle locale. Sa réponse stricte produit trois fichiers bornés, contrôlés puis joués dans Chromium sous bubblewrap, sans réseau et avec la soumission en lecture seule. Les contrôles publics couvrent la structure et le gameplay visible ; tests cachés, score scientifique et vainqueur restent explicitement faux. La sortie brute n'est ni retournée ni persistée ; le Ledger conserve seulement métriques et SHA-256. Aucun CLI Codex, Claude ou Hermes n'est lancé par ce palier.
 
+Le **pilote Workstack Arena Codex** est le premier adaptateur CLI réellement exécutable dans les sources. Il ne traite pas encore une carte ou un dépôt : il accepte uniquement la stack `codex-solo` sur `Signal Maze v1` public, dans une copie jetable du workspace ForgeBench. Deux consentements par run, une tentative, un budget exact de 3, 5 ou 10 minutes et un plafond de 512 Kio encadrent l'invocation. Les règles externes sont ignorées et une allowlist d'environnement exclut les clés API tierces, tokens cloud et socket SSH. OutilsIA ne transmet et ne monte ni dépôt utilisateur, board, suite cachée ou credential ; le mode `workspace-write` reste néanmoins une propriété de la sandbox Codex, pas une preuve indépendante d'isolation de lecture de l'hôte. La sortie brute est supprimée, les trois fichiers passent `7/7` checks statiques puis `39/39` checks Chromium publics, le coût ou quota reste inconnu et toute livraison attend une revue humaine. Claude Code, Hermes, l'exécution arbitraire et le classement scientifique restent hors de ce palier non publié.
+
 Le **Visible Gameplay Contract v1** fixe publiquement la génération 9 x 9, les huit transformations, la permutation des couleurs, la signature FNV-1a, les raisons de rejet, le snapshot et les IDs DOM. Une implémentation de référence distincte est vérifiée sur trois seeds, trois viewports et les entrées clavier, souris et tactile avec `npm run verify:forgebench:visible`. Cette réussite concerne uniquement la référence ; elle ne valide aucune soumission Ollama.
 
 Contrôles dédiés :
@@ -129,6 +131,7 @@ npm run verify:workstack-composer
 npm run verify:capability-router
 npm run verify:forgebench
 npm run verify:forgebench:visible
+npm run verify:workstack-arena
 npm run verify:evidence-ledger
 ```
 

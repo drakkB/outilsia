@@ -3,6 +3,7 @@ use crate::forgebench::validate_forgebench_result;
 use crate::forgebench_candidate::validate_forgebench_ollama_candidate_result;
 use crate::forgebench_isolation::validate_forgebench_isolation_result;
 use crate::forgebench_runner::validate_forgebench_reference_pilot_result;
+use crate::workstack_arena::validate_workstack_arena_result;
 use crate::workstack_composer::{canonical_sha256, validate_workstack_plan};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -144,7 +145,49 @@ fn verify_entry(
         .ok_or_else(|| "Type d'entree Evidence Ledger absent.".to_string())?;
     let is_reference_run = event_type == "forgebench_reference_pilot_verified";
     let is_candidate_run = event_type == "forgebench_ollama_candidate_verified";
-    let is_executed_run = is_reference_run || is_candidate_run;
+    let is_arena_run = event_type == "workstack_arena_codex_pilot_verified";
+    let is_executed_run = is_reference_run || is_candidate_run || is_arena_run;
+    let invalid_execution_contract = if is_reference_run {
+        entry
+            .pointer("/execution/api_cost_eur")
+            .and_then(Value::as_u64)
+            != Some(0)
+            || entry
+                .pointer("/execution/cost_status")
+                .and_then(Value::as_str)
+                != Some("not_incurred")
+            || entry
+                .pointer("/human_decision/status")
+                .and_then(Value::as_str)
+                != Some("explicitly_confirmed_reference_pilot")
+    } else if is_candidate_run {
+        entry
+            .pointer("/execution/api_cost_eur")
+            .and_then(Value::as_u64)
+            != Some(0)
+            || entry
+                .pointer("/execution/cost_status")
+                .and_then(Value::as_str)
+                != Some("api_not_incurred_energy_not_measured")
+            || entry
+                .pointer("/human_decision/status")
+                .and_then(Value::as_str)
+                != Some("explicitly_confirmed_local_candidate")
+    } else if is_arena_run {
+        !entry
+            .pointer("/execution/api_cost_eur")
+            .is_some_and(Value::is_null)
+            || entry
+                .pointer("/execution/cost_status")
+                .and_then(Value::as_str)
+                != Some("vendor_cli_quota_or_cost_unknown")
+            || entry
+                .pointer("/human_decision/status")
+                .and_then(Value::as_str)
+                != Some("explicitly_confirmed_codex_cli_pilot")
+    } else {
+        false
+    };
     if entry
         .pointer("/privacy/raw_source_stored")
         .and_then(Value::as_bool)
@@ -154,30 +197,7 @@ fn verify_entry(
             .pointer("/validation/independent_run_verification")
             .and_then(Value::as_bool)
             != Some(is_executed_run)
-        || (is_executed_run
-            && (entry
-                .pointer("/execution/api_cost_eur")
-                .and_then(Value::as_u64)
-                != Some(0)
-                || if is_reference_run {
-                    entry
-                        .pointer("/execution/cost_status")
-                        .and_then(Value::as_str)
-                        != Some("not_incurred")
-                        || entry
-                            .pointer("/human_decision/status")
-                            .and_then(Value::as_str)
-                            != Some("explicitly_confirmed_reference_pilot")
-                } else {
-                    entry
-                        .pointer("/execution/cost_status")
-                        .and_then(Value::as_str)
-                        != Some("api_not_incurred_energy_not_measured")
-                        || entry
-                            .pointer("/human_decision/status")
-                            .and_then(Value::as_str)
-                            != Some("explicitly_confirmed_local_candidate")
-                }))
+        || (is_executed_run && invalid_execution_contract)
     {
         return Err("Entree Evidence Ledger non conforme a la politique locale.".to_string());
     }
@@ -519,6 +539,58 @@ fn source_contract(event_type: &str, source: &Value) -> Result<Value, String> {
                     "assignments": assignments,
                     "unresolved_roles": unresolved
                 }
+            }))
+        }
+        "workstack_arena_codex_pilot_verified" => {
+            validate_workstack_arena_result(source)?;
+            let workstack_id = workstack_id_claim(source, "/workstack_ref/workstack_id")?;
+            let candidate_id = safe_candidate_id(
+                source
+                    .pointer("/candidate/id")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default(),
+            )?;
+            let environment = required_enum_claim(
+                source,
+                "/candidate/environment",
+                &["windows_native", "linux_native", "wsl_default"],
+                "Environnement Workstack Arena",
+            )?;
+            Ok(json!({
+                "actor": {"kind": "outilsia_component", "id": "workstack_arena"},
+                "workstack_id": workstack_id,
+                "proof_level": "isolated_codex_visible_browser_pilot",
+                "source_integrity_sha256": source.pointer("/integrity/digest").cloned().unwrap_or(Value::Null),
+                "claims": {
+                    "run_id": source.get("run_id").cloned().unwrap_or(Value::Null),
+                    "benchmark_id": source.pointer("/benchmark/id").cloned().unwrap_or(Value::Null),
+                    "candidate_id": candidate_id,
+                    "environment": environment,
+                    "candidate_execution_verified": true,
+                    "submission_structure_verified": true,
+                    "visible_gameplay_verified": true,
+                    "static_checks_passed": numeric_claim(source, "/evaluator/visible_checks_passed"),
+                    "browser_checks_passed": numeric_claim(source, "/browser_evaluator/checks_passed"),
+                    "viewports_total": numeric_claim(source, "/browser_evaluator/viewports_total"),
+                    "hidden_suite_used": false,
+                    "scientific_eligible": false,
+                    "winner_declared": false,
+                    "submission_digest": source.pointer("/submission/digest").cloned().unwrap_or(Value::Null),
+                    "cli_duration_ms": numeric_claim(source, "/execution/duration_ms")
+                },
+                "execution": {
+                    "started": true,
+                    "latency_ms": source.pointer("/execution/duration_ms").and_then(Value::as_u64).unwrap_or_default()
+                        + source.pointer("/evaluator/duration_ms").and_then(Value::as_u64).unwrap_or_default()
+                        + source.pointer("/browser_evaluator/duration_ms").and_then(Value::as_u64).unwrap_or_default(),
+                    "api_cost_eur": Value::Null,
+                    "cost_status": "vendor_cli_quota_or_cost_unknown"
+                },
+                "validation": {
+                    "source_contract_valid": true,
+                    "independent_run_verification": true
+                },
+                "human_decision": {"status": "explicitly_confirmed_codex_cli_pilot"}
             }))
         }
         "forgebench_experiment_compiled" => {
@@ -1246,6 +1318,43 @@ mod tests {
         let serialized = serde_json::to_string(&ledger).expect("ledger JSON");
         assert!(!serialized.contains("raw_response"));
         assert!(!serialized.contains("index_html"));
+        assert!(!serialized.contains("workspace_path"));
+    }
+
+    #[test]
+    fn appends_a_codex_pilot_with_unknown_vendor_cost_and_no_raw_output() {
+        let source = crate::workstack_arena::tests::signed_result();
+        let (ledger, appended) = append_to_ledger(
+            empty_ledger().expect("empty"),
+            "workstack_arena_codex_pilot_verified",
+            &source,
+            5_000,
+        )
+        .expect("arena run entry");
+        assert!(appended);
+        verify_ledger(&ledger).expect("verified arena ledger");
+        let entry = &ledger["entries"][0];
+        assert_eq!(
+            entry["evidence"]["proof_level"],
+            "isolated_codex_visible_browser_pilot"
+        );
+        assert_eq!(entry["execution"]["started"], true);
+        assert!(entry["execution"]["api_cost_eur"].is_null());
+        assert_eq!(
+            entry["execution"]["cost_status"],
+            "vendor_cli_quota_or_cost_unknown"
+        );
+        assert_eq!(
+            entry["human_decision"]["status"],
+            "explicitly_confirmed_codex_cli_pilot"
+        );
+        assert_eq!(
+            entry["evidence"]["claims"]["visible_gameplay_verified"],
+            true
+        );
+        let serialized = serde_json::to_string(&ledger).expect("ledger JSON");
+        assert!(!serialized.contains("raw_cli_output"));
+        assert!(!serialized.contains("disposable workspace"));
         assert!(!serialized.contains("workspace_path"));
     }
 

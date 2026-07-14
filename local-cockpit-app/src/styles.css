@@ -1998,6 +1998,7 @@ summary:focus-visible,
   #compileWorkstackBtn,
   #routeCapabilitiesBtn,
   #compileForgeBenchBtn,
+  #runWorkstackArenaBtn,
   #simulateDigitalTwinBtn,
   #runModelAutopilotBtn,
   #saveFlightReferenceBtn,
@@ -2021,6 +2022,7 @@ summary:focus-visible,
   #compileWorkstackBtn,
   #routeCapabilitiesBtn,
   #compileForgeBenchBtn,
+  #runWorkstackArenaBtn,
   #simulateDigitalTwinBtn,
   #runModelAutopilotBtn,
   #saveFlightReferenceBtn,
@@ -2047,8 +2049,9 @@ summary:focus-visible,
 .workstack-composer-panel { grid-column: span 12; order: 25; }
 .capability-router-panel { grid-column: span 12; order: 26; }
 .forgebench-panel { grid-column: span 12; order: 27; }
-.evidence-ledger-panel { grid-column: span 12; order: 28; }
-.field-test-panel { grid-column: span 12; order: 29; }
+.workstack-arena-panel { grid-column: span 12; order: 28; }
+.evidence-ledger-panel { grid-column: span 12; order: 29; }
+.field-test-panel { grid-column: span 12; order: 30; }
 .models-panel { grid-column: span 6; order: 25; }
 .commands-panel { grid-column: span 6; order: 26; }
 .account-panel { grid-column: span 6; order: 30; }
@@ -3342,6 +3345,101 @@ dd {
 
 .capability-candidate.unavailable {
   opacity: 0.65;
+}
+
+.workstack-arena-intro,
+.workstack-arena-box {
+  background: rgba(18, 18, 18, 0.94);
+  border: 1px solid rgba(240, 190, 92, 0.3);
+  border-radius: 8px;
+}
+
+.workstack-arena-intro {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 10px;
+}
+
+.workstack-arena-intro span,
+.workstack-arena-summary span,
+.workstack-arena-proof span,
+.workstack-arena-consents span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.workstack-arena-controls {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 0.35fr);
+  margin-bottom: 10px;
+}
+
+.workstack-arena-consents {
+  border: 1px solid rgba(240, 190, 92, 0.22);
+  border-radius: 8px;
+  display: grid;
+  gap: 7px;
+  margin: 0 0 10px;
+  padding: 9px 10px 10px;
+}
+
+.workstack-arena-consents legend {
+  color: var(--muted-2);
+  font-size: 11px;
+  padding: 0 5px;
+}
+
+.workstack-arena-consents label {
+  align-items: start;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 18px minmax(0, 1fr);
+}
+
+.workstack-arena-consents input {
+  margin-top: 2px;
+}
+
+.workstack-arena-box {
+  display: grid;
+  gap: 10px;
+  line-height: 1.4;
+  min-height: 128px;
+  padding: 10px;
+}
+
+.workstack-arena-summary {
+  border-bottom: 1px solid rgba(139, 163, 174, 0.16);
+  display: grid;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+
+.workstack-arena-proof-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.workstack-arena-proof {
+  background: rgba(255, 255, 255, 0.035);
+  border-left: 3px solid rgba(94, 193, 225, 0.72);
+  display: grid;
+  gap: 2px;
+  min-height: 58px;
+  padding: 8px;
+}
+
+.workstack-arena-proof strong {
+  font-size: 15px;
+}
+
+.workstack-arena-warning {
+  color: var(--gold);
+  font-size: 11px;
 }
 
 .forgebench-intro,
@@ -6021,6 +6119,7 @@ dd {
   .workstack-composer-panel,
   .capability-router-panel,
   .forgebench-panel,
+  .workstack-arena-panel,
   .evidence-ledger-panel,
   .field-test-panel,
   .operation-panel,
@@ -6061,6 +6160,10 @@ dd {
   }
 
   .readiness-proof-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workstack-arena-proof-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -6150,7 +6253,7 @@ dd {
   .workspace-nav {
     align-items: stretch;
     padding: 7px;
-    top: 4px;
+    position: static;
   }
 
   .workspace-prerequisite {
@@ -6326,6 +6429,7 @@ dd {
   .first-test-panel,
   .operation-panel,
   .private-workload-panel,
+  .workstack-arena-panel,
   .readiness-panel,
   .account-panel,
   .benchmark-panel,
@@ -6375,7 +6479,9 @@ dd {
   .capability-assignment,
   .forgebench-controls,
   .forgebench-stacks,
-  .forgebench-stack {
+  .forgebench-stack,
+  .workstack-arena-controls,
+  .workstack-arena-proof-grid {
     grid-template-columns: 1fr;
   }
 

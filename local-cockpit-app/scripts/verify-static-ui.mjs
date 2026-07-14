@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
-const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_candidate.rs", "evidence_ledger.rs"]
+const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_candidate.rs", "workstack_arena.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
@@ -224,6 +224,26 @@ const requiredFeatureText = [
   ["rust ForgeBench visible controller", rust, "trusted_public_contract_controller_v1"],
   ["rust evidence local candidate", rust, "isolated_visible_browser_candidate"],
   ["css ForgeBench Ollama candidate", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".forgebench-candidate"],
+  ["html Workstack Arena", html, "workstackArenaBox"],
+  ["html Workstack Arena explicit quota consent", html, "workstackArenaQuotaConsent"],
+  ["html Workstack Arena execution consent", html, "workstackArenaExecutionConsent"],
+  ["js Workstack Arena request schema", js, "outilsia.workstack_arena_run_request.v1"],
+  ["js Workstack Arena result schema", js, "outilsia.workstack_arena_run_result.v1"],
+  ["rust Workstack Arena exact consent", rust, "codex_cli_signal_maze_pilot_v1"],
+  ["rust Workstack Arena disposable workspace", rust, "disposable_workspace_write_allowed"],
+  ["rust Workstack Arena no repository write", rust, '"original_repository_write_allowed"'],
+  ["rust Workstack Arena Codex sandbox", rust, '"--sandbox"'],
+  ["rust Workstack Arena ephemeral Codex session", rust, '"--ephemeral"'],
+  ["rust Workstack Arena ignores external rules", rust, '"--ignore-rules"'],
+  ["rust Workstack Arena environment allowlist", rust, "apply_codex_environment_allowlist"],
+  ["rust Workstack Arena environment proof", rust, "environment_allowlist_applied"],
+  ["rust Workstack Arena static evaluation", rust, '"visible_checks_passed": 7'],
+  ["rust Workstack Arena visible Chromium", rust, "evaluate_visible_browser"],
+  ["rust Workstack Arena unknown vendor cost", rust, "vendor_cli_quota_or_cost_unknown"],
+  ["rust Workstack Arena human gate", rust, "review_required_before_any_winner_or_delivery"],
+  ["rust Workstack Arena no winner", rust, '"winner_declared": false'],
+  ["css Workstack Arena", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".workstack-arena-box"],
+  ["rust evidence Workstack Arena", rust, "workstack_arena_codex_pilot_verified"],
   ["html evidence ledger", html, "evidenceLedgerBox"],
   ["html evidence source", html, "evidenceLedgerSource"],
   ["js evidence append schema", js, "outilsia.evidence_append_request.v1"],

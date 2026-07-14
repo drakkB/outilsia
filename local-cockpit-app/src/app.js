@@ -58,6 +58,7 @@ const state = {
   workstackComposer: null,
   workstackSelectedCard: null,
   capabilityRouter: null,
+  workstackArena: null,
   forgeBench: null,
   forgeBenchHiddenSuite: null,
   forgeBenchWorkerSandbox: null,
@@ -106,6 +107,9 @@ const WORKSTACK_COMPILE_REQUEST_SCHEMA = "outilsia.workstack_compile_request.v1"
 const WORKSTACK_COMPILE_RESULT_SCHEMA = "outilsia.workstack_compile_result.v1";
 const CAPABILITY_ROUTER_REQUEST_SCHEMA = "outilsia.capability_router_request.v1";
 const CAPABILITY_ROUTER_RESULT_SCHEMA = "outilsia.capability_router_result.v1";
+const WORKSTACK_ARENA_RUN_REQUEST_SCHEMA = "outilsia.workstack_arena_run_request.v1";
+const WORKSTACK_ARENA_RUN_RESULT_SCHEMA = "outilsia.workstack_arena_run_result.v1";
+const WORKSTACK_ARENA_CONSENT_SCOPE = "codex_cli_signal_maze_pilot_v1";
 const FORGEBENCH_COMPILE_REQUEST_SCHEMA = "outilsia.forgebench_compile_request.v1";
 const FORGEBENCH_COMPILE_RESULT_SCHEMA = "outilsia.forgebench_compile_result.v1";
 const FORGEBENCH_EXPERIMENT_SCHEMA = "outilsia.forgebench_experiment.v1";
@@ -479,6 +483,15 @@ const els = {
   copyCapabilityRouterJsonBtn: $("copyCapabilityRouterJsonBtn"),
   copyCapabilityRouterMarkdownBtn: $("copyCapabilityRouterMarkdownBtn"),
   clearCapabilityRouterBtn: $("clearCapabilityRouterBtn"),
+  workstackArenaState: $("workstackArenaState"),
+  workstackArenaCandidate: $("workstackArenaCandidate"),
+  workstackArenaDuration: $("workstackArenaDuration"),
+  workstackArenaQuotaConsent: $("workstackArenaQuotaConsent"),
+  workstackArenaExecutionConsent: $("workstackArenaExecutionConsent"),
+  workstackArenaBox: $("workstackArenaBox"),
+  runWorkstackArenaBtn: $("runWorkstackArenaBtn"),
+  copyWorkstackArenaBtn: $("copyWorkstackArenaBtn"),
+  clearWorkstackArenaBtn: $("clearWorkstackArenaBtn"),
   forgeBenchState: $("forgeBenchState"),
   forgeBenchBenchmark: $("forgeBenchBenchmark"),
   forgeBenchClaimLevel: $("forgeBenchClaimLevel"),
@@ -680,6 +693,8 @@ let workstackComposerBusy = false;
 let workstackComposerError = "";
 let capabilityRouterBusy = false;
 let capabilityRouterError = "";
+let workstackArenaBusy = false;
+let workstackArenaError = "";
 let forgeBenchBusy = false;
 let forgeBenchError = "";
 let forgeBenchVaultBusy = false;
@@ -773,6 +788,7 @@ const WORKSPACE_SECTIONS = {
     ["Lire un board", ".board-observer-panel"],
     ["Affecter les rôles", ".capability-router-panel"],
     ["Comparer des stacks", ".forgebench-panel"],
+    ["Lancer le pilote Codex", ".workstack-arena-panel"],
     ["Vérifier les preuves", ".evidence-ledger-panel"],
     ["Créer le passeport IA", ".capability-passport-panel"],
     ["Partager localement", ".local-capability-bridge-panel"],
@@ -876,6 +892,13 @@ const WORKSPACE_FEATURES = Object.freeze({
     target: ".capability-router-panel",
     focus: "#capabilityRouterObjective",
     label: "Capability Router"
+  },
+  workstack_arena: {
+    tab: "workflows",
+    panel: ".workstack-arena-panel",
+    target: ".workstack-arena-panel",
+    focus: "#workstackArenaCandidate",
+    label: "Workstack Arena"
   },
   forgebench: {
     tab: "workflows",
@@ -11922,6 +11945,7 @@ function capabilityRouterMarkdown(result = state.capabilityRouter) {
 
 function renderCapabilityRouterPanel() {
   if (!els.capabilityRouterBox) return;
+  queueMicrotask(renderWorkstackArenaPanel);
   const plan = state.workstackComposer?.plan;
   const result = state.capabilityRouter;
   const routing = result?.routing;
@@ -12184,6 +12208,7 @@ async function loadForgeBenchVault(silent = false) {
       state.forgeBench = null;
       state.forgeBenchReferencePilot = null;
       state.forgeBenchOllamaCandidate = null;
+      clearWorkstackArena(true);
       forgeBenchError = "";
       forgeBenchRunnerError = "";
       forgeBenchCandidateError = "";
@@ -12237,6 +12262,7 @@ async function sealForgeBenchVault() {
     state.forgeBench = null;
     state.forgeBenchReferencePilot = null;
     state.forgeBenchOllamaCandidate = null;
+    clearWorkstackArena(true);
     forgeBenchError = "";
     forgeBenchRunnerError = "";
     forgeBenchCandidateError = "";
@@ -12270,6 +12296,7 @@ async function clearForgeBenchVault() {
     state.forgeBench = null;
     state.forgeBenchReferencePilot = null;
     state.forgeBenchOllamaCandidate = null;
+    clearWorkstackArena(true);
     forgeBenchError = "";
     forgeBenchRunnerError = "";
     forgeBenchCandidateError = "";
@@ -12459,6 +12486,7 @@ async function prepareForgeBenchSandbox() {
     state.forgeBenchWorkerSandbox = status;
     state.forgeBenchReferencePilot = null;
     state.forgeBenchOllamaCandidate = null;
+    clearWorkstackArena(true);
     forgeBenchRunnerError = "";
     forgeBenchCandidateError = "";
     setStatus(result.replaced ? "Workspaces ForgeBench remplacés" : "Workspaces ForgeBench préparés", "ok");
@@ -12473,6 +12501,7 @@ async function prepareForgeBenchSandbox() {
     renderForgeBenchIsolationPanel();
     renderForgeBenchRunnerPanel();
     renderForgeBenchCandidatePanel();
+    renderWorkstackArenaPanel();
   }
 }
 
@@ -12488,6 +12517,7 @@ async function clearForgeBenchSandbox() {
     state.forgeBenchWorkerSandbox = status;
     state.forgeBenchReferencePilot = null;
     state.forgeBenchOllamaCandidate = null;
+    clearWorkstackArena(true);
     forgeBenchRunnerError = "";
     forgeBenchCandidateError = "";
     setStatus("Workspaces ForgeBench effacés", "ok");
@@ -12500,6 +12530,7 @@ async function clearForgeBenchSandbox() {
     renderForgeBenchIsolationPanel();
     renderForgeBenchRunnerPanel();
     renderForgeBenchCandidatePanel();
+    renderWorkstackArenaPanel();
   }
 }
 
@@ -12612,6 +12643,7 @@ async function probeForgeBenchIsolation() {
   state.forgeBenchIsolation = null;
   state.forgeBenchReferencePilot = null;
   state.forgeBenchOllamaCandidate = null;
+  clearWorkstackArena(true);
   forgeBenchRunnerError = "";
   forgeBenchCandidateError = "";
   renderForgeBenchIsolationPanel();
@@ -12641,6 +12673,7 @@ async function probeForgeBenchIsolation() {
     renderForgeBenchIsolationPanel();
     renderForgeBenchRunnerPanel();
     renderForgeBenchCandidatePanel();
+    renderWorkstackArenaPanel();
   }
 }
 
@@ -12794,6 +12827,7 @@ async function runForgeBenchReferencePilot() {
   forgeBenchRunnerError = "";
   state.forgeBenchReferencePilot = null;
   state.forgeBenchOllamaCandidate = null;
+  clearWorkstackArena(true);
   forgeBenchCandidateError = "";
   renderForgeBenchRunnerPanel();
   renderForgeBenchCandidatePanel();
@@ -12826,6 +12860,7 @@ async function runForgeBenchReferencePilot() {
     forgeBenchRunnerBusy = false;
     renderForgeBenchRunnerPanel();
     renderForgeBenchCandidatePanel();
+    renderWorkstackArenaPanel();
   }
 }
 
@@ -13124,6 +13159,7 @@ function forgeBenchMarkdown(result = state.forgeBench) {
 
 function renderForgeBenchPanel() {
   if (!els.forgeBenchBox) return;
+  queueMicrotask(renderWorkstackArenaPanel);
   const plan = state.workstackComposer?.plan;
   const router = state.capabilityRouter;
   const result = state.forgeBench;
@@ -13228,6 +13264,7 @@ async function compileForgeBenchExperiment() {
   state.forgeBench = null;
   state.forgeBenchReferencePilot = null;
   state.forgeBenchOllamaCandidate = null;
+  clearWorkstackArena(true);
   forgeBenchRunnerError = "";
   forgeBenchCandidateError = "";
   renderForgeBenchPanel();
@@ -13266,6 +13303,7 @@ async function compileForgeBenchExperiment() {
     renderForgeBenchPanel();
     renderForgeBenchSandboxPanel();
     renderForgeBenchCandidatePanel();
+    renderWorkstackArenaPanel();
     renderEvidenceLedgerPanel();
   }
 }
@@ -13295,6 +13333,7 @@ function clearForgeBench(silent = false) {
   state.forgeBench = null;
   state.forgeBenchReferencePilot = null;
   state.forgeBenchOllamaCandidate = null;
+  clearWorkstackArena(true);
   forgeBenchError = "";
   forgeBenchRunnerError = "";
   forgeBenchCandidateError = "";
@@ -13311,6 +13350,352 @@ function clearForgeBench(silent = false) {
   if (!silent) setStatus("ForgeBench effacé", "ok");
 }
 
+function isWorkstackArenaCodexCandidateId(value) {
+  return /^codex-cli:[A-Za-z0-9._:-]{1,149}$/.test(String(value || ""));
+}
+
+function workstackArenaCodexCandidates() {
+  const candidates = Array.isArray(state.capabilityRouter?.candidates) ? state.capabilityRouter.candidates : [];
+  return candidates
+    .filter((candidate) => (
+      candidate?.available === true
+      && candidate?.provider === "openai"
+      && candidate?.kind === "official_cli"
+      && isWorkstackArenaCodexCandidateId(candidate?.id)
+    ))
+    .sort((left, right) => String(left.label || left.id).localeCompare(String(right.label || right.id), "fr"));
+}
+
+function workstackArenaBoundCandidateId() {
+  const stacks = state.forgeBench?.experiment?.candidate_stacks;
+  const stack = Array.isArray(stacks)
+    ? stacks.find((candidate) => candidate?.key === "codex-solo" && candidate?.available === true)
+    : null;
+  const binding = Array.isArray(stack?.bindings)
+    ? stack.bindings.find((candidate) => candidate?.role === "worker")
+    : null;
+  const candidateId = String(binding?.candidate?.candidate_id || "");
+  return isWorkstackArenaCodexCandidateId(candidateId) ? candidateId : "";
+}
+
+function syncWorkstackArenaCandidateControl() {
+  if (!els.workstackArenaCandidate) return "";
+  const boundCandidateId = workstackArenaBoundCandidateId();
+  const candidates = workstackArenaCodexCandidates().filter((candidate) => candidate.id === boundCandidateId);
+  const current = els.workstackArenaCandidate.value;
+  els.workstackArenaCandidate.innerHTML = candidates.length
+    ? candidates.map((candidate) => `<option value="${escapeHtml(candidate.id)}">${escapeHtml(candidate.label || candidate.id)}</option>`).join("")
+    : '<option value="">Aucun Codex CLI lié à Codex Solo</option>';
+  const selected = candidates.some((candidate) => candidate.id === current) ? current : (candidates[0]?.id || "");
+  els.workstackArenaCandidate.value = selected;
+  return selected;
+}
+
+function workstackArenaResult(result = state.workstackArena) {
+  const candidateId = workstackArenaBoundCandidateId();
+  const workstack = state.workstackComposer?.plan;
+  const router = state.capabilityRouter;
+  const experiment = state.forgeBench?.experiment;
+  const reference = forgeBenchReferencePilotResult();
+  const submissionDigest = String(result?.submission?.digest || "");
+  const blockers = Array.isArray(result?.readiness?.blockers) ? [...result.readiness.blockers].sort() : [];
+  const requiredBlockers = [
+    "hidden_suite_not_evaluated",
+    "human_winner_decision_required",
+    "peer_candidates_not_run",
+    "vendor_cost_not_measured"
+  ].sort();
+  const captures = Array.isArray(result?.browser_evaluator?.screenshots) ? result.browser_evaluator.screenshots : [];
+  if (
+    result?.schema !== WORKSTACK_ARENA_RUN_RESULT_SCHEMA
+    || !/^wsa-[A-Za-z0-9_-]{1,76}$/.test(String(result?.run_id || ""))
+    || !candidateId
+    || result?.candidate?.id !== candidateId
+    || result?.candidate?.adapter_kind !== "codex_cli_signal_maze_v1"
+    || result?.candidate?.sandbox_mode !== "workspace-write"
+    || result?.candidate?.cli_invoked !== true
+    || result?.candidate?.subscription_or_vendor_quota_verified !== false
+    || result?.benchmark?.id !== "signal-maze-v1"
+    || result?.benchmark?.track !== "codex_cli_visible_browser_pilot"
+    || result?.batch_ref?.stack_key !== "codex-solo"
+    || result?.workstack_ref?.workstack_id !== workstack?.workstack_id
+    || result?.workstack_ref?.integrity_digest !== workstack?.integrity?.digest
+    || result?.workstack_ref?.raw_context_included !== false
+    || result?.router_ref?.integrity_digest !== router?.integrity?.digest
+    || result?.router_ref?.dry_run_source_validated !== true
+    || result?.batch_ref?.experiment_digest !== experiment?.integrity?.digest
+    || result?.batch_ref?.protocol_digest !== experiment?.protocol_digest
+    || result?.reference_pilot_ref?.pilot_id !== reference?.pilot_id
+    || result?.reference_pilot_ref?.integrity_digest !== reference?.integrity?.digest
+    || result?.consent?.confirmed !== true
+    || result?.consent?.scope !== WORKSTACK_ARENA_CONSENT_SCOPE
+    || result?.consent?.candidate_id !== candidateId
+    || result?.consent?.vendor_cli_network_allowed !== true
+    || result?.consent?.vendor_cli_quota_or_cost_unknown_accepted !== true
+    || result?.consent?.disposable_workspace_write_allowed !== true
+    || result?.consent?.generated_code_execution_allowed !== true
+    || result?.consent?.original_repository_write_allowed !== false
+    || result?.consent?.board_write_allowed !== false
+    || result?.consent?.merge_allowed !== false
+    || result?.consent?.publish_allowed !== false
+    || result?.consent?.hidden_suite_allowed !== false
+    || result?.budget?.max_attempts !== 1
+    || result?.budget?.max_output_bytes !== 524288
+    || ![180, 300, 600].includes(result?.budget?.max_duration_seconds)
+    || result?.execution?.started !== true
+    || result?.execution?.succeeded !== true
+    || result?.execution?.timed_out !== false
+    || result?.execution?.attempts !== 1
+    || result?.execution?.output_budget_exceeded !== false
+    || !(Number(result?.execution?.duration_ms) > 0)
+    || Number(result?.execution?.stdout_bytes || 0) + Number(result?.execution?.stderr_bytes || 0) > 524288
+    || result?.execution?.raw_prompt_returned !== false
+    || result?.execution?.raw_cli_output_returned !== false
+    || result?.submission?.materialized !== true
+    || result?.submission?.exact_topology_verified !== true
+    || result?.submission?.run_contract_unchanged !== true
+    || result?.submission?.files_total !== 4
+    || result?.submission?.generated_code_executed !== true
+    || !/^[a-f0-9]{64}$/i.test(submissionDigest)
+    || result?.evaluator?.kind !== "deterministic_visible_static_gate"
+    || result?.evaluator?.succeeded !== true
+    || result?.evaluator?.independent_process !== true
+    || result?.evaluator?.workspace_read_only !== true
+    || result?.evaluator?.hidden_suite_used !== false
+    || result?.evaluator?.visible_checks_total !== 7
+    || result?.evaluator?.visible_checks_passed !== 7
+    || result?.evaluator?.submission_digest !== submissionDigest
+    || result?.browser_evaluator?.kind !== "chromium_visible_gameplay_gate"
+    || result?.browser_evaluator?.succeeded !== true
+    || result?.browser_evaluator?.independent_process !== true
+    || result?.browser_evaluator?.workspace_read_only !== true
+    || result?.browser_evaluator?.execution_copy_ephemeral !== true
+    || result?.browser_evaluator?.public_contract_only !== true
+    || result?.browser_evaluator?.hidden_suite_used !== false
+    || result?.browser_evaluator?.seeds_total !== 3
+    || result?.browser_evaluator?.viewports_total !== 3
+    || JSON.stringify(result?.browser_evaluator?.input_modes) !== JSON.stringify(["keyboard", "mouse", "touch"])
+    || result?.browser_evaluator?.checks_total !== 39
+    || result?.browser_evaluator?.checks_passed !== 39
+    || result?.browser_evaluator?.submission_digest !== submissionDigest
+    || captures.length !== 3
+    || captures.some((capture) => !/^[a-f0-9]{64}$/i.test(String(capture?.sha256 || "")))
+    || result?.security?.public_benchmark_prompt_only !== true
+    || result?.security?.original_repository_mounted !== false
+    || result?.security?.original_repository_modified !== false
+    || result?.security?.board_written !== false
+    || result?.security?.merged !== false
+    || result?.security?.published !== false
+    || result?.security?.hidden_suite_mounted !== false
+    || result?.security?.hidden_suite_used !== false
+    || result?.security?.credentials_read_by_outilsia !== false
+    || result?.security?.environment_allowlist_applied !== true
+    || result?.security?.vendor_cli_auth_status_inspected !== false
+    || result?.security?.host_read_scope_independently_verified !== false
+    || result?.security?.raw_cli_output_returned !== false
+    || result?.security?.raw_cli_output_persisted !== false
+    || result?.security?.generated_code_executed !== true
+    || result?.security?.evaluator_process_isolated !== true
+    || result?.security?.temporary_workspace_removed !== true
+    || result?.security?.paths_returned !== false
+    || result?.cost?.amount_eur !== null
+    || result?.cost?.status !== "vendor_cli_quota_or_cost_unknown"
+    || result?.cost?.subscription_quota_inspected !== false
+    || result?.cost?.direct_api_call_by_outilsia !== false
+    || result?.human_gate?.status !== "review_required_before_any_winner_or_delivery"
+    || result?.human_gate?.winner_approval_recorded !== false
+    || result?.human_gate?.delivery_approval_recorded !== false
+    || result?.readiness?.candidate_execution_verified !== true
+    || result?.readiness?.submission_structure_verified !== true
+    || result?.readiness?.visible_gameplay_verified !== true
+    || result?.readiness?.hidden_evaluator_verified !== false
+    || result?.readiness?.scientific_eligible !== false
+    || result?.readiness?.winner_declared !== false
+    || JSON.stringify(blockers) !== JSON.stringify(requiredBlockers)
+    || !/^[a-f0-9]{64}$/i.test(String(result?.integrity?.digest || ""))
+  ) return null;
+  return result;
+}
+
+function workstackArenaMissingSteps() {
+  const missing = [];
+  const plan = state.workstackComposer?.plan;
+  const candidateId = syncWorkstackArenaCandidateControl();
+  if (plan?.readiness?.ready !== true || plan?.status !== "ready_for_human_review") missing.push("Compiler une Workstack prête pour revue humaine");
+  if (state.capabilityRouter?.routing?.status !== "proposal_complete") missing.push("Détecter les capacités et obtenir un routage complet");
+  if (!state.forgeBench?.experiment?.readiness?.protocol_ready) missing.push("Préparer l'expérience Signal Maze dans ForgeBench");
+  if (!candidateId || candidateId !== workstackArenaBoundCandidateId()) missing.push("Lier un Codex CLI disponible à la stack Codex Solo");
+  if (!forgeBenchSandboxMatchesExperiment()) missing.push("Matérialiser les workspaces ForgeBench vérifiés");
+  if (forgeBenchIsolationResult()?.readiness?.isolation_backend_ready !== true) missing.push("Vérifier le backend d'isolation");
+  if (!forgeBenchReferencePilotResult()) missing.push("Valider le pilote technique de référence");
+  if (!els.workstackArenaQuotaConsent?.checked) missing.push("Accepter le quota ou coût Codex inconnu pour ce run");
+  if (!els.workstackArenaExecutionConsent?.checked) missing.push("Autoriser l'écriture et l'exécution dans le workspace jetable");
+  return missing;
+}
+
+function workstackArenaReceiptMarkdown(result = workstackArenaResult()) {
+  if (!result) return "";
+  return [
+    "# Reçu Workstack Arena · pilote Codex",
+    "",
+    `- Run : ${result.run_id}`,
+    `- Candidat : ${result.candidate?.label || result.candidate?.id || "Codex CLI"}`,
+    `- Environnement : ${result.candidate?.environment || "non exposé"}`,
+    `- Durée : ${Number(result.execution?.duration_ms || 0)} ms`,
+    `- Contrôle statique : ${result.evaluator?.visible_checks_passed || 0}/${result.evaluator?.visible_checks_total || 0}`,
+    `- Jeu Chromium : ${result.browser_evaluator?.checks_passed || 0}/${result.browser_evaluator?.checks_total || 0} · ${result.browser_evaluator?.viewports_total || 0} formats`,
+    `- Soumission SHA-256 : ${result.submission?.digest || "absente"}`,
+    `- Coût/quota : inconnu, géré par la connexion Codex CLI de l'utilisateur`,
+    `- Variables transmises : allowlist système minimale, sans clé API tierce`,
+    `- Dépôt utilisateur modifié : non`,
+    `- Board, merge ou publication : non`,
+    `- Tests cachés : non`,
+    `- Gagnant déclaré : non`,
+    `- Revue humaine requise : oui`,
+    "",
+    "Ce reçu prouve un pilote public et exploratoire. Il ne constitue ni un benchmark scientifique ni une autorisation de livraison."
+  ].join("\n");
+}
+
+function renderWorkstackArenaPanel() {
+  if (!els.workstackArenaBox) return;
+  const candidateId = syncWorkstackArenaCandidateControl();
+  const result = workstackArenaResult();
+  const missing = workstackArenaMissingSteps();
+  const nativeOrTest = Boolean(invoke || result?.test_mode);
+  els.runWorkstackArenaBtn.disabled = workstackArenaBusy || !invoke || missing.length > 0;
+  els.copyWorkstackArenaBtn.disabled = !result;
+  els.clearWorkstackArenaBtn.disabled = workstackArenaBusy || (!state.workstackArena && !workstackArenaError);
+  els.workstackArenaCandidate.disabled = workstackArenaBusy || !candidateId;
+  els.workstackArenaDuration.disabled = workstackArenaBusy;
+
+  if (!nativeOrTest) {
+    els.workstackArenaState.textContent = "app native requise";
+    els.workstackArenaBox.className = "workstack-arena-box empty";
+    els.workstackArenaBox.textContent = "Le pilote Codex isolé est disponible uniquement dans l'application Windows/Linux.";
+    return;
+  }
+  if (workstackArenaBusy) {
+    els.workstackArenaState.textContent = "Codex dans le workspace jetable";
+    els.workstackArenaBox.className = "workstack-arena-box empty";
+    els.workstackArenaBox.innerHTML = "<strong>Signal Maze est en construction</strong><span>Un seul essai, budget borné, workspace jetable. L'évaluation statique puis Chromium démarreront uniquement si Codex termine.</span>";
+    return;
+  }
+  if (workstackArenaError) {
+    els.workstackArenaState.textContent = "pilote refusé";
+    els.workstackArenaBox.className = "workstack-arena-box empty";
+    els.workstackArenaBox.innerHTML = `<strong>Aucune preuve enregistrée</strong><span>${escapeHtml(workstackArenaError)}</span>`;
+    return;
+  }
+  if (result) {
+    const durationSeconds = Math.max(0.1, Number(result.execution?.duration_ms || 0) / 1000).toFixed(1);
+    els.workstackArenaState.textContent = "pilote Codex vérifié";
+    els.workstackArenaBox.className = "workstack-arena-box";
+    els.workstackArenaBox.innerHTML = `
+      <div class="workstack-arena-summary">
+        <strong>${escapeHtml(result.candidate?.label || "Codex CLI")} · Signal Maze exécuté</strong>
+        <span>${escapeHtml(result.candidate?.environment || "environnement isolé")} · ${escapeHtml(durationSeconds)} s · workspace supprimé après vérification</span>
+      </div>
+      <div class="workstack-arena-proof-grid">
+        <div class="workstack-arena-proof"><span>Worker</span><strong>Codex exécuté</strong><span>1 essai borné</span></div>
+        <div class="workstack-arena-proof"><span>Structure</span><strong>${escapeHtml(`${result.evaluator.visible_checks_passed}/${result.evaluator.visible_checks_total}`)}</strong><span>contrôles statiques</span></div>
+        <div class="workstack-arena-proof"><span>Gameplay</span><strong>${escapeHtml(`${result.browser_evaluator.checks_passed}/${result.browser_evaluator.checks_total}`)}</strong><span>3 formats Chromium</span></div>
+        <div class="workstack-arena-proof"><span>Coût / quota</span><strong>Inconnu</strong><span>connexion CLI utilisateur</span></div>
+      </div>
+      <small class="workstack-arena-warning">Exploratoire : aucun test caché, pair concurrent ou gagnant. Revue humaine obligatoire avant toute livraison.</small>
+    `;
+    return;
+  }
+  els.workstackArenaState.textContent = missing.length ? `${missing.length} prérequis` : "prêt sur consentement";
+  els.workstackArenaBox.className = "workstack-arena-box empty";
+  els.workstackArenaBox.innerHTML = missing.length
+    ? `<strong>Préparer le pilote Codex</strong><span>${missing.map((step) => escapeHtml(step)).join(" · ")}</span>`
+    : "<strong>Run strict prêt</strong><span>Codex recevra uniquement le contrat public Signal Maze. OutilsIA ne transmettra ni ne montera le dépôt d'origine, le board ou les tests cachés. Merge et publication resteront interdits.</span>";
+}
+
+async function runWorkstackArenaCodexPilot() {
+  const candidateId = syncWorkstackArenaCandidateControl();
+  const missing = workstackArenaMissingSteps();
+  if (!invoke || workstackArenaBusy || !candidateId || missing.length) return null;
+  if (!window.confirm("Lancer le pilote Codex CLI ?\n\nCe run peut consommer le quota ou le coût associé à votre connexion Codex. OutilsIA ne peut ni le mesurer ni le rembourser. Un seul Signal Maze jetable sera modifié et exécuté.")) return null;
+  workstackArenaBusy = true;
+  workstackArenaError = "";
+  state.workstackArena = null;
+  renderWorkstackArenaPanel();
+  renderEvidenceLedgerPanel();
+  setStatus("Pilote Workstack Arena : Codex construit Signal Maze...");
+  try {
+    const result = await invoke("run_workstack_arena_codex_pilot", {
+      request: {
+        schema: WORKSTACK_ARENA_RUN_REQUEST_SCHEMA,
+        workstack: state.workstackComposer.plan,
+        capability_routing: state.capabilityRouter,
+        forgebench_result: state.forgeBench,
+        reference_pilot_result: forgeBenchReferencePilotResult(),
+        isolation_result: forgeBenchIsolationResult(),
+        candidate_id: candidateId,
+        consent: {
+          confirmed: true,
+          scope: WORKSTACK_ARENA_CONSENT_SCOPE,
+          candidate_id: candidateId,
+          vendor_cli_network_allowed: true,
+          vendor_cli_quota_or_cost_unknown_accepted: true,
+          disposable_workspace_write_allowed: true,
+          generated_code_execution_allowed: true,
+          original_repository_write_allowed: false,
+          board_write_allowed: false,
+          merge_allowed: false,
+          publish_allowed: false,
+          hidden_suite_allowed: false
+        },
+        budget: {
+          max_duration_seconds: Number(els.workstackArenaDuration?.value || 300),
+          max_attempts: 1,
+          max_output_bytes: 524288
+        }
+      }
+    });
+    state.workstackArena = result;
+    if (!workstackArenaResult(result)) throw new Error("preuve native Workstack Arena non conforme");
+    if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "workstack_arena_codex_pilot_verified";
+    setStatus("Pilote Codex vérifié dans Workstack Arena", "ok");
+    return result;
+  } catch (error) {
+    state.workstackArena = null;
+    workstackArenaError = String(error || "Pilote Codex impossible");
+    setStatus(`Workstack Arena : ${workstackArenaError}`, "error");
+    return null;
+  } finally {
+    workstackArenaBusy = false;
+    if (els.workstackArenaQuotaConsent) els.workstackArenaQuotaConsent.checked = false;
+    if (els.workstackArenaExecutionConsent) els.workstackArenaExecutionConsent.checked = false;
+    renderWorkstackArenaPanel();
+    renderEvidenceLedgerPanel();
+  }
+}
+
+async function copyWorkstackArenaReceipt() {
+  const markdown = workstackArenaReceiptMarkdown();
+  if (!markdown) return;
+  try {
+    await navigator.clipboard.writeText(`${markdown}\n`);
+    setStatus("Reçu Workstack Arena copié", "ok");
+  } catch (error) {
+    setStatus(`Copie Workstack Arena impossible : ${error}`, "error");
+  }
+}
+
+function clearWorkstackArena(silent = false) {
+  state.workstackArena = null;
+  workstackArenaError = "";
+  if (els.workstackArenaQuotaConsent) els.workstackArenaQuotaConsent.checked = false;
+  if (els.workstackArenaExecutionConsent) els.workstackArenaExecutionConsent.checked = false;
+  if (!silent && els.workstackArenaDuration) els.workstackArenaDuration.value = "300";
+  renderWorkstackArenaPanel();
+  renderEvidenceLedgerPanel();
+  if (!silent) setStatus("Workstack Arena effacée", "ok");
+}
+
 function evidenceEventLabel(value) {
   return ({
     board_observed: "Board observé",
@@ -13319,7 +13704,8 @@ function evidenceEventLabel(value) {
     forgebench_experiment_compiled: "Expérience ForgeBench préparée",
     forgebench_isolation_probed: "Isolation ForgeBench testée",
     forgebench_reference_pilot_verified: "Pilote ForgeBench vérifié",
-    forgebench_ollama_candidate_verified: "Candidat Ollama vérifié"
+    forgebench_ollama_candidate_verified: "Candidat Ollama vérifié",
+    workstack_arena_codex_pilot_verified: "Pilote Codex vérifié"
   })[value] || value;
 }
 
@@ -13331,7 +13717,8 @@ function evidenceActorLabel(value) {
     forgebench: "ForgeBench",
     forgebench_isolation: "ForgeBench Isolation",
     forgebench_runner: "ForgeBench Runner",
-    forgebench_candidate_runner: "ForgeBench Candidat local"
+    forgebench_candidate_runner: "ForgeBench Candidat local",
+    workstack_arena: "Workstack Arena"
   })[value] || value;
 }
 
@@ -13343,11 +13730,12 @@ function evidenceSourceDocument(eventType) {
   if (eventType === "forgebench_isolation_probed") return forgeBenchIsolationResult() || null;
   if (eventType === "forgebench_reference_pilot_verified") return forgeBenchReferencePilotResult() || null;
   if (eventType === "forgebench_ollama_candidate_verified") return forgeBenchOllamaCandidateResult() || null;
+  if (eventType === "workstack_arena_codex_pilot_verified") return workstackArenaResult() || null;
   return null;
 }
 
 function evidenceAvailableTypes() {
-  return ["forgebench_ollama_candidate_verified", "forgebench_reference_pilot_verified", "forgebench_isolation_probed", "forgebench_experiment_compiled", "capability_routing_proposed", "workstack_compiled", "board_observed"]
+  return ["workstack_arena_codex_pilot_verified", "forgebench_ollama_candidate_verified", "forgebench_reference_pilot_verified", "forgebench_isolation_probed", "forgebench_experiment_compiled", "capability_routing_proposed", "workstack_compiled", "board_observed"]
     .filter((eventType) => Boolean(evidenceSourceDocument(eventType)));
 }
 
@@ -18972,7 +19360,7 @@ function installTestHarness() {
         workstack_ref: { workstack_id: "ws-demo-signal-maze", source_key: "planka:card-ready-1", integrity_digest: "c".repeat(64) },
         objective_kind: "code",
         candidates: [
-          { id: "codex-cli:wsl_default", provider: "openai", label: "Codex CLI · WSL", kind: "official_cli", environment: "wsl_default", available: true, version: "0.144.1", capabilities: ["code", "tests"], auth: { status: "not_inspected" }, evidence: { status: "version_command_succeeded" } },
+          { id: "codex-cli:wsl_default", provider: "openai", label: "Codex CLI · WSL", kind: "official_cli", environment: "wsl_default", executable: "codex", available: true, version: "0.144.1", capabilities: ["code", "repository_edit", "tests"], auth: { status: "not_inspected" }, evidence: { status: "version_command_succeeded" } },
           { id: "claude-code:windows_native", provider: "anthropic", label: "Claude Code · Windows", kind: "official_cli", environment: "windows_native", available: true, version: "2.1.206", capabilities: ["audit", "tests"], auth: { status: "not_inspected" }, evidence: { status: "version_command_succeeded" } },
           { id: "hermes-agent:wsl_default", provider: "nous-research", label: "Hermes Agent · WSL", kind: "official_cli", environment: "wsl_default", available: false, version: null, capabilities: ["planning"], auth: { status: "not_inspected" }, evidence: { status: "not_found" } },
           { id: "local-model:ollama_native:hermes3:8b", provider: "ollama", label: "hermes3:8b · Ollama natif", kind: "local_model", environment: "ollama_native", available: true, version: null, capabilities: ["analysis", "orchestration", "planning"], auth: { status: "not_required" }, evidence: { status: "reported_installed" } }
@@ -19051,7 +19439,7 @@ function installTestHarness() {
           experiment_id: "fb-demo-signal-maze",
           created_at_ms: Date.now(),
           benchmark: { id: "signal-maze-v1", version: "1.0.0-exploratory", spec_sha256: "a".repeat(64), track: "greenfield_browser_game", public_task_included: false },
-          workstack_ref: { workstack_id: "ws-demo-signal-maze", integrity_digest: "b".repeat(64) },
+          workstack_ref: { workstack_id: "ws-demo-signal-maze", integrity_digest: "c".repeat(64) },
           capability_routing_ref: { integrity_digest: "d".repeat(64), status: "proposal_complete" },
           claim_level: "exploratory",
           protocol: {
@@ -19066,9 +19454,9 @@ function installTestHarness() {
           },
           protocol_digest: protocolDigest,
           candidate_stacks: [
-            { key: "codex-solo", label: "Codex CLI seul", available: true, bindings: [binding("worker", "codex-cli:test", "Codex CLI"), binding("independent_verifier", "forgebench:deterministic-evaluator", "Évaluateur déterministe ForgeBench")], blockers: [], protocol_digest: protocolDigest, execution_started: false, scores_computed: false },
+            { key: "codex-solo", label: "Codex CLI seul", available: true, bindings: [binding("worker", "codex-cli:wsl_default", "Codex CLI · WSL", "wsl_default"), binding("independent_verifier", "forgebench:deterministic-evaluator", "Évaluateur déterministe ForgeBench")], blockers: [], protocol_digest: protocolDigest, execution_started: false, scores_computed: false },
             { key: "claude-solo", label: "Claude Code seul", available: true, bindings: [binding("worker", "claude-code:test", "Claude Code"), binding("independent_verifier", "forgebench:deterministic-evaluator", "Évaluateur déterministe ForgeBench")], blockers: [], protocol_digest: protocolDigest, execution_started: false, scores_computed: false },
-            { key: "hermes-codex-claude", label: "Hermes planifie, Codex construit, Claude vérifie", available: true, bindings: [binding("planner", "hermes-agent:test", "Hermes Agent"), binding("worker", "codex-cli:test", "Codex CLI"), binding("independent_verifier", "claude-code:test", "Claude Code")], blockers: [], protocol_digest: protocolDigest, execution_started: false, scores_computed: false },
+            { key: "hermes-codex-claude", label: "Hermes planifie, Codex construit, Claude vérifie", available: true, bindings: [binding("planner", "hermes-agent:test", "Hermes Agent"), binding("worker", "codex-cli:wsl_default", "Codex CLI · WSL", "wsl_default"), binding("independent_verifier", "claude-code:test", "Claude Code")], blockers: [], protocol_digest: protocolDigest, execution_started: false, scores_computed: false },
             { key: "ollama-local", label: "Modèle Ollama local", available: true, bindings: [binding("worker", "local-model:ollama_native:hermes3:8b", "hermes3:8b · Ollama natif", "ollama_native"), binding("independent_verifier", "forgebench:deterministic-evaluator", "Évaluateur déterministe ForgeBench")], blockers: [], protocol_digest: protocolDigest, execution_started: false, scores_computed: false }
           ],
           readiness: { protocol_ready: true, exploratory_ready: true, scientific_ready: false, selected_claim_ready: true, blockers: [], warnings: ["local_hidden_suite_not_worker_isolated"] },
@@ -19208,6 +19596,7 @@ function installTestHarness() {
       renderForgeBenchIsolationPanel();
       renderForgeBenchRunnerPanel();
       renderForgeBenchCandidatePanel();
+      renderWorkstackArenaPanel();
       renderEvidenceLedgerPanel();
       return {
         result: state.forgeBench,
@@ -19218,6 +19607,65 @@ function installTestHarness() {
         candidate: state.forgeBenchOllamaCandidate,
         panel: els.forgeBenchBox?.textContent || "",
         markdown: forgeBenchMarkdown()
+      };
+    },
+    applyWorkstackArenaState() {
+      this.applyForgeBenchState();
+      const candidateId = syncWorkstackArenaCandidateControl();
+      const browserEvaluator = {
+        ...state.forgeBenchOllamaCandidate.browser_evaluator,
+        submission_digest: "a".repeat(64)
+      };
+      if (els.workstackArenaCandidate) els.workstackArenaCandidate.value = candidateId;
+      if (els.workstackArenaDuration) els.workstackArenaDuration.value = "300";
+      if (els.workstackArenaQuotaConsent) els.workstackArenaQuotaConsent.checked = true;
+      if (els.workstackArenaExecutionConsent) els.workstackArenaExecutionConsent.checked = true;
+      state.workstackArena = {
+        schema: WORKSTACK_ARENA_RUN_RESULT_SCHEMA,
+        contract_version: "2026-07-14",
+        run_id: "wsa-demo-codex-pilot",
+        workstack_ref: { workstack_id: "ws-demo-signal-maze", integrity_digest: "c".repeat(64), raw_context_included: false },
+        router_ref: { integrity_digest: "d".repeat(64), dry_run_source_validated: true },
+        benchmark: { id: "signal-maze-v1", track: "codex_cli_visible_browser_pilot" },
+        batch_ref: { batch_id: "fbsb-demo-signal-maze", experiment_digest: "f".repeat(64), protocol_digest: "e".repeat(64), stack_key: "codex-solo", public_seed_sha256: "5".repeat(64) },
+        reference_pilot_ref: { pilot_id: "fbp-demo-reference-run", integrity_digest: "7".repeat(64) },
+        host_environment: "linux",
+        selected_backend: "linux-bwrap-native",
+        candidate: { id: candidateId, label: "Codex CLI · WSL", adapter_kind: "codex_cli_signal_maze_v1", sandbox_mode: "workspace-write", environment: "wsl_default", version: "0.144.1", cli_invoked: true, subscription_or_vendor_quota_verified: false },
+        consent: {
+          confirmed: true,
+          scope: WORKSTACK_ARENA_CONSENT_SCOPE,
+          candidate_id: candidateId,
+          vendor_cli_network_allowed: true,
+          vendor_cli_quota_or_cost_unknown_accepted: true,
+          disposable_workspace_write_allowed: true,
+          generated_code_execution_allowed: true,
+          original_repository_write_allowed: false,
+          board_write_allowed: false,
+          merge_allowed: false,
+          publish_allowed: false,
+          hidden_suite_allowed: false
+        },
+        budget: { max_duration_seconds: 300, max_attempts: 1, max_output_bytes: 524288 },
+        execution: { started: true, succeeded: true, timed_out: false, attempts: 1, duration_ms: 4210, output_budget_exceeded: false, prompt_sha256: "7".repeat(64), stdout_sha256: "8".repeat(64), stdout_bytes: 1200, stderr_sha256: "9".repeat(64), stderr_bytes: 0, raw_prompt_returned: false, raw_cli_output_returned: false },
+        submission: { materialized: true, exact_topology_verified: true, run_contract_unchanged: true, files_total: 4, bytes_total: 14000, digest: "a".repeat(64), generated_code_executed: true },
+        evaluator: { kind: "deterministic_visible_static_gate", started: true, succeeded: true, timed_out: false, duration_ms: 140, independent_process: true, workspace_read_only: true, network_namespace_enforced: true, hidden_suite_used: false, visible_checks_total: 7, visible_checks_passed: 7, submission_digest: "a".repeat(64) },
+        browser_evaluator: browserEvaluator,
+        security: { public_benchmark_prompt_only: true, original_repository_mounted: false, original_repository_modified: false, board_written: false, merged: false, published: false, hidden_suite_mounted: false, hidden_suite_used: false, credentials_read_by_outilsia: false, environment_allowlist_applied: true, vendor_cli_auth_status_inspected: false, vendor_cli_network_allowed_by_consent: true, host_read_scope_controlled_by_vendor_cli_sandbox: true, host_read_scope_independently_verified: false, raw_cli_output_returned: false, raw_cli_output_persisted: false, generated_code_executed: true, evaluator_process_isolated: true, temporary_workspace_removed: true, paths_returned: false },
+        cost: { amount_eur: null, status: "vendor_cli_quota_or_cost_unknown", subscription_quota_inspected: false, direct_api_call_by_outilsia: false },
+        human_gate: { status: "review_required_before_any_winner_or_delivery", winner_approval_recorded: false, delivery_approval_recorded: false },
+        readiness: { candidate_execution_verified: true, submission_structure_verified: true, visible_gameplay_verified: true, hidden_evaluator_verified: false, scientific_eligible: false, winner_declared: false, blockers: ["hidden_suite_not_evaluated", "peer_candidates_not_run", "vendor_cost_not_measured", "human_winner_decision_required"] },
+        integrity: { algorithm: "SHA-256", canonicalization: "recursive-key-sort-json-v1", scope: "canonical_document_without_integrity", digest: "0".repeat(64) },
+        test_mode: true
+      };
+      workstackArenaError = "";
+      if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "workstack_arena_codex_pilot_verified";
+      renderWorkstackArenaPanel();
+      renderEvidenceLedgerPanel();
+      return {
+        result: state.workstackArena,
+        panel: els.workstackArenaBox?.textContent || "",
+        receipt: workstackArenaReceiptMarkdown()
       };
     },
     applyEvidenceLedgerState() {
@@ -20620,11 +21068,21 @@ els.clearForgeBenchSandboxBtn?.addEventListener("click", clearForgeBenchSandbox)
 els.probeForgeBenchIsolationBtn?.addEventListener("click", probeForgeBenchIsolation);
 els.runForgeBenchPilotBtn?.addEventListener("click", runForgeBenchReferencePilot);
 els.runForgeBenchCandidateBtn?.addEventListener("click", runForgeBenchOllamaCandidate);
+els.runWorkstackArenaBtn?.addEventListener("click", runWorkstackArenaCodexPilot);
+els.copyWorkstackArenaBtn?.addEventListener("click", copyWorkstackArenaReceipt);
+els.clearWorkstackArenaBtn?.addEventListener("click", () => clearWorkstackArena(false));
+for (const input of [els.workstackArenaQuotaConsent, els.workstackArenaExecutionConsent]) {
+  input?.addEventListener("change", renderWorkstackArenaPanel);
+}
+for (const input of [els.workstackArenaCandidate, els.workstackArenaDuration]) {
+  input?.addEventListener("change", () => clearWorkstackArena(true));
+}
 for (const input of [els.forgeBenchBenchmark, els.forgeBenchClaimLevel, els.forgeBenchSeedCount]) {
   input?.addEventListener("change", () => {
     state.forgeBench = null;
     state.forgeBenchReferencePilot = null;
     state.forgeBenchOllamaCandidate = null;
+    clearWorkstackArena(true);
     forgeBenchError = "";
     forgeBenchRunnerError = "";
     forgeBenchCandidateError = "";
@@ -20640,6 +21098,7 @@ els.forgeBenchStacks?.addEventListener("change", () => {
   state.forgeBench = null;
   state.forgeBenchReferencePilot = null;
   state.forgeBenchOllamaCandidate = null;
+  clearWorkstackArena(true);
   forgeBenchError = "";
   forgeBenchRunnerError = "";
   forgeBenchCandidateError = "";
@@ -20654,6 +21113,7 @@ els.forgeBenchCandidateModel?.addEventListener("change", () => {
   state.forgeBench = null;
   state.forgeBenchReferencePilot = null;
   state.forgeBenchOllamaCandidate = null;
+  clearWorkstackArena(true);
   forgeBenchError = "";
   forgeBenchRunnerError = "";
   forgeBenchCandidateError = "";
@@ -21029,6 +21489,7 @@ renderForgeBenchSandboxPanel();
 renderForgeBenchIsolationPanel();
 renderForgeBenchRunnerPanel();
 renderForgeBenchCandidatePanel();
+renderWorkstackArenaPanel();
 renderEvidenceLedgerPanel();
 renderPreparePanel();
 renderReadinessPanel();

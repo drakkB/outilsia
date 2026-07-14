@@ -59,7 +59,7 @@ const STARTER_GAME: &str = include_str!("../../forgebench/signal-maze-v1/starter
 const STARTER_INDEX: &str = include_str!("../../forgebench/signal-maze-v1/starter/index.html");
 const STARTER_STYLES: &str = include_str!("../../forgebench/signal-maze-v1/starter/styles.css");
 
-const EVALUATOR_SCRIPT: &str = r#"
+pub(crate) const EVALUATOR_SCRIPT: &str = r#"
 set -eu
 if ! command -v bwrap >/dev/null 2>&1; then exit 72; fi
 set -- --die-with-parent --new-session --unshare-all --clearenv
@@ -870,7 +870,7 @@ fn write_candidate_files(workspace: &Path, files: &CandidateFiles) -> Result<(),
     Ok(())
 }
 
-fn validate_submission(workspace: &Path) -> Result<(String, u64), String> {
+pub(crate) fn validate_submission(workspace: &Path) -> Result<(String, u64), String> {
     let expected_names = EXPECTED_FILES
         .iter()
         .map(|value| (*value).to_string())
@@ -930,7 +930,7 @@ fn validate_submission(workspace: &Path) -> Result<(String, u64), String> {
     ))
 }
 
-fn marker_values(output: &str) -> BTreeMap<String, String> {
+pub(crate) fn marker_values(output: &str) -> BTreeMap<String, String> {
     output
         .lines()
         .filter_map(|line| line.trim().split_once('='))

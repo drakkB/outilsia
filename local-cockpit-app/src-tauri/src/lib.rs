@@ -9,6 +9,7 @@ mod forgebench_runner;
 mod forgebench_sandbox;
 mod forgebench_vault;
 mod local_capability_bridge;
+mod workstack_arena;
 mod workstack_composer;
 
 use board_observer::observe_planka_board;
@@ -42,6 +43,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env, fs};
 use sysinfo::{Disks, System};
 use tauri::{AppHandle, Emitter, Manager, State};
+use workstack_arena::run_workstack_arena_codex_pilot;
 use workstack_composer::compile_work_card;
 
 const OUTILSIA_ENDPOINT: &str = "https://outilsia.fr";
@@ -5161,6 +5163,7 @@ pub fn run() {
             observe_planka_board,
             compile_work_card,
             route_workstack_capabilities,
+            run_workstack_arena_codex_pilot,
             append_evidence_entry,
             get_evidence_ledger,
             clear_evidence_ledger,
