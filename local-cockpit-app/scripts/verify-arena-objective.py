@@ -28,6 +28,12 @@ def main():
     assert "La preuve versionnée reste attachée" in hub
     assert "Le runtime et le budget restent visibles" in download
     assert "versioned preflight proof remains attached" in llms
+    assert "Preuve physique candidate · 14 juillet 2026" in hub
+    assert "Mixtral 8x7B 26 Go termine via Ollama WSL" in download
+    assert "Physical candidate proof (2026-07-14)" in llms
+    assert "48,3 s à 4,1 tok/s" in hub and "48,3 s à 4,1 tok/s" in download
+    assert "33,3 %" in hub and "33,3 %" in download
+    assert "48.3 seconds at 4.1 tok/s" in llms and "33.3% GPU offload" in llms
     valid = (
         '{"instruction":"BLEU-47","memory":"RIVIERE-29",'
         '"calculation":42,"correction":"La VRAM accélère l’inférence locale.",'

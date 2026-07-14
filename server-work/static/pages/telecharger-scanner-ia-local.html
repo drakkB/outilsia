@@ -113,6 +113,7 @@
       </div>
       <p class="fine">Le score affiche les preuves réussies sur six, la vitesse exacte Ollama et la latence. Il aide à choisir sur votre PC sans prétendre résumer toute la qualité d'un LLM.</p>
       <p class="fine"><strong>Préflight Arena · candidat source :</strong> avant le premier calcul, les sources postérieures au build public affichent les références exactes, runtimes Windows/WSL, tailles, délais, offload probable et budget global. La sélection privilégie une baseline légère, un assistant Hermes puis un autre candidat installé hors Hermes ; une confirmation garantit zéro téléchargement et une exécution séquentielle. Le runtime et le budget restent visibles dans l'historique, le rapport et MemoryForge.</p>
+      <p class="fine"><strong>Mesure physique candidate :</strong> Mixtral 8x7B 26 Go termine via Ollama WSL sur RTX 4080 SUPER 16 Go + 63 Go RAM en 48,3 s à 4,1 tok/s, avec exécution hybride et 33,3 % d'offload GPU. Le Cockpit le classe donc comme test possible avec RAM, pas comme modèle fluide recommandé.</p>
     </section>
 
     <section class="wrap panel" style="margin-bottom:18px;border-color:rgba(251,191,36,.36);background:linear-gradient(135deg,rgba(251,191,36,.10),rgba(15,23,42,.92),rgba(34,197,94,.07))">
