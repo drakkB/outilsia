@@ -150,6 +150,17 @@ def assert_quick_action_button(page, label: str):
         raise AssertionError(f"{label}: quick action button should be enabled while idle {state}")
 
 
+def assert_readiness_visual_state(page, width: int, label: str):
+    if page.locator("#readinessState").get_attribute("data-status-tone") != "ready":
+        raise AssertionError(f"{label}: completed machine report is not marked ready")
+    if width <= 760:
+        columns = page.locator(".readiness-proof-grid").evaluate(
+            "el => getComputedStyle(el).gridTemplateColumns.split(' ').length"
+        )
+        if columns != 2:
+            raise AssertionError(f"{label}: mobile proof summary should be a compact 2x2 grid, got {columns}")
+
+
 def check_scanned_view(browser, width: int, height: int, label: str):
     page = browser.new_page(viewport={"width": width, "height": height}, device_scale_factor=1)
     page.goto(HTML.as_uri(), wait_until="load")
@@ -185,6 +196,7 @@ def check_scanned_view(browser, width: int, height: int, label: str):
         raise AssertionError(f"{label}: essential mode shows too many work panels {visible_tools}")
 
     page.locator("#workspaceSectionSelect").select_option(".readiness-panel")
+    assert_readiness_visual_state(page, width, label)
     page.locator('#readinessBox [data-open-feature="recommendation"]').first.click()
     page.wait_for_timeout(180)
     recommendation_navigation = page.evaluate(

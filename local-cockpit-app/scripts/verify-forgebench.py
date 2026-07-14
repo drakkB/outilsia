@@ -137,9 +137,25 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     if page.locator("#evidenceLedgerSource").input_value() != "forgebench_ollama_candidate_verified":
         raise AssertionError(f"{label}: candidate proof is not offered to Evidence Ledger")
 
+    execution_details = page.locator("#forgeBenchExecutionDetails")
+    if execution_details.get_attribute("open") is not None:
+        raise AssertionError(f"{label}: advanced ForgeBench stages must stay folded by default")
+    page.add_style_tag(content=".workspace-nav { position: static !important; }")
+    compact_screenshot = OUT / f"forgebench-compact-{label}.png"
+    panel.screenshot(path=str(compact_screenshot))
+    compact_height = panel.bounding_box()["height"]
+    execution_details.locator("summary").click()
+    page.wait_for_timeout(120)
+    if execution_details.get_attribute("open") is None:
+        raise AssertionError(f"{label}: advanced ForgeBench stages cannot be expanded")
+    expanded_height = panel.bounding_box()["height"]
+    if expanded_height <= compact_height + 100:
+        raise AssertionError(f"{label}: ForgeBench disclosure does not reduce the default panel")
+
     text = panel.inner_text()
     for expected in [
-        "ForgeBench Lab",
+        "Comparer des stacks",
+        "ForgeBench",
         "Signal Maze v1",
         "Résultat",
         "Efficacité",

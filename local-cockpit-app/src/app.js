@@ -39,6 +39,7 @@ const PRIVATE_WORKLOAD_CATALOG = globalThis.__OUTILSIA_PRIVATE_WORKLOAD_PACKS__ 
 
 const state = {
   scan: null,
+  analysisError: "",
   compatibility: null,
   benchmark: null,
   chatResult: null,
@@ -338,8 +339,11 @@ const els = {
   quickDecisionStrip: document.querySelector(".quick-decision-strip"),
   quickMomentCell: document.querySelector(".quick-moment-cell"),
   workspaceNav: document.querySelector(".workspace-nav"),
+  workspacePrerequisite: $("workspacePrerequisite"),
+  workspacePrerequisiteText: $("workspacePrerequisiteText"),
   workspaceContent: $("workspaceContent"),
   workspaceTitle: $("workspaceTitle"),
+  workspaceSubtitle: $("workspaceSubtitle"),
   workspaceSectionSelect: $("workspaceSectionSelect"),
   workspaceSectionPrevBtn: $("workspaceSectionPrevBtn"),
   workspaceSectionNextBtn: $("workspaceSectionNextBtn"),
@@ -479,6 +483,8 @@ const els = {
   forgeBenchClaimLevel: $("forgeBenchClaimLevel"),
   forgeBenchSeedCount: $("forgeBenchSeedCount"),
   forgeBenchStacks: $("forgeBenchStacks"),
+  forgeBenchExecutionDetails: $("forgeBenchExecutionDetails"),
+  forgeBenchExecutionSummary: $("forgeBenchExecutionSummary"),
   forgeBenchBox: $("forgeBenchBox"),
   compileForgeBenchBtn: $("compileForgeBenchBtn"),
   copyForgeBenchJsonBtn: $("copyForgeBenchJsonBtn"),
@@ -702,19 +708,36 @@ const WORKSPACE_TITLES = {
   workflows: "Atelier IA",
   account: "Compte"
 };
+const WORKSPACE_SUBTITLES = {
+  overview: "Décider quoi faire",
+  machine: "Comprendre le matériel",
+  models: "Choisir et gérer",
+  tests: "Mesurer localement",
+  assistant: "Utiliser les modèles",
+  workflows: "Composer et prouver",
+  account: "Sauver et partager"
+};
+const WORKSPACE_PREREQUISITES = {
+  machine: "Identifiez le matériel avant d'interpréter les limites et les upgrades.",
+  models: "Détectez le matériel et Ollama avant de choisir ou gérer les modèles.",
+  tests: "Détectez Ollama et les modèles installés avant de lancer une mesure locale.",
+  assistant: "Détectez les modèles disponibles avant de choisir un assistant local.",
+  workflows: "Créez d'abord un profil machine fiable avant de composer ou partager une capacité.",
+  account: "Analysez la machine avant de sauvegarder un bilan ou signaler un résultat."
+};
 const WORKSPACE_SECTIONS = {
   overview: [
-    ["Verdict", ".verdict-panel"],
+    ["Verdict immédiat", ".verdict-panel"],
     ["Bilan machine", ".readiness-panel"]
   ],
   machine: [
-    ["Diagnostic matériel", ".machine-panel"],
-    ["Potentiel et runtime", ".verdict-panel"],
+    ["Matériel détecté", ".machine-panel"],
+    ["Capacité IA", ".verdict-panel"],
     ["Guides d'achat", ".buying-panel"],
-    ["Test terrain", ".field-test-panel"],
-    ["Upgrade Digital Twin", ".upgrade-digital-twin-panel"],
-    ["Plan d'action", ".action-panel"],
-    ["Pack décision", ".decision-panel"]
+    ["Preuve terrain", ".field-test-panel"],
+    ["Simuler un upgrade", ".upgrade-digital-twin-panel"],
+    ["Actions recommandées", ".action-panel"],
+    ["Résumé à partager", ".decision-panel"]
   ],
   models: [
     ["Modèles compatibles", ".models-panel"],
@@ -725,36 +748,36 @@ const WORKSPACE_SECTIONS = {
     ["Commandes Ollama", ".commands-panel"]
   ],
   tests: [
-    ["Parcours et choix du modèle", ".prepare-panel"],
+    ["Choisir un modèle", ".prepare-panel"],
     ["Premier test", ".first-test-panel"],
-    ["Arena locale", ".arena-panel"],
-    ["Tests privés", ".private-workload-panel"],
-    ["Console", ".operation-panel"],
-    ["Benchmark", ".benchmark-panel"],
-    ["Model Autopilot", ".model-autopilot-panel"],
-    ["Flight Recorder", ".flight-recorder-panel"],
-    ["Historique benchmarks", ".benchmark-history-panel"]
+    ["Comparer des modèles", ".arena-panel"],
+    ["Tester un besoin privé", ".private-workload-panel"],
+    ["Suivre une opération", ".operation-panel"],
+    ["Mesurer un modèle", ".benchmark-panel"],
+    ["Optimiser les réglages", ".model-autopilot-panel"],
+    ["Suivre les performances", ".flight-recorder-panel"],
+    ["Historique des mesures", ".benchmark-history-panel"]
   ],
   assistant: [
-    ["PromptForge", ".promptforge-panel"],
-    ["Mes prompts", ".prompt-library-panel"],
-    ["Dialogue local", ".chat-panel"],
-    ["MemoryForge", ".memory-panel"]
+    ["Améliorer un prompt", ".promptforge-panel"],
+    ["Prompts sauvegardés", ".prompt-library-panel"],
+    ["Parler à un modèle", ".chat-panel"],
+    ["Exporter la mémoire", ".memory-panel"]
   ],
   workflows: [
-    ["Pont Strategy Arena", ".strategy-bridge-panel"],
-    ["AI Capability Passport", ".capability-passport-panel"],
-    ["Passerelle locale", ".local-capability-bridge-panel"],
-    ["Board Observer", ".board-observer-panel"],
-    ["Workstack Composer", ".workstack-composer-panel"],
-    ["Capability Router", ".capability-router-panel"],
-    ["ForgeBench", ".forgebench-panel"],
-    ["Evidence Ledger", ".evidence-ledger-panel"]
+    ["Préparer Strategy Arena", ".strategy-bridge-panel"],
+    ["Créer le passeport IA", ".capability-passport-panel"],
+    ["Partager localement", ".local-capability-bridge-panel"],
+    ["Lire un board", ".board-observer-panel"],
+    ["Composer le plan", ".workstack-composer-panel"],
+    ["Affecter les rôles", ".capability-router-panel"],
+    ["Comparer des stacks", ".forgebench-panel"],
+    ["Vérifier les preuves", ".evidence-ledger-panel"]
   ],
   account: [
     ["Bilan machine", ".readiness-panel"],
-    ["Compte OutilsIA", ".account-panel"],
-    ["Feedback", ".feedback-panel"],
+    ["Sauvegarde OutilsIA", ".account-panel"],
+    ["Signaler un problème", ".feedback-panel"],
     ["Historique local", ".history-panel"]
   ]
 };
@@ -793,6 +816,20 @@ const WORKSPACE_FEATURES = Object.freeze({
     target: ".benchmark-panel",
     focus: "#benchmarkModelInput",
     label: "Benchmark local"
+  },
+  promptforge: {
+    tab: "assistant",
+    panel: ".promptforge-panel",
+    target: ".promptforge-panel",
+    focus: "#promptForgeInput",
+    label: "Amélioration du prompt"
+  },
+  readiness: {
+    tab: "overview",
+    panel: ".readiness-panel",
+    target: "#readinessBox",
+    focus: "#readinessBox",
+    label: "Bilan machine"
   },
   digital_twin: {
     tab: "machine",
@@ -854,6 +891,70 @@ const readinessProof = {
 function setStatus(text, kind = "") {
   els.statusText.textContent = text;
   els.statusText.className = kind;
+}
+
+function panelStatusTone(text = "") {
+  const value = String(text).trim().toLocaleLowerCase("fr");
+  if (!value) return "neutral";
+  if (/échec|erreur|incompatible|indisponible|bloqué/.test(value)) return "error";
+  if (/requis|à lancer|à relancer|à mesurer|à essayer|à générer|à installer|à préparer|non |aucun|inactive|préparation|^0(?:\s|$)/.test(value)) return "action";
+  if (/prêt|connecté|installé|mesuré|actif|réussi|validé|preuve obtenue|rapport prêt|profil prêt|calculé|^\d+\/100$/.test(value)) return "ready";
+  return "neutral";
+}
+
+function syncPanelStatusTones() {
+  for (const badge of els.workspaceContent?.querySelectorAll(".panel-title > span") || []) {
+    badge.dataset.statusTone = panelStatusTone(badge.textContent);
+  }
+}
+
+function syncForgeBenchExecutionSummary() {
+  if (!els.forgeBenchExecutionSummary) return;
+  const statuses = [
+    els.forgeBenchVaultState,
+    els.forgeBenchSandboxState,
+    els.forgeBenchIsolationState,
+    els.forgeBenchRunnerState,
+    els.forgeBenchCandidateState
+  ].map((node) => String(node?.textContent || "").trim().toLocaleLowerCase("fr"));
+  const errors = statuses.filter((value) => /refusé|erreur|indisponible|ancien/.test(value)).length;
+  const busy = statuses.filter((value) => /en cours|opération|préparation locale|génération locale/.test(value)).length;
+  const verified = statuses.filter((value) => /scellée localement|workspaces vérifiés|canari isolé vérifié|transport isolé vérifié|gameplay visible vérifié/.test(value)).length;
+  if (errors) {
+    els.forgeBenchExecutionSummary.textContent = `${errors} étape${errors > 1 ? "s" : ""} à corriger`;
+    els.forgeBenchExecutionSummary.dataset.statusTone = "error";
+    return;
+  }
+  if (busy) {
+    els.forgeBenchExecutionSummary.textContent = "opération locale en cours";
+    els.forgeBenchExecutionSummary.dataset.statusTone = "action";
+    return;
+  }
+  els.forgeBenchExecutionSummary.textContent = verified
+    ? `${verified}/5 étapes vérifiées`
+    : "5 étapes avancées";
+  els.forgeBenchExecutionSummary.dataset.statusTone = verified ? "ready" : "neutral";
+}
+
+function installPanelStatusObserver() {
+  if (!els.workspaceContent || typeof MutationObserver === "undefined") return;
+  let queued = false;
+  const sync = () => {
+    if (queued) return;
+    queued = true;
+    window.requestAnimationFrame(() => {
+      queued = false;
+      syncPanelStatusTones();
+      syncForgeBenchExecutionSummary();
+    });
+  };
+  new MutationObserver(sync).observe(els.workspaceContent, {
+    childList: true,
+    characterData: true,
+    subtree: true
+  });
+  syncPanelStatusTones();
+  syncForgeBenchExecutionSummary();
 }
 
 function restoreWorkspaceSectionState() {
@@ -961,6 +1062,15 @@ function stepWorkspaceSection(direction) {
   setWorkspaceSection(tab, entries[next][1], { focusContent: true });
 }
 
+function renderWorkspacePrerequisite(tab = els.appShell?.dataset.workspaceTab || "overview") {
+  if (!els.workspacePrerequisite) return;
+  const required = tab !== "overview" && !state.scan;
+  els.workspacePrerequisite.hidden = !required;
+  if (required && els.workspacePrerequisiteText) {
+    els.workspacePrerequisiteText.textContent = WORKSPACE_PREREQUISITES[tab] || "Analysez ce PC avant de continuer.";
+  }
+}
+
 function setWorkspaceTab(tab = "overview", { persist = true, focusContent = false } = {}) {
   const normalized = WORKSPACE_TABS.includes(tab) ? tab : "overview";
   const essential = normalized === "overview";
@@ -968,6 +1078,7 @@ function setWorkspaceTab(tab = "overview", { persist = true, focusContent = fals
   els.appShell?.classList.toggle("mode-advanced", !essential);
   if (els.appShell) els.appShell.dataset.workspaceTab = normalized;
   if (els.workspaceTitle) els.workspaceTitle.textContent = WORKSPACE_TITLES[normalized];
+  if (els.workspaceSubtitle) els.workspaceSubtitle.textContent = WORKSPACE_SUBTITLES[normalized];
   for (const button of els.workspaceTabButtons) {
     const selected = button.dataset.workspaceTabTarget === normalized;
     button.setAttribute("aria-selected", String(selected));
@@ -977,8 +1088,17 @@ function setWorkspaceTab(tab = "overview", { persist = true, focusContent = fals
   if (els.workspaceContent && activeButton) {
     els.workspaceContent.setAttribute("aria-labelledby", activeButton.id);
   }
+  if (activeButton) {
+    window.requestAnimationFrame(() => {
+      const strip = activeButton.parentElement;
+      if (!strip || strip.scrollWidth <= strip.clientWidth) return;
+      const targetLeft = activeButton.offsetLeft - ((strip.clientWidth - activeButton.offsetWidth) / 2);
+      strip.scrollTo({ left: Math.max(0, targetLeft), behavior: "auto" });
+    });
+  }
   const section = renderWorkspaceSectionMenu(normalized);
   setWorkspaceSection(normalized, section, { persist: false });
+  renderWorkspacePrerequisite(normalized);
   if (persist) {
     try {
       localStorage.setItem(WORKSPACE_TAB_STORAGE_KEY, normalized);
@@ -2279,6 +2399,15 @@ function primaryActionState() {
   const runtime = runtimeReadinessState(flow.testModel);
 
   if (!flow.scanned) {
+    if (state.analysisError) {
+      return {
+        key: "scan-retry",
+        label: "Relancer l'analyse",
+        detail: "scan interrompu",
+        status: "Le scan n'a pas pu se terminer. Relance-le ; aucune installation ne sera lancée sans confirmation.",
+        command: "scan"
+      };
+    }
     return {
       key: "scan",
       label: "Scanner ce PC",
@@ -2388,19 +2517,30 @@ function renderPrimaryAction() {
   const label = els.prepareBtn.querySelector("span");
   const detail = els.prepareBtn.querySelector("small");
   els.prepareBtn.classList.toggle("is-busy", primaryAnalysisBusy);
-  if (label) label.textContent = primaryAnalysisBusy ? "Analyse en cours..." : state.scan ? "Actualiser l'analyse" : "Analyser ce PC";
-  if (detail) detail.textContent = primaryAnalysisBusy ? "détection matériel et modèles" : "scan matériel + modèles";
+  if (label) label.textContent = primaryAnalysisBusy
+    ? "Analyse en cours..."
+    : state.scan
+      ? "Actualiser l'analyse"
+      : state.analysisError
+        ? "Relancer l'analyse"
+        : "Analyser ce PC";
+  if (detail) detail.textContent = primaryAnalysisBusy
+    ? "détection matériel et modèles"
+    : state.analysisError && !state.scan
+      ? "le dernier scan a été interrompu"
+      : "scan matériel + modèles";
   els.prepareBtn.dataset.primaryCommand = "analyze";
   delete els.prepareBtn.dataset.primaryModel;
   els.prepareBtn.title = "Analyse le matériel, détecte Ollama et charge les recommandations modèles.";
   if (els.statusText && !els.statusText.className.includes("bad")) {
     els.statusText.textContent = state.scan
       ? state.compatibility ? "Analyse prête : matériel et modèles détectés" : "Scan terminé : recommandations à charger"
-      : "Prêt à analyser ce PC";
+      : state.analysisError ? "Analyse à relancer" : "Prêt à analyser ce PC";
   }
   renderStickyAction(action);
   renderEssentialFocus(action);
   renderQuickDecision(action);
+  renderWorkspacePrerequisite();
 }
 
 function renderStickyAction(action = primaryActionState()) {
@@ -2474,10 +2614,10 @@ function renderQuickDecision(action = primaryActionState()) {
       : flow.modelReady ? "Lance un benchmark court visible dans l'app." : "Installe le modèle test puis mesure.";
   const upgradeLabel = upgrade?.label || upgrade?.name || (state.scan ? "Aucun achat urgent" : "Pas encore");
   const upgradeDetail = upgrade?.reason || upgrade?.price_range_eur || (state.scan ? "Teste d'abord, achète seulement si un blocage est prouvé." : "Aucun achat avant diagnostic.");
-  els.quickActionText.textContent = state.scan ? action.label : "Analyser ce PC";
+  els.quickActionText.textContent = state.scan || state.analysisError ? action.label : "Analyser ce PC";
   els.quickActionDetail.textContent = state.scan
     ? `${score === null ? "Potentiel à calculer" : `Potentiel matériel ${score}/100`} · Runtime : ${runtime.label}. ${action.status}`
-    : localCapabilitySentence(compatibility);
+    : state.analysisError ? action.status : localCapabilitySentence(compatibility);
   els.quickModelText.textContent = recommendedLabel;
   els.quickModelDetail.textContent = recommendedDetail;
   const moment = modelOfMomentState();
@@ -3911,6 +4051,7 @@ function useUsageProfilePack(target = "benchmark") {
 function renderScan(scan) {
   invalidateCapabilityPassport();
   clearCapabilityRouter(true);
+  state.analysisError = "";
   state.modelAutopilotRun = null;
   state.upgradeDigitalTwinRun = null;
   state.scan = scan;
@@ -7632,8 +7773,42 @@ function cockpitMemoryMarkdown() {
   return sections.filter(Boolean).join("\n\n---\n\n");
 }
 
+function syncReadinessControls(scanReady = Boolean(state.scan)) {
+  els.copyReadinessSummaryBtn.disabled = !scanReady;
+  els.copyReadinessBtn.disabled = !scanReady;
+  els.saveReadinessMemoryBtn.disabled = !scanReady;
+  els.saveReadinessAccountBtn.disabled = !scanReady;
+  els.shareReadinessBtn.disabled = !scanReady || !lastSyncedMachineId;
+  if (els.pdfReportBtn) els.pdfReportBtn.disabled = !scanReady;
+  if (els.pdfReadinessBtn) els.pdfReadinessBtn.disabled = !scanReady;
+  els.copyWindowsRecipeBtn.disabled = !scanReady;
+  els.downloadWindowsRecipeBtn.disabled = !scanReady;
+  els.topCopyWindowsRecipeBtn.disabled = !scanReady;
+  els.topDownloadWindowsRecipeBtn.disabled = !scanReady;
+}
+
 function renderReadinessPanel() {
   if (!els.readinessBox) return;
+  const scanReady = Boolean(state.scan);
+  if (els.appShell) els.appShell.dataset.scanReady = String(scanReady);
+  syncReadinessControls(scanReady);
+  if (!scanReady) {
+    const analysisError = String(state.analysisError || "");
+    els.readinessState.textContent = analysisError ? "analyse à relancer" : "analyse requise";
+    els.readinessBox.className = "readiness-box empty readiness-prescan-box";
+    els.readinessBox.innerHTML = `
+      <div class="readiness-prescan${analysisError ? " has-error" : ""}">
+        <div>
+          <span class="label">${analysisError ? "Analyse interrompue" : "Point de départ"}</span>
+          <strong>${analysisError ? "Le scan n'a pas pu se terminer" : "Ce PC n'a pas encore été analysé"}</strong>
+          <p>${analysisError ? `${escapeHtml(analysisError)} Réessaie ; aucune installation ne sera lancée sans confirmation.` : "Le matériel, Ollama et les modèles locaux sont encore inconnus."}</p>
+        </div>
+        <button type="button" data-run-analysis data-primary-command="analyze">${analysisError ? "Relancer l'analyse" : "Analyser ce PC"}</button>
+      </div>
+    `;
+    renderCapabilityPassportPanel();
+    return;
+  }
   const report = readinessReport();
   const recommendation = report.recommendation_engine;
   const recommendationWinner = recommendation?.winner;
@@ -7805,17 +7980,6 @@ function renderReadinessPanel() {
       <span>${report.account_ready ? "La machine est synchronisée : partage ou exporte le rapport." : "Sauvegarde le PC dans ton compte pour retrouver ses benchmarks et partager le rapport."}</span>
     </div>
   `;
-  els.copyReadinessSummaryBtn.disabled = !state.scan;
-  els.copyReadinessBtn.disabled = !state.scan;
-  els.saveReadinessMemoryBtn.disabled = !state.scan;
-  els.saveReadinessAccountBtn.disabled = !state.scan;
-  els.shareReadinessBtn.disabled = !lastSyncedMachineId;
-  if (els.pdfReportBtn) els.pdfReportBtn.disabled = !state.scan;
-  if (els.pdfReadinessBtn) els.pdfReadinessBtn.disabled = !state.scan;
-  els.copyWindowsRecipeBtn.disabled = !state.scan;
-  els.downloadWindowsRecipeBtn.disabled = !state.scan;
-  els.topCopyWindowsRecipeBtn.disabled = !state.scan;
-  els.topDownloadWindowsRecipeBtn.disabled = !state.scan;
   queueWindowsRecipeAutosave();
   renderCapabilityPassportPanel();
 }
@@ -11537,7 +11701,7 @@ function renderWorkstackComposerPanel() {
     <div class="workstack-stage">
       <strong>${escapeHtml(`${index + 1}. ${workstackRoleLabel(stage.role || "rôle")}`)}</strong>
       <span>${escapeHtml(workstackActionLabel(stage.action || "action non définie"))}</span>
-      <small>${escapeHtml(stage.enabled ? workstackStatusLabel(stage.status || "actif") : "désactivé")}</small>
+      <small>${escapeHtml(stage.enabled ? workstackStatusLabel(stage.status || "actif") : "après validation")}</small>
     </div>
   `).join("");
   const digest = plan.integrity?.digest || "";
@@ -11549,7 +11713,7 @@ function renderWorkstackComposerPanel() {
       <span>${escapeHtml(workstackPriorityLabel(plan.routing?.priority || "balanced"))} · plan uniquement · gate humaine obligatoire</span>
       <span>SHA-256 ${escapeHtml(digest ? `${digest.slice(0, 14)}…${digest.slice(-8)}` : "non disponible")}</span>
     </div>
-    ${blockers.length ? `<div class="workstack-blockers">Bloqué : ${escapeHtml(blockers.map(workstackBlockerLabel).join(" · "))}</div>` : `<div class="workstack-blockers">Aucun blocage contractuel. L'exécution reste désactivée.</div>`}
+    ${blockers.length ? `<div class="workstack-blockers">Bloqué : ${escapeHtml(blockers.map(workstackBlockerLabel).join(" · "))}</div>` : `<div class="workstack-blockers">Aucun blocage contractuel. Aucune exécution lancée ; une validation humaine reste obligatoire.</div>`}
     <div class="workstack-stage-list">${stageRows}</div>
   `;
 }
@@ -14137,7 +14301,26 @@ function fallbackVerdict(scan) {
   return "Machine limitee pour LLM locaux: commence par RAM 32 Go minimum puis GPU 12 Go VRAM.";
 }
 
+function readableAnalysisError(error) {
+  return String(error || "Le système n'a pas répondu dans le délai prévu.")
+    .replace(/[A-Z]:\\Users\\[^\\\s]+(?:\\[^\s"'<>|:;,]+)*/gi, "dossier utilisateur")
+    .replace(/\/home\/[^/\s]+(?:\/[^\s"'<>|:;,]+)*/g, "dossier utilisateur")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 220);
+}
+
+function setAnalysisError(error = "") {
+  state.analysisError = error ? readableAnalysisError(error) : "";
+  if (!state.scan && els.topMachineKey) {
+    els.topMachineKey.textContent = state.analysisError ? "Analyse à relancer" : "Pas encore scannée";
+  }
+  renderReadinessPanel();
+  renderPrimaryAction();
+}
+
 async function scanMachine() {
+  setAnalysisError("");
   setStatus("Scan local en cours...");
   els.scanBtn.disabled = true;
   try {
@@ -14147,7 +14330,8 @@ async function scanMachine() {
     setStatus("Scan termine", "ok");
     renderPrimaryAction();
   } catch (error) {
-    setStatus(String(error), "bad");
+    setAnalysisError(error);
+    setStatus(`Analyse interrompue : ${state.analysisError}`, "bad");
   } finally {
     els.scanBtn.disabled = false;
   }
@@ -17766,6 +17950,23 @@ function installTestHarness() {
     restorePreviousUpgradeDigitalTwinScenario,
     applyModelAutopilotRecommendation,
     rollbackModelAutopilotProfile,
+    applyScanFailureState(error = "C:\\Users\\demo\\AppData\\Local\\Ollama n'a pas répondu dans le délai prévu.") {
+      state.scan = null;
+      state.compatibility = null;
+      setAnalysisError(error);
+      setWorkspaceTab("overview", { focusContent: false });
+      setWorkspaceSection("overview", ".readiness-panel", { focusContent: false });
+      return {
+        error: state.analysisError,
+        action: primaryActionState(),
+        panel: els.readinessBox?.textContent || ""
+      };
+    },
+    clearScanFailureState() {
+      setAnalysisError("");
+      setWorkspaceTab("overview", { focusContent: false });
+      setWorkspaceSection("overview", ".readiness-panel", { focusContent: false });
+    },
     async applyInstallSafetyPreflightState() {
       this.applyDemoState();
       const ready = evaluateInstallSafetyPreflight("qwen3:14b", {
@@ -20163,6 +20364,11 @@ document.addEventListener("click", async (event) => {
     useUsageProfilePack(usagePackTarget);
     return;
   }
+  const analysisButton = event.target?.closest?.("[data-run-analysis]");
+  if (analysisButton) {
+    await handlePrimaryAction({ currentTarget: analysisButton });
+    return;
+  }
   const openFeatureButton = event.target?.closest?.("[data-open-feature]");
   const featureKey = openFeatureButton?.getAttribute?.("data-open-feature");
   if (featureKey && revealWorkspaceFeature(featureKey)) {
@@ -20349,6 +20555,7 @@ if (!invoke) {
 
 restoreWorkspaceSectionState();
 restoreWorkspaceTab();
+installPanelStatusObserver();
 loadHistory();
 renderBenchmarkHistory();
 renderBenchmarkModelOptions();

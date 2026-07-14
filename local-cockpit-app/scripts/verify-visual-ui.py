@@ -58,6 +58,23 @@ def assert_button_text_fits(page, label: str):
         raise AssertionError(f"{label}: button overflow {bad[:5]}")
 
 
+def assert_primary_hover(page, label: str):
+    for selector in ["#prepareBtn", "#quickActionBtn"]:
+        button = page.locator(selector)
+        if not button.is_visible() or button.is_disabled():
+            raise AssertionError(f"{label}: primary action is not available: {selector}")
+        button.hover()
+        appearance = button.evaluate(
+            """(node) => ({
+              backgroundImage: getComputedStyle(node).backgroundImage,
+              color: getComputedStyle(node).color
+            })"""
+        )
+        if "linear-gradient" not in appearance["backgroundImage"] or appearance["color"] != "rgb(2, 21, 17)":
+            raise AssertionError(f"{label}: primary hover loses contrast: {selector} {appearance}")
+    page.mouse.move(0, 0)
+
+
 def assert_idle_console_button_hidden(page, label: str):
     visible = page.evaluate(
         """() => {
@@ -91,6 +108,65 @@ def assert_sticky_action_hidden(page, label: str):
         raise AssertionError(f"{label}: sticky action should be hidden in essential mode, got {visible}")
 
 
+def assert_prescan_readiness(page, label: str):
+    page.locator("#workspaceOverviewBtn").click()
+    page.locator("#workspaceSectionSelect").select_option(".readiness-panel")
+    page.wait_for_timeout(120)
+    text = page.locator("#readinessBox").inner_text()
+    if "Ce PC n'a pas encore été analysé" not in text:
+        raise AssertionError(f"{label}: prescan decision is unclear: {text[:400]}")
+    buttons = page.locator("#readinessBox button:visible")
+    if buttons.count() != 1 or buttons.first.inner_text().strip() != "Analyser ce PC":
+        raise AssertionError(f"{label}: prescan should expose one analysis action")
+    if page.locator("#readinessBox .readiness-action-card").count():
+        raise AssertionError(f"{label}: advanced decisions leaked before scan")
+    if page.locator(".readiness-primary-actions:visible, .readiness-export-actions:visible").count():
+        raise AssertionError(f"{label}: report exports leaked before scan")
+    if page.locator(".quick-decision-strip:visible").count():
+        raise AssertionError(f"{label}: duplicate analysis action leaked above the prescan report")
+    if page.locator("#readinessState").get_attribute("data-status-tone") != "action":
+        raise AssertionError(f"{label}: prescan status is not visually actionable")
+
+
+def assert_workspace_prerequisite(page, label: str):
+    page.locator("#workspaceMachineBtn").click()
+    page.wait_for_timeout(80)
+    guard = page.locator("#workspacePrerequisite")
+    if not guard.is_visible():
+        raise AssertionError(f"{label}: advanced workspace has no route back to analysis")
+    if "Identifiez le matériel" not in guard.inner_text():
+        raise AssertionError(f"{label}: machine prerequisite lacks useful context")
+    button = guard.locator("[data-run-analysis]")
+    if not button.is_visible() or button.is_disabled() or button.inner_text().strip() != "Analyser ce PC":
+        raise AssertionError(f"{label}: workspace analysis route is not actionable")
+    page.locator("#workspaceOverviewBtn").click()
+    page.locator("#workspaceSectionSelect").select_option(".readiness-panel")
+
+
+def assert_scan_failure_recovery(page, label: str):
+    proof = page.evaluate("() => window.__OUTILSIA_TEST__.applyScanFailureState()")
+    page.wait_for_timeout(100)
+    panel = page.locator("#readinessBox")
+    text = panel.inner_text()
+    if "Le scan n'a pas pu se terminer" not in text or "Relancer l'analyse" not in text:
+        raise AssertionError(f"{label}: scan failure has no clear recovery path: {text[:400]}")
+    if any(fragment in text or fragment in proof["error"] for fragment in ("C:\\Users\\demo", "AppData", "/home/demo")):
+        raise AssertionError(f"{label}: scan failure exposes a personal path")
+    if page.locator("#topMachineKey").inner_text().strip() != "Analyse à relancer":
+        raise AssertionError(f"{label}: machine summary does not expose the retry state")
+    if page.locator("#quickActionText").inner_text().strip() != "Relancer l'analyse":
+        raise AssertionError(f"{label}: quick action does not offer a retry")
+    retry = panel.locator("[data-run-analysis]")
+    if not retry.is_visible() or retry.is_disabled() or retry.inner_text().strip() != "Relancer l'analyse":
+        raise AssertionError(f"{label}: scan retry button is not actionable")
+    if page.locator("#readinessState").get_attribute("data-status-tone") != "action":
+        raise AssertionError(f"{label}: scan failure state is not visually actionable")
+    page.evaluate("() => window.__OUTILSIA_TEST__.clearScanFailureState()")
+    page.wait_for_timeout(80)
+    if "Ce PC n'a pas encore été analysé" not in panel.inner_text():
+        raise AssertionError(f"{label}: clearing the failure did not restore the initial state")
+
+
 def assert_desktop_grid(page):
     columns = page.evaluate(
         """() => getComputedStyle(document.querySelector('.grid')).gridTemplateColumns.split(' ').length"""
@@ -109,9 +185,13 @@ def check_viewport(browser, width: int, height: int, label: str):
     assert_visible(page, ".quick-decision-strip", f"{label} quick decision")
     assert_no_horizontal_overflow(page, label)
     assert_button_text_fits(page, label)
+    assert_primary_hover(page, label)
     assert_idle_console_button_hidden(page, label)
     assert_essential_work_panels_quiet(page, label)
     assert_sticky_action_hidden(page, label)
+    assert_prescan_readiness(page, label)
+    assert_workspace_prerequisite(page, label)
+    assert_scan_failure_recovery(page, label)
     if width >= 1000:
         assert_desktop_grid(page)
     screenshot = OUT / f"local-cockpit-{label}.png"

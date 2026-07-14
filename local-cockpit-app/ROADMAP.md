@@ -10,14 +10,14 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 
 ## Livré dans les sources - Navigation par espaces
 
-État au 13 juillet 2026 : l'ancienne page unique Essentiel/Détails est remplacée par sept espaces persistants : Accueil, Machine, Modèles, Tests, Assistant, Atelier IA et Compte. Le commit `ff3ed59` passe les pipelines Windows `29259013783` et Linux `29259013856`. Chaque espace ouvre maintenant un seul module à la fois, avec navigation précédent/suivant et une option **Toutes les sections**. Le candidat n'est pas encore déployé comme release publique.
+État au 14 juillet 2026 : l'ancienne page unique Essentiel/Détails est remplacée par sept espaces persistants : Accueil, Machine, Modèles, Tests, Assistant, Atelier IA et Compte. Le socle initial du commit `ff3ed59` a été enrichi par un lot UX nocturne qui traite les prérequis, les erreurs, la hiérarchie des modules et le mobile. Chaque espace ouvre maintenant un seul module à la fois, avec navigation précédent/suivant et une option **Toutes les sections**. Le candidat n'est pas encore déployé comme release publique.
 
 - [x] Conserver le matériel détecté et l'action d'analyse au sommet de la fenêtre.
 - [x] Attribuer chaque panneau à un ou plusieurs espaces sans changer ses identifiants ou son état.
 - [x] Router automatiquement Dialogue vers Assistant, Bench vers Tests, Upgrade vers Machine et Workstack vers Atelier IA.
 - [x] Ajouter un menu Section contextuel qui concentre l'écran sur un module, avec précédent, suivant et vue complète.
 - [x] Donner toute la largeur disponible au module isolé par le menu Section, notamment au Benchmark.
-- [x] Afficher les sept onglets sans défilement horizontal sur Android et prendre en charge les flèches, Début et Fin au clavier.
+- [x] Conserver les sept onglets sur une ligne défilable sur Android, recentrer l'onglet actif et prendre en charge les flèches, Début et Fin au clavier.
 - [x] Conserver les formulaires et mémoriser l'espace actif entre deux ouvertures.
 - [x] Réduire le pire cas mesuré de 18,1 à 2,1 hauteurs d'écran sur desktop et de 36,5 à 3,6 sur mobile.
 - [x] Ajouter une recette Playwright dédiée qui contrôle propriété des panneaux, routage, persistance, menu Section, clavier et débordements.
@@ -26,6 +26,11 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Empêcher les panneaux Tests actifs de masquer une section Accueil choisie et compacter les onglets mobiles sur une seule ligne défilable.
 - [x] Donner une identité visuelle sobre à chaque espace, transformer les états de panneau en badges et distinguer les commandes principales des exports secondaires.
 - [x] Relier les prérequis Model Autopilot, Flight Recorder, Passerelle locale, Workstack Composer, Capability Router et ForgeBench à leur écran source sans exécution automatique.
+- [x] Commencer les titres de modules par l'action compréhensible et conserver le nom technique en sous-titre pour les preuves et les exports.
+- [x] Remplacer les états avant scan par un prérequis explicite et une commande **Analyser ce PC**, sans donnée avancée prématurée.
+- [x] Transformer l'échec d'analyse en parcours de reprise visible, sans exposer de chemin personnel dans l'interface.
+- [x] Replier les cinq étapes techniques de ForgeBench tout en gardant leur synthèse et leur état accessibles.
+- [x] Garantir des cibles tactiles d'au moins 44 px, un focus clavier visible, des statuts mobiles non tronqués et un contraste lisible au survol.
 - [ ] Publier cette interface et la présenter sur le site seulement après validation manuelle du build candidat.
 
 ## Correctif validé dans les sources - Hermes, runtime et mémoire réelle

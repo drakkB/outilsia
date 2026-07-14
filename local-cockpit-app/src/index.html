@@ -162,6 +162,7 @@
           <div class="workspace-nav-heading">
             <span class="label">Espace actif</span>
             <strong id="workspaceTitle">Accueil</strong>
+            <small id="workspaceSubtitle">Décider quoi faire</small>
           </div>
           <div class="workspace-tabs" role="tablist" aria-label="Naviguer dans le cockpit">
             <button id="workspaceOverviewBtn" type="button" role="tab" aria-selected="true" aria-controls="workspaceContent" data-workspace-tab-target="overview">Accueil</button>
@@ -181,6 +182,15 @@
             <button id="workspaceSectionNextBtn" class="workspace-section-step" type="button" aria-label="Section suivante" title="Section suivante">&#8250;</button>
           </div>
         </nav>
+
+        <section id="workspacePrerequisite" class="workspace-prerequisite" aria-live="polite" hidden>
+          <div>
+            <span class="label">Étape préalable</span>
+            <strong>Analyse requise</strong>
+            <p id="workspacePrerequisiteText">Identifiez d'abord le matériel, Ollama et les modèles locaux.</p>
+          </div>
+          <button type="button" data-run-analysis data-primary-command="analyze">Analyser ce PC</button>
+        </section>
 
         <section id="workspaceContent" class="grid" role="tabpanel" aria-labelledby="workspaceOverviewBtn">
         <article class="panel machine-panel" data-workspace="machine">
@@ -322,7 +332,7 @@
 
         <article class="panel capability-passport-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
-            <h2>AI Capability Passport</h2>
+            <h2>Passeport IA <small>AI Capability Passport</small></h2>
             <span id="capabilityPassportState">scan requis</span>
           </div>
           <div id="capabilityPassportBox" class="capability-passport-box empty">
@@ -337,7 +347,7 @@
 
         <article class="panel local-capability-bridge-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
-            <h2>Passerelle locale</h2>
+            <h2>Partage local <small>Local Capability Bridge</small></h2>
             <span id="localCapabilityBridgeState">désactivée</span>
           </div>
           <div id="localCapabilityBridgeBox" class="local-capability-bridge-box empty">
@@ -354,7 +364,7 @@
 
         <article class="panel board-observer-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
-            <h2>Board Observer</h2>
+            <h2>Lire un board <small>Board Observer</small></h2>
             <span id="boardObserverState">non configuré</span>
           </div>
           <div class="board-observer-intro">
@@ -387,7 +397,7 @@
 
         <article class="panel workstack-composer-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
-            <h2>Workstack Composer</h2>
+            <h2>Composer le plan <small>Workstack Composer</small></h2>
             <span id="workstackComposerState">aucune carte</span>
           </div>
           <div class="workstack-composer-intro">
@@ -427,7 +437,7 @@
 
         <article class="panel capability-router-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
-            <h2>Capability Router</h2>
+            <h2>Affecter les rôles <small>Capability Router</small></h2>
             <span id="capabilityRouterState">plan requis</span>
           </div>
           <div class="capability-router-intro">
@@ -460,7 +470,7 @@
 
         <article class="panel forgebench-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
-            <h2>ForgeBench Lab</h2>
+            <h2>Comparer des stacks <small>ForgeBench</small></h2>
             <span id="forgeBenchState">routage requis</span>
           </div>
           <div class="forgebench-intro">
@@ -496,6 +506,15 @@
             <label><input type="checkbox" name="forgeBenchStack" value="hermes-codex-claude" checked> <span>Hermes → Codex → Claude</span></label>
             <label><input type="checkbox" name="forgeBenchStack" value="ollama-local"> <span>Modèle Ollama local</span></label>
           </fieldset>
+          <details id="forgeBenchExecutionDetails" class="forgebench-execution-details">
+            <summary>
+              <span>
+                <strong>Préparation sécurisée et exécution</strong>
+                <small>Coffre local, espaces isolés, pilote puis candidat</small>
+              </span>
+              <span id="forgeBenchExecutionSummary">5 étapes avancées</span>
+            </summary>
+            <div class="forgebench-execution-body">
           <div class="forgebench-vault">
             <div class="forgebench-vault-heading">
               <strong>Suite cachée locale</strong>
@@ -577,6 +596,8 @@
               <button id="runForgeBenchCandidateBtn" type="button" disabled>Lancer le candidat local</button>
             </div>
           </div>
+            </div>
+          </details>
           <div id="forgeBenchBox" class="forgebench-box empty">
             Compile d'abord une Workstack puis un routage complet. ForgeBench préparera l'expérience sans l'exécuter.
           </div>
@@ -591,7 +612,7 @@
 
         <article class="panel evidence-ledger-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
-            <h2>Evidence Ledger</h2>
+            <h2>Vérifier les preuves <small>Evidence Ledger</small></h2>
             <span id="evidenceLedgerState">chargement local</span>
           </div>
           <div class="evidence-ledger-intro">
@@ -810,7 +831,7 @@
             <h2>Bilan de cette machine</h2>
             <span id="readinessState">non généré</span>
           </div>
-          <div id="readinessBox" class="readiness-box empty">Analyse la machine puis lance un benchmark pour obtenir un bilan lisible et des actions concrètes.</div>
+          <div id="readinessBox" class="readiness-box empty" aria-live="polite">Analyse la machine puis lance un benchmark pour obtenir un bilan lisible et des actions concrètes.</div>
           <div class="row-actions readiness-primary-actions">
             <button id="saveReadinessAccountBtn" type="button" disabled>Sauver compte</button>
             <button id="shareReadinessBtn" type="button" disabled>Partager</button>
@@ -857,8 +878,8 @@
 
         <article class="panel model-autopilot-panel advanced-panel" data-workspace="tests">
           <div class="panel-title">
-            <h2>Model Autopilot</h2>
-            <span id="modelAutopilotState">modèle installé requis</span>
+            <h2>Optimiser les réglages <small>Model Autopilot</small></h2>
+            <span id="modelAutopilotState">choix du modèle requis</span>
           </div>
           <div class="autopilot-budget" aria-label="Budget Model Autopilot">
             <div><span>Profils</span><strong>3</strong></div>
@@ -876,7 +897,7 @@
 
         <article class="panel flight-recorder-panel advanced-panel" data-workspace="tests">
           <div class="panel-title">
-            <h2>Flight Recorder</h2>
+            <h2>Suivre les performances <small>Flight Recorder</small></h2>
             <span id="flightRecorderState">benchmark requis</span>
           </div>
           <div id="flightRecorderBox" class="flight-recorder-box empty">
@@ -919,6 +940,7 @@
           </div>
           <div id="promptLibraryList" class="prompt-library-list empty">Sauvegarde un prompt optimisé depuis PromptForge pour le réutiliser dans Benchmark, Dialogue ou Arena.</div>
           <div class="row-actions">
+            <button class="path-action" type="button" data-open-feature="promptforge">Créer un prompt</button>
             <button id="copyPromptLibraryBtn" type="button" disabled>Copier bibliothèque</button>
             <button id="clearPromptLibraryBtn" type="button" disabled>Vider</button>
           </div>

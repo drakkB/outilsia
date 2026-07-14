@@ -19,6 +19,38 @@ WORKSPACES = {
     "account": ("workspaceAccountBtn", 4),
 }
 
+WORKSPACE_SUBTITLES = {
+    "overview": "Décider quoi faire",
+    "machine": "Comprendre le matériel",
+    "models": "Choisir et gérer",
+    "tests": "Mesurer localement",
+    "assistant": "Utiliser les modèles",
+    "workflows": "Composer et prouver",
+    "account": "Sauver et partager",
+}
+
+WORKSPACE_FIRST_SECTIONS = {
+    "overview": "Verdict immédiat",
+    "machine": "Matériel détecté",
+    "models": "Modèles compatibles",
+    "tests": "Choisir un modèle",
+    "assistant": "Améliorer un prompt",
+    "workflows": "Préparer Strategy Arena",
+    "account": "Bilan machine",
+}
+
+HUMAN_PANEL_TITLES = {
+    ".capability-passport-panel": ("Passeport IA", "AI Capability Passport"),
+    ".local-capability-bridge-panel": ("Partage local", "Local Capability Bridge"),
+    ".board-observer-panel": ("Lire un board", "Board Observer"),
+    ".workstack-composer-panel": ("Composer le plan", "Workstack Composer"),
+    ".capability-router-panel": ("Affecter les rôles", "Capability Router"),
+    ".forgebench-panel": ("Comparer des stacks", "ForgeBench"),
+    ".evidence-ledger-panel": ("Vérifier les preuves", "Evidence Ledger"),
+    ".model-autopilot-panel": ("Optimiser les réglages", "Model Autopilot"),
+    ".flight-recorder-panel": ("Suivre les performances", "Flight Recorder"),
+}
+
 
 def assert_no_horizontal_overflow(page, label: str):
     metrics = page.evaluate(
@@ -33,11 +65,27 @@ def assert_no_horizontal_overflow(page, label: str):
         raise AssertionError(f"{label}: horizontal overflow {overflow}px {metrics}")
 
 
+def assert_touch_targets(page, label: str):
+    bad = page.evaluate(
+        """() => [...document.querySelectorAll('button, .ghost-btn')]
+          .filter((node) => node.offsetParent !== null)
+          .map((node) => {
+            const rect = node.getBoundingClientRect();
+            return { text: node.textContent.trim(), width: rect.width, height: rect.height };
+          })
+          .filter((item) => item.width < 42 || item.height < 42)"""
+    )
+    if bad:
+        raise AssertionError(f"{label}: touch targets are too small: {bad[:5]}")
+
+
 def inspect_workspace(page, workspace: str, expected_panels: int, label: str):
     state = page.evaluate(
         r"""(workspace) => {
           const shell = document.querySelector('#appShell');
           const selected = document.querySelector('[data-workspace-tab-target][aria-selected="true"]');
+          const tabStrip = selected?.parentElement?.getBoundingClientRect();
+          const selectedRect = selected?.getBoundingClientRect();
           const visible = [...document.querySelectorAll('#workspaceContent > article.panel')]
             .filter((panel) => panel.offsetParent !== null)
             .map((panel) => ({
@@ -50,6 +98,9 @@ def inspect_workspace(page, workspace: str, expected_panels: int, label: str):
             active: shell?.dataset.workspaceTab || '',
             selected: selected?.dataset.workspaceTabTarget || '',
             selectedCount: document.querySelectorAll('[data-workspace-tab-target][aria-selected="true"]').length,
+            subtitle: document.querySelector('#workspaceSubtitle')?.textContent?.trim() || '',
+            activeTabVisible: !!tabStrip && !!selectedRect && selectedRect.left >= tabStrip.left - 1 && selectedRect.right <= tabStrip.right + 1,
+            prerequisiteVisible: !!document.querySelector('#workspacePrerequisite')?.offsetParent,
             visible,
             ownedCount: owned.length,
             section: document.querySelector('#workspaceSectionSelect')?.value || '',
@@ -61,6 +112,12 @@ def inspect_workspace(page, workspace: str, expected_panels: int, label: str):
     )
     if state["active"] != workspace or state["selected"] != workspace or state["selectedCount"] != 1:
         raise AssertionError(f"{label}: invalid active tab state {state}")
+    if state["subtitle"] != WORKSPACE_SUBTITLES[workspace]:
+        raise AssertionError(f"{label}: unclear workspace subtitle {state['subtitle']!r}")
+    if not state["activeTabVisible"]:
+        raise AssertionError(f"{label}: active tab remains outside the mobile strip")
+    if state["prerequisiteVisible"]:
+        raise AssertionError(f"{label}: scan prerequisite remained visible after a complete machine state")
     if state["ownedCount"] != expected_panels:
         raise AssertionError(
             f"{label}: expected {expected_panels} owned panels, got {state['ownedCount']}"
@@ -75,6 +132,9 @@ def inspect_workspace(page, workspace: str, expected_panels: int, label: str):
         raise AssertionError(
             f"{label}: expected {expected_panels + 1} section choices, got {section_count}"
         )
+    first_label = page.locator("#workspaceSectionSelect option").first.inner_text().strip()
+    if first_label != WORKSPACE_FIRST_SECTIONS[workspace]:
+        raise AssertionError(f"{label}: first section remains technical or unstable: {first_label!r}")
     return state
 
 
@@ -84,6 +144,9 @@ def assert_feature_route(page, source_tab: str, source_section: str, button: str
     route_button = page.locator(button)
     if not route_button.is_visible() or route_button.is_disabled():
         raise AssertionError(f"{label}: prerequisite route is not actionable: {button}")
+    visible_disabled = route_button.locator("xpath=..").locator("button:visible:disabled").count()
+    if visible_disabled:
+        raise AssertionError(f"{label}: disabled commands still clutter the prerequisite row")
     route_button.click()
     page.wait_for_timeout(400)
     state = page.evaluate(
@@ -116,6 +179,11 @@ def check(browser, width: int, height: int, label: str):
     page.evaluate("() => window.__OUTILSIA_TEST__.applyDemoState()")
     page.wait_for_timeout(250)
 
+    for selector, (task_label, technical_label) in HUMAN_PANEL_TITLES.items():
+        title = page.locator(f"{selector} .panel-title h2").inner_text().strip()
+        if not title.startswith(task_label) or technical_label not in title:
+            raise AssertionError(f"{label}: panel title does not explain {technical_label}: {title!r}")
+
     orphaned = page.evaluate(
         """() => [...document.querySelectorAll('#workspaceContent > article.panel')]
           .filter((panel) => !panel.dataset.workspace)
@@ -130,6 +198,8 @@ def check(browser, width: int, height: int, label: str):
         page.wait_for_timeout(80)
         assert_no_horizontal_overflow(page, f"{label}-{workspace}")
         state = inspect_workspace(page, workspace, expected_panels, f"{label}-{workspace}")
+        if width <= 760:
+            assert_touch_targets(page, f"{label}-{workspace}")
         heights[workspace] = round(state["height"] / state["viewport"], 2)
         page.locator("#workspaceSectionSelect").select_option("__all__")
         page.wait_for_timeout(60)
@@ -174,6 +244,7 @@ def check(browser, width: int, height: int, label: str):
         ("workflows", ".workstack-composer-panel", '.workstack-composer-panel [data-open-feature="board"]', "workflows", ".board-observer-panel", "#boardObserverUrl", "workstack-to-board"),
         ("workflows", ".capability-router-panel", '.capability-router-panel [data-open-feature="workstack"]', "workflows", ".workstack-composer-panel", "#workstackPriority", "router-to-workstack"),
         ("workflows", ".forgebench-panel", '.forgebench-panel [data-open-feature="router"]', "workflows", ".capability-router-panel", "#capabilityRouterObjective", "forgebench-to-router"),
+        ("assistant", ".prompt-library-panel", '.prompt-library-panel [data-open-feature="promptforge"]', "assistant", ".promptforge-panel", "#promptForgeInput", "library-to-promptforge"),
     ]
     for route in prerequisite_routes:
         assert_feature_route(page, *route[:-1], f"{label}-{route[-1]}")
@@ -205,6 +276,14 @@ def check(browser, width: int, height: int, label: str):
     )
     if keyboard_state != {"active": "machine", "focused": "workspaceMachineBtn"}:
         raise AssertionError(f"{label}: keyboard tab navigation failed: {keyboard_state}")
+    focus_ring = page.locator("#workspaceMachineBtn").evaluate(
+        """(button) => {
+          const style = getComputedStyle(button);
+          return { style: style.outlineStyle, width: parseFloat(style.outlineWidth) || 0 };
+        }"""
+    )
+    if focus_ring["style"] == "none" or focus_ring["width"] < 2:
+        raise AssertionError(f"{label}: keyboard focus is not visibly indicated: {focus_ring}")
 
     page.locator("#workspaceOverviewBtn").click()
     page.wait_for_timeout(150)

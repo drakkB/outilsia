@@ -57,6 +57,16 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     for forbidden in ["Contexte prive", "secret@example.com", "api_key"]:
         if forbidden in text:
             raise AssertionError(f"{label}: private value rendered {forbidden!r}")
+    if width <= 760:
+        badge = page.locator("#workstackComposerState").evaluate(
+            """(node) => ({
+              clientWidth: node.clientWidth,
+              scrollWidth: node.scrollWidth,
+              whiteSpace: getComputedStyle(node).whiteSpace
+            })"""
+        )
+        if badge["scrollWidth"] > badge["clientWidth"] + 1 or badge["whiteSpace"] == "nowrap":
+            raise AssertionError(f"{label}: status badge remains truncated: {badge}")
 
     overflow = page.evaluate(
         """() => ({
@@ -70,6 +80,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     if errors:
         raise AssertionError(f"{label}: page errors {errors}")
 
+    page.add_style_tag(content=".workspace-nav { position: static !important; }")
     screenshot = OUT / f"workstack-composer-{label}.png"
     panel.screenshot(path=str(screenshot))
     page.close()
