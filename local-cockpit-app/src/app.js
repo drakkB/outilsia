@@ -6603,6 +6603,7 @@ function readinessMarkdown(report = readinessReport()) {
     report.benchmark
       ? `- Benchmark: ${report.benchmark.model} - ${report.benchmark.estimated_tokens_per_second} tok/s - ${report.benchmark.elapsed_ms} ms - ${benchmarkMeasurementLabel(report.benchmark)} - ${benchmarkExecutionLabel(report.benchmark)} - succès ${report.benchmark.success ? "oui" : "non"}`
       : "- Aucun benchmark lancé.",
+    report.benchmark && benchmarkPlacementVerdict(report.benchmark) ? `- ${benchmarkPlacementVerdict(report.benchmark)}` : "",
     report.model_autopilot?.active
       ? `- Model Autopilot: profil ${report.model_autopilot.active.label} actif - ${modelAutopilotTuningLabel(report.model_autopilot.active.tuning)}`
       : report.model_autopilot?.recommended
@@ -7272,6 +7273,7 @@ function memoryBenchmarkCards() {
       item.arena_objective ? `- Preuve Arena objective: ${item.arena_objective.passed_count}/${item.arena_objective.total_count} (${item.arena_objective.score}/100)` : "",
       item.arena_objective ? `- Vérifications: ${item.arena_objective.checks.map((check) => `${check.label} ${check.passed ? "OK" : "NON"}`).join(" · ")}` : "",
       item.arena_preflight_schema === ARENA_PREFLIGHT_SCHEMA ? `- Runtime Arena: ${item.arena_runtime_label} · ${item.arena_installed_size_label} · délai ${item.arena_timeout_seconds} s` : "",
+      benchmarkPlacementVerdict(item) ? `- ${benchmarkPlacementVerdict(item)}` : "",
       item.recommendation_proof ? `- Recommendation Engine ${item.recommendation_proof.profile_label}: ${item.recommendation_proof.passed_count}/${item.recommendation_proof.total_count} (${item.recommendation_proof.score}/100)` : "",
       item.resource_estimates ? `- Ressources: ${item.resource_estimates.vram_required_q4_gb || "?"} Go VRAM Q4 estimés · ${item.resource_estimates.machine_ram_gb || "?"} Go RAM disponibles · ${item.resource_estimates.storage_label || "stockage à confirmer"}` : "",
       item.error ? `- Erreur: ${item.error}` : "",
@@ -15079,6 +15081,8 @@ function appendBenchmarkToConsole(result) {
   appendOperationLine(`Temps: ${result.elapsed_ms ?? 0} ms · ${benchmarkSpeedLabel(result)}: ${result.estimated_tokens_per_second ?? 0} tok/s · ${benchmarkMeasurementLabel(result)} · Mode: ${String(result.execution_mode || "auto") === "cpu" ? "CPU seul" : "automatique"}`, "bench");
   const metricDetails = benchmarkMetricDetails(result);
   if (metricDetails) appendOperationLine(metricDetails, "bench");
+  const placement = benchmarkPlacementVerdict(result);
+  if (placement) appendOperationLine(placement, "bench");
   const output = result.success
     ? result.output_preview || "Sortie vide"
     : friendlyBenchmarkError(result);
@@ -16137,6 +16141,14 @@ function benchmarkQualityVerdict(result) {
   const tps = Number(result.estimated_tokens_per_second || 0);
   const elapsed = Number(result.elapsed_ms || 0);
   const preview = String(result.output_preview || "").trim();
+  const processor = String(result.runtime_processor || "unknown").toLowerCase();
+  const gpuOffload = Number(result.runtime_gpu_offload_percent || 0);
+  if (processor === "hybrid" && gpuOffload > 0 && gpuOffload < 70 && tps < 8) {
+    return "Verdict d'usage : exécutable avec offload RAM, mais trop lent pour être recommandé comme modèle quotidien sur cette machine.";
+  }
+  if (processor === "cpu" && tps < 8) {
+    return "Verdict d'usage : exécution CPU confirmée, mais débit trop faible pour un usage quotidien confortable.";
+  }
   if (tps >= 40 && elapsed <= 6000 && preview.length >= 80) {
     return "Qualité courte : très bon candidat, réponse exploitable et vitesse confortable.";
   }
@@ -16177,12 +16189,36 @@ function benchmarkMetricDetails(result) {
   return details.join(" · ");
 }
 
+function benchmarkRuntimeSizeLabel(value) {
+  const bytes = Number(value || 0);
+  if (!Number.isFinite(bytes) || bytes <= 0) return "";
+  return `${Math.round((bytes / 1024 / 1024 / 1024) * 10) / 10} Go`;
+}
+
+function benchmarkPlacementVerdict(result) {
+  if (String(result?.runtime_evidence_source || "") !== "ollama_api_ps") return "";
+  const processor = String(result?.runtime_processor || "unknown").toLowerCase();
+  if (!["gpu", "hybrid", "cpu"].includes(processor)) return "";
+  const offload = Math.max(0, Math.min(100, Number(result?.runtime_gpu_offload_percent || 0)));
+  const modelSize = benchmarkRuntimeSizeLabel(result?.runtime_model_size_bytes);
+  const vramSize = benchmarkRuntimeSizeLabel(result?.runtime_vram_bytes);
+  const footprint = modelSize && vramSize ? ` · ${vramSize} / ${modelSize} placés en VRAM` : "";
+  if (processor === "hybrid") {
+    return `Placement mesuré : hybride GPU + RAM · ${formatDoctorNumber(offload, " %")} du modèle sur le GPU${footprint}.`;
+  }
+  if (processor === "gpu") {
+    return `Placement mesuré : GPU · ${formatDoctorNumber(offload || 100, " %")} du modèle sur le GPU${footprint}.`;
+  }
+  return `Placement mesuré : CPU/RAM · ${formatDoctorNumber(offload, " %")} du modèle sur le GPU${footprint}.`;
+}
+
 function renderBenchmark(result) {
   const model = ollamaActionRef(result.model || "");
   const quality = benchmarkQualityVerdict(result);
   const executionMode = benchmarkExecutionLabel(result);
   const measurement = benchmarkMeasurementLabel(result);
   const metricDetails = benchmarkMetricDetails(result);
+  const placement = benchmarkPlacementVerdict(result);
   const cpuRetry = model && isCudaBenchmarkFailure(result)
     ? `<button type="button" class="cpu-retry-btn" data-retry-benchmark-cpu="${escapeHtml(model)}">Retester sans GPU</button>`
     : "";
@@ -16197,6 +16233,7 @@ function renderBenchmark(result) {
       <span>Méthode : ${escapeHtml(measurement)}</span>
       ${metricDetails ? `<span>Détails : ${escapeHtml(metricDetails)}</span>` : ""}
       <span>Exécution : ${escapeHtml(executionMode)}</span>
+      ${placement ? `<span>${escapeHtml(placement)}</span>` : ""}
       <span>${escapeHtml(quality)}</span>
       <span>${escapeHtml(output)}</span>
     </div>
@@ -16343,6 +16380,7 @@ function renderBenchmarkHistory(items = readBenchmarkHistory()) {
           <strong>${escapeHtml(benchmarkModelDisplayLabel(item.model))} ${item.success ? "" : `· ${escapeHtml(benchmarkTimedOut(item) ? "test incomplet" : "erreur")}`}</strong>
           <span>${escapeHtml(new Date(Number(item.created_at_ms || Date.now())).toLocaleString("fr-FR"))} · ${escapeHtml(item.estimated_tokens_per_second || 0)} tok/s · ${escapeHtml(item.elapsed_ms || 0)} ms</span>
           ${item.arena_preflight_schema === ARENA_PREFLIGHT_SCHEMA ? `<span>${escapeHtml(item.arena_runtime_label)} · ${escapeHtml(item.arena_installed_size_label)} · délai ${escapeHtml(item.arena_timeout_seconds)} s</span>` : ""}
+          ${benchmarkPlacementVerdict(item) ? `<span>${escapeHtml(benchmarkPlacementVerdict(item))}</span>` : ""}
           <span>${escapeHtml(item.success ? item.output_preview || "Sortie vide" : friendlyBenchmarkError(item))}</span>
         </div>
       `).join("")}
@@ -16379,6 +16417,7 @@ function benchmarkHistoryMarkdown(items = readBenchmarkHistory()) {
       `- Méthode: ${benchmarkMeasurementLabel(item)}`,
       `- Tokens: ${item.estimated_tokens}`,
       item.arena_preflight_schema === ARENA_PREFLIGHT_SCHEMA ? `- Runtime Arena: ${item.arena_runtime_label} · ${item.arena_installed_size_label} · délai ${item.arena_timeout_seconds} s` : "",
+      benchmarkPlacementVerdict(item) ? `- ${benchmarkPlacementVerdict(item)}` : "",
       !item.success ? `- Diagnostic: ${friendlyBenchmarkError(item)}` : "",
       "",
       "```text",
@@ -19280,6 +19319,69 @@ function installTestHarness() {
         monitorLive: Boolean(els.operationMonitor?.classList.contains("operation-live")),
         installed: isOllamaModelInstalledInScan(model),
         installing: isOllamaModelInstalling(model)
+      };
+    },
+    applyBenchmarkPlacementState() {
+      this.applyDemoState();
+      const hybrid = {
+        ...demoBenchmark("nous-hermes2-mixtral:8x7b"),
+        model: "nous-hermes2-mixtral:8x7b",
+        success: true,
+        elapsed_ms: 48261,
+        estimated_tokens_per_second: 4.1,
+        measurement_source: "ollama_api",
+        runtime_evidence_source: "ollama_api_ps",
+        runtime_processor: "hybrid",
+        runtime_gpu_offload_percent: 33.3,
+        runtime_model_size_bytes: 27503704640,
+        runtime_vram_bytes: 9156771840,
+        output_preview: "La VRAM stocke les poids du modèle et accélère l'inférence locale.",
+        created_at_ms: Date.now()
+      };
+      const gpu = {
+        ...hybrid,
+        model: "hermes3:8b",
+        elapsed_ms: 3490,
+        estimated_tokens_per_second: 117.3,
+        runtime_processor: "gpu",
+        runtime_gpu_offload_percent: 100,
+        runtime_model_size_bytes: 5046586573,
+        runtime_vram_bytes: 5046586573
+      };
+      const cpu = {
+        ...hybrid,
+        model: "qwen3:0.6b",
+        estimated_tokens_per_second: 3.2,
+        runtime_processor: "cpu",
+        runtime_gpu_offload_percent: 0,
+        runtime_model_size_bytes: 560493568,
+        runtime_vram_bytes: 0
+      };
+      const unproven = {
+        ...hybrid,
+        runtime_evidence_source: "",
+        runtime_processor: "unknown"
+      };
+      state.benchmark = hybrid;
+      renderBenchmark(hybrid);
+      saveBenchmarkHistoryEntry(hybrid);
+      return {
+        hybrid: {
+          placement: benchmarkPlacementVerdict(hybrid),
+          quality: benchmarkQualityVerdict(hybrid)
+        },
+        gpu: {
+          placement: benchmarkPlacementVerdict(gpu),
+          quality: benchmarkQualityVerdict(gpu)
+        },
+        cpu: {
+          placement: benchmarkPlacementVerdict(cpu),
+          quality: benchmarkQualityVerdict(cpu)
+        },
+        unproven: benchmarkPlacementVerdict(unproven),
+        rendered: els.benchmarkResult?.textContent || "",
+        history: benchmarkHistoryMarkdown(),
+        memory: memoryBenchmarkCards()
       };
     },
     memoryMarkdown: () => cockpitMemoryMarkdown(),

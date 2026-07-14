@@ -43,6 +43,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Exiger une confirmation chiffrée avant la campagne et empêcher deux exécutions Arena concurrentes.
 - [x] Conserver la preuve Arena Preflight v1 dans le run, l'historique, le rapport, MemoryForge et la fiche terrain.
 - [x] Confirmer manuellement le nouveau libellé et le benchmark long dans le build Windows candidat : Mixtral 26 Go sous WSL, 48,3 s, 4,1 tok/s, exécution hybride et 33,3 % d'offload GPU sur RTX 4080 SUPER 16 Go.
+- [x] Afficher le placement GPU/RAM mesuré dans le résultat, l'historique, le rapport et MemoryForge, puis distinguer réussite technique et confort quotidien.
 
 ## Maintenant - Hardware Doctor 2.0 et AI Capability Passport v1
 
