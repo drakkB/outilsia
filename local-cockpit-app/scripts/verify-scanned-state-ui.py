@@ -172,7 +172,9 @@ def check_scanned_view(browser, width: int, height: int, label: str):
     assert_quick_action_button(page, label)
     assert_sticky_action_hidden_in_essential(page, label)
     assert_text(page, "#readinessBox", "Machine prête pour l'IA locale", f"{label} readiness")
-    assert_text(page, "#readinessBox", "AI Capability Passport", f"{label} readiness passport")
+    assert_text(page, "#readinessBox", "Trois actions utiles", f"{label} readiness actions")
+    assert_text(page, "#readinessBox", "Choisir le meilleur modèle", f"{label} recommendation action")
+    assert_no_text(page, "#readinessBox", "Recommendation Engine v2 non encore lancé", f"{label} readiness jargon")
     assert_text(page, "#arenaBox", "Meilleur compromis", f"{label} arena")
     assert_no_text(page, "#arenaBox", "undefined/100", f"{label} arena score")
     assert_no_text(page, "#arenaBox", "NaN/100", f"{label} arena score")
@@ -181,6 +183,26 @@ def check_scanned_view(browser, width: int, height: int, label: str):
     visible_tools = visible_focus_tools(page)
     if len(visible_tools) > 1:
         raise AssertionError(f"{label}: essential mode shows too many work panels {visible_tools}")
+
+    page.locator("#workspaceSectionSelect").select_option(".readiness-panel")
+    page.locator('#readinessBox [data-open-feature="recommendation"]').first.click()
+    page.wait_for_timeout(180)
+    recommendation_navigation = page.evaluate(
+        """() => ({
+          tab: document.querySelector('.app-shell')?.dataset.workspaceTab,
+          section: document.querySelector('#workspaceSectionSelect')?.value,
+          engineVisible: !!document.querySelector('.recommendation-engine-card')?.offsetParent,
+          runVisible: !!document.querySelector('[data-run-recommendation]')?.offsetParent
+        })"""
+    )
+    if recommendation_navigation != {
+        "tab": "tests",
+        "section": ".prepare-panel",
+        "engineVisible": True,
+        "runVisible": True,
+    }:
+        raise AssertionError(f"{label}: recommendation action did not open the exact control {recommendation_navigation}")
+    page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('overview')")
 
     memory = result["memory"]
     required_memory = [
@@ -313,6 +335,26 @@ def check_scanned_view(browser, width: int, height: int, label: str):
     unexpected_tools = [tool for tool in visible_tools if tool not in allowed_tools]
     if unexpected_tools:
         raise AssertionError(f"{label}: optional tools should not stay as a main panel in essential mode {visible_tools}")
+    overview_visibility = page.evaluate(
+        r"""() => ({
+          readinessVisible: !!document.querySelector('.readiness-panel')?.offsetParent,
+          foreignPanels: [...document.querySelectorAll('#workspaceContent > article.panel')]
+            .filter((panel) => panel.offsetParent !== null)
+            .filter((panel) => !String(panel.dataset.workspace || '').split(/\s+/).includes('overview'))
+            .map((panel) => panel.className)
+        })"""
+    )
+    if not overview_visibility["readinessVisible"] or overview_visibility["foreignPanels"]:
+        raise AssertionError(f"{label}: Accueil section routing leaked another workspace {overview_visibility}")
+    quick_summary_visibility = page.evaluate(
+        r"""() => ({
+          primaryVisible: !!document.querySelector('.quick-decision-strip > div:first-child')?.offsetParent,
+          secondaryVisible: [...document.querySelectorAll('.quick-decision-strip > div:not(:first-child)')]
+            .filter((cell) => cell.offsetParent !== null).length
+        })"""
+    )
+    if not quick_summary_visibility["primaryVisible"] or quick_summary_visibility["secondaryVisible"] != 0:
+        raise AssertionError(f"{label}: Bilan machine should keep one next action without duplicate proof cards {quick_summary_visibility}")
     quick_action = page.locator("#quickActionText").inner_text(timeout=5000)
     if "Optimiser" in quick_action or "PromptForge" in quick_action:
         raise AssertionError(f"{label}: PromptForge leaked into top action: {quick_action}")

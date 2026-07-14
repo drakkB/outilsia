@@ -42,6 +42,22 @@ def main():
             })""",
             wrong_usage,
         )
+        page.evaluate("() => window.__OUTILSIA_TEST__.applyDemoState()")
+        page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('overview')")
+        page.locator("#workspaceSectionSelect").select_option(".readiness-panel")
+        readiness_before = page.locator("#readinessBox").inner_text()
+        open_comparison = page.locator('#readinessBox [data-open-feature="recommendation"]').first
+        assert open_comparison.is_visible(), "The home summary must expose the comparison action"
+        open_comparison.click()
+        page.wait_for_timeout(200)
+        navigation = page.evaluate(
+            """() => ({
+              tab: document.querySelector('.app-shell')?.dataset.workspaceTab,
+              section: document.querySelector('#workspaceSectionSelect')?.value,
+              engineVisible: !!document.querySelector('.recommendation-engine-card')?.offsetParent,
+              runVisible: !!document.querySelector('[data-run-recommendation]')?.offsetParent
+            })"""
+        )
         rendered = page.evaluate(
             "() => window.__OUTILSIA_TEST__.applyRecommendationEngineState('code')"
         )
@@ -61,6 +77,15 @@ def main():
     assert negative["wrongUsage"]["score"] == 80, negative
     assert negative["wrongUsage"]["passed_count"] == 6, negative
     assert negative["malformed"]["score"] == 0, negative
+    assert "recommendation engine v2 non encore lancé" not in readiness_before.lower(), readiness_before
+    assert "choisir le meilleur modèle" in readiness_before.lower(), readiness_before
+    assert "ouvrir la comparaison" in readiness_before.lower(), readiness_before
+    assert navigation == {
+        "tab": "tests",
+        "section": ".prepare-panel",
+        "engineVisible": True,
+        "runVisible": True,
+    }, navigation
 
     decision = rendered["decision"]
     report = rendered["report"]
@@ -68,7 +93,7 @@ def main():
     assert decision["winner"]["model"] == "qwen3:latest", decision
     assert decision["confidence"] == "solide", decision
     assert decision["verdict"].startswith("Garder qwen3:latest"), decision
-    assert "Recommendation Engine v2" in rendered["prepare"], rendered["prepare"]
+    assert "Comparaison par usage" in rendered["prepare"], rendered["prepare"]
     assert "Garder qwen3:latest" in rendered["readiness"], rendered["readiness"]
     assert recommendation["protocol"] == "outilsia.recommendation.v2", recommendation
     assert recommendation["winner"]["checks"] == "7/7", recommendation

@@ -705,7 +705,7 @@ const WORKSPACE_TITLES = {
 const WORKSPACE_SECTIONS = {
   overview: [
     ["Verdict", ".verdict-panel"],
-    ["Rapport machine", ".readiness-panel"]
+    ["Bilan machine", ".readiness-panel"]
   ],
   machine: [
     ["Diagnostic matériel", ".machine-panel"],
@@ -725,7 +725,7 @@ const WORKSPACE_SECTIONS = {
     ["Commandes Ollama", ".commands-panel"]
   ],
   tests: [
-    ["Parcours guidé", ".prepare-panel"],
+    ["Parcours et choix du modèle", ".prepare-panel"],
     ["Premier test", ".first-test-panel"],
     ["Arena locale", ".arena-panel"],
     ["Tests privés", ".private-workload-panel"],
@@ -752,12 +752,63 @@ const WORKSPACE_SECTIONS = {
     ["Evidence Ledger", ".evidence-ledger-panel"]
   ],
   account: [
-    ["Rapport machine", ".readiness-panel"],
+    ["Bilan machine", ".readiness-panel"],
     ["Compte OutilsIA", ".account-panel"],
     ["Feedback", ".feedback-panel"],
     ["Historique local", ".history-panel"]
   ]
 };
+const WORKSPACE_FEATURES = Object.freeze({
+  recommendation: {
+    tab: "tests",
+    panel: ".prepare-panel",
+    target: ".recommendation-engine-card",
+    focus: "[data-run-recommendation]",
+    label: "Comparaison par usage"
+  },
+  arena: {
+    tab: "tests",
+    panel: ".arena-panel",
+    target: ".arena-panel",
+    focus: "#runArenaBtn",
+    label: "Arena locale"
+  },
+  autopilot: {
+    tab: "tests",
+    panel: ".model-autopilot-panel",
+    target: ".model-autopilot-panel",
+    focus: "#runModelAutopilotBtn",
+    label: "Réglages Ollama"
+  },
+  flight: {
+    tab: "tests",
+    panel: ".flight-recorder-panel",
+    target: ".flight-recorder-panel",
+    focus: "#saveFlightReferenceBtn",
+    label: "Suivi des performances"
+  },
+  digital_twin: {
+    tab: "machine",
+    panel: ".upgrade-digital-twin-panel",
+    target: ".upgrade-digital-twin-panel",
+    focus: "#simulateDigitalTwinBtn",
+    label: "Simulation d'upgrade"
+  },
+  passport: {
+    tab: "workflows",
+    panel: ".capability-passport-panel",
+    target: ".capability-passport-panel",
+    focus: "#generateCapabilityPassportBtn",
+    label: "Passeport de capacité"
+  },
+  bridge: {
+    tab: "workflows",
+    panel: ".local-capability-bridge-panel",
+    target: ".local-capability-bridge-panel",
+    focus: "#startLocalCapabilityBridgeBtn",
+    label: "Passerelle locale"
+  }
+});
 const workspaceSectionState = {};
 const readinessProof = {
   copied: false,
@@ -934,6 +985,30 @@ function revealWorkspacePanel(tab, panel, block = "center") {
   const entry = (WORKSPACE_SECTIONS[tab] || []).find(([, selector]) => panelElement?.matches?.(selector));
   if (entry) setWorkspaceSection(tab, entry[1], { persist: true });
   window.requestAnimationFrame(() => panelElement?.scrollIntoView({ behavior: "smooth", block }));
+}
+
+function revealWorkspaceFeature(featureKey) {
+  const feature = WORKSPACE_FEATURES[featureKey];
+  if (!feature) return false;
+  const panel = document.querySelector(feature.panel);
+  if (!panel) return false;
+  setWorkspaceTab(feature.tab);
+  setWorkspaceSection(feature.tab, feature.panel, { persist: true });
+  const target = panel.querySelector(feature.target) || panel;
+  if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+  document.querySelectorAll(".feature-focus-pulse").forEach((element) => element.classList.remove("feature-focus-pulse"));
+  target.classList.add("feature-focus-pulse");
+  window.requestAnimationFrame(() => {
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    const control = target.querySelector(feature.focus) || panel.querySelector(feature.focus);
+    window.setTimeout(() => {
+      const focusTarget = control && !control.disabled ? control : target;
+      focusTarget.focus({ preventScroll: true });
+    }, 260);
+  });
+  window.setTimeout(() => target.classList.remove("feature-focus-pulse"), 1800);
+  setStatus(`${feature.label} ouverte`, "ok");
+  return true;
 }
 
 function revealOperationConsole() {
@@ -3616,17 +3691,17 @@ function renderRecommendationEngine(profileKey = readUsageProfileKey()) {
   const actionLabel = recommendationEngineBusy
     ? "Comparaison en cours..."
     : missing.length
-      ? `Installer ${missing.length} modèle(s) et comparer`
-      : `Comparer ${candidates.length} modèle(s)`;
+      ? `Installer ${missing.length} modèle(s), puis comparer`
+      : `Lancer la comparaison (${candidates.length} modèles)`;
   return `
     <div class="recommendation-engine-card ${decision?.winner ? "has-decision" : ""}">
       <div class="recommendation-engine-head">
         <div>
-          <span class="label">Recommendation Engine v2</span>
-          <strong>Meilleur modèle pour ${escapeHtml(profile.label)}</strong>
-          <p>Mêmes preuves communes, plus un test ${escapeHtml(recommendationUsageTask(profileKey).label.toLowerCase())}.</p>
+          <span class="label">Comparaison par usage · moteur v2</span>
+          <strong>Quel modèle convient le mieux à ${escapeHtml(profile.label)} ?</strong>
+          <p>Deux modèles passent le même test local. OutilsIA mesure la qualité, la vitesse et les ressources avant de proposer un gagnant.</p>
         </div>
-        <em>${decision ? `confiance ${escapeHtml(decision.confidence)}` : "à mesurer"}</em>
+        <em>${decision ? `confiance ${escapeHtml(decision.confidence)}` : "pas encore comparé"}</em>
       </div>
       <div class="recommendation-candidates">
         ${candidates.length ? candidates.map((item) => {
@@ -3654,7 +3729,7 @@ function renderRecommendationEngine(profileKey = readUsageProfileKey()) {
         <button type="button" data-run-recommendation="${escapeHtml(profileKey)}" ${recommendationEngineBusy || candidates.length < 2 ? "disabled" : ""}>${escapeHtml(actionLabel)}</button>
         ${decision?.winner ? `<button type="button" data-post-install-chat="${escapeHtml(decision.winner.model)}">Utiliser le gagnant</button>` : ""}
       </div>
-      <p class="fine-note">Aucun modèle n'est supprimé automatiquement. La décision compare uniquement les candidats testés sur cette machine.</p>
+      <p class="fine-note">${missing.length ? `${missing.length} téléchargement(s) seront nécessaires après votre clic. ` : ""}Aucun modèle n'est supprimé automatiquement. La décision compare uniquement les candidats réellement testés sur cette machine.</p>
     </div>
   `;
 }
@@ -6215,7 +6290,7 @@ function prepareFlowState() {
     status = "modèle requis";
     next = `Installer ${testModel}.`;
   } else if (!benchmarkReady) {
-    status = "test prêt";
+    status = "benchmark à lancer";
     next = `Lancer le benchmark ${testModel}.`;
   } else if (recommended.ref && !recommended.installed) {
     status = "2e modèle prêt";
@@ -7525,30 +7600,174 @@ function cockpitMemoryMarkdown() {
 function renderReadinessPanel() {
   if (!els.readinessBox) return;
   const report = readinessReport();
+  const recommendation = report.recommendation_engine;
+  const recommendationWinner = recommendation?.winner;
+  const benchmark = report.benchmark;
+  const recommended = report.recommended_model;
+  const arenaWinner = report.arena?.compromise;
+  const autopilotLabel = report.model_autopilot?.active
+    ? `${report.model_autopilot.active.label} actif`
+    : report.model_autopilot?.recommended
+      ? `${report.model_autopilot.recommended.label} conseillé`
+      : "Réglages à mesurer";
+  const twinLabel = report.upgrade_digital_twin?.decision?.label || "Tester un upgrade avant achat";
+  const scoreLabel = report.score === null ? "--" : String(report.score);
+  const proofLabel = benchmark ? `${benchmark.estimated_tokens_per_second} tok/s` : "À mesurer";
+  const proofDetail = benchmark ? `${benchmark.model} · ${benchmark.elapsed_ms} ms` : "Lance un benchmark court";
+  const recommendedLabel = recommended?.title || recommended?.ref || report.test_model || "À déterminer";
+  const recommendedDetail = recommended
+    ? `${recommended.ref} · ${recommended.installed ? recommended.benchmarked ? "installé et mesuré" : "installé" : "à installer"}`
+    : "Le scan choisira un modèle adapté";
+  const arenaLabel = arenaWinner || "À comparer";
+  const arenaDetail = arenaWinner
+    ? `${report.arena.compromise_score}/100 · ${report.arena.successful_count || 0} succès`
+    : "Compare au moins deux modèles installés";
+  const actionCards = [
+    {
+      eyebrow: "Choisir le meilleur modèle",
+      title: recommendationWinner ? recommendation.verdict : `Comparer pour ${report.usage_profile.label}`,
+      detail: recommendationWinner
+        ? `${recommendationWinner.model} · ${recommendationWinner.score}/100 · confiance ${recommendation.confidence}`
+        : "OutilsIA soumet deux modèles au même test local et explique son choix.",
+      state: recommendationWinner ? "mesuré" : "à faire",
+      feature: "recommendation",
+      button: recommendationWinner ? "Voir le comparatif" : "Ouvrir la comparaison"
+    },
+    {
+      eyebrow: "Optimiser Ollama",
+      title: autopilotLabel,
+      detail: report.model_autopilot?.active
+        ? modelAutopilotTuningLabel(report.model_autopilot.active.tuning)
+        : "Mesure puis applique un profil de contexte et de ressources adapté à cette machine.",
+      state: report.model_autopilot?.active ? "actif" : "optionnel",
+      feature: "autopilot",
+      button: report.model_autopilot?.active ? "Voir les réglages" : "Mesurer les réglages"
+    },
+    {
+      eyebrow: "Préparer un achat",
+      title: twinLabel,
+      detail: report.upgrade_digital_twin
+        ? `${report.upgrade_digital_twin.compatibility.status} · confiance ${report.upgrade_digital_twin.compatibility.confidence}`
+        : "Simule GPU, RAM, stockage, alimentation et boîtier sans modifier le PC.",
+      state: report.upgrade_digital_twin ? "calculé" : "facultatif",
+      feature: "digital_twin",
+      button: report.upgrade_digital_twin ? "Voir le scénario" : "Simuler un upgrade"
+    }
+  ];
+  const technicalModules = [
+    {
+      label: "Comparaison par usage",
+      technical: "Recommendation Engine v2",
+      value: recommendationWinner ? `${recommendationWinner.model} · ${recommendationWinner.score}/100` : "Non comparé",
+      feature: "recommendation"
+    },
+    {
+      label: "Réglages Ollama",
+      technical: "Model Autopilot",
+      value: autopilotLabel,
+      feature: "autopilot"
+    },
+    {
+      label: "Suivi des performances",
+      technical: "Flight Recorder",
+      value: report.flight_recorder?.comparison?.headline || "Aucune référence choisie",
+      feature: "flight"
+    },
+    {
+      label: "Simulation d'upgrade",
+      technical: "Upgrade Digital Twin",
+      value: report.upgrade_digital_twin?.decision?.label || "Aucun scénario calculé",
+      feature: "digital_twin"
+    },
+    {
+      label: "Passeport de capacité",
+      technical: "AI Capability Passport",
+      value: report.capability_passport ? `SHA-256 ${report.capability_passport.digest.slice(0, 12)}…` : "Non généré",
+      feature: "passport"
+    },
+    {
+      label: "Accès local contrôlé",
+      technical: "Passerelle locale",
+      value: report.local_capability_bridge?.running ? "Active en lecture seule" : "Désactivée par défaut",
+      feature: "bridge"
+    }
+  ];
   els.readinessState.textContent = report.status;
   els.readinessBox.className = report.ready ? "readiness-box" : "readiness-box empty";
   els.readinessBox.innerHTML = `
-    <div class="readiness-summary">
-      <strong>${escapeHtml(report.title)}</strong>
-      <span>${escapeHtml(report.machine.gpu)} · ${escapeHtml(report.machine.vram)} VRAM · ${escapeHtml(report.machine.ram)} RAM</span>
-      <span>Score : ${escapeHtml(report.score === null ? "non calculé" : `${report.score}/100`)} · Modèles conseillés : ${escapeHtml(report.models.length)}</span>
-      <span>${report.benchmark ? `Preuve : ${escapeHtml(report.benchmark.model)} à ${escapeHtml(report.benchmark.estimated_tokens_per_second)} tok/s` : "Preuve locale non encore obtenue."}</span>
-      <span>${report.promptForge ? `PromptForge : ${escapeHtml(report.promptForge.before_score)} -> ${escapeHtml(report.promptForge.after_score)}/100` : "PromptForge non encore utilisé."}</span>
-      <span>${report.recommended_model ? `2e modèle : ${escapeHtml(report.recommended_model.ref)} · ${report.recommended_model.installed ? "installé" : "à installer"}` : "Deuxième modèle recommandé non déterminé."}</span>
-      <span>${report.arena?.compromise ? `Arena : rapide ${escapeHtml(report.arena.fastest || "n/a")} · assistant ${escapeHtml(report.arena.assistant || "n/a")} · compromis ${escapeHtml(report.arena.compromise)} (${escapeHtml(report.arena.compromise_score)}/100)` : "Arena locale non encore lancée."}</span>
-      <span>${report.recommendation_engine?.winner ? `Recommandation mesurée : ${escapeHtml(report.recommendation_engine.verdict)} · ${escapeHtml(report.recommendation_engine.winner.score)}/100 · confiance ${escapeHtml(report.recommendation_engine.confidence)}` : "Recommendation Engine v2 non encore lancé."}</span>
-      ${report.private_workload_pack?.winner ? `<span>Test privé : ${escapeHtml(report.private_workload_pack.winner.model)} · ${escapeHtml(report.private_workload_pack.winner.score)}/100 · pack ${escapeHtml(report.private_workload_pack.pack)} · contenu brut non conservé.</span>` : ""}
-      <span>${report.model_autopilot?.active ? `Profil Ollama : ${escapeHtml(report.model_autopilot.active.label)} · ${escapeHtml(modelAutopilotTuningLabel(report.model_autopilot.active.tuning))}` : report.model_autopilot?.recommended ? `Autopilot : ${escapeHtml(report.model_autopilot.recommended.label)} recommandé, à appliquer dans Tests.` : "Model Autopilot non encore mesuré."}</span>
-      <span>${report.flight_recorder?.comparison ? `Flight Recorder : ${escapeHtml(report.flight_recorder.comparison.headline)} · confiance ${escapeHtml(report.flight_recorder.comparison.confidence)}` : "Flight Recorder : aucune référence locale."}</span>
-      <span>${report.upgrade_digital_twin ? `Upgrade Digital Twin : ${escapeHtml(report.upgrade_digital_twin.decision.label)} · ${escapeHtml(report.upgrade_digital_twin.compatibility.status)} · confiance ${escapeHtml(report.upgrade_digital_twin.compatibility.confidence)}` : "Upgrade Digital Twin : aucun scénario calculé."}</span>
-      <span>${report.capability_passport ? `Passport : SHA-256 ${escapeHtml(`${report.capability_passport.digest.slice(0, 16)}…`)}` : "AI Capability Passport disponible dans Atelier IA après génération."}</span>
-      <span>${report.local_capability_bridge?.running ? `Passerelle locale : active sur 127.0.0.1 · lecture seule · expiration automatique.` : "Passerelle locale : désactivée par défaut dans Atelier IA."}</span>
-      ${report.install_safety_preflight ? `<span>Préflight installation : ${escapeHtml(report.install_safety_preflight.model)} · ${escapeHtml(report.install_safety_preflight.verdict)} · ${report.install_safety_preflight.storage_free_gb == null ? "espace inconnu" : `${escapeHtml(report.install_safety_preflight.storage_free_gb)} Go libres`} · aucun chemin exporté.</span>` : ""}
-      <span>${report.upgrades[0] ? `Upgrade utile : ${escapeHtml(report.upgrades[0].title)}` : "Aucun achat prioritaire pour l'instant."}</span>
-      <span>${report.account_ready ? "Compte prêt : rapport partageable disponible après synchronisation." : "Connecte le compte pour sauvegarder et partager ce rapport."}</span>
+    <div class="readiness-hero">
+      <div>
+        <span class="label">Bilan vérifié sur ce PC</span>
+        <strong>${escapeHtml(report.title)}</strong>
+        <p>${escapeHtml(report.machine.gpu)} · ${escapeHtml(report.machine.vram)} VRAM · ${escapeHtml(report.machine.ram)} RAM · ${escapeHtml(report.runtime_readiness?.label || "runtime à vérifier")}</p>
+      </div>
+      <div class="readiness-score" aria-label="Score IA locale ${escapeHtml(scoreLabel)} sur 100">
+        <strong>${escapeHtml(scoreLabel)}</strong>
+        <span>/100</span>
+      </div>
     </div>
-    <div class="readiness-next">
-      ${report.next.slice(0, 4).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+    <div class="readiness-proof-grid">
+      <div>
+        <span>Preuve locale</span>
+        <strong>${escapeHtml(proofLabel)}</strong>
+        <small>${escapeHtml(proofDetail)}</small>
+      </div>
+      <div>
+        <span>Modèle conseillé</span>
+        <strong>${escapeHtml(recommendedLabel)}</strong>
+        <small>${escapeHtml(recommendedDetail)}</small>
+      </div>
+      <div>
+        <span>Comparaison Arena</span>
+        <strong>${escapeHtml(arenaLabel)}</strong>
+        <small>${escapeHtml(arenaDetail)}</small>
+      </div>
+      <div>
+        <span>Upgrade utile</span>
+        <strong>${escapeHtml(report.upgrades[0]?.title || "Aucun achat urgent")}</strong>
+        <small>${escapeHtml(report.upgrades[0]?.reason || "Mesure avant décision d'achat")}</small>
+      </div>
+    </div>
+    <section class="readiness-actions" aria-label="Prochaines actions utiles">
+      <div class="readiness-section-head">
+        <div>
+          <span class="label">Pour aller plus loin</span>
+          <strong>Trois actions utiles, au même endroit</strong>
+        </div>
+        <p>Chaque bouton ouvre directement le bon écran. Aucun test long ni téléchargement ne démarre sans un second clic explicite.</p>
+      </div>
+      <div class="readiness-action-grid">
+        ${actionCards.map((item) => `
+          <article class="readiness-action-card">
+            <div class="readiness-action-head">
+              <span>${escapeHtml(item.eyebrow)}</span>
+              <em>${escapeHtml(item.state)}</em>
+            </div>
+            <strong>${escapeHtml(item.title)}</strong>
+            <p>${escapeHtml(item.detail)}</p>
+            <button type="button" data-open-feature="${escapeHtml(item.feature)}">${escapeHtml(item.button)}</button>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+    <details class="readiness-technical">
+      <summary>État détaillé des outils avancés</summary>
+      <div class="readiness-module-list">
+        ${technicalModules.map((item) => `
+          <div class="readiness-module-row">
+            <div>
+              <strong>${escapeHtml(item.label)}</strong>
+              <span>${escapeHtml(item.technical)}</span>
+            </div>
+            <p>${escapeHtml(item.value)}</p>
+            <button type="button" data-open-feature="${escapeHtml(item.feature)}" aria-label="Ouvrir ${escapeHtml(item.label)}">Ouvrir</button>
+          </div>
+        `).join("")}
+      </div>
+    </details>
+    <div class="readiness-account-note ${report.account_ready ? "is-ready" : ""}">
+      <strong>${report.account_ready ? "Rapport partageable prêt" : "Conserver ce bilan"}</strong>
+      <span>${report.account_ready ? "La machine est synchronisée : partage ou exporte le rapport." : "Sauvegarde le PC dans ton compte pour retrouver ses benchmarks et partager le rapport."}</span>
     </div>
   `;
   els.copyReadinessSummaryBtn.disabled = !state.scan;
@@ -7856,7 +8075,7 @@ function renderFirstTestPanel() {
     stateLabel = "modèle à installer";
     cta = `<button class="first-test-primary" type="button" data-install-model="${model}">Installer le modèle de test</button>`;
   } else if (modelReady && !benchmarkReady) {
-    stateLabel = "test prêt";
+    stateLabel = "benchmark à lancer";
     cta = `<button class="first-test-primary" type="button" data-benchmark-model="${model}">${escapeHtml(benchmarkButtonLabel(model, "Lancer le benchmark recommandé", "Installer + benchmarker"))}</button>`;
   } else if (benchmarkReady) {
     stateLabel = "test réussi";
@@ -9965,6 +10184,8 @@ async function runRecommendationEngine(profileKey = readUsageProfileKey()) {
     renderFieldTestPanel();
     renderStrategyBridgePanel();
     finishOperationMonitor(decision?.winner ? "Recommandation mesurée" : "Comparaison sans gagnant");
+    revealWorkspacePanel("tests", document.querySelector(".prepare-panel"), "center");
+    window.requestAnimationFrame(() => document.querySelector(".recommendation-engine-card")?.scrollIntoView({ behavior: "smooth", block: "center" }));
     setStatus(decision?.verdict || "Aucun modèle validé", decision?.winner ? "ok" : "warn");
     return run;
   } finally {
@@ -15805,6 +16026,7 @@ async function installRecommendedModel(model, button = null) {
       return;
     }
   }
+  revealWorkspacePanel("tests", els.operationPanel, "start");
   setOperationFocus(`Téléchargement en cours : ${clean}`, [
     `Commande : ${ollamaRuntimeCommandLabel(clean)} pull ${clean}`,
     `Budget : ${preflight.estimated_upper_gb == null ? "taille inconnue" : `${preflight.estimated_upper_gb} Go maximum estimé`} + ${preflight.reserve_gb} Go de réserve`,
@@ -15940,6 +16162,7 @@ async function deleteInstalledModel(model, button = null) {
     return;
   }
   resetOperationConsole(`Suppression Ollama demandée : ${clean}`);
+  revealWorkspacePanel("tests", els.operationPanel, "start");
   await ensureInstallProgressListener().catch((error) => {
     appendOperationLine(`Console temps réel non initialisée : ${error}`, "erreur");
   });
@@ -15998,6 +16221,7 @@ async function deleteInstalledModel(model, button = null) {
 
 async function installOllamaRuntime(button = null) {
   resetOperationConsole("Installation d'Ollama demandée");
+  revealWorkspacePanel("tests", els.operationPanel, "start");
   setOperationFocus("Installation Ollama en cours", [
     "L'app tente l'installation automatique si la plateforme le permet.",
     "Si Windows ouvre un installeur, termine l'installation puis relance le scan.",
@@ -16060,6 +16284,7 @@ async function installWslRuntime(button = els.installWslBtn) {
     return;
   }
   resetOperationConsole("Installation WSL demandée");
+  revealWorkspacePanel("tests", els.operationPanel, "start");
   setOperationFocus("Installation WSL en cours", [
     "Windows peut demander une confirmation administrateur.",
     "Un redémarrage peut être nécessaire avant que la distribution Linux soit utilisable.",
@@ -19299,6 +19524,7 @@ function installTestHarness() {
       const model = "phi4:14b";
       state.installingModels = { [model]: true };
       resetOperationConsole(`Installation Ollama demandée : ${model}`);
+      revealWorkspacePanel("tests", els.operationPanel, "start");
       setCancelOperationEnabled(true, model);
       setOperationFocus(`Téléchargement en cours : ${model}`, [
         `Commande : ${ollamaRuntimeCommandLabel()} pull ${model}`,
@@ -19896,6 +20122,11 @@ document.addEventListener("click", async (event) => {
   const usagePackTarget = usagePackButton?.getAttribute?.("data-usage-pack");
   if (usagePackTarget) {
     useUsageProfilePack(usagePackTarget);
+    return;
+  }
+  const openFeatureButton = event.target?.closest?.("[data-open-feature]");
+  const featureKey = openFeatureButton?.getAttribute?.("data-open-feature");
+  if (featureKey && revealWorkspaceFeature(featureKey)) {
     return;
   }
   const recommendationButton = event.target?.closest?.("[data-run-recommendation]");

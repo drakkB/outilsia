@@ -803,20 +803,25 @@
 
         <article class="panel readiness-panel" data-workspace="overview account">
           <div class="panel-title">
-            <h2>Rapport machine prête</h2>
+            <h2>Bilan de cette machine</h2>
             <span id="readinessState">non généré</span>
           </div>
-          <div id="readinessBox" class="readiness-box empty">Prépare la machine ou lance un benchmark pour obtenir un rapport final clair : prêt, bloqué ou à compléter.</div>
-          <div class="row-actions">
-            <button id="copyReadinessSummaryBtn" type="button" disabled>Copier résumé</button>
-            <button id="copyReadinessBtn" type="button" disabled>Copier rapport</button>
-            <button id="saveReadinessMemoryBtn" type="button" disabled>Ajouter à MemoryForge</button>
+          <div id="readinessBox" class="readiness-box empty">Analyse la machine puis lance un benchmark pour obtenir un bilan lisible et des actions concrètes.</div>
+          <div class="row-actions readiness-primary-actions">
             <button id="saveReadinessAccountBtn" type="button" disabled>Sauver compte</button>
             <button id="shareReadinessBtn" type="button" disabled>Partager</button>
             <button id="pdfReadinessBtn" type="button" disabled>PDF modèle/upgrade</button>
-            <button id="copyWindowsRecipeBtn" type="button" disabled>Copier recette bêta</button>
-            <button id="downloadWindowsRecipeBtn" type="button" disabled>Télécharger recette</button>
+            <button id="saveReadinessMemoryBtn" type="button" disabled>MemoryForge</button>
           </div>
+          <details class="readiness-export-actions">
+            <summary>Copies et exports techniques</summary>
+            <div class="row-actions">
+              <button id="copyReadinessSummaryBtn" type="button" disabled>Copier résumé</button>
+              <button id="copyReadinessBtn" type="button" disabled>Copier rapport complet</button>
+              <button id="copyWindowsRecipeBtn" type="button" disabled>Copier recette bêta</button>
+              <button id="downloadWindowsRecipeBtn" type="button" disabled>Télécharger recette</button>
+            </div>
+          </details>
         </article>
 
         <article class="panel benchmark-panel" data-workspace="tests">

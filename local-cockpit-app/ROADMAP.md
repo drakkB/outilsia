@@ -21,6 +21,9 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Conserver les formulaires et mémoriser l'espace actif entre deux ouvertures.
 - [x] Réduire le pire cas mesuré de 18,1 à 2,1 hauteurs d'écran sur desktop et de 36,5 à 3,6 sur mobile.
 - [x] Ajouter une recette Playwright dédiée qui contrôle propriété des panneaux, routage, persistance, menu Section, clavier et débordements.
+- [x] Remplacer le journal technique de l'Accueil par un Bilan machine : quatre preuves, trois actions utiles et détails avancés repliés.
+- [x] Donner à chaque statut avancé un bouton de navigation exact ; `Choisir le meilleur modèle` ouvre `Tests > Parcours et choix du modèle` et focalise le bouton de comparaison sans lancer de téléchargement.
+- [x] Empêcher les panneaux Tests actifs de masquer une section Accueil choisie et compacter les onglets mobiles sur une seule ligne défilable.
 - [ ] Publier cette interface et la présenter sur le site seulement après validation manuelle du build candidat.
 
 ## Correctif validé dans les sources - Hermes, runtime et mémoire réelle
