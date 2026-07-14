@@ -170,6 +170,18 @@ def check(browser, width: int, height: int, label: str):
     screenshot_initial = OUT / f"terrain-ux-{label}-initial.png"
     page.screenshot(path=screenshot_initial, full_page=True)
 
+    page.locator("#prepareBtn").click()
+    page.wait_for_function("() => !document.querySelector('#prepareBtn')?.disabled")
+    page.locator("#workspaceOverviewBtn").click()
+    page.locator("#workspaceSectionSelect").select_option(".readiness-panel")
+    scan_only = text(page, "#readinessBox")
+    scan_only_folded = scan_only.casefold()
+    for needle in ["Diagnostic matériel de ce PC", "Matériel très solide, benchmark à lancer"]:
+        if needle.casefold() not in scan_only_folded:
+            raise AssertionError(f"{label}: scan-only Bilan missing {needle!r}: {scan_only}")
+    if "Machine à compléter".casefold() in scan_only_folded:
+        raise AssertionError(f"{label}: generic pending title survived the scan: {scan_only}")
+
     assert_no_horizontal_overflow(page, f"{label}-scanned")
     assert_scanned_contract(page, f"{label}-scanned")
     screenshot_scanned = OUT / f"terrain-ux-{label}-scanned.png"

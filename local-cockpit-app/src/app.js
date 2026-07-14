@@ -6710,13 +6710,26 @@ function readinessReport() {
     : runtimeReadiness.key === "cpu-only"
       ? driverRemediation ? "CPU prêt · pilote GPU à vérifier" : "CPU prêt · accélération GPU non validée"
       : flow.status;
+  const hardwareLevel = score !== null && score >= 80
+    ? "Matériel très solide"
+    : score !== null && score >= 50
+      ? "Matériel compatible"
+      : "Matériel détecté";
   const title = ready
     ? "Machine prête pour l'IA locale"
     : runtimeReadiness.key === "cpu-only"
       ? driverRemediation
         ? "IA locale validée en CPU · pilote GPU à vérifier"
         : "IA locale validée en CPU · backend GPU à mesurer"
-      : "Machine à compléter";
+      : runtimeReadiness.key === "cuda-blocked"
+        ? "Modèle prêt, accélération GPU bloquée"
+        : !flow.ollamaReady
+          ? `${hardwareLevel}, Ollama à préparer`
+          : !flow.modelReady
+            ? `${hardwareLevel}, modèle test à installer`
+            : !flow.benchmarkReady
+              ? `${hardwareLevel}, benchmark à lancer`
+              : "Benchmark obtenu, runtime à confirmer";
   const next = [];
   if (!flow.scanned) next.push("Scanner la machine.");
   if (flow.scanned && !flow.ollamaReady) next.push("Installer Ollama puis relancer le scan.");
@@ -7847,6 +7860,11 @@ function renderReadinessPanel() {
   const recommendation = report.recommendation_engine;
   const recommendationWinner = recommendation?.winner;
   const benchmark = report.benchmark;
+  const heroScope = report.ready
+    ? "Bilan mesuré sur ce PC"
+    : benchmark
+      ? "Bilan local à confirmer"
+      : "Diagnostic matériel de ce PC";
   const recommended = report.recommended_model;
   const arenaWinner = report.arena?.compromise;
   const autopilotLabel = report.model_autopilot?.active
@@ -7941,7 +7959,7 @@ function renderReadinessPanel() {
   els.readinessBox.innerHTML = `
     <div class="readiness-hero">
       <div>
-        <span class="label">Bilan vérifié sur ce PC</span>
+        <span class="label">${escapeHtml(heroScope)}</span>
         <strong>${escapeHtml(report.title)}</strong>
         <p>${escapeHtml(report.machine.gpu)} · ${escapeHtml(report.machine.vram)} VRAM · ${escapeHtml(report.machine.ram)} RAM · ${escapeHtml(report.runtime_readiness?.label || "runtime à vérifier")}</p>
       </div>

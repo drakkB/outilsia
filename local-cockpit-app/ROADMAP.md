@@ -35,6 +35,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Ouvrir Atelier IA sur Composer le plan, Compte sur la sauvegarde et placer les actions modèles avant Force/Usage/Limite.
 - [x] Harmoniser l'état Compte connecté afin qu'aucun message résiduel ne demande encore de se connecter.
 - [x] Migrer une seule fois les préférences héritées de l'ancienne page longue vers la première section de chaque espace, puis respecter les nouveaux choix persistants.
+- [x] Remplacer le titre générique d'un Bilan incomplet par l'étape réellement manquante : Ollama, modèle test, benchmark, GPU ou confirmation du runtime.
 - [ ] Publier cette interface et la présenter sur le site seulement après validation manuelle du build candidat.
 
 ## Correctif validé dans les sources - Hermes, runtime et mémoire réelle
