@@ -263,7 +263,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "Aucun vainqueur automatique",
         "2 candidats",
         "Fable Joint Sentinel",
-        "Baseline conservateur",
+        "Controle conservateur OutilsIA",
         "Ordre provisoire vérifié",
         "5 scénarios cachés + 1 public",
         "Aucun vainqueur déclaré",

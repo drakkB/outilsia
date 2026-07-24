@@ -21,7 +21,9 @@ use capability_router::route_workstack_capabilities;
 use evidence_ledger::{append_evidence_entry, clear_evidence_ledger, get_evidence_ledger};
 use forgebench::compile_forgebench_experiment;
 use forgebench_candidate::run_forgebench_ollama_candidate;
-use forgebench_garden::{evaluate_forgebench_garden, get_forgebench_garden_example};
+use forgebench_garden::{
+    evaluate_forgebench_garden, get_forgebench_garden_baseline, get_forgebench_garden_example,
+};
 use forgebench_garden_vault::{
     clear_forgebench_garden_hidden_suite, get_forgebench_garden_hidden_suite_status,
     seal_forgebench_garden_hidden_suite,
@@ -5193,6 +5195,7 @@ pub fn run() {
             clear_forgebench_garden_hidden_suite,
             evaluate_forgebench_garden,
             get_forgebench_garden_example,
+            get_forgebench_garden_baseline,
             start_local_capability_bridge,
             get_local_capability_bridge_status,
             stop_local_capability_bridge,

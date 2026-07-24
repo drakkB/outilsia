@@ -17,6 +17,9 @@ const CONTRACT_VERSION: &str = "2026-07-24";
 const CONTRACT_SOURCE: &str = include_str!("../../forgebench/garden-bamboo-v1/contract.json");
 const EXAMPLE_SOURCE: &str =
     include_str!("../../forgebench/garden-bamboo-v1/examples/fable-joint-sentinel-v0.5.garden");
+const BASELINE_SOURCE: &str = include_str!(
+    "../../forgebench/garden-bamboo-v1/examples/controle-conservateur-outilsia-v1.garden"
+);
 const MAX_SOURCE_BYTES: usize = 16 * 1024;
 const MAX_CANDIDATES: usize = 8;
 const MAX_WHEN_PER_CHANNEL: usize = 10;
@@ -2278,18 +2281,23 @@ pub(crate) fn validate_forgebench_garden_result(result: &Value) -> Result<(), St
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn get_forgebench_garden_example() -> Value {
+fn garden_example_document(
+    candidate_id: &str,
+    source: &str,
+    authoring_mode: &str,
+    simulator_used: bool,
+    thresholds_tuned: bool,
+) -> Value {
     json!({
         "schema": "outilsia.forgebench_garden_example.v1",
         "benchmark_id": GARDEN_BENCHMARK_ID,
-        "candidate_id": "fable-joint-sentinel-v0.5",
-        "source": EXAMPLE_SOURCE,
+        "candidate_id": candidate_id,
+        "source": source,
         "provenance": {
-            "authoring_mode": "open_book_iterative",
+            "authoring_mode": authoring_mode,
             "blind_one_shot": false,
-            "simulator_used_during_authoring": true,
-            "thresholds_tuned_after_visible_runs": true,
+            "simulator_used_during_authoring": simulator_used,
+            "thresholds_tuned_after_visible_runs": thresholds_tuned,
             "api_cost_eur_micros": Value::Null,
             "generation_duration_ms": Value::Null,
             "energy_wh_milli": Value::Null,
@@ -2300,6 +2308,28 @@ pub(crate) fn get_forgebench_garden_example() -> Value {
             "winner_declared": false
         }
     })
+}
+
+#[tauri::command]
+pub(crate) fn get_forgebench_garden_example() -> Value {
+    garden_example_document(
+        "fable-joint-sentinel-v0.5",
+        EXAMPLE_SOURCE,
+        "open_book_iterative",
+        true,
+        true,
+    )
+}
+
+#[tauri::command]
+pub(crate) fn get_forgebench_garden_baseline() -> Value {
+    garden_example_document(
+        "controle-conservateur-outilsia-v1",
+        BASELINE_SOURCE,
+        "human_authored",
+        false,
+        false,
+    )
 }
 
 #[cfg(test)]
@@ -2385,6 +2415,15 @@ mod tests {
     }
 
     #[test]
+    fn outilsia_human_control_compiles() {
+        let program = compile_program(BASELINE_SOURCE).expect("program");
+        assert_eq!(program.display_name, "Controle conservateur OutilsIA");
+        assert!(program.static_budget_units <= 512);
+        assert!(is_sha256(&program.source_sha256));
+        assert!(is_sha256(&program.program_sha256));
+    }
+
+    #[test]
     fn parser_rejects_capabilities_and_unknown_sensor() {
         let with_comment =
             EXAMPLE_SOURCE.replace("domain bamboo", "domain bamboo\n# import network");
@@ -2409,17 +2448,11 @@ mod tests {
 
     #[test]
     fn candidate_order_does_not_change_metrics() {
-        let conservative = EXAMPLE_SOURCE
-            .replace(
-                "barrier.joint_integrity_pct <= 64%",
-                "barrier.joint_integrity_pct <= 70%",
-            )
-            .replace("Fable Joint Sentinel", "Conservative Joint Sentinel");
         let seeds = [100_001, 100_002, 100_003, 100_004, 100_005];
         let first = evaluate_with_hidden_seeds(
             request(vec![
                 ("fable", EXAMPLE_SOURCE, "open_book_iterative"),
-                ("conservative", &conservative, "human_authored"),
+                ("control", BASELINE_SOURCE, "human_authored"),
             ]),
             &receipt(5),
             &seeds,
@@ -2427,7 +2460,7 @@ mod tests {
         .expect("first");
         let second = evaluate_with_hidden_seeds(
             request(vec![
-                ("conservative", &conservative, "human_authored"),
+                ("control", BASELINE_SOURCE, "human_authored"),
                 ("fable", EXAMPLE_SOURCE, "open_book_iterative"),
             ]),
             &receipt(5),
@@ -2448,6 +2481,8 @@ mod tests {
                 .collect::<BTreeMap<_, _>>()
         };
         assert_eq!(by_id(&first), by_id(&second));
+        assert_eq!(first["candidates"].as_array().map(Vec::len), Some(2));
+        assert_eq!(first["comparison"]["winner_declared"], false);
     }
 
     #[test]

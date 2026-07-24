@@ -563,6 +563,7 @@ const els = {
   forgeBenchGardenThresholdsTuned: $("forgeBenchGardenThresholdsTuned"),
   forgeBenchGardenSource: $("forgeBenchGardenSource"),
   loadForgeBenchGardenExampleBtn: $("loadForgeBenchGardenExampleBtn"),
+  loadForgeBenchGardenBaselineBtn: $("loadForgeBenchGardenBaselineBtn"),
   addForgeBenchGardenCandidateBtn: $("addForgeBenchGardenCandidateBtn"),
   clearForgeBenchGardenDraftBtn: $("clearForgeBenchGardenDraftBtn"),
   forgeBenchGardenBatchState: $("forgeBenchGardenBatchState"),
@@ -13429,6 +13430,7 @@ function renderForgeBenchGardenPanel() {
   const draftReady = forgeBenchGardenDraftReady(draft);
 
   els.loadForgeBenchGardenExampleBtn.disabled = !invoke || forgeBenchGardenBusy;
+  els.loadForgeBenchGardenBaselineBtn.disabled = !invoke || forgeBenchGardenBusy;
   els.addForgeBenchGardenCandidateBtn.disabled = forgeBenchGardenBusy
     || !draftReady
     || (forgeBenchGardenCandidates.length >= 8
@@ -13575,10 +13577,13 @@ function renderForgeBenchGardenPanel() {
   `;
 }
 
-async function loadForgeBenchGardenExample() {
+async function loadForgeBenchGardenExample(exampleKind = "fable") {
   if (!invoke || forgeBenchGardenBusy) return null;
   try {
-    const example = await invoke("get_forgebench_garden_example");
+    const baseline = exampleKind === "baseline";
+    const example = await invoke(
+      baseline ? "get_forgebench_garden_baseline" : "get_forgebench_garden_example"
+    );
     if (
       example?.schema !== FORGEBENCH_GARDEN_EXAMPLE_SCHEMA
       || example?.benchmark_id !== FORGEBENCH_GARDEN_BENCHMARK_ID
@@ -13594,7 +13599,12 @@ async function loadForgeBenchGardenExample() {
     els.forgeBenchGardenSource.value = example.source;
     syncForgeBenchGardenAuthoringControls();
     renderForgeBenchGardenPanel();
-    setStatus("Fable Joint Sentinel chargé avec sa provenance itérative", "ok");
+    setStatus(
+      baseline
+        ? "Contrôle humain OutilsIA chargé : repère simple, non produit par une IA"
+        : "Fable Joint Sentinel chargé avec sa provenance itérative",
+      "ok"
+    );
     return example;
   } catch (error) {
     forgeBenchGardenError = String(error || "Exemple Garden indisponible");
@@ -13807,7 +13817,8 @@ function sendForgeBenchGardenToLedger() {
   els.evidenceLedgerSource.value = "forgebench_garden_batch_verified";
   renderEvidenceLedgerPanel();
   revealWorkspacePanel("workflows", document.querySelector(".evidence-ledger-panel"));
-  setStatus("Preuve Garden prête : confirme son ajout dans Evidence Ledger", "ok");
+  requestAnimationFrame(() => els.appendEvidenceBtn?.focus());
+  setStatus("Reçu Garden sélectionné : clique « Ajouter la preuve » pour l'enregistrer", "ok");
 }
 
 function demoForgeBenchGardenDocuments() {
@@ -13893,7 +13904,7 @@ function demoForgeBenchGardenDocuments() {
   });
   const candidates = [
     candidate("fable-joint-sentinel-v0.5", "Fable Joint Sentinel", 1, "open_book_iterative", 0, 0, 742, 1860, 468),
-    candidate("baseline-conservateur-v1", "Baseline conservateur", 2, "human_authored", 1, 3, 781, 1510, 420)
+    candidate("controle-conservateur-outilsia-v1", "Controle conservateur OutilsIA", 2, "human_authored", 1, 3, 781, 1510, 420)
   ];
   return {
     status: {
@@ -20712,8 +20723,8 @@ function installTestHarness() {
           }
         },
         {
-          candidate_id: "baseline-conservateur-v1",
-          source: 'garden "Baseline conservateur" version 0.5\ndomain bamboo\nruleset: bamboo.v1',
+          candidate_id: "controle-conservateur-outilsia-v1",
+          source: 'garden "Controle conservateur OutilsIA" version 0.5\ndomain bamboo\nruleset: bamboo.v1',
           provenance: {
             authoring_mode: "human_authored",
             blind_one_shot: false,
@@ -22270,7 +22281,8 @@ els.runForgeBenchCandidateBtn?.addEventListener("click", runForgeBenchOllamaCand
 els.sealForgeBenchGardenVaultBtn?.addEventListener("click", sealForgeBenchGardenVault);
 els.refreshForgeBenchGardenVaultBtn?.addEventListener("click", () => loadForgeBenchGardenVault(false));
 els.clearForgeBenchGardenVaultBtn?.addEventListener("click", clearForgeBenchGardenVault);
-els.loadForgeBenchGardenExampleBtn?.addEventListener("click", loadForgeBenchGardenExample);
+els.loadForgeBenchGardenExampleBtn?.addEventListener("click", () => loadForgeBenchGardenExample("fable"));
+els.loadForgeBenchGardenBaselineBtn?.addEventListener("click", () => loadForgeBenchGardenExample("baseline"));
 els.addForgeBenchGardenCandidateBtn?.addEventListener("click", addForgeBenchGardenCandidate);
 els.clearForgeBenchGardenDraftBtn?.addEventListener("click", clearForgeBenchGardenDraft);
 els.runForgeBenchGardenBtn?.addEventListener("click", runForgeBenchGarden);

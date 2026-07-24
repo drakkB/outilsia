@@ -8,6 +8,8 @@ const read = (path) => readFileSync(resolve(root, path), "utf8");
 const contract = JSON.parse(read("forgebench/garden-bamboo-v1/contract.json"));
 const source = read("forgebench/garden-bamboo-v1/examples/fable-joint-sentinel-v0.5.garden");
 const provenance = JSON.parse(read("forgebench/garden-bamboo-v1/examples/fable-joint-sentinel-v0.5.provenance.json"));
+const baselineSource = read("forgebench/garden-bamboo-v1/examples/controle-conservateur-outilsia-v1.garden");
+const baselineProvenance = JSON.parse(read("forgebench/garden-bamboo-v1/examples/controle-conservateur-outilsia-v1.provenance.json"));
 const rust = [
   read("src-tauri/src/forgebench_garden.rs"),
   read("src-tauri/src/forgebench_garden_vault.rs"),
@@ -105,10 +107,20 @@ assert.equal(provenance.blind_one_shot, false);
 assert.equal(provenance.simulator_used_during_authoring, true);
 assert.equal(provenance.thresholds_tuned_after_visible_runs, true);
 assert.equal(provenance.winner_claimed, false);
+assert.match(baselineSource, /^garden "Controle conservateur OutilsIA" version 0\.5\n/);
+assert.match(baselineSource, /history\.days_since_monitoring_day >= 7day/);
+assert.match(baselineSource, /barrier\.joint_integrity_pct <= 60%/);
+assert.equal(baselineSource.includes("\r"), false);
+assert.equal(baselineProvenance.authoring_mode, "human_authored");
+assert.equal(baselineProvenance.simulator_used_during_authoring, false);
+assert.equal(baselineProvenance.thresholds_tuned_after_visible_runs, false);
+assert.equal(baselineProvenance.eligible_for_blind_claim, false);
+assert.equal(baselineProvenance.winner_claimed, false);
 
 for (const marker of [
   "evaluate_forgebench_garden",
   "get_forgebench_garden_example",
+  "get_forgebench_garden_baseline",
   "seal_forgebench_garden_hidden_suite",
   "get_forgebench_garden_hidden_suite_status",
   "clear_forgebench_garden_hidden_suite",
@@ -126,6 +138,7 @@ for (const marker of [
   "forgeBenchGardenDetails",
   "forgeBenchGardenCandidateId",
   "forgeBenchGardenSource",
+  "loadForgeBenchGardenBaselineBtn",
   "runForgeBenchGardenBtn",
   "sendForgeBenchGardenToLedgerBtn",
   "forgebench_garden_batch_verified",
@@ -136,6 +149,7 @@ for (const marker of [
 for (const marker of [
   "FORGEBENCH_GARDEN_REQUEST_SCHEMA",
   "forgeBenchGardenVerifiedResult",
+  "get_forgebench_garden_baseline",
   "hidden_suite_loaded_after_candidate_freeze",
   "raw_candidate_sources_persisted",
   "winner_declared",
@@ -147,15 +161,17 @@ assert.ok(css.includes(".forgebench-garden-details"));
 assert.ok(css.includes(".forgebench-garden-result-row"));
 assert.ok(notice.includes("Garden/Bamboo v1"));
 assert.ok(notice.includes("deterministic_dsl_public_and_hidden_batch"));
+assert.ok(notice.includes("contrôle humain OutilsIA"));
 assert.ok(roadmap.includes("garden-bamboo-generalization-v1"));
 assert.ok(roadmap.includes("aucun vainqueur"));
+assert.ok(roadmap.includes("contrôle humain OutilsIA"));
 assert.ok(packageJson.scripts["verify:forgebench:garden"].includes("test:forgebench:garden:ranking"));
 assert.ok(packageJson.scripts["verify:ci-source"].includes("verify:forgebench:garden"));
 
 for (const [name, document, markers] of [
-  ["scanner hub", scannerHub, ["Garden/Bamboo v1", "1 à 8 politiques GardenScript", "ni une fonction du build public actuel"]],
-  ["download page", downloadPage, ["Garden/Bamboo v1 dans le candidat source", "Aucun code candidat arbitraire", "existe seulement dans un candidat source postérieur au build public"]],
-  ["llms.txt", llms, ["ForgeBench Garden/Bamboo v1 (source candidate, not in the current public build)", "candidate code is never executed", "no winner is declared"]]
+  ["scanner hub", scannerHub, ["Garden/Bamboo v1", "1 à 8 politiques GardenScript", "contrôle humain OutilsIA", "ni une fonction du build public actuel"]],
+  ["download page", downloadPage, ["Garden/Bamboo v1 dans le candidat source", "contrôle humain OutilsIA", "Aucun code candidat arbitraire", "existe seulement dans un candidat source postérieur au build public"]],
+  ["llms.txt", llms, ["ForgeBench Garden/Bamboo v1 (source candidate, not in the current public build)", "OutilsIA human control", "candidate code is never executed", "no winner is declared"]]
 ]) {
   for (const marker of markers) {
     assert.ok(document.includes(marker), `${name} missing marker: ${marker}`);

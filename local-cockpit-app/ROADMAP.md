@@ -1,6 +1,6 @@
 # OutilsIA Local Cockpit - Roadmap produit
 
-Mise à jour : 2026-07-14
+Mise à jour : 2026-07-24
 
 ## Cap produit
 
@@ -291,6 +291,7 @@ ForgeBench Garden/Bamboo v1 implémenté dans les sources le 24 juillet 2026, sa
 - [x] Séparer vitesse, coût et énergie du classement stratégique lexicographique.
 - [x] Ajouter un coffre Garden dédié, un reçu borné et une preuve `deterministic_dsl_public_and_hidden_batch` dans Evidence Ledger.
 - [x] Ajouter l'interface avancée repliée, l'exemple Fable à provenance honnête et les tests Rust/JS de contrat, classement, falsification et fuite.
+- [x] Ajouter un contrôle humain OutilsIA distinct, sans simulateur ni tuning déclaré, afin de comparer un candidat à un repère simple sans fabriquer un second résultat d'IA.
 - [ ] Faire une recette native Windows et Linux sur le candidat source, puis recueillir au moins un second candidat comparable.
 - [ ] Soumettre toute future publication à une validation humaine explicite ; ne jamais transformer l'ordre provisoire en gagnant automatique.
 

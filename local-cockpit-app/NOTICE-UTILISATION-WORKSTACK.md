@@ -74,11 +74,11 @@ Le parcours s'arrête ici. Un modèle Ollama local peut produire une soumission,
 Ce parcours avancé est indépendant du préflight Signal Maze. Il reste replié dans **Comparer des stacks > Préparation sécurisée et exécution > Garden/Bamboo v1** et ne modifie pas le scan, les recommandations de modèles ou le parcours débutant.
 
 1. Ouvrir **Garden/Bamboo v1**, puis sceller cinq scénarios cachés. Le reçu visible contient seulement l'identifiant de suite, le nombre de scénarios et des empreintes.
-2. Charger **Fable Joint Sentinel** ou saisir un programme GardenScript 0.5. Pour cet exemple, conserver la provenance `open_book_iterative` : le simulateur a été utilisé et les seuils ont été ajustés après des runs visibles.
-3. Ajouter de 1 à 8 candidats au lot. Un identifiant, une source ou une provenance dupliqués ou incohérents sont refusés.
+2. Charger **Fable Joint Sentinel**, le **contrôle humain OutilsIA**, ou saisir un programme GardenScript 0.5. Pour Fable, conserver la provenance `open_book_iterative` : le simulateur a été utilisé et les seuils ont été ajustés après des runs visibles. Le contrôle OutilsIA est volontairement simple, `human_authored`, sans simulateur ni tuning déclaré ; il sert seulement de repère et ne représente pas une IA candidate.
+3. Ajouter de 1 à 8 candidats au lot. Un identifiant, une source ou une provenance dupliqués ou incohérents sont refusés. Comparer Fable au contrôle ne crée toujours ni vainqueur, ni preuve scientifique, ni recommandation horticole.
 4. Cliquer sur **Évaluer le lot**. OutilsIA compile et signe toutes les sources avant d'ouvrir le coffre, puis interprète le DSL sans exécuter de code candidat.
 5. Lire l'ordre provisoire. Le tri est lexicographique : validité sur tous les scénarios, sorties actives, jours non contenus, confinement, vitalité minimale, cannes vivantes, vitalité finale, travail puis eau. La vitesse de génération et le coût restent affichables séparément mais ne changent jamais cet ordre.
-6. Cliquer sur **Préparer Evidence Ledger**, puis confirmer **Ajouter la preuve**. Le Ledger reçoit seulement identifiants bornés, empreintes, provenance, métriques agrégées et statuts de coût ; aucune source, seed ou métrique cachée par scénario.
+6. Cliquer sur **Ouvrir le journal de preuves**, puis sur **Ajouter la preuve** après le changement de section. Le Ledger reçoit seulement identifiants bornés, empreintes, provenance, métriques agrégées et statuts de coût ; aucune source, seed ou métrique cachée par scénario.
 7. Une revue humaine et une validation manuelle de release restent nécessaires. Même avec plusieurs runs comparables, l'app conserve `winner_declared=false`.
 
 ## Ce que prouve l'Evidence Ledger
