@@ -3,7 +3,7 @@
 
   const invoke = window.__TAURI__?.core?.invoke;
   const CATALOG_SCHEMA = "outilsia.agent_adapter_policy_catalog.v1";
-  const EXPECTED_IDS = ["claude-code", "codex-cli", "hermes-agent"];
+  const EXPECTED_IDS = ["claude-code", "codex-cli", "hermes-agent", "kimi-code"];
   const details = document.getElementById("agentAdapterPolicyDetails");
   const summaryState = document.getElementById("agentAdapterPolicySummary");
   const stateNode = document.getElementById("agentAdapterPolicyState");
@@ -68,7 +68,7 @@
       || codex?.budget?.max_attempts !== 1
       || codex?.budget?.max_output_bytes !== 524288
       || JSON.stringify(codex?.budget?.duration_options_seconds) !== JSON.stringify([180, 300, 600])
-      || restricted.length !== 2
+      || restricted.length !== 3
       || restricted.some((policy) => policy?.current_state !== "detect_only" || policy?.execution?.enabled !== false)
       || policies.some((policy) => boundaryKeys.some((key) => !falseBoundary(policy, key)))
     ) return null;
@@ -165,7 +165,7 @@
     }).join("");
     const digest = String(catalog.integrity?.digest || "");
     stateNode.textContent = "registre vérifié";
-    summaryState.textContent = "1 pilote · 2 détections";
+    summaryState.textContent = "1 pilote · 3 détections";
     summaryState.dataset.statusTone = "ready";
     box.className = "agent-adapter-policy-box";
     box.innerHTML = `
@@ -275,6 +275,16 @@
             adapter_id: "hermes-agent",
             provider: "nous-research",
             label: "Hermes Agent",
+            kind: "official_cli",
+            current_state: "detect_only",
+            execution: { enabled: false },
+            budget: { max_attempts: 0, duration_options_seconds: [], max_output_bytes: 0 },
+            boundaries: {}
+          },
+          {
+            adapter_id: "kimi-code",
+            provider: "moonshot-ai",
+            label: "Kimi Code",
             kind: "official_cli",
             current_state: "detect_only",
             execution: { enabled: false },

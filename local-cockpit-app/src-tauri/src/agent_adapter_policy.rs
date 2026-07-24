@@ -9,6 +9,7 @@ const CONTRACT_VERSION: &str = "2026-07-24";
 const CODEX_ADAPTER_ID: &str = "codex-cli";
 const CLAUDE_ADAPTER_ID: &str = "claude-code";
 const HERMES_ADAPTER_ID: &str = "hermes-agent";
+const KIMI_ADAPTER_ID: &str = "kimi-code";
 const CODEX_SCOPE: &str = "codex_cli_signal_maze_pilot_v1";
 const CODEX_BENCHMARK_ID: &str = "signal-maze-v1";
 const CODEX_STACK_KEY: &str = "codex-solo";
@@ -196,6 +197,18 @@ fn unsigned_catalog() -> Value {
                 "orchestration_handoff_contract_missing",
             ],
         ),
+        detect_only_policy(
+            KIMI_ADAPTER_ID,
+            "moonshot-ai",
+            "Kimi Code",
+            &["kimi"],
+            &[
+                "adapter_execution_contract_missing",
+                "budget_contract_missing",
+                "workspace_boundary_unverified",
+                "subscription_or_api_cost_unverified",
+            ],
+        ),
     ];
     json!({
         "schema": CATALOG_SCHEMA,
@@ -369,13 +382,19 @@ pub(crate) fn validate_agent_adapter_policy_catalog(catalog: &Value) -> Result<(
     let policies = catalog
         .get("policies")
         .and_then(Value::as_array)
-        .filter(|policies| policies.len() == 3)
-        .ok_or_else(|| "Trois politiques agents exactes sont requises.".to_string())?;
+        .filter(|policies| policies.len() == 4)
+        .ok_or_else(|| "Quatre politiques agents exactes sont requises.".to_string())?;
     let ids = policies
         .iter()
         .filter_map(|policy| policy.get("adapter_id").and_then(Value::as_str))
         .collect::<BTreeSet<_>>();
-    if ids != BTreeSet::from([CODEX_ADAPTER_ID, CLAUDE_ADAPTER_ID, HERMES_ADAPTER_ID])
+    if ids
+        != BTreeSet::from([
+            CODEX_ADAPTER_ID,
+            CLAUDE_ADAPTER_ID,
+            HERMES_ADAPTER_ID,
+            KIMI_ADAPTER_ID,
+        ])
         || policies.iter().any(|policy| {
             policy.get("kind").and_then(Value::as_str) != Some("official_cli")
                 || !validate_detection(policy)
@@ -399,6 +418,8 @@ pub(crate) fn validate_agent_adapter_policy_catalog(catalog: &Value) -> Result<(
             .is_some_and(|value| validate_detect_only_policy(value, "anthropic"))
         || !policy(HERMES_ADAPTER_ID)
             .is_some_and(|value| validate_detect_only_policy(value, "nous-research"))
+        || !policy(KIMI_ADAPTER_ID)
+            .is_some_and(|value| validate_detect_only_policy(value, "moonshot-ai"))
     {
         return Err("État d'exécution des adaptateurs incohérent.".to_string());
     }
@@ -467,7 +488,7 @@ mod tests {
     }
 
     #[test]
-    fn catalog_is_signed_and_contains_exactly_three_adapters() {
+    fn catalog_is_signed_and_contains_exactly_four_adapters() {
         let catalog = signed_catalog_value();
         validate_agent_adapter_policy_catalog(&catalog).expect("valid catalog");
         assert_eq!(
@@ -475,7 +496,7 @@ mod tests {
                 .get("policies")
                 .and_then(Value::as_array)
                 .map(Vec::len),
-            Some(3)
+            Some(4)
         );
     }
 

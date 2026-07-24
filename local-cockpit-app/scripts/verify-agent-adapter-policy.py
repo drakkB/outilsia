@@ -38,15 +38,15 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
 
     if not proof["valid"]:
         raise AssertionError(f"{label}: policy fixture was rejected")
-    if proof["summary"] != "1 pilote · 2 détections":
+    if proof["summary"] != "1 pilote · 3 détections":
         raise AssertionError(f"{label}: misleading adapter summary {proof['summary']!r}")
-    if len(proof["policies"]) != 3:
-        raise AssertionError(f"{label}: expected exactly three adapter policies")
+    if len(proof["policies"]) != 4:
+        raise AssertionError(f"{label}: expected exactly four adapter policies")
 
     policies = {policy["adapter_id"]: policy for policy in proof["policies"]}
     if policies["codex-cli"]["current_state"] != "bounded_public_pilot":
         raise AssertionError(f"{label}: Codex policy is not bounded")
-    for adapter_id in ["claude-code", "hermes-agent"]:
+    for adapter_id in ["claude-code", "hermes-agent", "kimi-code"]:
         policy = policies[adapter_id]
         if policy["current_state"] != "detect_only":
             raise AssertionError(f"{label}: {adapter_id} is not detect-only")
@@ -64,6 +64,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "512 Kio",
         "Claude Code",
         "Hermes Agent",
+        "Kimi Code",
         "Détection seulement",
         "aucune exécution",
         "Consentement",
@@ -78,7 +79,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         raise AssertionError(f"{label}: policy JSON cannot be copied")
     if not page.locator("#copyAgentAdapterPolicySummaryBtn").is_enabled():
         raise AssertionError(f"{label}: policy summary cannot be copied")
-    if page.locator(".agent-adapter-policy-row").count() != 3:
+    if page.locator(".agent-adapter-policy-row").count() != 4:
         raise AssertionError(f"{label}: policy rows are incomplete")
 
     overflow = page.evaluate(
@@ -111,7 +112,7 @@ def main() -> None:
         browser.close()
     print(
         f"agent_adapter_policy_ui_ok desktop={desktop} mobile={mobile} "
-        "bounded=codex-cli detect_only=claude-code,hermes-agent"
+        "bounded=codex-cli detect_only=claude-code,hermes-agent,kimi-code"
     )
 
 

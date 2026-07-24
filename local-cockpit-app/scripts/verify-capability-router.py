@@ -68,6 +68,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "Codex CLI · WSL",
         "Claude Code · Windows",
         "Hermes Agent · WSL",
+        "Kimi Code · Windows",
         "compte et quota non vérifiés",
         "Aucun agent lancé",
     ]:

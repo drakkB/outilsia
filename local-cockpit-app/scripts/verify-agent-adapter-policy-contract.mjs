@@ -72,6 +72,7 @@ for (const marker of [
   'const CODEX_ADAPTER_ID: &str = "codex-cli"',
   'const CLAUDE_ADAPTER_ID: &str = "claude-code"',
   'const HERMES_ADAPTER_ID: &str = "hermes-agent"',
+  'const KIMI_ADAPTER_ID: &str = "kimi-code"',
   'current_state: "detect_only".to_string()',
   '"enabled": false',
   '"allowed_scopes": []',
@@ -138,11 +139,11 @@ if (
 }
 
 for (const [label, source, markers] of [
-  ["notice", notice, ["Agent Adapter Policy", "Codex reste borné à Signal Maze public", "deux adaptateurs en détection seule, Claude Code et Hermes Agent"]],
-  ["roadmap", roadmap, ["Agent Adapter Policy v1 implémenté", "Claude Code et Hermes restent `detect_only`", "Codex borné au pilote public"]],
+  ["notice", notice, ["Agent Adapter Policy", "Codex reste borné à Signal Maze public", "trois adaptateurs en détection seule, Claude Code, Hermes Agent et Kimi Code"]],
+  ["roadmap", roadmap, ["Agent Adapter Policy v1 implémenté", "Claude Code, Hermes et Kimi restent `detect_only`", "Codex borné au pilote public"]],
   ["app README", appReadme, ["registre Agent Adapter Policy v1", "Détection, autorisation et consentement"]],
   ["repo README", repoReadme, ["Agent Adapter Policy v1", "detection-only"]],
-  ["hub", hub, ["Agent Adapter Policy v1 · candidat source", "Claude Code et Hermes restent en détection seule"]],
+  ["hub", hub, ["Agent Adapter Policy v1 · candidat source", "Claude Code, Hermes et Kimi restent en détection seule"]],
   ["download", download, ["Agent Adapter Policy v1 · source non publique", "Détection, autorisation et consentement"]],
   ["llms.txt", llms, ["Agent Adapter Policy v1 (source candidate, not in the current public build)", "starts no agent or machine probe"]],
 ]) {
@@ -153,9 +154,9 @@ for (const [label, source, markers] of [
 
 console.log(
   "agent_adapter_policy_contract_ok",
-  "adapters=3",
+  "adapters=4",
   "bounded=codex-cli",
-  "detect_only=claude-code,hermes-agent",
+  "detect_only=claude-code,hermes-agent,kimi-code",
   "attempts=1",
   "durations=180,300,600",
   "output=524288",

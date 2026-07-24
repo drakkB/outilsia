@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kimi K3 et K2.7 Code en local : poids, PC et Kimi Code</title>
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="description" content="Kimi K3 et K2.7 Code en local : disponibilité réelle, 595 Go de poids INT4, Kimi Code Windows/Linux, serveurs 8 GPU et configuration PC honnête.">
+<link rel="canonical" href="https://outilsia.fr/blog/kimi-k3-k2-7-code-local-2026">
+<meta property="og:title" content="Kimi K3 et K2.7 Code en local : ce qui tourne vraiment">
+<meta property="og:description" content="K3 est disponible comme service, K2.7 Code pèse environ 595 Go en INT4 : guide matériel, CLI, API et auto-hébergement sans fausse promesse.">
+<meta property="og:type" content="article">
+<meta property="og:image" content="https://outilsia.fr/static/images/local-cockpit/og-local-cockpit-1200x630.jpg">
+<meta property="og:url" content="https://outilsia.fr/blog/kimi-k3-k2-7-code-local-2026">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:site_name" content="OutilsIA.fr">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://outilsia.fr/static/images/local-cockpit/og-local-cockpit-1200x630.jpg">
+<meta name="twitter:title" content="Kimi K3/K2.7 en local : le verdict matériel">
+<meta name="twitter:description" content="CLI local, modèle distant ou 595 Go de poids auto-hébergés : les trois chemins Kimi expliqués clairement.">
+<link rel="stylesheet" href="/static/css/tailwind.min.css">
+<style>
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#080b12;color:#fff}
+.glass{background:rgba(15,23,42,.78);border:1px solid rgba(255,255,255,.09)}
+.gradient-text{background:linear-gradient(135deg,#67e8f9,#fbbf24,#86efac);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.prose h2{font-size:1.65rem;font-weight:900;color:#fff;margin-top:2.35rem;margin-bottom:1rem}
+.prose h3{font-size:1.15rem;font-weight:850;color:#e5e7eb;margin-top:1.55rem;margin-bottom:.6rem}
+.prose p,.prose li{color:#cbd5e1;line-height:1.75}
+.prose a{color:#67e8f9;text-decoration:underline;text-underline-offset:3px}
+.hero{position:relative;overflow:hidden;border-radius:16px;border:1px solid rgba(103,232,249,.25);background:linear-gradient(135deg,#07101a,#171229 58%,#07130f);min-height:310px;margin:24px 0;padding:24px}
+.hero-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:20px;align-items:end;min-height:260px}
+.hero-copy{align-self:center;max-width:600px}.hero-copy strong{display:block;font-size:clamp(2rem,6vw,4.8rem);line-height:.95}.hero-copy span{display:block;color:#a5f3fc;font-weight:800;margin-top:12px}
+.weight-stack{display:grid;gap:9px;align-self:center}.weight-line{height:26px;border-radius:6px;background:linear-gradient(90deg,rgba(103,232,249,.82),rgba(251,191,36,.25));box-shadow:0 10px 28px rgba(0,0,0,.24)}.weight-line:nth-child(2){width:86%}.weight-line:nth-child(3){width:72%}.weight-line:nth-child(4){width:58%}
+.chip{display:inline-flex;align-items:center;border-radius:999px;padding:6px 10px;background:rgba(103,232,249,.10);border:1px solid rgba(103,232,249,.24);color:#a5f3fc;font-size:.74rem;font-weight:900;text-transform:uppercase;letter-spacing:.05em}
+.statgrid,.decision,.config-grid,.parts-grid{display:grid;gap:12px;margin:18px 0}
+.statgrid{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.decision{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.config-grid{grid-template-columns:repeat(auto-fit,minmax(235px,1fr))}
+.parts-grid{grid-template-columns:repeat(auto-fit,minmax(205px,1fr))}
+.stat,.card,.config-card{padding:15px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.10)}
+.stat strong,.card strong,.config-card strong{display:block;color:#fff;margin-bottom:5px}.stat span,.card span,.config-card span{display:block;color:#94a3b8;font-size:.9rem;line-height:1.5}
+.ok{border-color:rgba(34,197,94,.36);background:rgba(34,197,94,.08)}.warn{border-color:rgba(251,191,36,.38);background:rgba(251,191,36,.08)}.no{border-color:rgba(248,113,113,.38);background:rgba(248,113,113,.08)}
+.callout{padding:16px;border-left:4px solid #67e8f9;background:rgba(103,232,249,.07);border-radius:0 8px 8px 0;margin:18px 0}
+.affiliate-box{padding:20px;border-radius:8px;background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.30);margin:22px 0}
+.part-link{display:block;padding:14px;border-radius:8px;background:rgba(15,23,42,.90);border:1px solid rgba(255,255,255,.10);text-decoration:none!important}.part-link strong,.part-link span{display:block}.part-link span{font-size:.87rem;color:#94a3b8;margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{border-bottom:1px solid rgba(255,255,255,.09);padding:10px;text-align:left;vertical-align:top}th{color:#94a3b8;text-transform:uppercase;font-size:.73rem;letter-spacing:.05em}
+pre{background:#020617;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:14px;overflow:auto;color:#cbd5e1}code{background:#020617;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:2px 6px;color:#67e8f9}
+.product-shot{width:100%;height:auto;border:1px solid rgba(255,255,255,.12);border-radius:8px;margin:18px 0}
+@media(max-width:700px){.hero-grid{grid-template-columns:1fr}.hero{min-height:0}.weight-stack{margin-top:8px}th,td{padding:8px 6px}}
+</style>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"TechArticle","headline":"Kimi K3 et K2.7 Code en local : poids, PC et Kimi Code","description":"Guide français vérifié sur la disponibilité locale de Kimi K3 et K2.7 Code, les poids officiels, le CLI, les serveurs nécessaires et une configuration hybride raisonnable.","author":{"@type":"Person","name":"Chris Drakkeng","url":"https://outilsia.fr/about"},"publisher":{"@type":"Organization","name":"OutilsIA.fr"},"datePublished":"2026-07-24","dateModified":"2026-07-24","mainEntityOfPage":"https://outilsia.fr/blog/kimi-k3-k2-7-code-local-2026","about":["Kimi K3","Kimi K2.7 Code","Kimi Code","IA locale","configuration PC IA"],"mentions":[{"@type":"SoftwareApplication","name":"Kimi Code","url":"https://www.kimi.com/code/en"},{"@type":"SoftwareApplication","name":"Kimi K2.7 Code","url":"https://huggingface.co/moonshotai/Kimi-K2.7-Code"},{"@type":"Organization","name":"Moonshot AI","url":"https://www.kimi.com/"}]}
+</script>
+<script type="application/ld+json" data-outilsia-author-block>{"@context":"https://schema.org","@type":"BlogPosting","@id":"https://outilsia.fr/blog/kimi-k3-k2-7-code-local-2026#article","mainEntityOfPage":"https://outilsia.fr/blog/kimi-k3-k2-7-code-local-2026","headline":"Kimi K3 et K2.7 Code en local : poids, PC et Kimi Code","description":"Kimi local sans confusion : service, CLI, API, poids open-weights et matériel.","image":"https://outilsia.fr/static/images/local-cockpit/og-local-cockpit-1200x630.jpg","inLanguage":"fr-FR","datePublished":"2026-07-24","dateModified":"2026-07-24","author":{"@type":"Person","@id":"https://outilsia.fr/#chris","name":"Chris Drakkeng","url":"https://outilsia.fr/about"},"publisher":{"@type":"Organization","@id":"https://outilsia.fr/#organization","name":"OutilsIA.fr","logo":{"@type":"ImageObject","url":"https://outilsia.fr/static/og-home.png"}},"isPartOf":{"@type":"WebSite","@id":"https://outilsia.fr/#website"},"speakable":{"@type":"SpeakableSpecification","cssSelector":["h1",".lead"]}}</script>
+<script type="application/ld+json" data-outilsia-breadcrumb>{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Accueil","item":"https://outilsia.fr/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://outilsia.fr/blog"},{"@type":"ListItem","position":3,"name":"Kimi K3 et K2.7 Code en local","item":"https://outilsia.fr/blog/kimi-k3-k2-7-code-local-2026"}]}</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Peut-on installer Kimi K3 en local aujourd'hui ?","acceptedAnswer":{"@type":"Answer","text":"Au 24 juillet 2026, Kimi K3 est disponible dans les services Kimi et l'API, mais Moonshot annonce la publication des poids complets pour le 27 juillet. OutilsIA ne propose donc aucune fausse commande locale."}},{"@type":"Question","name":"Kimi K2.7 Code tourne-t-il sur une RTX 4090 ou 5090 ?","acceptedAnswer":{"@type":"Answer","text":"Pas en entier sur une seule carte. Les 64 fichiers de poids INT4 officiels totalisent environ 595 Go. Les recettes officielles visent huit H200 ou une architecture hybride avec huit L20 et beaucoup de mémoire CPU."}},{"@type":"Question","name":"Kimi Code est-il une IA locale ?","acceptedAnswer":{"@type":"Answer","text":"Le programme Kimi Code s'installe sur Windows, Linux ou macOS, mais l'utilisation des modèles Kimi via abonnement ou API reste distante. Une interface locale ne signifie pas que l'inférence est locale."}},{"@type":"Question","name":"Quel PC acheter pour utiliser Kimi ?","acceptedAnswer":{"@type":"Answer","text":"Pour Kimi via abonnement ou API, un PC de développement standard suffit. Une station 64 à 128 Go de RAM, SSD 2 à 4 To et GPU 24 à 32 Go sert surtout à garder des modèles locaux 14B à 32B en complément, pas à charger K2.7 Code en entier."}}]}
+</script>
+</head>
+<body class="antialiased">
+<nav class="fixed top-0 w-full z-50 glass">
+  <div class="max-w-7xl mx-auto px-4 flex items-center justify-between h-16">
+    <a href="/" class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-amber-300 flex items-center justify-center text-sm font-black">IA</div><span class="text-xl font-bold">Outils<span class="gradient-text">IA</span></span></a>
+    <div class="hidden md:flex items-center gap-6 text-sm"><a href="/ia-locale" class="text-gray-400 hover:text-cyan-300">IA locale</a><a href="/materiel" class="text-gray-400 hover:text-cyan-300">Matériel</a><a href="/scanner-ia-local" class="text-gray-400 hover:text-cyan-300">Scanner mon PC</a><a href="/blog" class="text-cyan-300 font-semibold">Blog</a></div>
+  </div>
+</nav>
+
+<article class="pt-28 pb-20 px-4">
+  <div class="max-w-4xl mx-auto">
+    <div class="text-xs text-gray-500 mb-8"><a href="/">Accueil</a> &rsaquo; <a href="/blog">Blog</a> &rsaquo; Kimi local</div>
+    <header>
+      <div class="chip mb-4">Veille frontier &middot; Local réel &middot; Kimi Code</div>
+      <h1 class="text-3xl sm:text-5xl font-black tracking-tight mb-4">Kimi K3 et K2.7 Code en local : <span class="gradient-text">ce qui tourne vraiment</span></h1>
+      <p class="author-byline" data-outilsia-author-block style="margin:6px 0 0;font-size:14px;color:#94a3b8">Par <a href="/about" rel="author" style="color:inherit;font-weight:700">Chris Drakkeng</a> — tests IA locale et matériel</p>
+      <p class="lead text-lg text-gray-300 leading-relaxed mt-4">Kimi fait beaucoup parler de lui, mais trois choses sont mélangées : le CLI installé sur votre PC, le modèle servi à distance et les poids auto-hébergés. Au 24 juillet 2026, K2.7 Code est open-weights mais pèse environ 595 Go en INT4 ; K3 est disponible comme service et ses poids complets sont annoncés pour le 27 juillet.</p>
+      <div class="flex flex-wrap gap-3 text-sm text-gray-500 mt-4"><span>Publié le 24 juillet 2026</span><span>&bull;</span><span>12 min</span><span>&bull;</span><span>Sources Moonshot AI et Hugging Face</span></div>
+    </header>
+
+    <section class="hero" aria-label="Comparaison technique Kimi K3 et K2.7 Code">
+      <div class="hero-grid">
+        <div class="hero-copy"><strong>K3 / K2.7</strong><span>Service immédiat &middot; 595 Go de poids pour le vrai local K2.7</span></div>
+        <div class="weight-stack" aria-hidden="true"><div class="weight-line"></div><div class="weight-line"></div><div class="weight-line"></div><div class="weight-line"></div></div>
+      </div>
+    </section>
+
+    <section class="glass rounded-lg p-6 border border-cyan-400/20 mb-10">
+      <p class="chip mb-3">Verdict OutilsIA</p>
+      <h2 class="text-2xl font-black mb-3">Oui à Kimi sur un PC normal ; non au modèle complet dans une carte gaming</h2>
+      <div class="decision">
+        <div class="card ok"><strong>Kimi.com / Kimi Code / API</strong><span>Utilisable maintenant sur un PC standard. Le programme est local, l'inférence Kimi est distante.</span></div>
+        <div class="card warn"><strong>K2.7 Code auto-hébergé</strong><span>Poids INT4 publics d'environ 595 Go. Serveur multi-GPU ou architecture hybride massive.</span></div>
+        <div class="card no"><strong>K3 local aujourd'hui</strong><span>Poids complets annoncés pour le 27 juillet 2026 : aucune commande locale fiable à publier le 24.</span></div>
+      </div>
+    </section>
+
+    <div class="prose prose-invert max-w-none">
+      <h2>Kimi K3, K2.7 Code et K2.6 : lequel choisir ?</h2>
+      <div class="overflow-x-auto">
+        <table>
+          <thead><tr><th>Modèle</th><th>Rôle</th><th>Contexte</th><th>État local au 24/07</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Kimi K3</strong></td><td>Modèle phare : code long, connaissance, raisonnement, vision</td><td>Jusqu'à 1M tokens via les offres compatibles</td><td>Service/API disponibles ; poids complets annoncés le 27 juillet</td></tr>
+            <tr><td><strong>Kimi K2.7 Code</strong></td><td>Code agentique long-horizon, multimodal, thinking obligatoire</td><td>256K</td><td>Poids publics ; environ 595 Go pour le checkpoint INT4 officiel</td></tr>
+            <tr><td><strong>Kimi K2.6</strong></td><td>Usage plus général : conversation, analyse, image/vidéo et code</td><td>Selon l'accès Kimi</td><td>Poids publics de la même famille d'architecture</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Moonshot conseille K2.7 Code pour la programmation et K2.6 pour l'usage général. K3 devient le modèle phare dans Kimi Code et l'API. Cette distinction compte : un nom de modèle dans un sélecteur cloud ne prouve pas qu'un checkpoint local est déjà téléchargeable.</p>
+
+      <h2>Le chiffre que les présentations oublient : 595 Go</h2>
+      <p>La fiche officielle K2.7 Code décrit un MoE de <strong>1 000 milliards de paramètres totaux</strong>, dont environ <strong>32 milliards actifs par token</strong>. Le calcul par token profite du MoE, mais la machine doit toujours stocker tous les experts nécessaires.</p>
+      <p>OutilsIA a additionné les 64 fichiers <code>model-*.safetensors</code> listés par l'API officielle Hugging Face : <strong>595 177 988 208 octets</strong>, soit environ 595,18 Go décimaux ou 554,30 Gio. Ce checkpoint est déjà compressé en INT4 natif.</p>
+      <div class="callout"><strong>32B actifs ne veut pas dire 32B à télécharger.</strong> Une RTX 4090 24 Go ou une RTX 5090 32 Go peut participer à un déploiement hybride, mais elle ne contient pas seule près de 595 Go de poids.</div>
+
+      <h2>Le matériel documenté officiellement</h2>
+      <p>Le guide de déploiement Moonshot ne présente pas une tour grand public. Il donne trois repères concrets :</p>
+      <div class="config-grid">
+        <section class="config-card no"><strong>Service vLLM / SGLang</strong><span>Un nœud avec 8× NVIDIA H200 en tensor parallel 8. C'est la recette serveur officielle simple.</span></section>
+        <section class="config-card warn"><strong>Inférence hybride KTransformers</strong><span>8× NVIDIA L20 + 2× Intel 6454S. Moonshot rapporte 24,51 tok/s en décodage à 48 requêtes concurrentes.</span></section>
+        <section class="config-card"><strong>LoRA, pas inférence légère</strong><span>2× RTX 4090 + Intel 8488C + 1,97 To de RAM et 200 Go de swap pour l'exemple de fine-tuning LoRA.</span></section>
+      </div>
+      <p>Le dernier exemple ne signifie pas que deux RTX 4090 suffisent à faire tenir le modèle en mémoire. Les près de 2 To de RAM sont précisément l'information importante.</p>
+
+      <h2>Kimi Code sous Windows et Linux</h2>
+      <p>Kimi Code est un agent de programmation en terminal. Il peut lire et modifier un projet, lancer des commandes, utiliser MCP et déléguer à des sous-agents. Son installation est disponible sous Windows, Linux et macOS.</p>
+      <h3>Windows PowerShell</h3>
+      <pre><code>irm https://code.kimi.com/kimi-code/install.ps1 | iex
+kimi --version
+kimi doctor</code></pre>
+      <h3>Linux, WSL ou macOS</h3>
+      <pre><code>curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash
+kimi --version
+kimi doctor</code></pre>
+      <p>Au premier lancement, l'utilisateur choisit l'authentification Kimi ou une clé de plateforme. OutilsIA ne doit jamais lire ce jeton. Son intégration source se limite donc à une commande de version bornée : elle prouve la présence du CLI, pas l'état du compte, le quota, le modèle sélectionné ou le coût.</p>
+
+      <h2>Ce qu'OutilsIA Local Cockpit ajoute</h2>
+      <img class="product-shot" src="/static/images/local-cockpit/og-local-cockpit-1200x630.jpg" width="1200" height="630" loading="lazy" alt="OutilsIA Local Cockpit affiche le diagnostic matériel et les modèles compatibles">
+      <div class="decision">
+        <a class="card ok" href="/telecharger-scanner-ia-local"><strong>Scanner avant d'acheter</strong><span>CPU, RAM, GPU, VRAM, stockage, Windows/WSL/Linux et modèles Ollama installés.</span></a>
+        <div class="card"><strong>K2.7 classé frontier</strong><span>Le catalogue affiche le modèle sans bouton Installer ou Bench et rappelle son poids officiel.</span></div>
+        <div class="card"><strong>Kimi Code détecté seulement</strong><span>Le Capability Router peut vérifier <code>kimi --version</code>. Aucun agent ni réseau n'est lancé par cette détection.</span></div>
+      </div>
+      <p>Cette extension appartient au candidat source postérieur au build public actuel. Elle ne doit pas être attribuée au téléchargement disponible tant qu'une nouvelle release Windows/Linux cohérente n'a pas été publiée.</p>
+
+      <h2>La configuration raisonnable : Kimi distant + modèles locaux utiles</h2>
+      <p>Pour la plupart des utilisateurs, le meilleur choix n'est pas un serveur K2.7. C'est une <strong>station hybride</strong> : Kimi K3/K2.7 via abonnement ou API pour les tâches très lourdes, et un modèle 14B à 32B réellement local pour la confidentialité, l'offline et les tests rapides.</p>
+      <div class="config-grid">
+        <section class="config-card ok"><strong>Développeur simple</strong><span>32 Go RAM, SSD 1 à 2 To, iGPU ou GPU existant. Kimi Code fonctionne ; les petits modèles Ollama restent possibles.</span></section>
+        <section class="config-card ok"><strong>Station hybride recommandée</strong><span>64 à 128 Go RAM, SSD 2 à 4 To et GPU 24 à 32 Go. Kimi reste distant ; Qwen, Gemma, Mistral ou Hermes tournent localement selon le benchmark.</span></section>
+        <section class="config-card no"><strong>K2.7 intégral</strong><span>Plusieurs centaines de Go de mémoire et plusieurs GPU serveur. Passez par un intégrateur/datacenter, pas un panier Amazon improvisé.</span></section>
+      </div>
+
+      <div class="affiliate-box">
+        <strong>Transparence affiliation</strong>
+        <p>Les liens Amazon ci-dessous sont affiliés : OutilsIA peut recevoir une commission sans surcoût. Ils composent une station hybride pour modèles locaux plus petits et Kimi distant. <strong>Ils ne permettent pas de charger K2.7 Code en entier.</strong> Vérifiez la QVL RAM, les dimensions GPU, l'alimentation et les connecteurs de votre carte mère avant achat.</p>
+        <div class="parts-grid">
+          <a class="part-link" href="https://www.amazon.fr/s?k=kit+64+Go+DDR5+2x32&amp;tag=boiral21-21&amp;ascsubtag=outilsia-kimi-ram64" target="_blank" rel="sponsored nofollow noopener"><strong>64 Go DDR5</strong><span>Bon point de départ pour Ollama, IDE, conteneurs et Kimi Code en parallèle.</span></a>
+          <a class="part-link" href="https://www.amazon.fr/s?k=kit+128+Go+DDR5+2x64&amp;tag=boiral21-21&amp;ascsubtag=outilsia-kimi-ram128" target="_blank" rel="sponsored nofollow noopener"><strong>128 Go DDR5</strong><span>Pour gros contextes, offload CPU et plusieurs outils ; seulement si la carte mère le valide.</span></a>
+          <a class="part-link" href="https://www.amazon.fr/s?k=SSD+NVMe+4+To+PCIe+4&amp;tag=boiral21-21&amp;ascsubtag=outilsia-kimi-ssd4" target="_blank" rel="sponsored nofollow noopener"><strong>SSD NVMe 4 To</strong><span>Modèles GGUF, dépôts, caches et workspaces sans saturer le disque système.</span></a>
+          <a class="part-link" href="https://www.amazon.fr/s?k=RTX+3090+24+Go&amp;tag=boiral21-21&amp;ascsubtag=outilsia-kimi-rtx3090" target="_blank" rel="sponsored nofollow noopener"><strong>GPU 24 Go</strong><span>Palier local 32B quantifié selon runtime ; ne contient pas les poids K2.7.</span></a>
+          <a class="part-link" href="https://www.amazon.fr/s?k=RTX+5090+32+Go&amp;tag=boiral21-21&amp;ascsubtag=outilsia-kimi-rtx5090" target="_blank" rel="sponsored nofollow noopener"><strong>GPU 32 Go</strong><span>Plus de marge locale et de vitesse, toujours très loin des 595 Go du modèle complet.</span></a>
+          <a class="part-link" href="https://www.amazon.fr/s?k=boitier+full+tower+airflow+E-ATX&amp;tag=boiral21-21&amp;ascsubtag=outilsia-kimi-case" target="_blank" rel="sponsored nofollow noopener"><strong>Boîtier full tower</strong><span>Utile pour une grosse carte locale ; mesurer format, longueur, épaisseur et airflow.</span></a>
+        </div>
+      </div>
+
+      <h2>Faut-il attendre K3 open-weights ?</h2>
+      <p>Oui avant de publier une configuration locale K3. Moonshot annonce les poids complets pour le <strong>27 juillet 2026</strong>. Tant que la liste officielle des fichiers, le format, la licence et les recettes de déploiement ne sont pas publics, une estimation matérielle précise serait prématurée.</p>
+      <p>OutilsIA mettra à jour ce guide et le catalogue après vérification. Si K3 conserve 2,8T paramètres, il restera de toute façon dans la catégorie serveur extrême, même si son architecture MoE réduit le calcul actif par token.</p>
+
+      <h2>Questions fréquentes</h2>
+      <h3>Existe-t-il une commande Ollama officielle pour Kimi K2.7 Code ?</h3>
+      <p>OutilsIA n'en publie pas au 24 juillet. La page Ollama historique Kimi K2 est indiquée comme retirée et sans modèle poussé. Le catalogue garde donc K2.7 en watchlist sans bouton d'installation.</p>
+      <h3>Une RTX 5090 suffit-elle pour Kimi K2.7 ?</h3>
+      <p>Non. Elle peut accélérer une partie d'un déploiement hybride, mais ses 32 Go représentent environ 5 % de la taille des seuls poids INT4 officiels.</p>
+      <h3>Kimi Code est-il gratuit ?</h3>
+      <p>Le CLI est open source sous licence MIT. L'accès aux modèles Kimi dépend ensuite d'un niveau de compte, d'un abonnement ou d'une facturation API. Vérifiez toujours la page officielle des offres avant usage.</p>
+      <h3>K2.7 Code est-il open source ?</h3>
+      <p>Les poids et le code sont publiés sous une licence MIT modifiée. La modification impose un affichage visible du nom “Kimi K2.7 Code” aux produits commerciaux dépassant 100 millions d'utilisateurs actifs mensuels ou 20 millions de dollars de revenu mensuel.</p>
+
+      <h2>Verdict final</h2>
+      <p>Kimi mérite sa place dans OutilsIA, mais pas comme un modèle “Installer en un clic”. Sa valeur actuelle est double : <strong>Kimi Code/K3 comme capacité distante de haut niveau</strong>, et <strong>K2.7 Code comme signal open-weights majeur pour les serveurs</strong>.</p>
+      <p>Le choix intelligent pour un particulier reste une station locale raisonnable, capable de lancer de bons 14B/32B, complétée par Kimi pour les tâches qui justifient le cloud. Le Cockpit doit rendre cette frontière visible au lieu de pousser un achat inutile.</p>
+
+      <section class="glass rounded-lg p-6 border border-amber-300/30 my-10">
+        <p class="chip mb-3">À faire maintenant</p>
+        <div class="decision">
+          <a class="card ok" href="/telecharger-scanner-ia-local"><strong>Télécharger Local Cockpit</strong><span>Mesurer votre PC Windows/Linux avant de choisir un modèle ou un upgrade.</span></a>
+          <a class="card" href="/blog/config-pc-llm-local-24go-2026"><strong>Construire une station locale 24 Go</strong><span>Une cible réaliste pour les modèles 14B à 32B, pas pour K2.7 intégral.</span></a>
+          <a class="card" href="/blog/glm-5-2-753b-open-weights-2026"><strong>Comparer avec GLM-5.2</strong><span>Un autre modèle frontier qui exige plusieurs centaines de Go.</span></a>
+        </div>
+      </section>
+
+      <h2>Sources officielles</h2>
+      <ul>
+        <li><a href="https://www.kimi.com/help/agent/agent-overview" target="_blank" rel="nofollow noopener">Moonshot AI : chronologie Kimi et publication annoncée des poids K3</a></li>
+        <li><a href="https://www.kimi.com/code/docs/en/kimi-code/models.html" target="_blank" rel="nofollow noopener">Kimi Code : modèles K3 et K2.7 Code</a></li>
+        <li><a href="https://www.kimi.com/resources/kimi-k2-7-code" target="_blank" rel="nofollow noopener">Moonshot AI : architecture et accès K2.7 Code</a></li>
+        <li><a href="https://huggingface.co/moonshotai/Kimi-K2.7-Code" target="_blank" rel="nofollow noopener">Hugging Face officiel : poids Kimi K2.7 Code</a></li>
+        <li><a href="https://huggingface.co/moonshotai/Kimi-K2.7-Code/blob/main/docs/deploy_guidance.md" target="_blank" rel="nofollow noopener">Guide officiel : vLLM, SGLang et KTransformers</a></li>
+        <li><a href="https://huggingface.co/moonshotai/Kimi-K2.7-Code/blob/main/LICENSE" target="_blank" rel="nofollow noopener">Licence MIT modifiée K2.7 Code</a></li>
+        <li><a href="https://github.com/MoonshotAI/kimi-code" target="_blank" rel="nofollow noopener">Dépôt officiel Kimi Code</a></li>
+        <li><a href="https://www.kimi.com/code/docs/en/kimi-code-cli/reference/kimi-command.html" target="_blank" rel="nofollow noopener">Référence officielle de la commande kimi</a></li>
+      </ul>
+    </div>
+  </div>
+</article>
+
+<footer class="border-t border-white/10 py-8 px-4 text-center text-sm text-gray-500">
+  <a href="/" class="hover:text-cyan-300">OutilsIA.fr</a> &middot; <a href="/mentions-legales" class="hover:text-cyan-300">Mentions légales</a> &middot; <a href="/confidentialite" class="hover:text-cyan-300">Confidentialité</a>
+</footer>
+</body>
+</html>

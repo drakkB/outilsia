@@ -185,7 +185,7 @@
       <span class="pill">ForgeBench + Workstack Arena · source, non public</span>
       <h2>Ollama ou Codex peuvent produire le même mini-jeu sous un protocole vérifiable</h2>
       <p class="muted">Le candidat source peut appeler un modèle déjà installé via la boucle locale Ollama ou invoquer Codex CLI une fois dans un workspace jetable. Ollama reçoit uniquement Signal Maze public ; son code est gelé avant la preuve visible puis un holdout local séparé. Codex reste limité à la voie publique. Le propriétaire peut ensuite qualifier le reçu signé sans autoriser une livraison ou un gagnant.</p>
-      <p class="fine"><strong>Agent Adapter Policy v1 · source non publique :</strong> le registre signé ne lance rien. Il autorise seulement le pilote Codex public et maintient Claude Code comme Hermes Agent en détection seule, sans scope, budget ou workspace exécutable. Détection, autorisation et consentement restent trois états distincts.</p>
+      <p class="fine"><strong>Agent Adapter Policy v1 · source non publique :</strong> le registre signé ne lance rien. Il autorise seulement le pilote Codex public et maintient Claude Code, Hermes Agent et Kimi Code en détection seule, sans scope, budget ou workspace exécutable. Détection, autorisation et consentement restent trois états distincts.</p>
       <div class="proof" style="margin-top:14px">
         <div><strong>Consentement séparé</strong><span>Une tentative, durée bornée, coût API maximal 0 € et modèle déjà installé.</span></div>
         <div><strong>Contexte minimal</strong><span>Aucun fichier utilisateur, outil, dépôt, credential, seed caché ou Internet donné au modèle.</span></div>
@@ -424,10 +424,12 @@ Freshness: fresh</div>
         <div><b>Qwen 3.6 27B / 35B</b><span class="muted">Très bon signal pour coding et agents locaux. À tester sur 24 Go VRAM, RTX 3090/4090, RTX 5090 ou machines à mémoire unifiée solide.</span></div>
         <div><b>Hermes Agent v0.18</b><span class="muted">Important pour assistant personnel, mémoire, décisions et workflows Obsidian/MemoryForge. Hermes reste un profil clé dans l'Arena locale.</span></div>
         <div><b>GLM-4.7-Flash / GLM-5.2</b><span class="muted">GLM-4.7-Flash devient un signal à surveiller côté Ollama récent ; GLM-5.2 reste frontier, important mais hors machine grand public.</span></div>
+        <div><b>Kimi K3 / K2.7 Code</b><span class="muted">Kimi Code peut être détecté sans lire le compte. K2.7 reste un modèle serveur d'environ 595 Go en INT4 ; K3 n'est pas présenté comme installable avant ses poids complets.</span></div>
       </div>
       <div class="actions" style="margin-top:14px">
         <a class="btn secondary" href="/blog/rtx-3090-qwen-3-6-hermes-ia-locale-2026">Qwen 3.6 + Hermes</a>
         <a class="btn secondary" href="/blog/glm-5-2-753b-open-weights-2026">Comprendre GLM-5.2</a>
+        <a class="btn secondary" href="/blog/kimi-k3-k2-7-code-local-2026">Kimi K3/K2.7 en local</a>
         <a class="btn secondary" href="/scanner-ia-local">Scanner avant d'installer</a>
       </div>
     </section>

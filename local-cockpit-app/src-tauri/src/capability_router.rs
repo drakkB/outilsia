@@ -102,7 +102,7 @@ enum ProbeEnvironment {
     Wsl,
 }
 
-const TOOL_PROFILES: [ToolProfile; 3] = [
+const TOOL_PROFILES: [ToolProfile; 4] = [
     ToolProfile {
         id: "codex-cli",
         provider: "openai",
@@ -146,6 +146,23 @@ const TOOL_PROFILES: [ToolProfile; 3] = [
             "writing",
         ],
     },
+    ToolProfile {
+        id: "kimi-code",
+        provider: "moonshot-ai",
+        label: "Kimi Code",
+        executables: &["kimi"],
+        capabilities: &[
+            "analysis",
+            "audit",
+            "code",
+            "orchestration",
+            "planning",
+            "repository_edit",
+            "research",
+            "tests",
+            "writing",
+        ],
+    },
 ];
 
 fn unix_ms() -> u128 {
@@ -182,7 +199,10 @@ fn environment_display_name(environment: ProbeEnvironment) -> &'static str {
 }
 
 fn command_for_version(environment: ProbeEnvironment, executable: &str) -> Option<Command> {
-    if !matches!(executable, "codex" | "claude" | "hermes" | "hermes-agent") {
+    if !matches!(
+        executable,
+        "codex" | "claude" | "hermes" | "hermes-agent" | "kimi"
+    ) {
         return None;
     }
     match environment {
@@ -841,6 +861,12 @@ mod tests {
             Some("0.144.1".to_string())
         );
         assert_eq!(version_token("C:\\Users\\name\\tool.exe"), None);
+    }
+
+    #[test]
+    fn version_probe_allowlist_includes_kimi_without_accepting_shell_input() {
+        assert!(command_for_version(ProbeEnvironment::Native, "kimi").is_some());
+        assert!(command_for_version(ProbeEnvironment::Native, "kimi;whoami").is_none());
     }
 
     #[test]

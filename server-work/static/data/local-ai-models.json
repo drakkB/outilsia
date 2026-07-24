@@ -1,6 +1,6 @@
 {
-  "version": "2026-07-13",
-  "updated_at": "2026-07-13",
+  "version": "2026-07-24",
+  "updated_at": "2026-07-24",
   "categories": [
     {
       "name": "Petits modeles rapides",
@@ -471,6 +471,21 @@
           "pilotable_text": false,
           "runtime_status": "frontier_watchlist",
           "source_url": "https://build.nvidia.com/nvidia/nemotron-3-super-120b-a12b"
+        },
+        {
+          "name": "Kimi K2.7 Code",
+          "params": "1T-A32B MoE",
+          "kind": "text",
+          "use_case": "code agentique long-horizon et multimodal ; poids officiels INT4 d'environ 595 Go, réservés aux serveurs multi-GPU ou hybrides CPU/GPU",
+          "vram_q4": 595,
+          "vram_q8": 1100,
+          "vram_fp16": 2000,
+          "ollama": "",
+          "date_added": "2026-07-24",
+          "actionable_text": false,
+          "pilotable_text": false,
+          "runtime_status": "frontier_watchlist",
+          "source_url": "https://huggingface.co/moonshotai/Kimi-K2.7-Code"
         },
         {
           "name": "GLM-5.2",

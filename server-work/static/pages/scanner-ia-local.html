@@ -203,7 +203,7 @@
         <span class="pill">ForgeBench + Workstack Arena · source, non public</span>
         <h2 class="text-3xl md:text-4xl font-black mt-4">Faire construire puis jouer le même mini-jeu par Ollama ou Codex, sous preuves bornées</h2>
         <p class="muted mt-3 text-lg">ForgeBench peut appeler un modèle Ollama déjà installé sur Signal Maze public. Une fois le code gelé, il enchaîne la preuve visible et un holdout local séparé. Le pilote Workstack Arena peut aussi invoquer Codex CLI une fois dans un workspace jetable, mais seulement sur le contrat public. Le propriétaire qualifie ensuite le reçu signé sans transformer son clic en livraison ou en victoire.</p>
-        <p class="mini mt-4"><strong>Agent Adapter Policy v1 · candidat source :</strong> un registre signé sépare ce qui est seulement détecté de ce qui peut être exécuté. Codex reste borné à Signal Maze public avec une tentative, un budget de 3, 5 ou 10 minutes et deux consentements. Claude Code et Hermes restent en détection seule, sans scope, budget, workspace ou lancement autorisé.</p>
+        <p class="mini mt-4"><strong>Agent Adapter Policy v1 · candidat source :</strong> un registre signé sépare ce qui est seulement détecté de ce qui peut être exécuté. Codex reste borné à Signal Maze public avec une tentative, un budget de 3, 5 ou 10 minutes et deux consentements. Claude Code, Hermes et Kimi restent en détection seule, sans scope, budget, workspace ou lancement autorisé.</p>
         <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-3 mt-6">
           <article class="card p-4"><strong class="cyan">Identité signée</strong><p class="mini mt-2">Runtime Windows ou WSL et référence exacte du modèle sont liés au protocole et au batch.</p></article>
           <article class="card p-4"><strong class="cyan">Prompt public seulement</strong><p class="mini mt-2">Aucun dépôt, fichier personnel, outil, credential, seed privé ou accès Internet n'est fourni au modèle.</p></article>
@@ -416,11 +416,13 @@
           <article class="card p-4"><strong class="cyan">Qwen 3.6</strong><p class="mini mt-2">Modèle chaud pour code agentique : 27B/35B à tester surtout sur 24 Go VRAM ou mémoire unifiée solide.</p></article>
           <article class="card p-4"><strong class="cyan">Hermes Agent v0.18</strong><p class="mini mt-2">Signal important côté agents, mémoire visible et preuves de completion. OutilsIA garde Hermes comme profil assistant/mémoire.</p></article>
           <article class="card p-4"><strong class="cyan">GLM-4.7-Flash / GLM-5.2</strong><p class="mini mt-2">GLM-4.7-Flash entre en watchlist pratique ; GLM-5.2 reste frontier, trop lourd pour un PC normal aujourd'hui.</p></article>
+          <article class="card p-4"><strong class="cyan">Kimi K3 / K2.7 Code</strong><p class="mini mt-2">Kimi Code est détectable sans lire le compte. K2.7 reste frontier avec environ 595 Go de poids INT4 ; K3 attend ses poids complets annoncés.</p></article>
         </div>
         <div class="flex flex-wrap gap-3 mt-6">
           <a class="btn btn-primary" href="/telecharger-scanner-ia-local">Lancer le scanner desktop</a>
           <a class="btn btn-secondary" href="/blog/vram-8-12-16-24-quel-modele-2026">Lire le guide VRAM</a>
           <a class="btn btn-secondary" href="/blog/ollama-windows-vs-wsl-ia-locale-2026">Windows ou WSL</a>
+          <a class="btn btn-secondary" href="/blog/kimi-k3-k2-7-code-local-2026">Comprendre Kimi local</a>
         </div>
       </div>
     </section>
