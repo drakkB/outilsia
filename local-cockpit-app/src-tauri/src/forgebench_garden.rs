@@ -1425,9 +1425,7 @@ fn grow_rhizomes(state: &mut State, day: u16, phase: &Phase) {
         let mut depth_delta = growth_mm * 80 / 1_000;
         if prior.depth_mm > 300 {
             depth_delta = -depth_delta.abs();
-        } else if prior.depth_mm < 120 {
-            depth_delta = depth_delta.abs();
-        } else if (usize::from(day) + index).is_multiple_of(2) {
+        } else if prior.depth_mm < 120 || (usize::from(day) + index).is_multiple_of(2) {
             depth_delta = depth_delta.abs();
         } else {
             depth_delta = -depth_delta.abs();
@@ -1763,6 +1761,7 @@ fn aggregate_json(metrics: &AggregateMetrics) -> Value {
     })
 }
 
+#[cfg(test)]
 pub(crate) fn evaluate_with_hidden_seeds(
     request: EvaluateGardenRequest,
     suite_receipt: &Value,
