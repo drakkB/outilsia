@@ -1,6 +1,7 @@
 use crate::capability_router::validate_capability_router_result;
 use crate::forgebench::validate_forgebench_result;
 use crate::forgebench_candidate::validate_forgebench_ollama_candidate_result;
+use crate::forgebench_garden::validate_forgebench_garden_result;
 use crate::forgebench_isolation::validate_forgebench_isolation_result;
 use crate::forgebench_runner::validate_forgebench_reference_pilot_result;
 use crate::workstack_arena::validate_workstack_arena_result;
@@ -146,9 +147,10 @@ fn verify_entry(
         .ok_or_else(|| "Type d'entree Evidence Ledger absent.".to_string())?;
     let is_reference_run = event_type == "forgebench_reference_pilot_verified";
     let is_candidate_run = event_type == "forgebench_ollama_candidate_verified";
+    let is_garden_run = event_type == "forgebench_garden_batch_verified";
     let is_arena_run = event_type == "workstack_arena_codex_pilot_verified";
     let is_human_review = event_type == "workstack_human_review_recorded";
-    let is_executed_run = is_reference_run || is_candidate_run || is_arena_run;
+    let is_executed_run = is_reference_run || is_candidate_run || is_garden_run || is_arena_run;
     let invalid_execution_contract = if is_reference_run {
         entry
             .pointer("/execution/api_cost_eur")
@@ -175,6 +177,18 @@ fn verify_entry(
                 .pointer("/human_decision/status")
                 .and_then(Value::as_str)
                 != Some("explicitly_confirmed_local_candidate")
+    } else if is_garden_run {
+        !entry
+            .pointer("/execution/api_cost_eur")
+            .is_some_and(Value::is_null)
+            || entry
+                .pointer("/execution/cost_status")
+                .and_then(Value::as_str)
+                != Some("candidate_costs_bounded_or_unknown")
+            || entry
+                .pointer("/human_decision/status")
+                .and_then(Value::as_str)
+                != Some("explicitly_confirmed_garden_batch")
     } else if is_arena_run {
         !entry
             .pointer("/execution/api_cost_eur")
@@ -883,6 +897,106 @@ fn source_contract(event_type: &str, source: &Value) -> Result<Value, String> {
                 "human_decision": {"status": "explicitly_confirmed_local_candidate"}
             }))
         }
+        "forgebench_garden_batch_verified" => {
+            validate_forgebench_garden_result(source)?;
+            let source_candidates = source
+                .get("candidates")
+                .and_then(Value::as_array)
+                .ok_or_else(|| "Candidats Garden absents pour Evidence Ledger.".to_string())?;
+            if source_candidates.is_empty() || source_candidates.len() > 8 {
+                return Err("Nombre de candidats Garden invalide pour Evidence Ledger.".to_string());
+            }
+            let mut candidates = Vec::with_capacity(source_candidates.len());
+            let mut latency_ms = 0_u64;
+            for candidate in source_candidates {
+                let candidate_id = safe_candidate_id(
+                    candidate
+                        .get("candidate_id")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default(),
+                )?;
+                let authoring_mode = required_enum_claim(
+                    candidate,
+                    "/provenance/authoring_mode",
+                    &["blind_one_shot", "open_book_iterative", "human_authored"],
+                    "Mode de provenance Garden",
+                )?;
+                let cost_status = required_enum_claim(
+                    candidate,
+                    "/provenance/cost_status",
+                    &[
+                        "measured",
+                        "not_reported",
+                        "subscription_quota_unknown",
+                        "local_energy_not_measured",
+                    ],
+                    "Statut de cout Garden",
+                )?;
+                let evaluation_duration_ms = candidate
+                    .pointer("/performance/evaluation_duration_ms")
+                    .and_then(Value::as_u64)
+                    .unwrap_or_default();
+                latency_ms = latency_ms.saturating_add(evaluation_duration_ms);
+                candidates.push(json!({
+                    "candidate_id": candidate_id,
+                    "source_sha256": candidate.get("source_sha256").cloned().unwrap_or(Value::Null),
+                    "program_sha256": candidate.get("program_sha256").cloned().unwrap_or(Value::Null),
+                    "provisional_rank": numeric_claim(candidate, "/provisional_rank"),
+                    "authoring_mode": authoring_mode,
+                    "blind_one_shot": candidate.pointer("/provenance/blind_one_shot").cloned().unwrap_or(json!(false)),
+                    "eligible_for_blind_claim": candidate.pointer("/provenance/eligible_for_blind_claim").cloned().unwrap_or(json!(false)),
+                    "generation_duration_ms": candidate.pointer("/provenance/generation_duration_ms").cloned().unwrap_or(Value::Null),
+                    "api_cost_eur_micros": candidate.pointer("/provenance/api_cost_eur_micros").cloned().unwrap_or(Value::Null),
+                    "energy_wh_milli": candidate.pointer("/provenance/energy_wh_milli").cloned().unwrap_or(Value::Null),
+                    "cost_status": cost_status,
+                    "evaluation_duration_ms": evaluation_duration_ms,
+                    "all_scenarios_rankable": candidate.pointer("/combined_aggregate/all_scenarios_rankable").cloned().unwrap_or(json!(false)),
+                    "escaped_active_tips_sum": numeric_claim(candidate, "/combined_aggregate/escaped_active_tips_sum"),
+                    "days_uncontained_sum": numeric_claim(candidate, "/combined_aggregate/days_uncontained_sum"),
+                    "containment_permille_mean": numeric_claim(candidate, "/combined_aggregate/containment_permille_mean"),
+                    "minimum_vitality_permille_worst": numeric_claim(candidate, "/combined_aggregate/minimum_vitality_permille_worst"),
+                    "living_canes_mean_milli": numeric_claim(candidate, "/combined_aggregate/living_canes_mean_milli"),
+                    "final_vitality_permille_mean": numeric_claim(candidate, "/combined_aggregate/final_vitality_permille_mean"),
+                    "labor_used_min_sum": numeric_claim(candidate, "/combined_aggregate/labor_used_min_sum"),
+                    "water_used_mm_sum": numeric_claim(candidate, "/combined_aggregate/water_used_mm_sum")
+                }));
+            }
+            Ok(json!({
+                "actor": {"kind": "outilsia_component", "id": "forgebench_garden_evaluator"},
+                "workstack_id": Value::Null,
+                "proof_level": "deterministic_dsl_public_and_hidden_batch",
+                "source_integrity_sha256": source.pointer("/integrity/digest").cloned().unwrap_or(Value::Null),
+                "claims": {
+                    "benchmark_id": source.pointer("/benchmark/id").cloned().unwrap_or(Value::Null),
+                    "track": source.pointer("/benchmark/track").cloned().unwrap_or(Value::Null),
+                    "official_gardenarena_ranking": false,
+                    "candidate_set_sha256": source.pointer("/candidate_freeze/candidate_set_sha256").cloned().unwrap_or(Value::Null),
+                    "candidates_total": candidates.len(),
+                    "hidden_scenarios_total": numeric_claim(source, "/hidden_suite/scenario_count"),
+                    "hidden_suite_digest": source.pointer("/hidden_suite/receipt/suite_digest").cloned().unwrap_or(Value::Null),
+                    "hidden_scenario_commitment_digest": source.pointer("/hidden_suite/scenario_commitment_digest").cloned().unwrap_or(Value::Null),
+                    "same_scenarios_for_all_candidates": true,
+                    "candidate_code_executed": false,
+                    "raw_sources_stored": false,
+                    "hidden_material_stored": false,
+                    "comparable_runs": source.pointer("/comparison/comparable_runs").cloned().unwrap_or(json!(false)),
+                    "composite_score": false,
+                    "winner_declared": false,
+                    "candidates": candidates
+                },
+                "execution": {
+                    "started": true,
+                    "latency_ms": latency_ms,
+                    "api_cost_eur": Value::Null,
+                    "cost_status": "candidate_costs_bounded_or_unknown"
+                },
+                "validation": {
+                    "source_contract_valid": true,
+                    "independent_run_verification": true
+                },
+                "human_decision": {"status": "explicitly_confirmed_garden_batch"}
+            }))
+        }
         _ => Err("Type de preuve Evidence Ledger inconnu.".to_string()),
     }
 }
@@ -1443,6 +1557,42 @@ mod tests {
         assert!(!serialized.contains("index_html"));
         assert!(!serialized.contains("workspace_path"));
         assert!(!serialized.contains("hidden_seeds\":"));
+    }
+
+    #[test]
+    fn appends_a_garden_batch_as_bounded_metrics_only() {
+        let source = crate::forgebench_garden::test_forgebench_garden_result();
+        let (ledger, appended) = append_to_ledger(
+            empty_ledger().expect("empty"),
+            "forgebench_garden_batch_verified",
+            &source,
+            4_950,
+        )
+        .expect("Garden batch entry");
+        assert!(appended);
+        verify_ledger(&ledger).expect("verified Garden ledger");
+        let entry = &ledger["entries"][0];
+        assert_eq!(
+            entry["evidence"]["proof_level"],
+            "deterministic_dsl_public_and_hidden_batch"
+        );
+        assert_eq!(entry["execution"]["started"], true);
+        assert!(entry["execution"]["api_cost_eur"].is_null());
+        assert_eq!(
+            entry["execution"]["cost_status"],
+            "candidate_costs_bounded_or_unknown"
+        );
+        assert_eq!(
+            entry["evidence"]["claims"]["official_gardenarena_ranking"],
+            false
+        );
+        assert_eq!(entry["evidence"]["claims"]["winner_declared"], false);
+        assert_eq!(entry["evidence"]["claims"]["raw_sources_stored"], false);
+        assert_eq!(entry["evidence"]["claims"]["hidden_material_stored"], false);
+        let serialized = serde_json::to_string(&ledger).expect("ledger JSON");
+        assert!(!serialized.contains("when rhizome"));
+        assert!(!serialized.contains("hidden_seeds"));
+        assert!(!serialized.contains("scenario_parameters"));
     }
 
     #[test]

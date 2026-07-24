@@ -66,6 +66,8 @@ const state = {
   forgeBenchIsolation: null,
   forgeBenchReferencePilot: null,
   forgeBenchOllamaCandidate: null,
+  forgeBenchGardenHiddenSuite: null,
+  forgeBenchGardenResult: null,
   evidenceLedger: null,
   installSafetyPreflight: null,
   localSnapshots: [],
@@ -130,6 +132,14 @@ const FORGEBENCH_REFERENCE_PILOT_REQUEST_SCHEMA = "outilsia.forgebench_reference
 const FORGEBENCH_REFERENCE_PILOT_RESULT_SCHEMA = "outilsia.forgebench_reference_pilot_result.v1";
 const FORGEBENCH_OLLAMA_CANDIDATE_REQUEST_SCHEMA = "outilsia.forgebench_ollama_candidate_request.v3";
 const FORGEBENCH_OLLAMA_CANDIDATE_RESULT_SCHEMA = "outilsia.forgebench_ollama_candidate_result.v3";
+const FORGEBENCH_GARDEN_BENCHMARK_ID = "garden-bamboo-generalization-v1";
+const FORGEBENCH_GARDEN_REQUEST_SCHEMA = "outilsia.forgebench_garden_evaluate_request.v1";
+const FORGEBENCH_GARDEN_RESULT_SCHEMA = "outilsia.forgebench_garden_evaluate_result.v1";
+const FORGEBENCH_GARDEN_EXAMPLE_SCHEMA = "outilsia.forgebench_garden_example.v1";
+const FORGEBENCH_GARDEN_VAULT_SEAL_REQUEST_SCHEMA = "outilsia.forgebench_garden_hidden_suite_seal_request.v1";
+const FORGEBENCH_GARDEN_VAULT_SEAL_RESULT_SCHEMA = "outilsia.forgebench_garden_hidden_suite_seal_result.v1";
+const FORGEBENCH_GARDEN_VAULT_STATUS_SCHEMA = "outilsia.forgebench_garden_hidden_suite_status.v1";
+const FORGEBENCH_GARDEN_VAULT_RECEIPT_SCHEMA = "outilsia.forgebench_garden_hidden_suite_receipt.v1";
 const EVIDENCE_APPEND_REQUEST_SCHEMA = "outilsia.evidence_append_request.v1";
 const EVIDENCE_APPEND_RESULT_SCHEMA = "outilsia.evidence_append_result.v1";
 const EVIDENCE_LEDGER_SCHEMA = "outilsia.evidence_ledger.v1";
@@ -538,6 +548,30 @@ const els = {
   forgeBenchCandidateDuration: $("forgeBenchCandidateDuration"),
   forgeBenchCandidateBox: $("forgeBenchCandidateBox"),
   runForgeBenchCandidateBtn: $("runForgeBenchCandidateBtn"),
+  forgeBenchGardenDetails: $("forgeBenchGardenDetails"),
+  forgeBenchGardenState: $("forgeBenchGardenState"),
+  forgeBenchGardenVaultState: $("forgeBenchGardenVaultState"),
+  forgeBenchGardenVaultBox: $("forgeBenchGardenVaultBox"),
+  sealForgeBenchGardenVaultBtn: $("sealForgeBenchGardenVaultBtn"),
+  refreshForgeBenchGardenVaultBtn: $("refreshForgeBenchGardenVaultBtn"),
+  clearForgeBenchGardenVaultBtn: $("clearForgeBenchGardenVaultBtn"),
+  forgeBenchGardenDraftState: $("forgeBenchGardenDraftState"),
+  forgeBenchGardenCandidateId: $("forgeBenchGardenCandidateId"),
+  forgeBenchGardenAuthoringMode: $("forgeBenchGardenAuthoringMode"),
+  forgeBenchGardenCostStatus: $("forgeBenchGardenCostStatus"),
+  forgeBenchGardenSimulatorUsed: $("forgeBenchGardenSimulatorUsed"),
+  forgeBenchGardenThresholdsTuned: $("forgeBenchGardenThresholdsTuned"),
+  forgeBenchGardenSource: $("forgeBenchGardenSource"),
+  loadForgeBenchGardenExampleBtn: $("loadForgeBenchGardenExampleBtn"),
+  addForgeBenchGardenCandidateBtn: $("addForgeBenchGardenCandidateBtn"),
+  clearForgeBenchGardenDraftBtn: $("clearForgeBenchGardenDraftBtn"),
+  forgeBenchGardenBatchState: $("forgeBenchGardenBatchState"),
+  forgeBenchGardenCandidateList: $("forgeBenchGardenCandidateList"),
+  forgeBenchGardenResult: $("forgeBenchGardenResult"),
+  runForgeBenchGardenBtn: $("runForgeBenchGardenBtn"),
+  copyForgeBenchGardenResultBtn: $("copyForgeBenchGardenResultBtn"),
+  sendForgeBenchGardenToLedgerBtn: $("sendForgeBenchGardenToLedgerBtn"),
+  clearForgeBenchGardenResultBtn: $("clearForgeBenchGardenResultBtn"),
   evidenceLedgerState: $("evidenceLedgerState"),
   evidenceLedgerSource: $("evidenceLedgerSource"),
   evidenceLedgerBox: $("evidenceLedgerBox"),
@@ -722,6 +756,11 @@ let forgeBenchRunnerBusy = false;
 let forgeBenchRunnerError = "";
 let forgeBenchCandidateBusy = false;
 let forgeBenchCandidateError = "";
+let forgeBenchGardenBusy = false;
+let forgeBenchGardenError = "";
+let forgeBenchGardenVaultBusy = false;
+let forgeBenchGardenVaultError = "";
+const forgeBenchGardenCandidates = [];
 let evidenceLedgerBusy = false;
 let evidenceLedgerError = "";
 const privateWorkloadSelections = new Set();
@@ -13201,6 +13240,741 @@ async function runForgeBenchOllamaCandidate() {
   }
 }
 
+function forgeBenchGardenVaultReceipt(status = state.forgeBenchGardenHiddenSuite) {
+  const receipt = status?.receipt;
+  if (
+    status?.schema !== FORGEBENCH_GARDEN_VAULT_STATUS_SCHEMA
+    || status?.exists !== true
+    || status?.contents_returned !== false
+    || status?.vault_path_returned !== false
+    || receipt?.schema !== FORGEBENCH_GARDEN_VAULT_RECEIPT_SCHEMA
+    || receipt?.benchmark?.id !== FORGEBENCH_GARDEN_BENCHMARK_ID
+    || !(Number(receipt?.hidden_scenarios_total) >= 3 && Number(receipt?.hidden_scenarios_total) <= 12)
+    || receipt?.privacy?.hidden_seeds_returned !== false
+    || receipt?.privacy?.hidden_scenarios_returned !== false
+    || receipt?.privacy?.vault_path_returned !== false
+    || receipt?.isolation?.candidate_sources_frozen_before_read !== true
+    || receipt?.isolation?.same_scenarios_for_all_candidates !== true
+    || receipt?.isolation?.candidate_code_execution !== false
+    || !/^[a-f0-9]{64}$/i.test(String(receipt?.suite_digest || ""))
+    || !/^[a-f0-9]{64}$/i.test(String(receipt?.integrity?.digest || ""))
+  ) return null;
+  return receipt;
+}
+
+function forgeBenchGardenContainsForbiddenResultKey(value) {
+  if (Array.isArray(value)) return value.some(forgeBenchGardenContainsForbiddenResultKey);
+  if (!value || typeof value !== "object") return false;
+  const forbidden = new Set([
+    "source",
+    "hidden_seed",
+    "hidden_seeds",
+    "hidden_scenario",
+    "hidden_scenarios",
+    "scenario_parameters",
+    "raw_candidate_source",
+    "raw_candidate_sources"
+  ]);
+  return Object.entries(value).some(([key, nested]) => (
+    forbidden.has(key) || forgeBenchGardenContainsForbiddenResultKey(nested)
+  ));
+}
+
+function forgeBenchGardenVerifiedResult(result = state.forgeBenchGardenResult) {
+  const candidates = Array.isArray(result?.candidates) ? result.candidates : [];
+  const order = Array.isArray(result?.comparison?.provisional_order)
+    ? result.comparison.provisional_order
+    : [];
+  const manifest = Array.isArray(result?.candidate_freeze?.manifest)
+    ? result.candidate_freeze.manifest
+    : [];
+  if (
+    result?.schema !== FORGEBENCH_GARDEN_RESULT_SCHEMA
+    || result?.benchmark?.id !== FORGEBENCH_GARDEN_BENCHMARK_ID
+    || result?.benchmark?.official_gardenarena_ranking !== false
+    || result?.execution?.local_only !== true
+    || result?.execution?.network_called !== false
+    || result?.execution?.external_process_started !== false
+    || result?.execution?.candidate_code_executed !== false
+    || result?.execution?.dsl_interpreted !== true
+    || result?.execution?.hidden_suite_loaded_after_candidate_freeze !== true
+    || result?.execution?.same_scenarios_for_all_candidates !== true
+    || !(candidates.length >= 1 && candidates.length <= 8)
+    || manifest.length !== candidates.length
+    || result?.candidate_freeze?.candidate_count !== candidates.length
+    || !/^[a-f0-9]{64}$/i.test(String(result?.candidate_freeze?.candidate_set_sha256 || ""))
+    || result?.hidden_suite?.receipt?.schema !== FORGEBENCH_GARDEN_VAULT_RECEIPT_SCHEMA
+    || result?.hidden_suite?.scenario_count !== result?.hidden_suite?.receipt?.hidden_scenarios_total
+    || result?.hidden_suite?.seeds_returned !== false
+    || result?.hidden_suite?.scenario_parameters_returned !== false
+    || result?.hidden_suite?.per_scenario_metrics_returned !== false
+    || result?.comparison?.comparable_runs !== true
+    || result?.comparison?.method !== "lexicographic_aggregate_v1"
+    || result?.comparison?.composite_score !== false
+    || result?.comparison?.winner_declared !== false
+    || result?.comparison?.winner !== null
+    || order.length !== candidates.length
+    || new Set(order).size !== order.length
+    || candidates.some((candidate, index) => (
+      candidate?.candidate_id !== order[index]
+      || candidate?.provisional_rank !== index + 1
+      || !/^[a-f0-9]{64}$/i.test(String(candidate?.source_sha256 || ""))
+      || !/^[a-f0-9]{64}$/i.test(String(candidate?.program_sha256 || ""))
+      || candidate?.combined_aggregate?.scenario_count !== result.hidden_suite.scenario_count + 1
+    ))
+    || result?.privacy?.raw_candidate_sources_returned !== false
+    || result?.privacy?.raw_candidate_sources_persisted !== false
+    || result?.privacy?.hidden_seeds_returned !== false
+    || result?.privacy?.hidden_scenarios_returned !== false
+    || result?.release?.binary_published !== false
+    || result?.release?.site_deployed !== false
+    || result?.release?.manual_validation_required !== true
+    || !/^[a-f0-9]{64}$/i.test(String(result?.integrity?.digest || ""))
+    || forgeBenchGardenContainsForbiddenResultKey(result)
+  ) return null;
+  return result;
+}
+
+function forgeBenchGardenAuthoringLabel(mode) {
+  return ({
+    blind_one_shot: "aveugle en un essai",
+    open_book_iterative: "itératif, protocole visible",
+    human_authored: "écrit par un humain"
+  })[mode] || mode;
+}
+
+function forgeBenchGardenCostLabel(status) {
+  return ({
+    not_reported: "coût non renseigné",
+    subscription_quota_unknown: "quota abonnement inconnu",
+    local_energy_not_measured: "énergie locale non mesurée",
+    measured: "coût mesuré"
+  })[status] || status;
+}
+
+function forgeBenchGardenDigest(value) {
+  const digest = String(value || "");
+  return digest ? `${digest.slice(0, 12)}…${digest.slice(-8)}` : "absente";
+}
+
+function forgeBenchGardenMetricPercent(value) {
+  return `${(Number(value || 0) / 10).toLocaleString("fr-FR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  })}%`;
+}
+
+function forgeBenchGardenDraft() {
+  const authoringMode = String(els.forgeBenchGardenAuthoringMode?.value || "open_book_iterative");
+  return {
+    candidate_id: String(els.forgeBenchGardenCandidateId?.value || "").trim(),
+    source: String(els.forgeBenchGardenSource?.value || ""),
+    provenance: {
+      authoring_mode: authoringMode,
+      blind_one_shot: authoringMode === "blind_one_shot",
+      simulator_used_during_authoring: Boolean(els.forgeBenchGardenSimulatorUsed?.checked),
+      thresholds_tuned_after_visible_runs: Boolean(els.forgeBenchGardenThresholdsTuned?.checked),
+      api_cost_eur_micros: null,
+      generation_duration_ms: null,
+      energy_wh_milli: null,
+      cost_status: String(els.forgeBenchGardenCostStatus?.value || "not_reported")
+    }
+  };
+}
+
+function forgeBenchGardenDraftReady(draft = forgeBenchGardenDraft()) {
+  return /^[A-Za-z0-9._-]{1,64}$/.test(draft.candidate_id)
+    && draft.source.length > 0
+    && draft.source.length <= 16_384
+    && !(draft.provenance.blind_one_shot
+      && (draft.provenance.simulator_used_during_authoring
+        || draft.provenance.thresholds_tuned_after_visible_runs));
+}
+
+function syncForgeBenchGardenAuthoringControls() {
+  const blind = els.forgeBenchGardenAuthoringMode?.value === "blind_one_shot";
+  if (blind) {
+    els.forgeBenchGardenSimulatorUsed.checked = false;
+    els.forgeBenchGardenThresholdsTuned.checked = false;
+  }
+  els.forgeBenchGardenSimulatorUsed.disabled = forgeBenchGardenBusy || blind;
+  els.forgeBenchGardenThresholdsTuned.disabled = forgeBenchGardenBusy || blind;
+}
+
+function clearForgeBenchGardenResult(silent = false) {
+  state.forgeBenchGardenResult = null;
+  forgeBenchGardenError = "";
+  renderForgeBenchGardenPanel();
+  renderEvidenceLedgerPanel();
+  if (!silent) setStatus("Run Garden/Bamboo effacé", "ok");
+}
+
+function clearForgeBenchGardenDraft() {
+  els.forgeBenchGardenCandidateId.value = "";
+  els.forgeBenchGardenAuthoringMode.value = "open_book_iterative";
+  els.forgeBenchGardenCostStatus.value = "not_reported";
+  els.forgeBenchGardenSimulatorUsed.checked = false;
+  els.forgeBenchGardenThresholdsTuned.checked = false;
+  els.forgeBenchGardenSource.value = "";
+  syncForgeBenchGardenAuthoringControls();
+  renderForgeBenchGardenPanel();
+}
+
+function renderForgeBenchGardenPanel() {
+  if (!els.forgeBenchGardenResult) return;
+  syncForgeBenchGardenAuthoringControls();
+  const receipt = forgeBenchGardenVaultReceipt();
+  const result = forgeBenchGardenVerifiedResult();
+  const draft = forgeBenchGardenDraft();
+  const draftReady = forgeBenchGardenDraftReady(draft);
+
+  els.loadForgeBenchGardenExampleBtn.disabled = !invoke || forgeBenchGardenBusy;
+  els.addForgeBenchGardenCandidateBtn.disabled = forgeBenchGardenBusy
+    || !draftReady
+    || (forgeBenchGardenCandidates.length >= 8
+      && !forgeBenchGardenCandidates.some((candidate) => candidate.candidate_id === draft.candidate_id));
+  els.clearForgeBenchGardenDraftBtn.disabled = forgeBenchGardenBusy
+    || (!draft.candidate_id && !draft.source);
+  els.runForgeBenchGardenBtn.disabled = !invoke
+    || forgeBenchGardenBusy
+    || !receipt
+    || forgeBenchGardenCandidates.length < 1;
+  els.copyForgeBenchGardenResultBtn.disabled = !result;
+  els.sendForgeBenchGardenToLedgerBtn.disabled = !result;
+  els.clearForgeBenchGardenResultBtn.disabled = forgeBenchGardenBusy || !result;
+
+  els.forgeBenchGardenCandidateId.disabled = forgeBenchGardenBusy;
+  els.forgeBenchGardenAuthoringMode.disabled = forgeBenchGardenBusy;
+  els.forgeBenchGardenCostStatus.disabled = forgeBenchGardenBusy;
+  els.forgeBenchGardenSource.disabled = forgeBenchGardenBusy;
+  els.forgeBenchGardenDraftState.textContent = draftReady
+    ? "prêt à ajouter"
+    : draft.source || draft.candidate_id
+      ? "brouillon incomplet"
+      : "brouillon vide";
+
+  els.forgeBenchGardenBatchState.textContent = `${forgeBenchGardenCandidates.length} candidat${forgeBenchGardenCandidates.length > 1 ? "s" : ""}`;
+  els.forgeBenchGardenCandidateList.className = `forgebench-garden-candidate-list${forgeBenchGardenCandidates.length ? "" : " empty"}`;
+  els.forgeBenchGardenCandidateList.innerHTML = forgeBenchGardenCandidates.length
+    ? forgeBenchGardenCandidates.map((candidate) => {
+        const lines = candidate.source.split("\n").length;
+        const tuned = candidate.provenance.thresholds_tuned_after_visible_runs
+          ? "seuils ajustés"
+          : candidate.provenance.simulator_used_during_authoring
+            ? "simulateur utilisé"
+            : "sans tuning déclaré";
+        return `
+          <div class="forgebench-garden-candidate-row">
+            <div>
+              <strong>${escapeHtml(candidate.candidate_id)}</strong>
+              <span>${escapeHtml(forgeBenchGardenAuthoringLabel(candidate.provenance.authoring_mode))} · ${escapeHtml(tuned)}</span>
+            </div>
+            <small>${escapeHtml(lines)} lignes · ${escapeHtml(forgeBenchGardenCostLabel(candidate.provenance.cost_status))}</small>
+            <div class="forgebench-garden-candidate-actions">
+              <button type="button" data-edit-garden-candidate="${escapeHtml(candidate.candidate_id)}">Modifier</button>
+              <button type="button" data-remove-garden-candidate="${escapeHtml(candidate.candidate_id)}">Retirer</button>
+            </div>
+          </div>
+        `;
+      }).join("")
+    : "Charge l'exemple ou ajoute un programme GardenScript.";
+
+  els.sealForgeBenchGardenVaultBtn.disabled = !invoke || forgeBenchGardenVaultBusy || forgeBenchGardenBusy;
+  els.refreshForgeBenchGardenVaultBtn.disabled = !invoke || forgeBenchGardenVaultBusy || forgeBenchGardenBusy;
+  els.clearForgeBenchGardenVaultBtn.disabled = !invoke
+    || forgeBenchGardenVaultBusy
+    || forgeBenchGardenBusy
+    || !receipt;
+  els.sealForgeBenchGardenVaultBtn.textContent = receipt
+    ? "Remplacer les 5 scénarios"
+    : "Sceller 5 scénarios";
+
+  if (!invoke) {
+    els.forgeBenchGardenVaultState.textContent = "app native requise";
+    els.forgeBenchGardenVaultBox.className = "forgebench-garden-vault-box empty";
+    els.forgeBenchGardenVaultBox.textContent = "Le coffre Garden est disponible dans l'application Windows/Linux.";
+  } else if (forgeBenchGardenVaultBusy) {
+    els.forgeBenchGardenVaultState.textContent = "opération locale";
+    els.forgeBenchGardenVaultBox.className = "forgebench-garden-vault-box empty";
+    els.forgeBenchGardenVaultBox.textContent = "Création ou vérification locale. Aucun seed n'est renvoyé à l'interface.";
+  } else if (forgeBenchGardenVaultError) {
+    els.forgeBenchGardenVaultState.textContent = "coffre refusé";
+    els.forgeBenchGardenVaultBox.className = "forgebench-garden-vault-box empty";
+    els.forgeBenchGardenVaultBox.innerHTML = `<strong>Suite cachée non fiable</strong><span>${escapeHtml(forgeBenchGardenVaultError)}</span>`;
+  } else if (!receipt) {
+    els.forgeBenchGardenVaultState.textContent = "non scellée";
+    els.forgeBenchGardenVaultBox.className = "forgebench-garden-vault-box empty";
+    els.forgeBenchGardenVaultBox.textContent = "Scelle 5 scénarios privés. L'interface ne reçoit que leur nombre et des empreintes.";
+  } else {
+    els.forgeBenchGardenVaultState.textContent = `${receipt.hidden_scenarios_total} scénarios scellés`;
+    els.forgeBenchGardenVaultBox.className = "forgebench-garden-vault-box";
+    els.forgeBenchGardenVaultBox.innerHTML = `
+      <strong>${escapeHtml(receipt.suite_id || "Suite Garden")}</strong>
+      <span>${escapeHtml(receipt.hidden_scenarios_total)} scénarios · même lot pour tous les candidats</span>
+      <small>Suite SHA-256 ${escapeHtml(forgeBenchGardenDigest(receipt.suite_digest))} · contenu, seeds et chemin non retournés</small>
+    `;
+  }
+
+  if (forgeBenchGardenBusy) {
+    els.forgeBenchGardenState.textContent = "simulation locale";
+    els.forgeBenchGardenResult.className = "forgebench-garden-result empty";
+    els.forgeBenchGardenResult.textContent = "Compilation du lot, gel des empreintes, ouverture du coffre puis simulation déterministe. Aucun processus externe ou réseau.";
+    return;
+  }
+  if (forgeBenchGardenError) {
+    els.forgeBenchGardenDetails.open = true;
+    els.forgeBenchGardenState.textContent = "run refusé";
+    els.forgeBenchGardenResult.className = "forgebench-garden-result empty";
+    els.forgeBenchGardenResult.innerHTML = `<strong>Résultat non prouvé</strong><span>${escapeHtml(forgeBenchGardenError)}</span>`;
+    return;
+  }
+  if (!result) {
+    els.forgeBenchGardenState.textContent = !invoke
+      ? "app native requise"
+      : !receipt
+        ? "suite à sceller"
+        : forgeBenchGardenCandidates.length
+          ? "prêt à évaluer"
+          : "candidat requis";
+    els.forgeBenchGardenResult.className = "forgebench-garden-result empty";
+    els.forgeBenchGardenResult.textContent = "Aucun run. Le classement restera provisoire jusqu'à une revue humaine.";
+    return;
+  }
+
+  const rows = result.candidates.map((candidate) => {
+    const metrics = candidate.combined_aggregate || {};
+    return `
+      <div class="forgebench-garden-result-row">
+        <div class="forgebench-garden-rank">${escapeHtml(candidate.provisional_rank)}</div>
+        <div>
+          <strong>${escapeHtml(candidate.display_name || candidate.candidate_id)}</strong>
+          <span>${escapeHtml(candidate.candidate_id)} · ${escapeHtml(forgeBenchGardenAuthoringLabel(candidate.provenance?.authoring_mode))}</span>
+        </div>
+        <div class="forgebench-garden-metrics">
+          <span><strong>${escapeHtml(metrics.escaped_active_tips_sum ?? 0)}</strong> sorties</span>
+          <span><strong>${escapeHtml(metrics.days_uncontained_sum ?? 0)}</strong> jours non contenus</span>
+          <span><strong>${escapeHtml(forgeBenchGardenMetricPercent(metrics.minimum_vitality_permille_worst))}</strong> vitalité min.</span>
+          <span><strong>${escapeHtml(metrics.labor_used_min_sum ?? 0)}</strong> min travail</span>
+        </div>
+      </div>
+    `;
+  }).join("");
+  els.forgeBenchGardenDetails.open = true;
+  els.forgeBenchGardenState.textContent = `${result.candidates.length} run${result.candidates.length > 1 ? "s" : ""} comparables`;
+  els.forgeBenchGardenResult.className = "forgebench-garden-result";
+  els.forgeBenchGardenResult.innerHTML = `
+    <div class="forgebench-garden-result-summary">
+      <div>
+        <strong>Ordre provisoire vérifié</strong>
+        <span>${escapeHtml(result.hidden_suite.scenario_count)} scénarios cachés + 1 public · classement lexicographique</span>
+      </div>
+      <span class="forgebench-garden-no-winner">Aucun vainqueur déclaré</span>
+    </div>
+    <div class="forgebench-garden-result-list">${rows}</div>
+    <small>Lot SHA-256 ${escapeHtml(forgeBenchGardenDigest(result.candidate_freeze.candidate_set_sha256))} · reçu ${escapeHtml(forgeBenchGardenDigest(result.integrity.digest))} · vitesse et coût hors ordre stratégique</small>
+  `;
+}
+
+async function loadForgeBenchGardenExample() {
+  if (!invoke || forgeBenchGardenBusy) return null;
+  try {
+    const example = await invoke("get_forgebench_garden_example");
+    if (
+      example?.schema !== FORGEBENCH_GARDEN_EXAMPLE_SCHEMA
+      || example?.benchmark_id !== FORGEBENCH_GARDEN_BENCHMARK_ID
+      || !example?.candidate_id
+      || !example?.source
+      || example?.truth?.winner_declared !== false
+    ) throw new Error("exemple Garden natif non conforme");
+    els.forgeBenchGardenCandidateId.value = example.candidate_id;
+    els.forgeBenchGardenAuthoringMode.value = example.provenance.authoring_mode;
+    els.forgeBenchGardenCostStatus.value = example.provenance.cost_status;
+    els.forgeBenchGardenSimulatorUsed.checked = example.provenance.simulator_used_during_authoring === true;
+    els.forgeBenchGardenThresholdsTuned.checked = example.provenance.thresholds_tuned_after_visible_runs === true;
+    els.forgeBenchGardenSource.value = example.source;
+    syncForgeBenchGardenAuthoringControls();
+    renderForgeBenchGardenPanel();
+    setStatus("Fable Joint Sentinel chargé avec sa provenance itérative", "ok");
+    return example;
+  } catch (error) {
+    forgeBenchGardenError = String(error || "Exemple Garden indisponible");
+    renderForgeBenchGardenPanel();
+    setStatus(`ForgeBench Garden : ${forgeBenchGardenError}`, "error");
+    return null;
+  }
+}
+
+function addForgeBenchGardenCandidate() {
+  const candidate = forgeBenchGardenDraft();
+  if (!forgeBenchGardenDraftReady(candidate)) {
+    setStatus("Identifiant, source et provenance Garden à corriger", "warn");
+    return;
+  }
+  const duplicateSource = forgeBenchGardenCandidates.find((item) => (
+    item.candidate_id !== candidate.candidate_id && item.source === candidate.source
+  ));
+  if (duplicateSource) {
+    setStatus(`La même source est déjà attribuée à ${duplicateSource.candidate_id}`, "warn");
+    return;
+  }
+  const existing = forgeBenchGardenCandidates.findIndex((item) => item.candidate_id === candidate.candidate_id);
+  if (existing >= 0) forgeBenchGardenCandidates.splice(existing, 1, candidate);
+  else if (forgeBenchGardenCandidates.length < 8) forgeBenchGardenCandidates.push(candidate);
+  else {
+    setStatus("ForgeBench Garden accepte au maximum 8 candidats", "warn");
+    return;
+  }
+  clearForgeBenchGardenResult(true);
+  renderForgeBenchGardenPanel();
+  setStatus(existing >= 0 ? "Candidat Garden mis à jour" : "Candidat Garden ajouté au lot", "ok");
+}
+
+function editForgeBenchGardenCandidate(candidateId) {
+  const candidate = forgeBenchGardenCandidates.find((item) => item.candidate_id === candidateId);
+  if (!candidate) return;
+  els.forgeBenchGardenCandidateId.value = candidate.candidate_id;
+  els.forgeBenchGardenAuthoringMode.value = candidate.provenance.authoring_mode;
+  els.forgeBenchGardenCostStatus.value = candidate.provenance.cost_status;
+  els.forgeBenchGardenSimulatorUsed.checked = candidate.provenance.simulator_used_during_authoring;
+  els.forgeBenchGardenThresholdsTuned.checked = candidate.provenance.thresholds_tuned_after_visible_runs;
+  els.forgeBenchGardenSource.value = candidate.source;
+  syncForgeBenchGardenAuthoringControls();
+  renderForgeBenchGardenPanel();
+  els.forgeBenchGardenSource.focus();
+}
+
+function removeForgeBenchGardenCandidate(candidateId) {
+  const index = forgeBenchGardenCandidates.findIndex((item) => item.candidate_id === candidateId);
+  if (index < 0) return;
+  forgeBenchGardenCandidates.splice(index, 1);
+  clearForgeBenchGardenResult(true);
+  renderForgeBenchGardenPanel();
+  setStatus("Candidat Garden retiré du lot", "ok");
+}
+
+async function loadForgeBenchGardenVault(silent = false) {
+  if (!invoke || forgeBenchGardenVaultBusy || forgeBenchGardenBusy) return null;
+  forgeBenchGardenVaultBusy = true;
+  forgeBenchGardenVaultError = "";
+  if (!silent) setStatus("Vérification de la suite Garden...");
+  renderForgeBenchGardenPanel();
+  try {
+    const status = await invoke("get_forgebench_garden_hidden_suite_status");
+    if (
+      status?.schema !== FORGEBENCH_GARDEN_VAULT_STATUS_SCHEMA
+      || status?.contents_returned !== false
+      || status?.vault_path_returned !== false
+      || (status.exists && !forgeBenchGardenVaultReceipt(status))
+    ) throw new Error("reçu du coffre Garden invalide");
+    state.forgeBenchGardenHiddenSuite = status;
+    if (!silent) setStatus(status.exists ? "Suite Garden vérifiée" : "Suite Garden non scellée", status.exists ? "ok" : "warn");
+    return status;
+  } catch (error) {
+    state.forgeBenchGardenHiddenSuite = null;
+    forgeBenchGardenVaultError = String(error || "Coffre Garden illisible");
+    if (!silent) setStatus(`ForgeBench Garden : ${forgeBenchGardenVaultError}`, "error");
+    return null;
+  } finally {
+    forgeBenchGardenVaultBusy = false;
+    renderForgeBenchGardenPanel();
+  }
+}
+
+async function sealForgeBenchGardenVault() {
+  if (!invoke || forgeBenchGardenVaultBusy || forgeBenchGardenBusy) return null;
+  const replace = Boolean(forgeBenchGardenVaultReceipt());
+  if (replace && !window.confirm("Remplacer la suite cachée Garden ? Les anciens runs resteront lisibles mais ne seront plus reproductibles avec ce coffre.")) return null;
+  forgeBenchGardenVaultBusy = true;
+  forgeBenchGardenVaultError = "";
+  clearForgeBenchGardenResult(true);
+  renderForgeBenchGardenPanel();
+  try {
+    const result = await invoke("seal_forgebench_garden_hidden_suite", {
+      request: {
+        schema: FORGEBENCH_GARDEN_VAULT_SEAL_REQUEST_SCHEMA,
+        benchmark_id: FORGEBENCH_GARDEN_BENCHMARK_ID,
+        hidden_scenario_count: 5,
+        replace_existing: replace
+      }
+    });
+    if (
+      result?.schema !== FORGEBENCH_GARDEN_VAULT_SEAL_RESULT_SCHEMA
+      || result?.contents_returned !== false
+      || result?.receipt?.schema !== FORGEBENCH_GARDEN_VAULT_RECEIPT_SCHEMA
+    ) throw new Error("scellement Garden natif incomplet");
+    state.forgeBenchGardenHiddenSuite = {
+      schema: FORGEBENCH_GARDEN_VAULT_STATUS_SCHEMA,
+      contract_version: result.contract_version,
+      exists: true,
+      receipt: result.receipt,
+      contents_returned: false,
+      vault_path_returned: false
+    };
+    setStatus(replace ? "Suite Garden remplacée et scellée" : "Suite Garden scellée localement", "ok");
+    return result;
+  } catch (error) {
+    state.forgeBenchGardenHiddenSuite = null;
+    forgeBenchGardenVaultError = String(error || "Scellement Garden impossible");
+    setStatus(`ForgeBench Garden : ${forgeBenchGardenVaultError}`, "error");
+    return null;
+  } finally {
+    forgeBenchGardenVaultBusy = false;
+    renderForgeBenchGardenPanel();
+  }
+}
+
+async function clearForgeBenchGardenVault() {
+  if (!invoke || forgeBenchGardenVaultBusy || forgeBenchGardenBusy || !forgeBenchGardenVaultReceipt()) return;
+  if (!window.confirm("Effacer la suite cachée Garden locale ?")) return;
+  forgeBenchGardenVaultBusy = true;
+  forgeBenchGardenVaultError = "";
+  clearForgeBenchGardenResult(true);
+  renderForgeBenchGardenPanel();
+  try {
+    const status = await invoke("clear_forgebench_garden_hidden_suite");
+    if (status?.schema !== FORGEBENCH_GARDEN_VAULT_STATUS_SCHEMA || status?.exists !== false) {
+      throw new Error("suppression Garden native incomplète");
+    }
+    state.forgeBenchGardenHiddenSuite = status;
+    setStatus("Suite cachée Garden effacée", "ok");
+  } catch (error) {
+    forgeBenchGardenVaultError = String(error || "Suppression Garden impossible");
+    setStatus(`ForgeBench Garden : ${forgeBenchGardenVaultError}`, "error");
+  } finally {
+    forgeBenchGardenVaultBusy = false;
+    renderForgeBenchGardenPanel();
+  }
+}
+
+async function runForgeBenchGarden() {
+  if (
+    !invoke
+    || forgeBenchGardenBusy
+    || !forgeBenchGardenVaultReceipt()
+    || forgeBenchGardenCandidates.length < 1
+  ) return null;
+  forgeBenchGardenBusy = true;
+  forgeBenchGardenError = "";
+  state.forgeBenchGardenResult = null;
+  renderForgeBenchGardenPanel();
+  setStatus(`Simulation Garden/Bamboo de ${forgeBenchGardenCandidates.length} candidat(s)...`);
+  try {
+    const result = await invoke("evaluate_forgebench_garden", {
+      request: {
+        schema: FORGEBENCH_GARDEN_REQUEST_SCHEMA,
+        benchmark_id: FORGEBENCH_GARDEN_BENCHMARK_ID,
+        candidates: forgeBenchGardenCandidates.map((candidate) => ({
+          candidate_id: candidate.candidate_id,
+          source: candidate.source,
+          provenance: { ...candidate.provenance }
+        }))
+      }
+    });
+    if (!forgeBenchGardenVerifiedResult(result)) {
+      throw new Error("reçu Garden natif non conforme");
+    }
+    state.forgeBenchGardenResult = result;
+    if (els.evidenceLedgerSource) {
+      els.evidenceLedgerSource.value = "forgebench_garden_batch_verified";
+    }
+    setStatus("Lot Garden/Bamboo vérifié, ordre provisoire sans vainqueur", "ok");
+    return result;
+  } catch (error) {
+    state.forgeBenchGardenResult = null;
+    forgeBenchGardenError = String(error || "Simulation Garden impossible");
+    setStatus(`ForgeBench Garden : ${forgeBenchGardenError}`, "error");
+    return null;
+  } finally {
+    forgeBenchGardenBusy = false;
+    renderForgeBenchGardenPanel();
+    renderEvidenceLedgerPanel();
+  }
+}
+
+async function copyForgeBenchGardenResult() {
+  const result = forgeBenchGardenVerifiedResult();
+  if (!result) return;
+  try {
+    await navigator.clipboard.writeText(`${JSON.stringify(result, null, 2)}\n`);
+    setStatus("Reçu Garden/Bamboo borné copié", "ok");
+  } catch (error) {
+    setStatus(`Copie Garden impossible : ${error}`, "error");
+  }
+}
+
+function sendForgeBenchGardenToLedger() {
+  if (!forgeBenchGardenVerifiedResult()) return;
+  els.evidenceLedgerSource.value = "forgebench_garden_batch_verified";
+  renderEvidenceLedgerPanel();
+  revealWorkspacePanel("workflows", document.querySelector(".evidence-ledger-panel"));
+  setStatus("Preuve Garden prête : confirme son ajout dans Evidence Ledger", "ok");
+}
+
+function demoForgeBenchGardenDocuments() {
+  const receipt = {
+    schema: FORGEBENCH_GARDEN_VAULT_RECEIPT_SCHEMA,
+    contract_version: "2026-07-24",
+    suite_id: "ghs-demo-garden-bamboo",
+    benchmark: { id: FORGEBENCH_GARDEN_BENCHMARK_ID },
+    created_at_ms: Date.now() - 2000,
+    hidden_scenarios_total: 5,
+    suite_digest: "7".repeat(64),
+    storage: "local_app_data",
+    privacy: {
+      contents_returned: false,
+      hidden_seeds_returned: false,
+      hidden_scenarios_returned: false,
+      vault_path_returned: false
+    },
+    isolation: {
+      candidate_sources_frozen_before_read: true,
+      same_scenarios_for_all_candidates: true,
+      candidate_code_execution: false,
+      dsl_only: true
+    },
+    integrity: { digest: "8".repeat(64) }
+  };
+  const aggregate = (rank, scenarioCount, escaped, days, vitality, labor, water) => ({
+    all_scenarios_rankable: true,
+    scenario_count: scenarioCount,
+    escaped_active_tips_sum: escaped,
+    days_uncontained_sum: days,
+    containment_permille_mean: escaped ? 966 : 1000,
+    minimum_vitality_permille_worst: vitality,
+    living_canes_mean_milli: rank === 1 ? 27_000 : 29_000,
+    final_vitality_permille_mean: rank === 1 ? 820 : 845,
+    labor_used_min_sum: labor,
+    water_used_mm_sum: water,
+    patches_used_sum: scenarioCount,
+    resource_fallbacks_sum: 0
+  });
+  const candidate = (id, name, rank, mode, escaped, days, vitality, labor, water) => ({
+    candidate_id: id,
+    display_name: name,
+    source_sha256: rank === 1 ? "a".repeat(64) : "b".repeat(64),
+    program_sha256: rank === 1 ? "c".repeat(64) : "d".repeat(64),
+    static_budget_units: rank === 1 ? 24 : 18,
+    provisional_rank: rank,
+    provenance: {
+      authoring_mode: mode,
+      blind_one_shot: false,
+      simulator_used_during_authoring: mode === "open_book_iterative",
+      thresholds_tuned_after_visible_runs: mode === "open_book_iterative",
+      eligible_for_blind_claim: false,
+      generation_duration_ms: null,
+      api_cost_eur_micros: null,
+      energy_wh_milli: null,
+      cost_status: "not_reported"
+    },
+    public_scenario: {
+      rankable: true,
+      escaped_active_tips: 0,
+      days_uncontained: 0,
+      containment_permille: 1000,
+      minimum_vitality_permille: vitality,
+      living_canes: rank === 1 ? 27 : 29,
+      final_vitality_permille: rank === 1 ? 820 : 845,
+      labor_used_min: Math.round(labor / 6),
+      water_used_mm: Math.round(water / 6),
+      patches_used: 1,
+      resource_fallbacks: 0,
+      joint_breaches: 0,
+      under_barrier_breaches: 0,
+      over_lip_breaches: 0,
+      violations: []
+    },
+    hidden_aggregate: aggregate(rank, 5, escaped, days, vitality, Math.round(labor * 5 / 6), Math.round(water * 5 / 6)),
+    combined_aggregate: aggregate(rank, 6, escaped, days, vitality, labor, water),
+    performance: {
+      evaluation_duration_ms: rank === 1 ? 4 : 3,
+      generation_speed_changes_strategy_order: false,
+      generation_cost_changes_strategy_order: false
+    }
+  });
+  const candidates = [
+    candidate("fable-joint-sentinel-v0.5", "Fable Joint Sentinel", 1, "open_book_iterative", 0, 0, 742, 1860, 468),
+    candidate("baseline-conservateur-v1", "Baseline conservateur", 2, "human_authored", 1, 3, 781, 1510, 420)
+  ];
+  return {
+    status: {
+      schema: FORGEBENCH_GARDEN_VAULT_STATUS_SCHEMA,
+      contract_version: "2026-07-24",
+      exists: true,
+      receipt,
+      contents_returned: false,
+      vault_path_returned: false,
+      test_mode: true
+    },
+    result: {
+      schema: FORGEBENCH_GARDEN_RESULT_SCHEMA,
+      contract_version: "2026-07-24",
+      benchmark: {
+        id: FORGEBENCH_GARDEN_BENCHMARK_ID,
+        track: "outilsia_exploratory_generalization",
+        official_gardenarena_ranking: false,
+        contract_sha256: "9".repeat(64)
+      },
+      generated_at_ms: Date.now(),
+      execution: {
+        started: true,
+        local_only: true,
+        network_called: false,
+        external_process_started: false,
+        candidate_code_executed: false,
+        dsl_interpreted: true,
+        file_access_by_candidate: false,
+        hidden_suite_loaded_after_candidate_freeze: true,
+        same_scenarios_for_all_candidates: true
+      },
+      candidate_freeze: {
+        candidate_set_sha256: "6".repeat(64),
+        candidate_count: 2,
+        manifest: candidates.map((item) => ({
+          candidate_id: item.candidate_id,
+          source_sha256: item.source_sha256,
+          program_sha256: item.program_sha256
+        }))
+      },
+      hidden_suite: {
+        receipt,
+        scenario_count: 5,
+        scenario_commitment_digest: "5".repeat(64),
+        seeds_returned: false,
+        scenario_parameters_returned: false,
+        per_scenario_metrics_returned: false
+      },
+      comparison: {
+        comparable_runs: true,
+        method: "lexicographic_aggregate_v1",
+        composite_score: false,
+        strategy_order: [],
+        provisional_order: candidates.map((item) => item.candidate_id),
+        winner_declared: false,
+        winner: null,
+        winner_blockers: ["human_review_required", "manual_release_validation_required"],
+        speed_and_cost_reported_separately: true
+      },
+      candidates,
+      privacy: {
+        raw_candidate_sources_returned: false,
+        raw_candidate_sources_persisted: false,
+        hidden_seeds_returned: false,
+        hidden_scenarios_returned: false,
+        competitor_source_shared: false,
+        competitor_output_shared: false
+      },
+      truth: { exploratory_only: true },
+      release: {
+        binary_published: false,
+        site_deployed: false,
+        manual_validation_required: true
+      },
+      integrity: { digest: "4".repeat(64) },
+      test_mode: true
+    }
+  };
+}
+
 function forgeBenchMarkdown(result = state.forgeBench) {
   const experiment = result?.experiment;
   if (!experiment) return "";
@@ -14007,6 +14781,7 @@ function evidenceEventLabel(value) {
     forgebench_isolation_probed: "Isolation ForgeBench testée",
     forgebench_reference_pilot_verified: "Pilote ForgeBench vérifié",
     forgebench_ollama_candidate_verified: "Candidat Ollama vérifié",
+    forgebench_garden_batch_verified: "Lot Garden/Bamboo vérifié",
     workstack_arena_codex_pilot_verified: "Pilote Codex vérifié",
     workstack_human_review_recorded: "Décision humaine enregistrée"
   })[value] || value;
@@ -14021,6 +14796,7 @@ function evidenceActorLabel(value) {
     forgebench_isolation: "ForgeBench Isolation",
     forgebench_runner: "ForgeBench Runner",
     forgebench_candidate_runner: "ForgeBench Candidat local",
+    forgebench_garden: "ForgeBench Garden/Bamboo",
     workstack_arena: "Workstack Arena",
     local_owner: "Propriétaire local"
   })[value] || value;
@@ -14034,13 +14810,14 @@ function evidenceSourceDocument(eventType) {
   if (eventType === "forgebench_isolation_probed") return forgeBenchIsolationResult() || null;
   if (eventType === "forgebench_reference_pilot_verified") return forgeBenchReferencePilotResult() || null;
   if (eventType === "forgebench_ollama_candidate_verified") return forgeBenchOllamaCandidateResult() || null;
+  if (eventType === "forgebench_garden_batch_verified") return forgeBenchGardenVerifiedResult() || null;
   if (eventType === "workstack_arena_codex_pilot_verified") return workstackArenaResult() || null;
   if (eventType === "workstack_human_review_recorded") return workstackHumanReviewResult() || null;
   return null;
 }
 
 function evidenceAvailableTypes() {
-  return ["workstack_human_review_recorded", "workstack_arena_codex_pilot_verified", "forgebench_ollama_candidate_verified", "forgebench_reference_pilot_verified", "forgebench_isolation_probed", "forgebench_experiment_compiled", "capability_routing_proposed", "workstack_compiled", "board_observed"]
+  return ["workstack_human_review_recorded", "workstack_arena_codex_pilot_verified", "forgebench_garden_batch_verified", "forgebench_ollama_candidate_verified", "forgebench_reference_pilot_verified", "forgebench_isolation_probed", "forgebench_experiment_compiled", "capability_routing_proposed", "workstack_compiled", "board_observed"]
     .filter((eventType) => Boolean(evidenceSourceDocument(eventType)));
 }
 
@@ -18998,6 +19775,7 @@ function installTestHarness() {
     verifyCapabilityPassportIntegrity,
     capabilityPassportSummary,
     strategyArenaReadiness,
+    forgeBenchGardenVerifiedResult,
     modelInstallSizeBudget,
     evaluateInstallSafetyPreflight,
     installSafetyPreflightSummary,
@@ -19914,6 +20692,54 @@ function installTestHarness() {
         candidate: state.forgeBenchOllamaCandidate,
         panel: els.forgeBenchBox?.textContent || "",
         markdown: forgeBenchMarkdown()
+      };
+    },
+    applyForgeBenchGardenState() {
+      const documents = demoForgeBenchGardenDocuments();
+      forgeBenchGardenCandidates.splice(0, forgeBenchGardenCandidates.length,
+        {
+          candidate_id: "fable-joint-sentinel-v0.5",
+          source: 'garden "Fable Joint Sentinel" version 0.5\ndomain bamboo\nruleset: bamboo.v1',
+          provenance: {
+            authoring_mode: "open_book_iterative",
+            blind_one_shot: false,
+            simulator_used_during_authoring: true,
+            thresholds_tuned_after_visible_runs: true,
+            api_cost_eur_micros: null,
+            generation_duration_ms: null,
+            energy_wh_milli: null,
+            cost_status: "not_reported"
+          }
+        },
+        {
+          candidate_id: "baseline-conservateur-v1",
+          source: 'garden "Baseline conservateur" version 0.5\ndomain bamboo\nruleset: bamboo.v1',
+          provenance: {
+            authoring_mode: "human_authored",
+            blind_one_shot: false,
+            simulator_used_during_authoring: false,
+            thresholds_tuned_after_visible_runs: false,
+            api_cost_eur_micros: null,
+            generation_duration_ms: null,
+            energy_wh_milli: null,
+            cost_status: "not_reported"
+          }
+        }
+      );
+      state.forgeBenchGardenHiddenSuite = documents.status;
+      state.forgeBenchGardenResult = documents.result;
+      forgeBenchGardenError = "";
+      forgeBenchGardenVaultError = "";
+      if (els.evidenceLedgerSource) {
+        els.evidenceLedgerSource.value = "forgebench_garden_batch_verified";
+      }
+      renderForgeBenchGardenPanel();
+      renderEvidenceLedgerPanel();
+      return {
+        result: state.forgeBenchGardenResult,
+        verified: Boolean(forgeBenchGardenVerifiedResult()),
+        panel: els.forgeBenchGardenResult?.textContent || "",
+        state: els.forgeBenchGardenState?.textContent || ""
       };
     },
     applyWorkstackArenaState() {
@@ -21441,6 +22267,16 @@ els.clearForgeBenchSandboxBtn?.addEventListener("click", clearForgeBenchSandbox)
 els.probeForgeBenchIsolationBtn?.addEventListener("click", probeForgeBenchIsolation);
 els.runForgeBenchPilotBtn?.addEventListener("click", runForgeBenchReferencePilot);
 els.runForgeBenchCandidateBtn?.addEventListener("click", runForgeBenchOllamaCandidate);
+els.sealForgeBenchGardenVaultBtn?.addEventListener("click", sealForgeBenchGardenVault);
+els.refreshForgeBenchGardenVaultBtn?.addEventListener("click", () => loadForgeBenchGardenVault(false));
+els.clearForgeBenchGardenVaultBtn?.addEventListener("click", clearForgeBenchGardenVault);
+els.loadForgeBenchGardenExampleBtn?.addEventListener("click", loadForgeBenchGardenExample);
+els.addForgeBenchGardenCandidateBtn?.addEventListener("click", addForgeBenchGardenCandidate);
+els.clearForgeBenchGardenDraftBtn?.addEventListener("click", clearForgeBenchGardenDraft);
+els.runForgeBenchGardenBtn?.addEventListener("click", runForgeBenchGarden);
+els.copyForgeBenchGardenResultBtn?.addEventListener("click", copyForgeBenchGardenResult);
+els.sendForgeBenchGardenToLedgerBtn?.addEventListener("click", sendForgeBenchGardenToLedger);
+els.clearForgeBenchGardenResultBtn?.addEventListener("click", () => clearForgeBenchGardenResult(false));
 els.runWorkstackArenaBtn?.addEventListener("click", runWorkstackArenaCodexPilot);
 els.copyWorkstackArenaBtn?.addEventListener("click", copyWorkstackArenaReceipt);
 els.clearWorkstackArenaBtn?.addEventListener("click", () => clearWorkstackArena(false));
@@ -21515,6 +22351,20 @@ els.forgeBenchCandidateDuration?.addEventListener("change", () => {
   renderForgeBenchCandidatePanel();
   renderEvidenceLedgerPanel();
 });
+for (const input of [
+  els.forgeBenchGardenCandidateId,
+  els.forgeBenchGardenCostStatus,
+  els.forgeBenchGardenSimulatorUsed,
+  els.forgeBenchGardenThresholdsTuned,
+  els.forgeBenchGardenSource
+]) {
+  input?.addEventListener("input", renderForgeBenchGardenPanel);
+  input?.addEventListener("change", renderForgeBenchGardenPanel);
+}
+els.forgeBenchGardenAuthoringMode?.addEventListener("change", () => {
+  syncForgeBenchGardenAuthoringControls();
+  renderForgeBenchGardenPanel();
+});
 els.appendEvidenceBtn?.addEventListener("click", appendSelectedEvidence);
 els.refreshEvidenceLedgerBtn?.addEventListener("click", () => loadEvidenceLedger(false));
 els.copyEvidenceLedgerBtn?.addEventListener("click", copyEvidenceLedger);
@@ -21534,6 +22384,16 @@ els.downloadBtn.addEventListener("click", downloadMarkdown);
 els.vaultBtn.addEventListener("click", exportVault);
 els.openVaultBtn.addEventListener("click", openVault);
 document.addEventListener("click", async (event) => {
+  const editGardenCandidate = event.target?.closest?.("[data-edit-garden-candidate]")?.getAttribute?.("data-edit-garden-candidate") || "";
+  if (editGardenCandidate) {
+    editForgeBenchGardenCandidate(editGardenCandidate);
+    return;
+  }
+  const removeGardenCandidate = event.target?.closest?.("[data-remove-garden-candidate]")?.getAttribute?.("data-remove-garden-candidate") || "";
+  if (removeGardenCandidate) {
+    removeForgeBenchGardenCandidate(removeGardenCandidate);
+    return;
+  }
   const composeCard = event.target?.closest?.("[data-compose-board-card]")?.getAttribute?.("data-compose-board-card") || "";
   if (composeCard) {
     selectWorkstackCard(composeCard);
@@ -21874,6 +22734,7 @@ renderForgeBenchSandboxPanel();
 renderForgeBenchIsolationPanel();
 renderForgeBenchRunnerPanel();
 renderForgeBenchCandidatePanel();
+renderForgeBenchGardenPanel();
 renderWorkstackArenaPanel();
 renderEvidenceLedgerPanel();
 renderPreparePanel();
@@ -21885,6 +22746,7 @@ refreshAuthState();
 if (invoke) {
   void loadForgeBenchVault(true);
   void loadForgeBenchSandbox(true);
+  void loadForgeBenchGardenVault(true);
   void loadEvidenceLedger(true);
   void refreshLocalCapabilityBridgeStatus(true);
   window.setInterval(() => {

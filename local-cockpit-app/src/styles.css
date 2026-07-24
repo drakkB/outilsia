@@ -3664,6 +3664,8 @@ dd {
   color: var(--workspace-accent);
   content: "›";
   font-size: 22px;
+  grid-column: 3;
+  grid-row: 1;
   line-height: 1;
   transform: rotate(90deg);
   transition: transform 160ms ease;
@@ -3811,6 +3813,350 @@ dd {
   grid-template-columns: minmax(0, 2fr) minmax(130px, 1fr);
 }
 
+.forgebench-garden-details {
+  background: rgba(8, 17, 15, 0.92);
+  border: 1px solid rgba(134, 239, 172, 0.28);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.forgebench-garden-details > summary {
+  align-items: center;
+  cursor: pointer;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  list-style: none;
+  min-height: 62px;
+  padding: 11px 12px;
+}
+
+.forgebench-garden-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.forgebench-garden-details > summary::after {
+  color: #86efac;
+  content: "›";
+  font-size: 22px;
+  grid-column: 3;
+  grid-row: 1;
+  line-height: 1;
+  transform: rotate(90deg);
+  transition: transform 160ms ease;
+}
+
+.forgebench-garden-details[open] > summary::after {
+  transform: rotate(-90deg);
+}
+
+.forgebench-garden-details > summary > span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.forgebench-garden-details > summary small,
+.forgebench-garden-section-heading small,
+.forgebench-garden-vault-box span,
+.forgebench-garden-vault-box small,
+.forgebench-garden-candidate-row span,
+.forgebench-garden-candidate-row small,
+.forgebench-garden-result-summary span,
+.forgebench-garden-result-row span,
+.forgebench-garden-result > small,
+#forgeBenchGardenPrivacy {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+#forgeBenchGardenState {
+  border: 1px solid rgba(134, 239, 172, 0.26);
+  border-radius: 999px;
+  color: #b8f7cc;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.forgebench-garden-body {
+  border-top: 1px solid rgba(134, 239, 172, 0.16);
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.forgebench-garden-truth,
+.forgebench-garden-vault,
+.forgebench-garden-editor,
+.forgebench-garden-batch,
+.forgebench-garden-result {
+  border: 1px solid rgba(139, 163, 174, 0.18);
+  border-radius: 8px;
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.forgebench-garden-truth {
+  align-items: center;
+  background: rgba(23, 45, 31, 0.5);
+  border-color: rgba(134, 239, 172, 0.24);
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.forgebench-garden-truth > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.forgebench-garden-truth > div:first-child span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.forgebench-garden-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.forgebench-garden-flags span,
+.forgebench-garden-no-winner {
+  background: rgba(241, 201, 107, 0.08);
+  border: 1px solid rgba(241, 201, 107, 0.28);
+  border-radius: 999px;
+  color: #f1d58c;
+  font-size: 10px;
+  font-weight: 750;
+  padding: 4px 7px;
+}
+
+.forgebench-garden-vault {
+  background: rgba(28, 22, 12, 0.45);
+  border-color: rgba(229, 184, 92, 0.22);
+}
+
+.forgebench-garden-editor {
+  background: rgba(10, 23, 27, 0.56);
+  border-color: rgba(94, 193, 225, 0.23);
+}
+
+.forgebench-garden-batch {
+  background: rgba(15, 20, 24, 0.72);
+}
+
+.forgebench-garden-section-heading {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.forgebench-garden-section-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.forgebench-garden-section-heading > span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  padding-top: 2px;
+  text-align: right;
+}
+
+.forgebench-garden-vault-box {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.forgebench-garden-editor-controls {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(160px, 1fr) minmax(210px, 1.4fr) minmax(180px, 1fr);
+}
+
+.forgebench-garden-authoring-flags {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.forgebench-garden-authoring-flags label {
+  align-items: center;
+  border: 1px solid rgba(139, 163, 174, 0.16);
+  border-radius: 6px;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.forgebench-garden-authoring-flags input {
+  flex: 0 0 auto;
+  height: 16px;
+  margin: 0;
+  width: 16px;
+}
+
+.forgebench-garden-authoring-flags span {
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.forgebench-garden-source-label {
+  display: grid;
+  gap: 5px;
+}
+
+#forgeBenchGardenSource {
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  max-height: 420px;
+  min-height: 230px;
+  resize: vertical;
+  tab-size: 2;
+}
+
+.forgebench-garden-candidate-list {
+  display: grid;
+}
+
+.forgebench-garden-candidate-list.empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.forgebench-garden-candidate-row {
+  align-items: center;
+  border-top: 1px solid rgba(139, 163, 174, 0.14);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(160px, 1fr) auto;
+  min-width: 0;
+  padding: 9px 0;
+}
+
+.forgebench-garden-candidate-row:first-child {
+  border-top: 0;
+}
+
+.forgebench-garden-candidate-row > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.forgebench-garden-candidate-row strong,
+.forgebench-garden-candidate-row span,
+.forgebench-garden-candidate-row small {
+  overflow-wrap: anywhere;
+}
+
+.forgebench-garden-candidate-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.forgebench-garden-candidate-actions button {
+  font-size: 10px;
+  min-height: 30px;
+  padding: 5px 8px;
+}
+
+.forgebench-garden-result {
+  background: rgba(9, 17, 20, 0.96);
+  border-color: rgba(134, 239, 172, 0.26);
+}
+
+.forgebench-garden-result.empty {
+  color: var(--muted);
+  font-size: 12px;
+  min-height: 70px;
+}
+
+.forgebench-garden-result-summary {
+  align-items: center;
+  border-bottom: 1px solid rgba(139, 163, 174, 0.16);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding-bottom: 9px;
+}
+
+.forgebench-garden-result-summary > div {
+  display: grid;
+  gap: 3px;
+}
+
+.forgebench-garden-result-list {
+  display: grid;
+}
+
+.forgebench-garden-result-row {
+  align-items: center;
+  border-top: 1px solid rgba(139, 163, 174, 0.14);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 34px minmax(160px, 0.9fr) minmax(320px, 1.6fr);
+  min-width: 0;
+  padding: 9px 0;
+}
+
+.forgebench-garden-result-row:first-child {
+  border-top: 0;
+}
+
+.forgebench-garden-result-row > div:nth-child(2) {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.forgebench-garden-rank {
+  align-items: center;
+  aspect-ratio: 1;
+  background: rgba(134, 239, 172, 0.1);
+  border: 1px solid rgba(134, 239, 172, 0.3);
+  border-radius: 50%;
+  color: #b8f7cc;
+  display: flex;
+  font-size: 12px;
+  font-weight: 850;
+  justify-content: center;
+  width: 30px;
+}
+
+.forgebench-garden-metrics {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(4, minmax(70px, 1fr));
+}
+
+.forgebench-garden-metrics span {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(139, 163, 174, 0.13);
+  border-radius: 6px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+}
+
+.forgebench-garden-metrics strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
 @media (max-width: 640px) {
   .forgebench-candidate-controls {
     grid-template-columns: 1fr;
@@ -3823,8 +4169,61 @@ dd {
 
   #forgeBenchExecutionSummary {
     grid-column: 1 / -1;
+    grid-row: 2;
     justify-self: start;
     white-space: normal;
+  }
+
+  .forgebench-execution-details > summary::after {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .forgebench-garden-details > summary {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  #forgeBenchGardenState {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: start;
+    white-space: normal;
+  }
+
+  .forgebench-garden-details > summary::after {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .forgebench-garden-truth,
+  .forgebench-garden-editor-controls,
+  .forgebench-garden-authoring-flags,
+  .forgebench-garden-candidate-row,
+  .forgebench-garden-result-row {
+    grid-template-columns: 1fr;
+  }
+
+  .forgebench-garden-flags {
+    justify-content: flex-start;
+  }
+
+  .forgebench-garden-section-heading,
+  .forgebench-garden-result-summary {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .forgebench-garden-section-heading > span {
+    text-align: left;
+  }
+
+  .forgebench-garden-candidate-actions {
+    justify-content: flex-start;
+  }
+
+  .forgebench-garden-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

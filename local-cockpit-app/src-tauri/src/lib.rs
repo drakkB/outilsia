@@ -4,6 +4,8 @@ mod evidence_ledger;
 mod forgebench;
 mod forgebench_browser;
 mod forgebench_candidate;
+mod forgebench_garden;
+mod forgebench_garden_vault;
 mod forgebench_hidden;
 mod forgebench_isolation;
 mod forgebench_runner;
@@ -19,6 +21,11 @@ use capability_router::route_workstack_capabilities;
 use evidence_ledger::{append_evidence_entry, clear_evidence_ledger, get_evidence_ledger};
 use forgebench::compile_forgebench_experiment;
 use forgebench_candidate::run_forgebench_ollama_candidate;
+use forgebench_garden::{evaluate_forgebench_garden, get_forgebench_garden_example};
+use forgebench_garden_vault::{
+    clear_forgebench_garden_hidden_suite, get_forgebench_garden_hidden_suite_status,
+    seal_forgebench_garden_hidden_suite,
+};
 use forgebench_isolation::probe_forgebench_isolation;
 use forgebench_runner::run_forgebench_reference_pilot;
 use forgebench_sandbox::{
@@ -5181,6 +5188,11 @@ pub fn run() {
             probe_forgebench_isolation,
             run_forgebench_reference_pilot,
             run_forgebench_ollama_candidate,
+            seal_forgebench_garden_hidden_suite,
+            get_forgebench_garden_hidden_suite_status,
+            clear_forgebench_garden_hidden_suite,
+            evaluate_forgebench_garden,
+            get_forgebench_garden_example,
             start_local_capability_bridge,
             get_local_capability_bridge_status,
             stop_local_capability_bridge,

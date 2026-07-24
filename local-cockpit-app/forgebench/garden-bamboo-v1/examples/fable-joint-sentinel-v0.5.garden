@@ -1,0 +1,19 @@
+garden "Fable Joint Sentinel" version 0.5
+domain bamboo
+ruleset: bamboo.v1
+decide monitoring:
+  when rhizome.outside_active_tips_count >= 1count => full_perimeter
+  otherwise => surface_scan
+decide containment:
+  when rhizome.detected_outside_tips_count >= 2count => excavate_detected_sector
+  when rhizome.detected_outside_tips_count >= 1count => cut_detected_tip
+  otherwise => observe
+decide barrier:
+  when barrier.joint_integrity_pct <= 64% and resource.patch_left_count >= 1count => repair_worst_joint
+  otherwise => none
+decide canopy:
+  when cane.living_count >= 29count => thin_old_canes
+  otherwise => keep
+decide irrigation:
+  when soil.water_pct < 34% and resource.water_left_mm >= 12mm => 12mm
+  otherwise => 0mm

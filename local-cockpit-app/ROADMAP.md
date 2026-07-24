@@ -283,6 +283,17 @@ Revue humaine du reçu v0 implémentée dans les sources le 14 juillet 2026, san
 
 Holdout Ollama v1 implémenté dans les sources le 15 juillet 2026, sans publication : le candidat termine sa génération, sa soumission est gelée et les 39 contrôles visibles passent avant toute lecture du vault. Un second processus bubblewrap/Chromium reçoit ensuite cinq seeds comme entrées runtime et vérifie cinq familles de holdout sur desktop et Android. Le vault n'est pas monté ; seeds, identifiants privés, observations, DOM et captures ne sortent pas. Cette preuve reste non scientifique parce que les familles de checks sont publiques dans le code, le vault n'est ni chiffré ni inaccessible aux processus du même compte, les candidats pairs n'ont pas tourné et l'énergie n'est pas mesurée.
 
+ForgeBench Garden/Bamboo v1 implémenté dans les sources le 24 juillet 2026, sans publication : le contrat `garden-bamboo-generalization-v1` fige GardenScript 0.5, 24 capteurs, cinq décisions quotidiennes, budgets, coûts d'action et scénario synthétique public de 365 jours. Le parseur n'accepte qu'un DSL borné et n'exécute aucun code candidat, processus ou réseau. De 1 à 8 sources sont compilées, signées et gelées avant lecture d'un coffre caché distinct ; tous les candidats reçoivent ensuite le scénario public et exactement la même suite cachée. Le résultat conserve seulement métriques agrégées, empreintes et provenance bornée. Le tri est lexicographique et ne mélange jamais qualité, vitesse, coût ou énergie dans un score composite. Fable Joint Sentinel reste explicitement `open_book_iterative`, avec simulateur et seuils ajustés. La piste est exploratoire, non scientifique, non horticole et non officielle vis-à-vis de GardenArena : aucun vainqueur n'est déclaré.
+
+- [x] Figer le contrat Garden/Bamboo v1, ses capteurs, actions, budgets, engagements cachés et ordre de classement.
+- [x] Compiler un GardenScript strict sans boucle, récursion, état mutable, import, fichier, processus, horloge réelle, hasard, entrée/sortie ou réseau.
+- [x] Simuler en entiers un scénario public et une suite cachée commune, lue uniquement après gel de toutes les sources candidates.
+- [x] Séparer vitesse, coût et énergie du classement stratégique lexicographique.
+- [x] Ajouter un coffre Garden dédié, un reçu borné et une preuve `deterministic_dsl_public_and_hidden_batch` dans Evidence Ledger.
+- [x] Ajouter l'interface avancée repliée, l'exemple Fable à provenance honnête et les tests Rust/JS de contrat, classement, falsification et fuite.
+- [ ] Faire une recette native Windows et Linux sur le candidat source, puis recueillir au moins un second candidat comparable.
+- [ ] Soumettre toute future publication à une validation humaine explicite ; ne jamais transformer l'ordre provisoire en gagnant automatique.
+
 - [x] Détecter les CLI officielles par commande de version bornée, sans retourner leur chemin.
 - [x] Distinguer Windows natif, Linux natif, WSL par défaut, Ollama natif et Ollama WSL.
 - [x] Router par capacités et type de mission sans verrouiller la proposition sur une marque.
@@ -306,6 +317,7 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Ajouter `isolated_codex_visible_browser_pilot` après invocation réelle et bornée de Codex CLI, sans sortie brute, coût inventé, dépôt utilisateur ou claim de gagnant.
 - [x] Ajouter `explicit_local_human_review` pour une décision humaine structurée sur le reçu public signé, sans approbation visuelle, livraison ou gagnant.
 - [x] Ajouter une preuve de holdout Ollama après gel de la soumission, dans un évaluateur séparé du worker, avec uniquement compteurs et empreintes dans le Ledger.
+- [x] Ajouter `deterministic_dsl_public_and_hidden_batch` pour Garden/Bamboo avec lot gelé, suite commune, métriques agrégées et exclusion des sources/seeds/scénarios cachés.
 - [ ] Durcir ce holdout pour une prétention scientifique : logique de checks non publique, vault chiffré et inaccessible au même utilisateur, candidats pairs complets et énergie mesurée.
 
 - Séparer quatre responsabilités : Composer définit la chaîne, Workstack Arena exécute, ForgeBench évalue et Evidence Ledger conserve la preuve.

@@ -111,6 +111,8 @@ ForgeBench v0 prépare désormais `Signal Maze v1` dans l'espace Atelier IA : st
 
 Le Hidden Suite Vault peut générer localement cinq seeds privés et remettre uniquement un reçu signé à ForgeBench. Le fichier n'est pas chiffré au repos. Pour le candidat Ollama v3, le modèle termine sa génération avant que le vault soit lu ; un second évaluateur Chromium reçoit ensuite les seeds comme entrées d'exécution, sans monter le vault, et ne retourne que compteurs et empreintes. Les familles de checks restant publiques dans le code et un processus du même compte pouvant lire le fichier, ce holdout ne débloque encore aucun niveau scientifique.
 
+La piste exploratoire **Garden/Bamboo v1** ajoute un second protocole ForgeBench indépendant de Signal Maze. Le contrat `garden-bamboo-generalization-v1` fige 24 capteurs, cinq canaux de décision et un scénario synthétique public de 365 jours. De 1 à 8 programmes GardenScript 0.5 sont compilés et gelés avant lecture d'un coffre caché séparé, puis interprétés sur le scénario public et la même suite cachée. Le DSL interdit boucle, récursion, état mutable, import, fichier, processus, horloge réelle, hasard, entrée/sortie et réseau : aucun code candidat arbitraire n'est exécuté. Le classement est lexicographique, sans score composite ; vitesse, coût et énergie restent des mesures séparées. Fable Joint Sentinel est fourni comme exemple `open_book_iterative`, avec simulateur et réglage de seuils déclarés. Cette piste source n'est ni un classement GardenArena officiel, ni une mesure scientifique ou horticole, ni une fonction du build public actuel ; aucun vainqueur n'est déclaré.
+
 Le module **Espaces worker frais** matérialise désormais un workspace neuf par stack et seed public, hors dépôt source. Les trois fichiers du starter embarqué et le contrat public de run sont revérifiés à chaque lecture ; le reçu ne contient aucun chemin. Cette étape ne lance aucun CLI et n'isole encore ni processus, ni réseau, ni accès au vault : `worker_execution_ready=false` et `scientific_eligible=false` restent obligatoires.
 
 Le **Préflight isolation** ajoute un canari bubblewrap borné sous Linux ou WSL. Il vérifie des namespaces utilisateur, montage, réseau et processus distincts, l'écriture dans le seul workspace et une racine hôte masquée. Il ne lit aucun credential, ne reçoit aucun contenu caché et ne lance aucun worker. Un canari vert prouve seulement que le backend est disponible.
@@ -133,6 +135,7 @@ npm run verify:workstack-composer
 npm run verify:capability-router
 npm run verify:forgebench
 npm run verify:forgebench:visible
+npm run verify:forgebench:garden
 npm run verify:workstack-arena
 npm run verify:evidence-ledger
 ```

@@ -1,0 +1,226 @@
+{
+  "schema": "outilsia.forgebench_garden_contract.v1",
+  "id": "garden-bamboo-generalization-v1",
+  "contract_version": "2026-07-24",
+  "status": "exploratory_candidate",
+  "title": "ForgeBench Garden / Bamboo v1",
+  "language": {
+    "name": "GardenScript",
+    "version": "0.5",
+    "domain": "bamboo",
+    "ruleset": "bamboo.v1",
+    "max_source_bytes": 16384,
+    "max_when_per_channel": 10,
+    "max_predicates_per_branch": 8,
+    "static_budget_units": 512,
+    "vm_budget_units": 512,
+    "forbidden_capabilities": [
+      "loop",
+      "recursion",
+      "mutable_state",
+      "function",
+      "import",
+      "file",
+      "process",
+      "environment",
+      "real_clock",
+      "random",
+      "input_output",
+      "network"
+    ]
+  },
+  "channels": {
+    "order": [
+      "monitoring",
+      "containment",
+      "barrier",
+      "canopy",
+      "irrigation"
+    ],
+    "outputs": {
+      "monitoring": [
+        "surface_scan",
+        "barrier_probe",
+        "full_perimeter"
+      ],
+      "containment": [
+        "observe",
+        "cut_detected_tip",
+        "excavate_detected_sector"
+      ],
+      "barrier": [
+        "none",
+        "inspect_joints",
+        "repair_worst_joint"
+      ],
+      "canopy": [
+        "keep",
+        "thin_old_canes",
+        "harvest_mature_canes"
+      ],
+      "irrigation": {
+        "unit": "mm",
+        "minimum": 0,
+        "maximum": 20,
+        "positive_fraction_truncated_to_integer_mm": true
+      }
+    }
+  },
+  "sensors": [
+    { "id": "clock.day", "unit": "day", "minimum": 0, "maximum": 366 },
+    { "id": "calendar.season_progress_pct", "unit": "%", "minimum": 0, "maximum": 100 },
+    { "id": "weather.rain_7d_mm", "unit": "mm", "minimum": 0, "maximum": 2000 },
+    { "id": "soil.water_pct", "unit": "%", "minimum": 0, "maximum": 100 },
+    { "id": "colony.vitality_pct", "unit": "%", "minimum": 0, "maximum": 100 },
+    { "id": "rhizome.active_tips_count", "unit": "count", "minimum": 0, "maximum": 1000 },
+    { "id": "rhizome.segment_count", "unit": "count", "minimum": 0, "maximum": 100000 },
+    { "id": "rhizome.max_spread_cm", "unit": "cm", "minimum": 0, "maximum": 10000 },
+    { "id": "rhizome.max_depth_cm", "unit": "cm", "minimum": 0, "maximum": 500 },
+    { "id": "rhizome.nearest_barrier_cm", "unit": "cm", "minimum": 0, "maximum": 10000 },
+    { "id": "rhizome.barrier_contacts_30d_count", "unit": "count", "minimum": 0, "maximum": 1000 },
+    { "id": "rhizome.outside_active_tips_count", "unit": "count", "minimum": 0, "maximum": 1000 },
+    { "id": "rhizome.detected_outside_tips_count", "unit": "count", "minimum": 0, "maximum": 1000 },
+    { "id": "barrier.min_depth_cm", "unit": "cm", "minimum": 0, "maximum": 500 },
+    { "id": "barrier.exposed_lip_cm", "unit": "cm", "minimum": 0, "maximum": 100 },
+    { "id": "barrier.joint_integrity_pct", "unit": "%", "minimum": 0, "maximum": 100 },
+    { "id": "cane.shoots_count", "unit": "count", "minimum": 0, "maximum": 1000 },
+    { "id": "cane.living_count", "unit": "count", "minimum": 0, "maximum": 1000 },
+    { "id": "cane.mature_count", "unit": "count", "minimum": 0, "maximum": 1000 },
+    { "id": "history.days_since_monitoring_day", "unit": "day", "minimum": 0, "maximum": 366 },
+    { "id": "history.days_since_cut_day", "unit": "day", "minimum": 0, "maximum": 366 },
+    { "id": "resource.water_left_mm", "unit": "mm", "minimum": 0, "maximum": 2000 },
+    { "id": "resource.labor_left_min", "unit": "min", "minimum": 0, "maximum": 100000 },
+    { "id": "resource.patch_left_count", "unit": "count", "minimum": 0, "maximum": 1000 }
+  ],
+  "public_scenario": {
+    "id": "bamboo-underground-365d-v1",
+    "horizon_days": 365,
+    "origin": { "x_mm": 0, "depth_mm": 220, "initial_active_tips": 2 },
+    "managed_zone": { "minimum_x_mm": -1500, "maximum_x_mm": 1500 },
+    "exclusion_zone": { "minimum_x_mm": -5000, "maximum_x_mm": 5000 },
+    "initial": {
+      "soil_water_permille": 520,
+      "vitality_permille": 900,
+      "living_canes": 4,
+      "joint_integrity_permille": [650, 650]
+    },
+    "barrier": {
+      "depth_mm": 760,
+      "exposed_lip_mm": 150,
+      "joint_depth_mm": 300,
+      "joint_tolerance_mm": 100,
+      "contact_damage_permille": 30,
+      "joint_breach_below_permille": 600,
+      "intact_deflection_mm": 45
+    },
+    "budgets": {
+      "water_total_mm": 600,
+      "labor_total_min": 2500,
+      "patch_total_count": 6
+    },
+    "phases": [
+      { "id": "dormancy", "start_day": 1, "end_day": 60, "growth_permille": 0, "rain_7d_mm": 35, "evaporation_mm_day": 1, "shoots": false },
+      { "id": "shoot_emergence", "start_day": 61, "end_day": 120, "growth_permille": 250, "rain_7d_mm": 28, "evaporation_mm_day": 2, "shoots": true },
+      { "id": "rhizome_expansion", "start_day": 121, "end_day": 240, "growth_permille": 1000, "rain_7d_mm": 18, "evaporation_mm_day": 3, "shoots": false },
+      { "id": "culm_hardening", "start_day": 241, "end_day": 300, "growth_permille": 450, "rain_7d_mm": 24, "evaporation_mm_day": 2, "shoots": false },
+      { "id": "maintenance", "start_day": 301, "end_day": 365, "growth_permille": 100, "rain_7d_mm": 30, "evaporation_mm_day": 1, "shoots": false }
+    ],
+    "stress_schedule": [
+      { "id": "summer-drought-01", "kind": "drought", "start_day": 130, "end_day": 165, "rain_multiplier_permille": 100, "evaporation_bonus_mm_day": 3 },
+      { "id": "flash-flood-01", "kind": "flood", "start_day": 220, "end_day": 224, "rain_bonus_mm_day": 35, "drainage_multiplier_permille": 250, "waterlogging_vitality_loss_permille_day": 8 },
+      { "id": "windstorm-01", "kind": "windstorm", "start_day": 252, "end_day": 253, "gust_kmh": 105, "damage_threshold_kmh": 90, "eligible_cane_minimum_height_mm": 5000, "damaged_fraction_permille": 150, "vitality_loss_permille_per_cane": 6 },
+      { "id": "joint-shift-01", "kind": "barrier_damage", "start_day": 254, "end_day": 254, "target_joint_index": 1, "integrity_loss_permille": 220 }
+    ],
+    "model": {
+      "growth_mm_active_day": 45,
+      "horizontal_bias_permille": 970,
+      "vertical_bias_permille": 80,
+      "preferred_depth_minimum_mm": 120,
+      "preferred_depth_maximum_mm": 300,
+      "branch_every_active_days": 30,
+      "shoot_every_active_days": 24,
+      "max_active_tips": 32,
+      "max_segments": 12000,
+      "vitality_floor_permille": 350,
+      "water_dry_threshold_permille": 300,
+      "water_recovery_threshold_permille": 550,
+      "dry_vitality_loss_permille_day": 4,
+      "wet_vitality_gain_permille_day": 1,
+      "crowding_canes_threshold": 28,
+      "crowding_vitality_loss_permille_day": 1,
+      "rain_irrigation_efficiency_permille": 800
+    },
+    "actions": {
+      "surface_scan": { "labor_min": 1, "outside_depth_maximum_mm": 100 },
+      "barrier_probe": { "labor_min": 8, "outside_all": true, "panel_distance_maximum_mm": 250, "depth_maximum_mm": 450 },
+      "full_perimeter": { "labor_min": 20, "outside_all": true },
+      "observe": { "labor_min": 0 },
+      "cut_detected_tip": { "labor_min": 25, "vitality_loss_permille": 8, "maximum_targets": 1 },
+      "excavate_detected_sector": { "labor_min": 90, "vitality_loss_permille": 25, "maximum_targets": 32 },
+      "none": { "labor_min": 0 },
+      "inspect_joints": { "labor_min": 18 },
+      "repair_worst_joint": { "labor_min": 55, "patch_count": 1, "integrity_gain_permille": 300 },
+      "keep": { "labor_min": 0 },
+      "thin_old_canes": { "labor_min": 35, "maximum_targets": 2 },
+      "harvest_mature_canes": { "labor_min": 45, "maximum_targets": 3, "minimum_age_days": 1095 },
+      "irrigation_positive": { "labor_min": 2, "water_cost_equals_accepted_mm": true }
+    }
+  },
+  "hidden_generalization": {
+    "status": "local_sealed_suite",
+    "official_gardenarena_ranking": false,
+    "candidate_sources_frozen_before_suite_read": true,
+    "same_scenarios_for_all_candidates": true,
+    "contents_returned": false,
+    "default_scenarios": 5,
+    "minimum_scenarios": 3,
+    "maximum_scenarios": 12,
+    "generator_commitments": {
+      "phase_boundaries_unchanged": true,
+      "budgets_unchanged": true,
+      "action_costs_unchanged": true,
+      "sensor_contract_unchanged": true,
+      "drought_start_day_range": [124, 136],
+      "drought_duration_days_range": [28, 42],
+      "flood_start_day_range": [214, 226],
+      "flood_duration_days_range": [3, 7],
+      "wind_start_day_range": [246, 258],
+      "joint_shift_day_range": [248, 260],
+      "seasonal_rain_multiplier_permille_range": [850, 1150],
+      "seasonal_evaporation_delta_mm_day_range": [-1, 1]
+    }
+  },
+  "ranking": {
+    "method": "lexicographic_aggregate_v1",
+    "composite_score": false,
+    "official_gardenarena_ranking": false,
+    "strategy_order": [
+      "all_scenarios_rankable_desc",
+      "escaped_active_tips_sum_asc",
+      "days_uncontained_sum_asc",
+      "containment_permille_mean_desc",
+      "minimum_vitality_permille_worst_desc",
+      "living_canes_mean_desc",
+      "final_vitality_permille_mean_desc",
+      "labor_used_min_sum_asc",
+      "water_used_mm_sum_asc"
+    ],
+    "candidate_id_tie_breaker_for_display_only": true,
+    "generation_speed_and_cost_change_strategy_order": false,
+    "winner_before_comparable_runs_and_human_review": false
+  },
+  "integrity": {
+    "contract_sha256": "computed_and_verified_by_rust",
+    "candidate_source_sha256_required": true,
+    "candidate_set_sha256_required": true,
+    "hidden_suite_receipt_required": true,
+    "raw_hidden_scenarios_returned": false,
+    "raw_candidate_source_stored_in_evidence_ledger": false
+  },
+  "truth": {
+    "data_origin": "synthetic_hypothesis_scenario",
+    "scientific_measurement": false,
+    "real_world_prescription": false,
+    "claim": "Benchmark exploratoire OutilsIA de politiques déterministes. Il ne constitue ni un classement GardenArena officiel ni un conseil horticole."
+  }
+}

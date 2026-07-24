@@ -599,6 +599,121 @@
               <button id="runForgeBenchCandidateBtn" type="button" disabled>Lancer le candidat local</button>
             </div>
           </div>
+          <details id="forgeBenchGardenDetails" class="forgebench-garden-details">
+            <summary>
+              <span>
+                <strong>Garden/Bamboo v1</strong>
+                <small>Comparer des règles de contrôle dans un simulateur déterministe</small>
+              </span>
+              <span id="forgeBenchGardenState">suite à sceller</span>
+            </summary>
+            <div class="forgebench-garden-body">
+              <div class="forgebench-garden-truth">
+                <div>
+                  <strong>Piste OutilsIA exploratoire</strong>
+                  <span>Programme GardenScript interprété, scénario public + mêmes scénarios cachés pour tous les candidats.</span>
+                </div>
+                <div class="forgebench-garden-flags" aria-label="Limites du benchmark">
+                  <span>Pas de code exécuté</span>
+                  <span>Pas de score composite</span>
+                  <span>Aucun vainqueur automatique</span>
+                </div>
+              </div>
+
+              <section class="forgebench-garden-vault" aria-labelledby="forgeBenchGardenVaultTitle">
+                <div class="forgebench-garden-section-heading">
+                  <div>
+                    <strong id="forgeBenchGardenVaultTitle">Suite cachée Garden</strong>
+                    <small>Les seeds restent dans les données locales de l'app.</small>
+                  </div>
+                  <span id="forgeBenchGardenVaultState">non scellée</span>
+                </div>
+                <div id="forgeBenchGardenVaultBox" class="forgebench-garden-vault-box empty">
+                  Scelle 5 scénarios privés. L'interface ne reçoit que leur nombre et des empreintes.
+                </div>
+                <div class="row-actions">
+                  <button id="sealForgeBenchGardenVaultBtn" type="button" disabled>Sceller 5 scénarios</button>
+                  <button id="refreshForgeBenchGardenVaultBtn" type="button" disabled>Vérifier</button>
+                  <button id="clearForgeBenchGardenVaultBtn" type="button" disabled>Effacer</button>
+                </div>
+              </section>
+
+              <section class="forgebench-garden-editor" aria-labelledby="forgeBenchGardenEditorTitle">
+                <div class="forgebench-garden-section-heading">
+                  <div>
+                    <strong id="forgeBenchGardenEditorTitle">Programme candidat</strong>
+                    <small>Le lot est gelé et signé avant l'ouverture de la suite cachée.</small>
+                  </div>
+                  <span id="forgeBenchGardenDraftState">brouillon vide</span>
+                </div>
+                <div class="forgebench-garden-editor-controls">
+                  <label>
+                    <span class="field-label">Identifiant</span>
+                    <input id="forgeBenchGardenCandidateId" type="text" maxlength="64" autocomplete="off" placeholder="mon-programme-v1">
+                  </label>
+                  <label>
+                    <span class="field-label">Mode de création</span>
+                    <select id="forgeBenchGardenAuthoringMode">
+                      <option value="open_book_iterative">Itératif avec protocole visible</option>
+                      <option value="human_authored">Écrit par un humain</option>
+                      <option value="blind_one_shot">Génération aveugle en un essai</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span class="field-label">Coût déclaré</span>
+                    <select id="forgeBenchGardenCostStatus">
+                      <option value="not_reported">Non renseigné</option>
+                      <option value="subscription_quota_unknown">Quota abonnement inconnu</option>
+                      <option value="local_energy_not_measured">Énergie locale non mesurée</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="forgebench-garden-authoring-flags">
+                  <label>
+                    <input id="forgeBenchGardenSimulatorUsed" type="checkbox">
+                    <span>Simulateur utilisé pendant la création</span>
+                  </label>
+                  <label>
+                    <input id="forgeBenchGardenThresholdsTuned" type="checkbox">
+                    <span>Seuils ajustés après des runs visibles</span>
+                  </label>
+                </div>
+                <label class="forgebench-garden-source-label">
+                  <span class="field-label">GardenScript 0.5</span>
+                  <textarea id="forgeBenchGardenSource" rows="13" maxlength="16384" spellcheck="false" placeholder="garden &quot;Mon contrôleur&quot; version 0.5&#10;domain bamboo&#10;ruleset: bamboo.v1&#10;..."></textarea>
+                </label>
+                <small id="forgeBenchGardenPrivacy">La source reste dans cette session et sert au calcul local. Evidence Ledger ne conserve que les empreintes et métriques bornées.</small>
+                <div class="row-actions">
+                  <button id="loadForgeBenchGardenExampleBtn" type="button" disabled>Charger Fable Joint Sentinel</button>
+                  <button id="addForgeBenchGardenCandidateBtn" type="button" disabled>Ajouter au lot</button>
+                  <button id="clearForgeBenchGardenDraftBtn" type="button">Vider le brouillon</button>
+                </div>
+              </section>
+
+              <section class="forgebench-garden-batch" aria-labelledby="forgeBenchGardenBatchTitle">
+                <div class="forgebench-garden-section-heading">
+                  <div>
+                    <strong id="forgeBenchGardenBatchTitle">Lot comparable</strong>
+                    <small>De 1 à 8 sources distinctes, évaluées sur exactement les mêmes scénarios.</small>
+                  </div>
+                  <span id="forgeBenchGardenBatchState">0 candidat</span>
+                </div>
+                <div id="forgeBenchGardenCandidateList" class="forgebench-garden-candidate-list empty">
+                  Charge l'exemple ou ajoute un programme GardenScript.
+                </div>
+              </section>
+
+              <div id="forgeBenchGardenResult" class="forgebench-garden-result empty">
+                Aucun run. Le classement restera provisoire jusqu'à une revue humaine.
+              </div>
+              <div class="row-actions">
+                <button id="runForgeBenchGardenBtn" type="button" disabled>Évaluer le lot</button>
+                <button id="copyForgeBenchGardenResultBtn" type="button" disabled>Copier le reçu borné</button>
+                <button id="sendForgeBenchGardenToLedgerBtn" type="button" disabled>Préparer Evidence Ledger</button>
+                <button id="clearForgeBenchGardenResultBtn" type="button" disabled>Effacer le run</button>
+              </div>
+            </div>
+          </details>
             </div>
           </details>
           <div id="forgeBenchBox" class="forgebench-box empty">
@@ -710,6 +825,7 @@
                 <option value="forgebench_isolation_probed">Isolation ForgeBench testée</option>
                 <option value="forgebench_reference_pilot_verified">Pilote ForgeBench vérifié</option>
                 <option value="forgebench_ollama_candidate_verified">Candidat Ollama vérifié</option>
+                <option value="forgebench_garden_batch_verified">Lot Garden/Bamboo vérifié</option>
                 <option value="workstack_arena_codex_pilot_verified">Pilote Codex vérifié</option>
                 <option value="workstack_human_review_recorded">Décision humaine enregistrée</option>
               </select>
