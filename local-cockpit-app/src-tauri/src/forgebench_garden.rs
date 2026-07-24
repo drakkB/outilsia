@@ -1569,11 +1569,12 @@ fn simulate(program: &Program, scenario: &Scenario) -> ScenarioMetrics {
         .iter()
         .filter(|tip| tip.active && tip.outside)
         .count() as u32;
-    let containment_permille = if state.segments_total == 0 {
-        1_000
-    } else {
-        (state.segments_total.saturating_sub(state.outside_segments) * 1_000) / state.segments_total
-    };
+    let containment_permille = state
+        .segments_total
+        .saturating_sub(state.outside_segments)
+        .saturating_mul(1_000)
+        .checked_div(state.segments_total)
+        .unwrap_or(1_000);
     ScenarioMetrics {
         rankable: state.rankable,
         escaped_active_tips,
