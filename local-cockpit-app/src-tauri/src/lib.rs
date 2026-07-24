@@ -1,3 +1,4 @@
+mod agent_adapter_policy;
 mod board_observer;
 mod capability_router;
 mod evidence_ledger;
@@ -15,6 +16,7 @@ mod workstack_arena;
 mod workstack_composer;
 mod workstack_review;
 
+use agent_adapter_policy::get_agent_adapter_policy_catalog;
 use board_observer::observe_planka_board;
 use capability_router::route_workstack_capabilities;
 use evidence_ledger::{append_evidence_entry, clear_evidence_ledger, get_evidence_ledger};
@@ -5165,6 +5167,7 @@ pub fn run() {
             delete_ollama_model,
             install_ollama_runtime,
             install_wsl_runtime,
+            get_agent_adapter_policy_catalog,
             observe_planka_board,
             compile_work_card,
             route_workstack_capabilities,

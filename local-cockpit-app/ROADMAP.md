@@ -1,6 +1,6 @@
 # OutilsIA Local Cockpit - Roadmap produit
 
-Mise à jour : 2026-07-14
+Mise à jour : 2026-07-24
 
 ## Cap produit
 
@@ -277,6 +277,8 @@ Workstack Composer v0 implémenté dans les sources le 12 juillet 2026 : une car
 
 Capability Router v0 implémenté dans les sources le 12 juillet 2026, sans publication : il valide l'empreinte du Workstack, sonde en parallèle et avec timeout Codex CLI, Claude Code et Hermes Agent dans l'environnement natif et le WSL par défaut, ajoute les modèles Ollama déjà remontés par le scan, puis propose Planificateur, Exécutant et Vérificateur indépendant selon leurs capacités déclarées. Il ne lit aucun jeton, ne vérifie ni compte ni quota, ne scanne aucun dépôt, ne lance aucun agent et ne dépense aucun crédit API. Le résultat `outilsia.capability_router_result.v1` est signé, étiqueté dry-run et invalidé après un nouveau scan, une installation ou une suppression de modèle.
 
+Agent Adapter Policy v1 implémenté dans les sources le 24 juillet 2026, sans publication : un registre local signé décrit séparément Codex CLI, Claude Code et Hermes Agent sans lancer de sonde ni de worker. Codex expose uniquement le pilote public `codex_cli_signal_maze_pilot_v1`, avec une tentative, 3/5/10 minutes, 512 Kio, deux consentements par run et aucun accès autorisé au dépôt d'origine, board, suite cachée, credential, fusion, publication ou livraison. Claude Code et Hermes restent `detect_only`, sans scope, budget, environnement ou workspace d'exécution autorisé. L'interface replie ce contrat sous Capability Router et rappelle que détection, autorisation et consentement sont trois états distincts.
+
 Workstack Arena Local v0 implémenté dans les sources le 14 juillet 2026, sans publication : le premier adaptateur réel lance uniquement le candidat Codex CLI exact sur le benchmark public `Signal Maze v1`, dans une copie jetable du workspace ForgeBench vérifié. Deux consentements par run couvrent séparément le quota ou coût fournisseur inconnu et l'écriture/exécution du mini-jeu. Une tentative, un budget exact de 3, 5 ou 10 minutes et 512 Kio de sortie maximum sont imposés. Les règles externes sont ignorées et une allowlist d'environnement exclut clés API tierces, tokens cloud et socket SSH. Le dépôt utilisateur, le board, la suite cachée, les credentials, la fusion et la publication ne sont ni transmis ni montés. La soumission passe les mêmes `7/7` contrôles statiques et `39/39` contrôles Chromium publics, puis requiert une revue humaine. Le mode `workspace-write` reste une propriété de la sandbox Codex et n'est pas présenté comme une preuve OutilsIA d'isolation de lecture de tout l'hôte.
 
 Revue humaine du reçu v0 implémentée dans les sources le 14 juillet 2026, sans publication : après un run Codex signé, le propriétaire peut accepter le reçu pour une future comparaison, demander un nouveau run corrigé ou rejeter le run. La décision est structurée, signée, liée à l'empreinte exacte du run et ajoutable une seule fois à l'Evidence Ledger. Elle porte uniquement sur les métriques et limites du reçu public : aucune capture ni code n'étant conservé, elle ne revendique jamais une inspection visuelle, une approbation de qualité, une livraison, un gagnant, une écriture board, une fusion ou une publication.
@@ -290,6 +292,7 @@ Préflight Chromium guidé v1 implémenté dans les sources le 24 juillet 2026, 
 - [x] Router par capacités et type de mission sans verrouiller la proposition sur une marque.
 - [x] Imposer un vérificateur différent de l'exécutant lorsqu'une proposition complète est possible.
 - [x] Garder le panneau dans Atelier IA et fournir JSON, résumé et preuve visuelle desktop/mobile.
+- [x] Signer un registre de permissions, consentements et budgets par adaptateur : Codex borné au pilote public, Claude Code et Hermes en détection seule.
 - [x] Ajouter un consentement séparé et strict pour le pilote technique de référence : aucun CLI candidat, réseau ou crédit payant.
 - [x] Ajouter un second consentement et un budget explicite avant l'appel d'un modèle Ollama local déjà installé, sans accès fichier, Internet ou API payante ; la suite cachée n'est lue qu'après gel du code et l'exécution du candidat comme du holdout requiert une autorisation explicite.
 - [x] Ajouter un premier adaptateur CLI borné à Codex + Signal Maze public, avec contrat strict, budget, consentements, sortie limitée, workspace jetable et coût fournisseur inconnu.

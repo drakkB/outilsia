@@ -462,6 +462,29 @@
           <div id="capabilityRouterBox" class="capability-router-box empty">
             Compile d'abord une Workstack. Le routeur vérifiera ensuite les exécutants disponibles sans leur transmettre la mission.
           </div>
+          <details id="agentAdapterPolicyDetails" class="agent-adapter-policy-details">
+            <summary>
+              <span>
+                <strong>Ce qui peut réellement s'exécuter</strong>
+                <small>Permissions et budgets par adaptateur</small>
+              </span>
+              <span id="agentAdapterPolicySummary">règles à lire</span>
+            </summary>
+            <div class="agent-adapter-policy-body">
+              <div class="agent-adapter-policy-heading">
+                <strong>Agent Adapter Policy</strong>
+                <span id="agentAdapterPolicyState">app native requise</span>
+              </div>
+              <div id="agentAdapterPolicyBox" class="agent-adapter-policy-box empty">
+                Le registre signé distingue la simple détection d'un CLI d'une autorisation d'exécution.
+              </div>
+              <div class="row-actions">
+                <button id="loadAgentAdapterPolicyBtn" type="button">Vérifier les règles</button>
+                <button id="copyAgentAdapterPolicyJsonBtn" type="button" disabled>Copier JSON</button>
+                <button id="copyAgentAdapterPolicySummaryBtn" type="button" disabled>Copier résumé</button>
+              </div>
+            </div>
+          </details>
           <div class="row-actions">
             <button class="path-action" type="button" data-open-feature="workstack">Préparer le plan</button>
             <button id="routeCapabilitiesBtn" type="button" disabled>Détecter et proposer</button>
@@ -1161,5 +1184,6 @@
     <script src="./runtime-driver-matrix.js"></script>
     <script src="./private-workload-packs.js"></script>
     <script src="./app.js"></script>
+    <script src="./agent-adapter-policy.js"></script>
   </body>
 </html>

@@ -5,7 +5,9 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
-const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runtime.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_hidden.rs", "forgebench_candidate.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
+const agentAdapterPolicyJs = readFileSync(resolve(root, "src/agent-adapter-policy.js"), "utf8");
+const allJs = `${js}\n${agentAdapterPolicyJs}`;
+const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "agent_adapter_policy.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runtime.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_hidden.rs", "forgebench_candidate.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
@@ -14,10 +16,13 @@ const forgeBenchContract = readFileSync(resolve(root, "forgebench/signal-maze-v1
 const workstackNotice = readFileSync(resolve(root, "NOTICE-UTILISATION-WORKSTACK.md"), "utf8");
 
 const htmlIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]));
-const jsIds = new Set([...js.matchAll(/\$\("([^"]+)"\)/g)].map((match) => match[1]));
+const jsIds = new Set([
+  ...[...allJs.matchAll(/\$\("([^"]+)"\)/g)].map((match) => match[1]),
+  ...[...agentAdapterPolicyJs.matchAll(/getElementById\("([^"]+)"\)/g)].map((match) => match[1]),
+]);
 const missingIds = [...jsIds].filter((id) => !htmlIds.has(id));
 
-const invoked = new Set([...js.matchAll(/invoke\("([^"]+)"/g)].map((match) => match[1]));
+const invoked = new Set([...allJs.matchAll(/invoke\("([^"]+)"/g)].map((match) => match[1]));
 const rustCommands = new Set(
   [...rust.matchAll(/(?:async\s+)?fn\s+([a-zA-Z0-9_]+)\s*\(/g)].map((match) => match[1])
 );
@@ -170,6 +175,17 @@ const requiredFeatureText = [
   ["rust capability router no credentials", rust, "\"credentials_read\": false"],
   ["rust capability router independent verifier", rust, "independent_verifier_enforced"],
   ["css capability router", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".capability-router-box"],
+  ["html agent adapter policy", html, "agentAdapterPolicyBox"],
+  ["html agent adapter policy script", html, "agent-adapter-policy.js"],
+  ["js agent adapter policy schema", agentAdapterPolicyJs, "outilsia.agent_adapter_policy_catalog.v1"],
+  ["js agent adapter policy detection boundary", agentAdapterPolicyJs, "Détecté ne veut pas dire autorisé"],
+  ["js agent adapter policy command", agentAdapterPolicyJs, "get_agent_adapter_policy_catalog"],
+  ["rust agent adapter policy schema", rust, "outilsia.agent_adapter_policy_catalog.v1"],
+  ["rust agent adapter policy bounded Codex scope", rust, "codex_cli_signal_maze_pilot_v1"],
+  ["rust agent adapter policy Claude detect only", rust, "CLAUDE_ADAPTER_ID"],
+  ["rust agent adapter policy Hermes detect only", rust, "HERMES_ADAPTER_ID"],
+  ["rust agent adapter policy no implicit execution", rust, "\"execution_started\": false"],
+  ["css agent adapter policy", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".agent-adapter-policy-details"],
   ["html ForgeBench panel", html, "forgeBenchBox"],
   ["html ForgeBench stack selector", html, "forgeBenchStacks"],
   ["js ForgeBench request schema", js, "outilsia.forgebench_compile_request.v1"],
