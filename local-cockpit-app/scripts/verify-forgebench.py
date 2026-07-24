@@ -155,7 +155,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     compact_screenshot = OUT / f"forgebench-compact-{label}.png"
     panel.screenshot(path=str(compact_screenshot))
     compact_height = panel.bounding_box()["height"]
-    execution_details.locator(":scope > summary").click()
+    execution_details.locator("summary").click()
     page.wait_for_timeout(120)
     if execution_details.get_attribute("open") is None:
         raise AssertionError(f"{label}: advanced ForgeBench stages cannot be expanded")
@@ -215,69 +215,6 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         if forbidden in text or forbidden in proof["markdown"]:
             raise AssertionError(f"{label}: private value rendered {forbidden!r}")
 
-    garden_details = page.locator("#forgeBenchGardenDetails")
-    if garden_details.get_attribute("open") is not None:
-        raise AssertionError(f"{label}: Garden/Bamboo must stay folded before a result")
-    garden = page.evaluate("() => window.__OUTILSIA_TEST__.applyForgeBenchGardenState()")
-    garden_result = garden["result"]
-    if garden["verified"] is not True:
-        raise AssertionError(f"{label}: Garden/Bamboo fixture is not verified")
-    if garden_result["schema"] != "outilsia.forgebench_garden_evaluate_result.v1":
-        raise AssertionError(f"{label}: Garden/Bamboo result schema mismatch")
-    if garden_result["execution"]["candidate_code_executed"] is not False:
-        raise AssertionError(f"{label}: Garden/Bamboo claims candidate code execution")
-    if garden_result["execution"]["hidden_suite_loaded_after_candidate_freeze"] is not True:
-        raise AssertionError(f"{label}: Garden/Bamboo hidden suite ordering mismatch")
-    if garden_result["comparison"]["composite_score"] is not False or garden_result["comparison"]["winner_declared"] is not False:
-        raise AssertionError(f"{label}: Garden/Bamboo exposes a composite score or winner")
-    if garden_result["benchmark"]["official_gardenarena_ranking"] is not False:
-        raise AssertionError(f"{label}: Garden/Bamboo claims an official GardenArena ranking")
-    garden_json = json.dumps(garden_result, sort_keys=True)
-    for forbidden in ['"source":', '"hidden_seed":', '"hidden_seeds":', '"hidden_scenario":', '"hidden_scenarios":', '"scenario_parameters":']:
-        if forbidden in garden_json:
-            raise AssertionError(f"{label}: Garden/Bamboo result leaked {forbidden!r}")
-    ui_tamper_guard = page.evaluate(
-        """(result) => {
-          const forgedWinner = structuredClone(result);
-          forgedWinner.comparison.winner_declared = true;
-          forgedWinner.comparison.winner = forgedWinner.candidates[0].candidate_id;
-          const leakedSeeds = structuredClone(result);
-          leakedSeeds.hidden_suite.hidden_seeds = [100001, 100002, 100003];
-          return {
-            winnerAccepted: Boolean(window.__OUTILSIA_TEST__.forgeBenchGardenVerifiedResult(forgedWinner)),
-            hiddenAccepted: Boolean(window.__OUTILSIA_TEST__.forgeBenchGardenVerifiedResult(leakedSeeds))
-          };
-        }""",
-        garden_result,
-    )
-    if ui_tamper_guard["winnerAccepted"] or ui_tamper_guard["hiddenAccepted"]:
-        raise AssertionError(f"{label}: Garden/Bamboo UI accepted a forged winner or hidden material")
-    if garden_details.get_attribute("open") is None:
-        raise AssertionError(f"{label}: verified Garden/Bamboo result was not surfaced")
-    garden_text = garden_details.inner_text()
-    for expected in [
-        "Garden/Bamboo v1",
-        "Piste OutilsIA exploratoire",
-        "Pas de code exécuté",
-        "Pas de score composite",
-        "Aucun vainqueur automatique",
-        "2 candidats",
-        "Fable Joint Sentinel",
-        "Controle conservateur OutilsIA",
-        "Ordre provisoire vérifié",
-        "5 scénarios cachés + 1 public",
-        "Aucun vainqueur déclaré",
-        "vitesse et coût hors ordre stratégique",
-    ]:
-        if expected not in garden_text:
-            raise AssertionError(f"{label}: missing Garden/Bamboo truth {expected!r}")
-    if page.locator("#copyForgeBenchGardenResultBtn").is_disabled() or page.locator("#sendForgeBenchGardenToLedgerBtn").is_disabled():
-        raise AssertionError(f"{label}: verified Garden/Bamboo receipt cannot be exported")
-    if page.locator("#evidenceLedgerSource").input_value() != "forgebench_garden_batch_verified":
-        raise AssertionError(f"{label}: Garden/Bamboo proof is not offered to Evidence Ledger")
-    garden_screenshot = OUT / f"forgebench-garden-{label}.png"
-    garden_details.screenshot(path=str(garden_screenshot))
-
     overflow = page.evaluate(
         """() => ({
           viewport: innerWidth,
@@ -293,18 +230,18 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     screenshot = OUT / f"forgebench-{label}.png"
     panel.screenshot(path=str(screenshot))
     context.close()
-    return screenshot, garden_screenshot
+    return screenshot
 
 
 def main() -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
-        desktop, garden_desktop = verify_viewport(browser, 1440, 1000, "desktop")
-        mobile, garden_mobile = verify_viewport(browser, 390, 920, "mobile")
+        desktop = verify_viewport(browser, 1440, 1000, "desktop")
+        mobile = verify_viewport(browser, 390, 920, "mobile")
         browser.close()
     print(
-        f"forgebench_ui_ok desktop={desktop} mobile={mobile} garden_desktop={garden_desktop} garden_mobile={garden_mobile} "
-        "starter=sealed hidden=ui-fixture-holdout-verified stacks=4 workspaces=12 isolation=reference-pilot candidate=ollama-ui-fixture-v3 structure=true code-executed=true visible=39/39 holdout=5/5 garden=dsl-public-hidden science=false winner=false"
+        f"forgebench_ui_ok desktop={desktop} mobile={mobile} "
+        "starter=sealed hidden=ui-fixture-holdout-verified stacks=4 workspaces=12 isolation=reference-pilot candidate=ollama-ui-fixture-v3 structure=true code-executed=true visible=39/39 holdout=5/5 science=false winner=false"
     )
 
 

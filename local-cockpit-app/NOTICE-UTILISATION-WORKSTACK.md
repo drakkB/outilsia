@@ -1,6 +1,6 @@
 # Notice d'utilisation - Workstacks et preuves OutilsIA
 
-Version de la notice : 2026-07-24
+Version de la notice : 2026-07-15
 Périmètre : OutilsIA Local Cockpit, espace **Atelier IA**
 
 ## Navigation du cockpit
@@ -28,7 +28,6 @@ Les actions transversales ouvrent automatiquement l'espace correspondant. Par ex
 | Capability Router | Détecter les CLI et modèles locaux disponibles, puis proposer un planificateur, un exécutant et un vérificateur distinct. | Ne lit pas les jetons, ne vérifie pas les quotas et ne transmet pas la mission aux agents. |
 | Evidence Ledger | Conserver une trace locale chaînée des étapes validées et de leurs empreintes. | Ne stocke ni description brute, prompt, réponse de modèle, credential ou fichier projet. Il ne prouve pas à lui seul la qualité du résultat. |
 | ForgeBench | Préparer un protocole équitable `Signal Maze v1`, publier un contrat de gameplay observable, vérifier une référence clavier/souris/tactile, sceller localement des seeds privés, tester bubblewrap, exécuter un pilote technique, puis appeler facultativement un modèle Ollama local sur le seul contrat public. | Après consentement, le code candidat est gelé, contrôlé publiquement puis soumis à un second Chromium holdout sans réseau. Cette preuve locale ne vaut encore ni score scientifique ni vainqueur : familles de checks publiques, vault non chiffré, pairs et énergie restent des blocages. ForgeBench ne lance pas seul un agent CLI. |
-| ForgeBench Garden/Bamboo v1 | Interpréter de 1 à 8 programmes GardenScript bornés, les geler avant lecture d'une suite locale scellée, puis comparer scénario public et scénarios cachés identiques avec un ordre lexicographique explicite. | Ce candidat source ne lance aucun code arbitraire, processus externe ou réseau. Il ne constitue ni un classement GardenArena officiel, ni une mesure scientifique, ni un conseil horticole. Il ne calcule aucun score composite et ne déclare aucun vainqueur. |
 | Workstack Arena | Dans le candidat source, lancer **Codex CLI uniquement sur Signal Maze public** dans un workspace jetable, avec un seul essai borné, puis enregistrer une décision humaine structurée sur le reçu signé. | Aucun projet utilisateur, board, test caché, fusion ou publication. La revue n'inspecte ni capture ni code et n'autorise ni livraison ni gagnant. Claude Code, Hermes et l'exécution d'une carte arbitraire restent indisponibles. Le build public actuel ne contient pas encore ce pilote. |
 | MemoryForge / Obsidian | Conserver les décisions, bilans et connaissances durables du projet. | Ne reçoit pas tous les logs, prompts ou sorties brutes du Ledger. |
 | Strategy Arena | Exploiter les capacités IA locales préparées par OutilsIA pour les workflows quant, puis compiler et backtester. | OutilsIA ne génère pas de stratégie financière et ne lance pas de backtest. |
@@ -69,18 +68,6 @@ Les actions transversales ouvrent automatiquement l'espace correspondant. Par ex
 
 Le parcours s'arrête ici. Un modèle Ollama local peut produire une soumission, passer la recette publique puis un holdout local borné après gel du code. Codex CLI reste limité à la recette publique, car sa portée de lecture hôte n'est pas vérifiée indépendamment. Le propriétaire peut qualifier le reçu pour une future comparaison, demander un nouveau run ou le rejeter, sans transformer cette décision en validation visuelle ou livraison. Claude Code, Hermes, les cartes arbitraires et les dépôts utilisateur ne sont pas exécutés. Aucun score comparatif ou vainqueur n'existe à ce stade.
 
-## Parcours Garden/Bamboo v1 dans le candidat source
-
-Ce parcours avancé est indépendant du préflight Signal Maze. Il reste replié dans **Comparer des stacks > Préparation sécurisée et exécution > Garden/Bamboo v1** et ne modifie pas le scan, les recommandations de modèles ou le parcours débutant.
-
-1. Ouvrir **Garden/Bamboo v1**, puis sceller cinq scénarios cachés. Le reçu visible contient seulement l'identifiant de suite, le nombre de scénarios et des empreintes.
-2. Charger **Fable Joint Sentinel**, le **contrôle humain OutilsIA**, ou saisir un programme GardenScript 0.5. Pour Fable, conserver la provenance `open_book_iterative` : le simulateur a été utilisé et les seuils ont été ajustés après des runs visibles. Le contrôle OutilsIA est volontairement simple, `human_authored`, sans simulateur ni tuning déclaré ; il sert seulement de repère et ne représente pas une IA candidate.
-3. Ajouter de 1 à 8 candidats au lot. Un identifiant, une source ou une provenance dupliqués ou incohérents sont refusés. Comparer Fable au contrôle ne crée toujours ni vainqueur, ni preuve scientifique, ni recommandation horticole.
-4. Cliquer sur **Évaluer le lot**. OutilsIA compile et signe toutes les sources avant d'ouvrir le coffre, puis interprète le DSL sans exécuter de code candidat.
-5. Lire l'ordre provisoire. Le tri est lexicographique : validité sur tous les scénarios, sorties actives, jours non contenus, confinement, vitalité minimale, cannes vivantes, vitalité finale, travail puis eau. La vitesse de génération et le coût restent affichables séparément mais ne changent jamais cet ordre.
-6. Cliquer sur **Ouvrir le journal de preuves**, puis sur **Ajouter la preuve** après le changement de section. Le Ledger reçoit seulement identifiants bornés, empreintes, provenance, métriques agrégées et statuts de coût ; aucune source, seed ou métrique cachée par scénario.
-7. Une revue humaine et une validation manuelle de release restent nécessaires. Même avec plusieurs runs comparables, l'app conserve `winner_declared=false`.
-
 ## Ce que prouve l'Evidence Ledger
 
 Une entrée du Ledger prouve localement que :
@@ -91,7 +78,6 @@ Une entrée du Ledger prouve localement que :
 - aucune exécution n'avait commencé pour les étapes de préparation ;
 - pour `isolated_reference_run` uniquement, un worker technique déterministe a réellement été exécuté après consentement, puis vérifié par un second processus isolé ;
 - pour `isolated_visible_and_hidden_holdout_candidate`, le modèle Ollama identifié a réellement répondu après un second consentement, puis sa soumission gelée a passé sept contrôles statiques, 39 contrôles publics et cinq familles de holdout dans des processus isolés ; le Ledger ne conserve aucun seed ou résultat privé détaillé ;
-- pour `deterministic_dsl_public_and_hidden_batch`, le lot GardenScript a été gelé avant lecture de la suite cachée, interprété localement sur les mêmes scénarios et classé selon le contrat lexicographique ; seules les métriques agrégées et empreintes bornées sont conservées ;
 - pour `isolated_codex_visible_browser_pilot`, le Codex CLI identifié a réellement été invoqué une fois sur Signal Maze public, sa sortie bornée a été matérialisée dans un workspace jetable, puis la soumission a passé les mêmes sept contrôles statiques et 39 contrôles Chromium publics ;
 - pour `explicit_local_human_review`, le propriétaire local a choisi une décision structurée sur l'empreinte exacte du reçu public, après avoir reconnu ses limites ; cette preuve ne signifie jamais que le code ou les captures ont été inspectés ;
 - seuls les claims minimaux et métriques prévus ont été conservés.
@@ -104,8 +90,6 @@ Le Ledger refuse :
 - un type d'événement qui ne correspond pas au schéma source ;
 - une chaîne locale altérée ;
 - le même document source ajouté deux fois sous le même type d'événement ;
-- un résultat Garden/Bamboo dont le lot, l'ordre, le reçu caché, les métriques ou l'empreinte ont été modifiés ;
-- un résultat Garden/Bamboo qui contient une source candidate, un seed, un scénario caché brut, un score composite ou une déclaration de vainqueur ;
 - une seconde décision humaine pour le même run Workstack Arena.
 
 Le Ledger **ne prouve pas** :
@@ -128,9 +112,8 @@ Le Ledger **ne prouve pas** :
 7. `isolated_reference_run` : pilote technique réellement isolé, sans IA candidate, avec durée, coût API nul et sortie brute non conservée.
 8. `independent_visible_verification` : vérification dans un second processus isolé, soumission en lecture seule et six contrôles visibles. Les tests cachés restent absents.
 9. `isolated_visible_and_hidden_holdout_candidate` : modèle Ollama installé appelé sur la seule tâche publique, sortie brute non conservée, sept checks statiques, 39 checks publics Chromium puis cinq familles de holdout sur des seeds injectés seulement après gel du code. Seuls compteurs et empreintes sortent du second évaluateur. Ce niveau prouve ce run borné, pas une qualité scientifique ou une victoire comparative.
-10. `deterministic_dsl_public_and_hidden_batch` : lot de 1 à 8 programmes GardenScript compilés et gelés avant lecture du coffre, interprétés sur un scénario public et la même suite cachée, puis classés sans score composite. Les sources, seeds et métriques cachées unitaires sont exclus du Ledger ; le vainqueur reste non déclaré.
-11. `isolated_codex_visible_browser_pilot` : Codex CLI invoqué une fois sur la seule tâche Signal Maze publique, workspace jetable, sortie bornée, sept checks statiques et 39 checks Chromium publics. Le coût fournisseur reste inconnu et ce niveau ne vaut ni accès à un projet, ni test caché, ni victoire comparative.
-12. `explicit_local_human_review` : acceptation pour comparaison, demande de correction ou rejet du reçu public signé par le propriétaire humain. Cette décision ne conserve pas de texte libre, ne prouve aucune inspection du code ou des captures et n'autorise jamais livraison, gagnant, board, fusion ou publication.
+10. `isolated_codex_visible_browser_pilot` : Codex CLI invoqué une fois sur la seule tâche Signal Maze publique, workspace jetable, sortie bornée, sept checks statiques et 39 checks Chromium publics. Le coût fournisseur reste inconnu et ce niveau ne vaut ni accès à un projet, ni test caché, ni victoire comparative.
+11. `explicit_local_human_review` : acceptation pour comparaison, demande de correction ou rejet du reçu public signé par le propriétaire humain. Cette décision ne conserve pas de texte libre, ne prouve aucune inspection du code ou des captures et n'autorise jamais livraison, gagnant, board, fusion ou publication.
 
 ## Ce que prépare ForgeBench
 
@@ -155,14 +138,6 @@ Cette recette autonome est une **preuve de la référence visible uniquement**. 
 Le starter public de `Signal Maze v1` est scellé par un manifeste de fichiers et une empreinte SHA-256. Le vault peut maintenant générer cinq seeds privés et cinq familles de checks dans `forgebench-hidden-suite-v1.json`, sous le dossier applicatif Tauri. L'interface reçoit seulement un reçu signé avec identifiant, compteurs et empreinte.
 
 Le vault utilise les permissions du compte système mais **n'est pas chiffré au repos**. Pour Ollama v3, le modèle termine sa réponse et les fichiers sont gelés avant lecture du vault. Un évaluateur Chromium séparé reçoit ensuite uniquement les seeds comme entrées runtime ; le fichier du vault n'est jamais monté et seules les preuves agrégées sortent. Les familles de checks restent toutefois lisibles dans le code et un processus compromis du même compte pourrait lire le vault : `scientific_ready` reste donc faux.
-
-### Garden/Bamboo generalization v1
-
-Le contrat `forgebench/garden-bamboo-v1/contract.json` fige GardenScript 0.5, le domaine `bamboo`, le ruleset `bamboo.v1`, 24 capteurs, cinq canaux de décision, les coûts d'action, les budgets et le scénario public de 365 jours. Le parseur accepte uniquement des règles bornées : pas de boucle, récursion, état mutable, fonction, import, fichier, processus, environnement, horloge réelle, hasard, entrée/sortie ou réseau.
-
-Le coffre `forgebench-garden-hidden-suite-v1.json` est distinct du vault Signal Maze. Il contient de 3 à 12 seeds aléatoires et remet uniquement un reçu signé. La production compile toutes les sources, calcule l'empreinte du lot, puis seulement après lit le coffre. Chaque candidat reçoit exactement le même scénario public et les mêmes scénarios cachés. Le résultat n'expose ni seed, paramètre caché ou métrique cachée par scénario.
-
-Le classement `lexicographic_aggregate_v1` suit exactement le contrat, sans pondération : tous les scénarios doivent être valides, puis les sorties et jours non contenus sont minimisés, avant confinement, vitalité, cannes vivantes, travail et eau. L'identifiant ne sert qu'à stabiliser l'affichage d'une égalité exacte. Génération, durée, coût API et énergie sont des mesures séparées. Fable Joint Sentinel est enregistré comme exemple **itératif avec simulateur et seuils ajustés**, jamais comme génération aveugle. Cette piste OutilsIA est exploratoire et non officielle ; `winner_declared=false` reste obligatoire.
 
 ### Espaces worker frais
 
