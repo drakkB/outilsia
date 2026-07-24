@@ -1,6 +1,6 @@
 [package]
 name = "outilsia-local-cockpit"
-version = "0.1.1"
+version = "0.1.2"
 description = "OutilsIA Local Cockpit desktop app"
 edition = "2021"
 license = "UNLICENSED"

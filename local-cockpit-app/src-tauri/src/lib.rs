@@ -221,6 +221,7 @@ pub struct DesktopAuth {
 #[serde(rename_all = "snake_case")]
 pub struct AppBuildInfo {
     app_version: String,
+    channel: String,
     build_id: String,
     source_commit: String,
 }
@@ -756,6 +757,9 @@ fn get_desktop_auth(app: AppHandle) -> Result<Option<DesktopAuth>, String> {
 fn get_app_build_info() -> AppBuildInfo {
     AppBuildInfo {
         app_version: env!("CARGO_PKG_VERSION").to_string(),
+        channel: option_env!("OUTILSIA_RELEASE_CHANNEL")
+            .unwrap_or("beta")
+            .to_string(),
         build_id: option_env!("OUTILSIA_BUILD_ID")
             .unwrap_or("local-dev")
             .to_string(),
@@ -5816,6 +5820,7 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603|2026-06-15|PCI\\VEN_10DE|
     fn app_build_info_always_identifies_the_running_binary() {
         let info = get_app_build_info();
         assert_eq!(info.app_version, env!("CARGO_PKG_VERSION"));
+        assert!(!info.channel.trim().is_empty());
         assert!(!info.build_id.trim().is_empty());
     }
 }

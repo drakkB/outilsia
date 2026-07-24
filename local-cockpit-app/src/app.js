@@ -1488,7 +1488,7 @@ function releaseProof() {
   const freshness = release.freshness || null;
   return {
     app_version: launched.app_version || manifest.current_version || release.version || "0.1.1",
-    channel: manifest.channel || release.channel || "beta",
+    channel: launched.channel || manifest.channel || release.channel || "beta",
     release_label: release.label || release.version || "",
     build_id: launched.build_id || "unknown-build",
     source_commit: launched.source_commit || "",
@@ -1610,6 +1610,8 @@ function renderReleaseFallback(manifest = state.desktopManifest || demoDesktopMa
 function renderReleaseMetadata(release) {
   const manifest = state.desktopManifest || demoDesktopManifest();
   const launchedBuild = String(state.appBuildInfo?.build_id || "");
+  const launchedChannel = String(state.appBuildInfo?.channel || "");
+  const isReleaseCandidate = launchedChannel === "rc";
   const file = release?.primary_download;
   if (!release?.ok || !file?.url) {
     renderReleaseFallback(manifest);
@@ -1626,19 +1628,28 @@ function renderReleaseMetadata(release) {
     && release.build_id
     && launchedBuild !== release.build_id
   );
-  els.releaseTitle.textContent = `${release.product || "OutilsIA Local Cockpit"} ${release.label || release.version || "beta"}`;
-  els.releaseText.textContent = [
-    buildMismatch ? "Mise à jour disponible" : "Bêta prête",
-    launchedBuild ? `lancée ${launchedBuild}` : null,
-    release.build_id ? `build ${release.build_id}` : null,
-    file.platform || "desktop",
-    size || null,
-    file.sha256 ? `sha ${shortHash(file.sha256)}` : null,
-    release.published_at ? `publié ${release.published_at.slice(0, 10)}` : null
-  ].filter(Boolean).join(" - ");
+  els.releaseTitle.textContent = isReleaseCandidate
+    ? `OutilsIA Local Cockpit ${state.appBuildInfo?.app_version || ""}-rc`
+    : `${release.product || "OutilsIA Local Cockpit"} ${release.label || release.version || "beta"}`;
+  els.releaseText.textContent = (isReleaseCandidate
+    ? [
+        "Candidat privé, non publié",
+        launchedBuild ? `build ${launchedBuild}` : null,
+        release.build_id ? `release publique ${release.build_id}` : null,
+        "garder ce binaire pendant la recette"
+      ]
+    : [
+        buildMismatch ? "Mise à jour disponible" : "Bêta prête",
+        launchedBuild ? `lancée ${launchedBuild}` : null,
+        release.build_id ? `build ${release.build_id}` : null,
+        file.platform || "desktop",
+        size || null,
+        file.sha256 ? `sha ${shortHash(file.sha256)}` : null,
+        release.published_at ? `publié ${release.published_at.slice(0, 10)}` : null
+      ]).filter(Boolean).join(" - ");
   els.releaseDownloadBtn.href = url;
   els.releaseDownloadBtn.dataset.openUrl = url;
-  els.releaseDownloadBtn.textContent = "Télécharger l'app";
+  els.releaseDownloadBtn.textContent = isReleaseCandidate ? "Voir la release publique" : "Télécharger l'app";
   els.releaseDownloadBtn.setAttribute("download", file.name || "");
 }
 
@@ -8184,6 +8195,7 @@ function benchmarkSpeedFor(model) {
 function windowsRecipeEvidence() {
   const flow = prepareFlowState();
   const report = readinessReport();
+  const scan = state.scan || {};
   const release = report.release || releaseProof();
   const second = report.recommended_model || {};
   const nativeFlow = {
@@ -8226,6 +8238,7 @@ function windowsRecipeEvidence() {
     tester: "",
     machine: report.machine.name || report.machine.gpu || "",
     app_version: release.app_version || "0.1.1",
+    release_channel: release.channel || "beta",
     platform: "windows-x64",
     build_id: release.build_id || "",
     release_freshness_ok: Boolean(release.freshness_ok),
@@ -8236,7 +8249,23 @@ function windowsRecipeEvidence() {
       name: release.file_name || "",
       sha256: release.sha256 || "",
       url: release.url ? absoluteOutisiaUrl(release.url) : "https://outilsia.fr/static/downloads/local-cockpit/release.json"
-    }
+    },
+    machine_evidence: {
+      cpu: report.machine.cpu || "",
+      ram_gb: Number(scan.ram_gb || 0),
+      gpu: report.machine.gpu || "",
+      vram_gb: Number(scan.vram_gb || 0),
+      os: report.machine.os || ""
+    },
+    benchmark_evidence: report.benchmark ? {
+      model: report.benchmark.model || "",
+      tokens_per_second: Number(report.benchmark.estimated_tokens_per_second || 0),
+      elapsed_ms: Number(report.benchmark.elapsed_ms || 0),
+      execution_mode: report.benchmark.execution_mode || "auto",
+      runtime_processor: report.benchmark.runtime_processor || "unknown",
+      gpu_offload_percent: Number(report.benchmark.runtime_gpu_offload_percent || 0),
+      measurement_source: report.benchmark.measurement_source || ""
+    } : null
   };
   recipe.notes = ok
     ? "Recette générée depuis OutilsIA Local Cockpit."

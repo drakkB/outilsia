@@ -1,0 +1,165 @@
+name: Local Cockpit Private RC (No Deploy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      rc_number:
+        description: "Release-candidate sequence"
+        required: false
+        default: "1"
+  push:
+    branches:
+      - main
+    paths:
+      - "local-cockpit-app/package.json"
+      - "local-cockpit-app/package-lock.json"
+      - "local-cockpit-app/src/app.js"
+      - "local-cockpit-app/src-tauri/**"
+      - "local-cockpit-app/scripts/*release-candidate*"
+      - ".github/workflows/local-cockpit-release-candidate.yml"
+
+env:
+  OUTILSIA_BUILD_ID: ${{ github.run_id }}${{ github.run_attempt }}
+  OUTILSIA_RELEASE_CHANNEL: rc
+  OUTILSIA_RC_NUMBER: ${{ github.event.inputs.rc_number || '1' }}
+
+jobs:
+  windows:
+    name: Windows private RC
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: local-cockpit-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: local-cockpit-app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: local-cockpit-app/src-tauri
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify source
+        run: |
+          cargo test --manifest-path src-tauri/Cargo.toml --lib
+          cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+          npm run verify:ci-source
+          npm run test:release-candidate
+          npm run verify:release-candidate:workflow
+      - name: Build and package private Windows RC
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-windows-release-candidate.ps1 -RcNumber $env:OUTILSIA_RC_NUMBER -BuildId $env:OUTILSIA_BUILD_ID -KitDir "$env:RUNNER_TEMP\OutilsIA-Local-Cockpit-RC-Test" -SkipInstall
+      - name: Upload Windows candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: outilsia-local-cockpit-private-rc-windows
+          path: local-cockpit-app/.artifacts/release-candidate-windows/**
+          if-no-files-found: error
+      - name: Upload five-step field kit
+        uses: actions/upload-artifact@v4
+        with:
+          name: outilsia-local-cockpit-private-rc-field-kit
+          path: |
+            ${{ runner.temp }}/OutilsIA-Local-Cockpit-RC-Test/**
+            ${{ runner.temp }}/OutilsIA-Local-Cockpit-RC-Test.zip
+            ${{ runner.temp }}/OutilsIA-Local-Cockpit-RC-Test.zip.sha256.txt
+          if-no-files-found: error
+
+  linux:
+    name: Linux private RC
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: local-cockpit-app
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Tauri dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bubblewrap \
+            pkg-config \
+            libdbus-1-dev \
+            libglib2.0-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+      - name: Enable Bubblewrap namespaces
+        run: |
+          if sysctl -N kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
+            echo "OUTILSIA_CI_ORIGINAL_APPARMOR_USERNS=$(sysctl -n kernel.apparmor_restrict_unprivileged_userns)" >> "$GITHUB_ENV"
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: local-cockpit-app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: local-cockpit-app/src-tauri
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify source
+        run: |
+          cargo test --manifest-path src-tauri/Cargo.toml --lib
+          cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+          npm run verify:ci-source
+          npm run test:release-candidate
+          npm run verify:release-candidate:workflow
+      - name: Build Linux RC
+        run: npm exec tauri build
+      - name: Restore namespace policy
+        if: ${{ always() }}
+        run: |
+          if [ -n "${OUTILSIA_CI_ORIGINAL_APPARMOR_USERNS:-}" ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns="$OUTILSIA_CI_ORIGINAL_APPARMOR_USERNS"
+          fi
+      - name: Package Linux RC outside the public tree
+        run: npm run package:rc -- --output-dir .artifacts/release-candidate-linux --rc "$OUTILSIA_RC_NUMBER" --build-id "$OUTILSIA_BUILD_ID" --replace
+      - name: Verify Linux RC
+        run: npm run verify:rc -- --input .artifacts/release-candidate-linux --require-platform linux --require-freshness --require-clean-source
+      - name: Upload Linux candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: outilsia-local-cockpit-private-rc-linux
+          path: local-cockpit-app/.artifacts/release-candidate-linux/**
+          if-no-files-found: error
+
+  merge:
+    name: Merge private RC
+    needs:
+      - windows
+      - linux
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: local-cockpit-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: actions/download-artifact@v4
+        with:
+          name: outilsia-local-cockpit-private-rc-windows
+          path: local-cockpit-app/.artifacts/inputs/windows
+      - uses: actions/download-artifact@v4
+        with:
+          name: outilsia-local-cockpit-private-rc-linux
+          path: local-cockpit-app/.artifacts/inputs/linux
+      - name: Merge candidates without deployment
+        run: npm run merge:rc -- --input .artifacts/inputs/windows --input .artifacts/inputs/linux --output-dir .artifacts/release-candidate-merged --replace
+      - name: Verify cross-platform candidate
+        run: npm run verify:rc -- --input .artifacts/release-candidate-merged --require-platform windows-x64 --require-platform linux --require-freshness --require-clean-source
+      - name: Upload merged candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: outilsia-local-cockpit-private-rc-cross-platform
+          path: local-cockpit-app/.artifacts/release-candidate-merged/**
+          if-no-files-found: error
