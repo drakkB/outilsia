@@ -207,8 +207,15 @@ function gitOutput(args) {
   return result.status === 0 ? result.stdout.trim() : "";
 }
 
-function trackedSourceDirty() {
+function currentTrackedSourceDirty() {
   return Boolean(gitOutput(["status", "--porcelain", "--untracked-files=no"]));
+}
+
+function trackedSourceDirtyAtBuildStart() {
+  const declared = String(process.env.OUTILSIA_RC_SOURCE_TRACKED_DIRTY_AT_START || "").trim().toLowerCase();
+  if (declared === "true") return true;
+  if (declared === "false") return false;
+  return currentTrackedSourceDirty();
 }
 
 function prepareOutput(path, replace) {
@@ -272,7 +279,8 @@ function main() {
     created_at: new Date().toISOString(),
     source: {
       commit: sourceCommit,
-      tracked_dirty: trackedSourceDirty(),
+      tracked_dirty: trackedSourceDirtyAtBuildStart(),
+      post_build_tracked_dirty: currentTrackedSourceDirty(),
     },
     deployment: {
       public_allowed: false,

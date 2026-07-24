@@ -39,6 +39,7 @@ function expectFailure(script, args, phrase) {
 
 const root = mkdtempSync(join(tmpdir(), "outilsia-rc-"));
 try {
+  process.env.OUTILSIA_RC_SOURCE_TRACKED_DIRTY_AT_START = "false";
   const artifacts = join(root, "artifacts");
   const windows = join(root, "windows");
   const linux = join(root, "linux");
@@ -97,6 +98,9 @@ try {
   }
   if (candidate.deployment?.public_allowed !== false || candidate.test_policy?.full_terrain_gate_unchanged !== true) {
     throw new Error("RC safety policy is missing");
+  }
+  if (candidate.source?.tracked_dirty !== false || typeof candidate.source?.post_build_tracked_dirty !== "boolean") {
+    throw new Error("RC source provenance must distinguish pre-build and post-build state");
   }
   if (hash(readFileSync(publicReleasePath)) !== hash(publicBefore)) {
     throw new Error("RC pipeline mutated public release.json");

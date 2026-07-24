@@ -35,6 +35,7 @@ if ($trackedDirty -and !$AllowDirty) {
   $trackedDirty | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
   throw "Tracked source tree is dirty. Commit the RC source or pass -AllowDirty for a disposable local build."
 }
+$env:OUTILSIA_RC_SOURCE_TRACKED_DIRTY_AT_START = if ($trackedDirty) { "true" } else { "false" }
 $sourceCommit = (& git -C $repoRoot rev-parse HEAD).Trim()
 $env:OUTILSIA_BUILD_ID = $BuildId
 $env:OUTILSIA_RELEASE_CHANNEL = "rc"
@@ -50,6 +51,11 @@ $buildArgs = @(
 )
 if ($SkipInstall) { $buildArgs += "-SkipInstall" }
 Invoke-Checked "powershell.exe" $buildArgs
+$postBuildTrackedDirty = (& git -C $repoRoot status --porcelain --untracked-files=no)
+if ($postBuildTrackedDirty) {
+  Write-Host "Tracked changes generated during the Windows build:" -ForegroundColor Yellow
+  $postBuildTrackedDirty | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+}
 
 $artifactDir = Join-Path $desktop $ArtifactFolder
 $direct = Join-Path $artifactDir "outilsia-local-cockpit.exe"
