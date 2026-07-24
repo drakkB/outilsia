@@ -31,6 +31,8 @@ if (!$KitDir) { $KitDir = Join-Path $desktop "_OutilsIA\OutilsIA-Local-Cockpit-$
 
 $trackedDirty = (& git -C $repoRoot status --porcelain --untracked-files=no)
 if ($trackedDirty -and !$AllowDirty) {
+  Write-Host "Tracked changes detected before RC build:" -ForegroundColor Red
+  $trackedDirty | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
   throw "Tracked source tree is dirty. Commit the RC source or pass -AllowDirty for a disposable local build."
 }
 $sourceCommit = (& git -C $repoRoot rev-parse HEAD).Trim()

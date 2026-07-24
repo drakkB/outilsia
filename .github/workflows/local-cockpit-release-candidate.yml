@@ -43,6 +43,8 @@ jobs:
           workspaces: local-cockpit-app/src-tauri
       - name: Install dependencies
         run: npm ci
+      - name: Build and package private Windows RC
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-windows-release-candidate.ps1 -RcNumber $env:OUTILSIA_RC_NUMBER -BuildId $env:OUTILSIA_BUILD_ID -KitDir "$env:RUNNER_TEMP\OutilsIA-Local-Cockpit-RC-Test" -SkipInstall
       - name: Verify source
         run: |
           cargo test --manifest-path src-tauri/Cargo.toml --lib
@@ -50,8 +52,6 @@ jobs:
           npm run verify:ci-source
           npm run test:release-candidate
           npm run verify:release-candidate:workflow
-      - name: Build and package private Windows RC
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-windows-release-candidate.ps1 -RcNumber $env:OUTILSIA_RC_NUMBER -BuildId $env:OUTILSIA_BUILD_ID -KitDir "$env:RUNNER_TEMP\OutilsIA-Local-Cockpit-RC-Test" -SkipInstall
       - name: Upload Windows candidate
         uses: actions/upload-artifact@v4
         with:
