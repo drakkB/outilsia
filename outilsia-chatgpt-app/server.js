@@ -1,4 +1,5 @@
 import { createServer as createNodeServer } from "node:http";
+import { createHash, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -12,8 +13,8 @@ import { z } from "zod";
 import { buildCompatibilityDecision, buildUpgradeDecision, decisionText, USAGES } from "./lib/decision.js";
 import { OutilsiaApi, OutilsiaApiError } from "./lib/outilsia-api.js";
 
-export const APP_VERSION = "0.1.0";
-export const RESOURCE_URI = "ui://outilsia/machine-cockpit-v1.html";
+export const APP_VERSION = "0.2.0";
+export const RESOURCE_URI = "ui://outilsia/machine-cockpit-v2.html";
 export const TOOL_NAMES = [
   "check_pc_for_local_ai",
   "analyze_shared_report",
@@ -114,7 +115,8 @@ const readOnlyAnnotations = {
   openWorldHint: false,
 };
 
-const widgetHtml = readFileSync(new URL("./public/machine-cockpit-v1.html", import.meta.url), "utf8");
+const widgetHtml = readFileSync(new URL("./public/machine-cockpit-v2.html", import.meta.url), "utf8");
+const rateLimitSalt = randomBytes(32).toString("hex");
 
 function profileFromArgs(args) {
   return {
@@ -339,12 +341,16 @@ export function createOutilsiaMcpServer({ api = new OutilsiaApi() } = {}) {
 }
 
 function requestIdentity(req) {
-  return String(
+  const rawIdentity = String(
     req.headers["cf-connecting-ip"]
       || req.headers["x-forwarded-for"]
       || req.socket.remoteAddress
       || "unknown",
   ).split(",")[0].trim();
+  return createHash("sha256")
+    .update(rateLimitSalt)
+    .update(rawIdentity)
+    .digest("hex");
 }
 
 function createRateLimiter(limitPerMinute) {
@@ -352,6 +358,11 @@ function createRateLimiter(limitPerMinute) {
   return (identity) => {
     const now = Date.now();
     const minute = Math.floor(now / 60_000);
+    if (buckets.size > 10_000) {
+      for (const [key, value] of buckets) {
+        if (value.minute < minute) buckets.delete(key);
+      }
+    }
     const bucket = buckets.get(identity);
     if (!bucket || bucket.minute !== minute) {
       buckets.set(identity, { minute, count: 1 });
@@ -365,6 +376,7 @@ function createRateLimiter(limitPerMinute) {
 export function createHttpServer({
   api = new OutilsiaApi(),
   rateLimitPerMinute = Number(process.env.OUTILSIA_RATE_LIMIT_PER_MINUTE || 120),
+  challengeToken = process.env.OUTILSIA_OPENAI_CHALLENGE_TOKEN || "",
 } = {}) {
   const allowRequest = createRateLimiter(
     Number.isFinite(rateLimitPerMinute) && rateLimitPerMinute > 0 ? rateLimitPerMinute : 120,
@@ -376,6 +388,23 @@ export function createHttpServer({
       return;
     }
     const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+
+    if (req.method === "GET" && url.pathname === "/.well-known/openai-apps-challenge") {
+      const token = String(challengeToken).trim();
+      if (!token || token.length > 4096 || /[\r\n]/.test(token)) {
+        res.writeHead(404, {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": "no-store",
+        }).end("Not configured");
+        return;
+      }
+      res.writeHead(200, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      }).end(token);
+      return;
+    }
 
     if (req.method === "GET" && ["/", "/healthz"].includes(url.pathname)) {
       res.writeHead(200, {

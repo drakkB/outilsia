@@ -70,6 +70,7 @@ test("MCP exposes four read-only tools and returns renderable structured data", 
   for (const tool of listed.tools) {
     assert.equal(tool.annotations?.readOnlyHint, true);
     assert.equal(tool.annotations?.destructiveHint, false);
+    assert.equal(tool.annotations?.openWorldHint, false);
   }
 
   const result = await client.callTool({
@@ -125,4 +126,45 @@ test("MCP exposes four read-only tools and returns renderable structured data", 
     arguments: { decision: result.structuredContent.decision },
   });
   assert.equal(rendered.structuredContent.decision.schema_version, "outilsia.chatgpt.decision.v1");
+});
+
+test("domain verification returns only the configured OpenAI token", async (t) => {
+  const token = "openai-apps-verification-token-test";
+  const httpServer = createHttpServer({
+    api: fakeApi,
+    rateLimitPerMinute: 1_000,
+    challengeToken: token,
+  });
+  httpServer.listen(0, "127.0.0.1");
+  await once(httpServer, "listening");
+  const address = httpServer.address();
+  t.after(async () => {
+    await new Promise((resolve) => httpServer.close(resolve));
+  });
+
+  const response = await fetch(
+    `http://127.0.0.1:${address.port}/.well-known/openai-apps-challenge`,
+  );
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "text/plain; charset=utf-8");
+  assert.equal(await response.text(), token);
+});
+
+test("domain verification stays disabled until OpenAI provides a token", async (t) => {
+  const httpServer = createHttpServer({
+    api: fakeApi,
+    rateLimitPerMinute: 1_000,
+    challengeToken: "",
+  });
+  httpServer.listen(0, "127.0.0.1");
+  await once(httpServer, "listening");
+  const address = httpServer.address();
+  t.after(async () => {
+    await new Promise((resolve) => httpServer.close(resolve));
+  });
+
+  const response = await fetch(
+    `http://127.0.0.1:${address.port}/.well-known/openai-apps-challenge`,
+  );
+  assert.equal(response.status, 404);
 });

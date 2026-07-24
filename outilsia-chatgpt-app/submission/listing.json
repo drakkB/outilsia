@@ -1,0 +1,55 @@
+{
+  "name": "outilsia-local-ai",
+  "version": "0.2.0",
+  "interface": {
+    "displayName": "OutilsIA Local Cockpit",
+    "shortDescription": "Choisir une IA locale",
+    "longDescription": "OutilsIA aide à choisir un modèle d'IA locale à partir de faits matériels. Déclarez le CPU, la RAM, le GPU et la VRAM d'un PC, ou fournissez un rapport OutilsIA Local Cockpit déjà partagé. Le connecteur classe les modèles compatibles, distingue une estimation d'un benchmark réel, peut simuler un upgrade RAM/VRAM et affiche une fiche compacte dans la conversation. Tous les outils sont en lecture seule : ils ne scannent pas le PC, n'accèdent pas à Ollama, n'installent rien et n'effectuent aucun achat. Lorsqu'une machine suffit déjà, OutilsIA recommande explicitement de ne rien acheter.",
+    "developerName": "OutilsIA.fr",
+    "category": "Data & Analytics",
+    "capabilities": [
+      "Estimer la compatibilité d'un PC avec des modèles IA locaux",
+      "Analyser un rapport anonymisé OutilsIA Local Cockpit",
+      "Simuler une hausse de RAM ou de VRAM sans modifier la machine",
+      "Distinguer une estimation déclarative d'un benchmark réel",
+      "Afficher une décision compacte avec deux actions au maximum"
+    ],
+    "websiteURL": "https://outilsia.fr/chatgpt-ia-locale",
+    "privacyPolicyURL": "https://outilsia.fr/confidentialite-plugin-outilsia",
+    "termsOfServiceURL": "https://outilsia.fr/conditions-plugin-outilsia",
+    "supportURL": "https://outilsia.fr/support-plugin-outilsia",
+    "brandColor": "#006B5F",
+    "brandColorDark": "#52C993",
+    "defaultPrompt": [
+      "Quels modèles locaux tester avec mon Ryzen 7, 64 Go RAM et une RTX 4080 SUPER 16 Go ?",
+      "Que puis-je lancer avec un Core i7-4790K, 16 Go RAM et une GTX 1080 Ti 11 Go ?",
+      "Analyse mon rapport OutilsIA partagé et dis-moi quoi tester avant d'acheter."
+    ]
+  },
+  "mcp": {
+    "url": "https://outilsia.fr/mcp",
+    "authentication": "none",
+    "challengeBaseURL": "https://outilsia.fr",
+    "widgetResource": "ui://outilsia/machine-cockpit-v2.html"
+  },
+  "availability": {
+    "languages": [
+      "fr"
+    ],
+    "countries": [
+      "FR",
+      "BE",
+      "CH",
+      "CA"
+    ]
+  },
+  "assets": {
+    "logo": "submission/assets/outilsia-local-cockpit-512.png",
+    "starterPromptScreenshots": [
+      "submission/assets/starter-01-gaming.png",
+      "submission/assets/starter-02-old-pc.png",
+      "submission/assets/starter-03-report.png"
+    ]
+  },
+  "releaseNotes": "Soumission initiale du connecteur OutilsIA en lecture seule. Quatre outils permettent d'estimer un profil matériel déclaré, d'analyser un rapport public anonymisé, de simuler un upgrade RAM/VRAM et de rendre une fiche compacte. Aucun accès au PC, aucune installation, aucun achat et aucun tokens/s inventé."
+}

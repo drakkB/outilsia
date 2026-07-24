@@ -161,16 +161,12 @@ function safeLink(label, url, kind = "guide") {
   }
 }
 
-function buildLinks(reportUrl, buyingGuides = []) {
-  const links = [
+function buildLinks(reportUrl) {
+  return [
     safeLink("Télécharger Local Cockpit", "https://outilsia.fr/telecharger-scanner-ia-local", "download"),
     safeLink("Scanner et comparer", "https://outilsia.fr/scanner-ia-local", "scanner"),
     reportUrl ? safeLink("Ouvrir le rapport complet", reportUrl, "report") : null,
-  ];
-  for (const guide of buyingGuides.slice(0, 2)) {
-    links.push(safeLink(String(guide.title || guide.name || "Guide matériel"), guide.url || guide.guide_url, "guide"));
-  }
-  return links.filter(Boolean);
+  ].filter(Boolean);
 }
 
 function scorePayload(compatibility) {
@@ -234,7 +230,7 @@ export function buildCompatibilityDecision(payload, {
     benchmark_evidence: benchmarkEvidence,
     purchase,
     blocked_next: (compatibility.blocked_next || []).slice(0, 3).map(compactBlocked),
-    links: buildLinks(reportUrl, compatibility.buying_guides || []),
+    links: buildLinks(reportUrl),
     limits: [
       sourceKind === "shared_report"
         ? "Le rapport reflète les données partagées par Local Cockpit; il ne donne aucun accès à la machine."

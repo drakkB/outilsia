@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OutilsIA pour ChatGPT : choisir un modèle IA local pour son PC</title>
+  <meta name="description" content="Le connecteur MCP OutilsIA aide ChatGPT à lire un profil matériel ou un rapport Local Cockpit, recommander des modèles locaux et simuler un upgrade sans scanner le PC.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="https://outilsia.fr/chatgpt-ia-locale">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="OutilsIA pour ChatGPT">
+  <meta property="og:description" content="Profil PC, rapport Local Cockpit, modèles locaux et simulation d'upgrade dans une fiche compacte.">
+  <meta property="og:url" content="https://outilsia.fr/chatgpt-ia-locale">
+  <meta property="og:image" content="https://outilsia.fr/static/images/local-cockpit/og-local-cockpit-1200x630.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/static/css/outilsia-chatgpt-app.css">
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@type":"SoftwareApplication",
+    "name":"OutilsIA pour ChatGPT",
+    "applicationCategory":"UtilitiesApplication",
+    "operatingSystem":"ChatGPT, Web",
+    "url":"https://outilsia.fr/chatgpt-ia-locale",
+    "description":"Connecteur MCP en lecture seule pour analyser un profil matériel ou un rapport OutilsIA Local Cockpit dans ChatGPT.",
+    "offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},
+    "publisher":{"@type":"Organization","name":"OutilsIA.fr","url":"https://outilsia.fr"}
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@type":"FAQPage",
+    "mainEntity":[
+      {"@type":"Question","name":"ChatGPT peut-il scanner directement mon PC avec OutilsIA ?","acceptedAnswer":{"@type":"Answer","text":"Non. Le connecteur reçoit uniquement les caractéristiques que vous déclarez ou l'URL d'un rapport OutilsIA déjà partagé. Le scan réel reste dans Local Cockpit sur Windows ou Linux."}},
+      {"@type":"Question","name":"OutilsIA peut-il installer Ollama depuis ChatGPT ?","acceptedAnswer":{"@type":"Answer","text":"Non. Le connecteur ChatGPT est en lecture seule. Local Cockpit reste l'application qui scanne, installe, teste et benchmarke localement."}},
+      {"@type":"Question","name":"Le connecteur OutilsIA est-il déjà publié dans l'annuaire ChatGPT ?","acceptedAnswer":{"@type":"Answer","text":"Non. Le serveur MCP est disponible en bêta développeur pour recette. La soumission à l'annuaire public n'est pas encore finalisée."}}
+    ]
+  }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#contenu">Aller au contenu</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/">Outils<span>IA</span></a>
+      <nav class="nav" aria-label="Navigation principale">
+        <a href="/scanner-ia-local">Local Cockpit</a>
+        <a href="/confidentialite-plugin-outilsia">Confidentialité</a>
+        <a href="/support-plugin-outilsia">Support</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="contenu">
+    <section class="hero">
+      <div class="hero-inner">
+        <span class="eyebrow">Connecteur MCP · bêta développeur</span>
+        <h1>OutilsIA pour ChatGPT</h1>
+        <p class="lead">Déclarez votre CPU, RAM, GPU et VRAM, ou donnez un rapport Local Cockpit partagé. OutilsIA transforme ces faits en modèles locaux à tester, limites visibles et simulation d'upgrade.</p>
+        <div class="actions">
+          <a class="btn primary" href="#tester">Tester en mode développeur</a>
+          <a class="btn secondary" href="/telecharger-scanner-ia-local">Télécharger Local Cockpit</a>
+        </div>
+        <p class="honest"><strong>Statut honnête :</strong> le serveur MCP v0.2 est public pour recette. Le connecteur n'est pas encore publié dans l'annuaire ChatGPT et n'est pas présenté comme approuvé par OpenAI.</p>
+      </div>
+    </section>
+
+    <section class="band alt" aria-label="Preuves produit">
+      <div class="wrap">
+        <div class="proof-grid">
+          <div class="proof"><strong>Lecture seule</strong><span>Aucune installation, suppression ou commande lancée sur votre machine.</span></div>
+          <div class="proof"><strong>4 outils ciblés</strong><span>Profil PC, rapport partagé, simulation d'upgrade et fiche visuelle.</span></div>
+          <div class="proof"><strong>0 vitesse inventée</strong><span>Les tokens/s apparaissent seulement si un rapport contient une mesure réelle.</span></div>
+          <div class="proof"><strong>Achat non obligatoire</strong><span>Si le PC suffit, OutilsIA le dit clairement au lieu de pousser un upgrade.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap">
+        <h2>Une décision locale compréhensible dans la conversation</h2>
+        <p class="section-lead">Le connecteur ne remplace pas le scanner desktop. Il rend ses décisions lisibles dans ChatGPT et permet une première estimation lorsque vous connaissez déjà votre matériel.</p>
+        <div class="tool-grid">
+          <article class="tool"><strong>Vérifier un PC</strong><p>Classe les modèles à partir d'un profil matériel explicitement fourni.</p><code>check_pc_for_local_ai</code></article>
+          <article class="tool"><strong>Lire un rapport</strong><p>Analyse uniquement une URL publique exacte <code>outilsia.fr/r/…</code>.</p><code>analyze_shared_report</code></article>
+          <article class="tool"><strong>Simuler un upgrade</strong><p>Compare RAM et VRAM avant/après, sans achat ni modification du PC.</p><code>simulate_hardware_upgrade</code></article>
+          <article class="tool"><strong>Afficher la fiche</strong><p>Rend score, matériel, modèles, preuve et décision dans une carte compacte.</p><code>render_machine_cockpit</code></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="band alt">
+      <div class="wrap two-col">
+        <div>
+          <h2>Le parcours complet reste simple</h2>
+          <ol class="steps">
+            <li><strong>Donner des faits</strong><span>Profil déclaré ou rapport anonymisé créé par Local Cockpit.</span></li>
+            <li><strong>Interroger le moteur OutilsIA</strong><span>Les règles de compatibilité restent déterministes côté OutilsIA.fr.</span></li>
+            <li><strong>Afficher une décision</strong><span>ChatGPT explique le résultat et la fiche limite l'interface à deux actions utiles.</span></li>
+            <li><strong>Mesurer localement si nécessaire</strong><span>Installation, benchmark et preuve GPU se font dans Local Cockpit.</span></li>
+          </ol>
+        </div>
+        <div class="boundary">
+          <strong>Frontière non négociable</strong>
+          <p>ChatGPT ne reçoit aucun accès au terminal, à Ollama, aux fichiers personnels ou aux pilotes. Le connecteur conseille. Local Cockpit exécute seulement après une action locale explicite.</p>
+          <ul class="plain-list">
+            <li>Pas de scan silencieux.</li>
+            <li>Pas de commande distante sur le PC.</li>
+            <li>Pas de clé OpenAI requise par le serveur OutilsIA.</li>
+            <li>Pas de lien Amazon dans les réponses MCP.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="tester">
+      <div class="wrap two-col">
+        <div>
+          <span class="state">Recette développeur</span>
+          <h2 style="margin-top:14px">Connecter le serveur MCP public</h2>
+          <p class="section-lead">Dans ChatGPT, activez d'abord le mode développeur depuis Réglages → Sécurité et connexion, puis créez l'app depuis Réglages → Plugins avec l'URL de production ci-dessous.</p>
+          <div class="code-block">https://outilsia.fr/mcp</div>
+        </div>
+        <div>
+          <ol class="steps">
+            <li><strong>Activer le mode développeur</strong><span>Ouvrez Réglages → Sécurité et connexion.</span></li>
+            <li><strong>Créer l'app OutilsIA</strong><span>Dans Réglages → Plugins, sélectionnez + et utilisez exactement l'URL HTTPS affichée.</span></li>
+            <li><strong>Ouvrir une nouvelle conversation</strong><span>Ajoutez OutilsIA depuis le menu Plus, puis testez un profil complet.</span></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="band alt">
+      <div class="wrap">
+        <h2>Trois demandes utiles pour commencer</h2>
+        <div class="tool-grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+          <article class="tool"><strong>PC gaming</strong><p>« Mon Ryzen 7, 64 Go RAM et RTX 4080 SUPER 16 Go peuvent-ils faire tourner un bon assistant local ? »</p></article>
+          <article class="tool"><strong>Vieux PC</strong><p>« Que puis-je lancer avec un Core i7-4790K, 16 Go RAM et une GTX 1080 Ti 11 Go ? »</p></article>
+          <article class="tool"><strong>Rapport réel</strong><p>« Analyse ce rapport OutilsIA partagé et dis-moi quel modèle tester avant d'acheter. »</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap two-col">
+        <div>
+          <h2>Données minimales, résultat borné</h2>
+          <p class="section-lead">Le serveur ne conserve pas les profils ou les réponses. Un identifiant réseau haché et éphémère sert uniquement à limiter les abus. Un rapport partagé reste contrôlé depuis le compte OutilsIA qui l'a créé.</p>
+          <div class="actions">
+            <a class="btn primary" href="/confidentialite-plugin-outilsia">Lire la politique dédiée</a>
+            <a class="btn secondary" href="/conditions-plugin-outilsia">Voir les conditions</a>
+          </div>
+        </div>
+        <div class="notice">
+          <strong>Service indépendant</strong>
+          <p>OutilsIA.fr est un service indépendant. ChatGPT et OpenAI sont des marques de leurs propriétaires respectifs. Cette page ne revendique ni partenariat ni validation de la soumission publique.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="band alt faq">
+      <div class="wrap">
+        <h2>Questions fréquentes</h2>
+        <details><summary>ChatGPT peut-il scanner directement mon PC ?</summary><p>Non. Le profil est déclaré dans la conversation ou provient d'un rapport déjà partagé. Seule l'application desktop peut scanner la machine locale.</p></details>
+        <details><summary>Le connecteur peut-il installer Ollama ou un modèle ?</summary><p>Non. Ses quatre outils sont en lecture seule. Il peut recommander un modèle et renvoyer vers Local Cockpit, mais ne lance aucune action sur le PC.</p></details>
+        <details><summary>Pourquoi les tokens/s sont-ils parfois absents ?</summary><p>Parce qu'OutilsIA refuse d'inventer une vitesse. Une estimation matérielle n'est pas un benchmark ; les tokens/s exigent une mesure sauvegardée dans Local Cockpit.</p></details>
+        <details><summary>Le connecteur est-il déjà dans l'annuaire ChatGPT ?</summary><p>Non. Il est disponible pour recette en mode développeur. Le dossier de soumission et les contrôles publics sont en préparation.</p></details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <strong>OutilsIA pour ChatGPT · bêta développeur</strong>
+      <div class="footer-links">
+        <a href="/scanner-ia-local">Local Cockpit</a>
+        <a href="/support-plugin-outilsia">Support</a>
+        <a href="/confidentialite-plugin-outilsia">Confidentialité</a>
+        <a href="/conditions-plugin-outilsia">Conditions</a>
+        <a href="/mentions-legales">Mentions légales</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

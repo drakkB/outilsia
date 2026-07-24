@@ -8,6 +8,7 @@ function payload({
   compatible = [],
   upgrades = [],
   benchmarks = [],
+  buyingGuides = [],
 } = {}) {
   return {
     ok: true,
@@ -26,7 +27,7 @@ function payload({
       compatible,
       blocked_next: [],
       upgrades,
-      buying_guides: [],
+      buying_guides: buyingGuides,
     },
   };
 }
@@ -54,11 +55,16 @@ test("a comfortable text profile recommends no immediate purchase and excludes i
   const decision = buildCompatibilityDecision(payload({
     compatible: [flux, qwen],
     upgrades: [{ name: "RTX 3090 24 Go", summary: "Plus de VRAM" }],
+    buyingGuides: [{
+      title: "Guide affilié",
+      url: "https://outilsia.fr/materiel",
+    }],
   }), { usage: "assistant" });
   assert.equal(decision.purchase.priority, "none");
   assert.equal(decision.recommended_models[0].name, "Qwen 3");
   assert.equal(decision.benchmark_evidence, null);
   assert.match(decision.limits.join(" "), /n'est inventée/i);
+  assert.equal(decision.links.some((link) => link.kind === "guide"), false);
 });
 
 test("a shared report exposes only a real positive benchmark", () => {
@@ -76,6 +82,7 @@ test("a shared report exposes only a real positive benchmark", () => {
   assert.equal(decision.source.is_real_scan, true);
   assert.equal(decision.benchmark_evidence.tokens_per_second, 42.3);
   assert.equal(decision.links.some((link) => link.kind === "report"), true);
+  assert.equal(decision.links.length, 3);
 });
 
 test("an upgrade with no catalog gain is explicitly rejected", () => {

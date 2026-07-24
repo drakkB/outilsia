@@ -110,6 +110,11 @@
         color: var(--cyan);
         font-size: 11px;
       }
+      .more-models {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.4;
+      }
       .proof, .purchase {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
@@ -217,20 +222,31 @@
         const machine = decision.machine || {};
         const score = decision.score || {};
         const models = Array.isArray(decision.recommended_models) ? decision.recommended_models : [];
+        const visibleModels = models.slice(0, 3);
+        const hiddenModelCount = Math.max(0, models.length - visibleModels.length);
         const proof = decision.benchmark_evidence;
         const purchase = decision.purchase || {};
         const links = Array.isArray(decision.links) ? decision.links : [];
+        const preferredKinds = decision.source?.kind === "shared_report"
+          ? ["report", "download"]
+          : ["download", "scanner"];
+        const visibleLinks = preferredKinds
+          .map((kind) => links.find((link) => link.kind === kind))
+          .filter(Boolean)
+          .slice(0, 2);
         const limits = Array.isArray(decision.limits) ? decision.limits : [];
-        const modelRows = models.length
-          ? models.map((model) => `
+        const modelRows = visibleModels.length
+          ? visibleModels.map((model) => `
               <div class="model">
                 <div>
                   <strong>${escapeHtml(model.name)} ${escapeHtml(model.params)}</strong>
-                  <span>${escapeHtml(model.label)} · ${escapeHtml(model.reason)}</span>
+                  <span>${escapeHtml(model.reason)}</span>
                 </div>
                 ${model.ollama ? `<code>ollama run ${escapeHtml(model.ollama)}</code>` : ""}
               </div>
-            `).join("")
+            `).join("") + (hiddenModelCount
+              ? `<p class="more-models">+${hiddenModelCount} autre${hiddenModelCount > 1 ? "s" : ""} candidat${hiddenModelCount > 1 ? "s" : ""} classé${hiddenModelCount > 1 ? "s" : ""} dans la réponse.</p>`
+              : "")
           : `<p class="verdict">Aucun modèle ne peut être classé avec les données reçues.</p>`;
         const proofBlock = proof
           ? `<section>
@@ -280,7 +296,7 @@
             </div>
           </section>
           <nav class="links">
-            ${links.map((link) => `
+            ${visibleLinks.map((link) => `
               <button class="link" type="button" data-url="${escapeHtml(link.url)}" data-kind="${escapeHtml(link.kind)}">
                 ${escapeHtml(link.label)}
               </button>
@@ -340,7 +356,7 @@
       const initialize = async () => {
         try {
           await rpcRequest("ui/initialize", {
-            appInfo: { name: "outilsia-machine-cockpit", version: "0.1.0" },
+            appInfo: { name: "outilsia-machine-cockpit", version: "0.2.0" },
             appCapabilities: {},
             protocolVersion: "2026-01-26",
           });

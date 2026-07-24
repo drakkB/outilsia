@@ -9,7 +9,7 @@ Application MCP en lecture seule pour utiliser le moteur de décision OutilsIA d
 - Local Cockpit reste seul à scanner le matériel, installer Ollama ou un modèle, lancer un benchmark et écrire sur la machine.
 - Aucun appel OpenAI payant n'est nécessaire dans ce serveur. Le modèle hôte choisit et appelle les outils MCP.
 
-## Outils v1
+## Outils v0.2
 
 | Outil | Rôle | Écritures |
 |---|---|---|
@@ -43,13 +43,16 @@ Choisir `Streamable HTTP`, puis `http://127.0.0.1:8787/mcp`.
 
 ChatGPT exige une URL HTTPS publique terminée par `/mcp`. En mode développeur :
 
-1. Ouvrir les réglages ChatGPT et activer le mode développeur.
-2. Ajouter un plugin/serveur MCP.
-3. Saisir l'URL publique, par exemple `https://outilsia.fr/mcp`.
-4. Ouvrir une nouvelle conversation avec OutilsIA activé.
-5. Tester un profil déclaré, un rapport partagé, puis une demande hors périmètre.
+1. Ouvrir `Réglages → Sécurité et connexion`, puis activer le mode développeur.
+2. Ouvrir `Réglages → Plugins` ou `chatgpt.com/plugins`.
+3. Sélectionner le bouton `+` et créer une app en mode développeur.
+4. Saisir l'URL publique `https://outilsia.fr/mcp`.
+5. Ouvrir une nouvelle conversation, activer OutilsIA depuis le menu `Plus`, puis tester un profil déclaré, un rapport partagé et une demande hors périmètre.
 
 Le domaine de widget dédié est configuré seulement pour la soumission publique avec `OUTILSIA_WIDGET_DOMAIN`. Il doit être unique à cette app et contrôlé par OutilsIA.
+
+Le connecteur est disponible en bêta développeur. Il n'est pas présenté comme
+déjà approuvé ou publié dans l'annuaire public.
 
 ## Déploiement
 
@@ -62,12 +65,18 @@ le backend web général.
 
 ## Variables
 
-Voir `.env.example`. Aucun secret n'est requis pour la v1 anonyme.
+Voir `.env.example`. Aucun secret n'est requis pour la v0.2 anonyme.
+
+`OUTILSIA_OPENAI_CHALLENGE_TOKEN` reste vide en fonctionnement normal. Lorsque
+le portail OpenAI fournit un challenge de domaine, placez le token exact dans
+`/etc/outilsia-chatgpt-app.env`, redémarrez le service et vérifiez que
+`/.well-known/openai-apps-challenge` renvoie uniquement ce token en texte brut.
 
 ## Recette avant soumission
 
-- Cinq demandes positives : PC gaming, vieux PC, CPU only, rapport réel, simulation utile.
-- Trois demandes négatives : URL étrangère, demande d'installation locale, demande sans caractéristiques.
+- Cinq demandes positives et trois demandes négatives sont figées dans
+  `submission/test-cases.json`.
 - Vérifier le CSP, les liens sortants, la confidentialité et le rendu mobile.
 - Vérifier que le serveur est stable en HTTPS et que le widget n'utilise aucun sous-iframe.
-- Soumettre ensuite le plugin qui contient cette app depuis le portail OpenAI.
+- Exécuter `npm run smoke:production` après chaque déploiement.
+- Suivre `submission/CHECKLIST.md` avant toute soumission publique.

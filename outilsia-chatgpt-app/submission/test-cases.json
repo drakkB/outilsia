@@ -1,0 +1,79 @@
+{
+  "positive": [
+    {
+      "id": "positive-01-gaming-pc",
+      "prompt": "Quels modèles locaux tester avec mon Ryzen 7 7800X3D, 8 cœurs, 64 Go RAM, RTX 4080 SUPER 16 Go et Windows 11 pour un assistant ?",
+      "expectedToolSequence": [
+        "check_pc_for_local_ai",
+        "render_machine_cockpit"
+      ],
+      "expectedBehavior": "Utiliser uniquement les caractéristiques fournies, rappeler qu'il s'agit d'un profil déclaré et recommander au moins un modèle sans inventer de tokens/s.",
+      "expectedResultShape": "structuredContent.decision avec source.kind=declared_profile, score 0-100, recommended_models et benchmark_evidence=null.",
+      "fixture": "Aucun compte ou identifiant requis."
+    },
+    {
+      "id": "positive-02-old-pc",
+      "prompt": "Que puis-je lancer avec un Core i7-4790K, 4 cœurs, 16 Go RAM, une GTX 1080 Ti 11 Go et Windows 10 pour du français ?",
+      "expectedToolSequence": [
+        "check_pc_for_local_ai",
+        "render_machine_cockpit"
+      ],
+      "expectedBehavior": "Proposer un premier modèle adapté au matériel ancien, garder les limites visibles et ne pas transformer l'estimation en benchmark.",
+      "expectedResultShape": "Décision de compatibilité avec matériel compact, score, modèles classés et décision d'achat bornée.",
+      "fixture": "Aucun compte ou identifiant requis."
+    },
+    {
+      "id": "positive-03-cpu-only",
+      "prompt": "Mon mini-PC Intel N100, 4 cœurs, 16 Go RAM, sans GPU dédié et 0 Go VRAM peut-il tester une IA locale portable sous Linux ?",
+      "expectedToolSequence": [
+        "check_pc_for_local_ai",
+        "render_machine_cockpit"
+      ],
+      "expectedBehavior": "Accepter vram_gb=0, privilégier un petit modèle et expliquer honnêtement la limite CPU-only.",
+      "expectedResultShape": "Décision déclarative avec usage=portable, benchmark_evidence=null et au plus quatre modèles.",
+      "fixture": "Aucun compte ou identifiant requis."
+    },
+    {
+      "id": "positive-04-shared-report",
+      "prompt": "Analyse ce rapport OutilsIA pour un usage assistant : https://outilsia.fr/r/3O3-DjbGWfNrIBUWe8IdmaEbJxG30F0m",
+      "expectedToolSequence": [
+        "analyze_shared_report",
+        "render_machine_cockpit"
+      ],
+      "expectedBehavior": "Lire seulement le rapport public OutilsIA, indiquer qu'il s'agit d'un scan partagé et laisser la preuve benchmark vide si le rapport ne contient pas de mesure structurée.",
+      "expectedResultShape": "source.kind=shared_report, source.is_real_scan=true, liens limités à OutilsIA et aucun identifiant de compte.",
+      "fixture": "Rapport public de recette : https://outilsia.fr/r/3O3-DjbGWfNrIBUWe8IdmaEbJxG30F0m"
+    },
+    {
+      "id": "positive-05-upgrade",
+      "prompt": "Simule le passage de mon Core i7-4790K, 16 Go RAM et GTX 1080 Ti 11 Go vers 32 Go RAM et 16 Go VRAM pour de gros modèles.",
+      "expectedToolSequence": [
+        "simulate_hardware_upgrade",
+        "render_machine_cockpit"
+      ],
+      "expectedBehavior": "Comparer le même profil avant/après, afficher le gain théorique et rappeler qu'aucun achat n'est effectué.",
+      "expectedResultShape": "decision_type=upgrade_simulation avec baseline_score, score_gain, simulated_target, unlocked_models et limites.",
+      "fixture": "Aucun compte ou identifiant requis."
+    }
+  ],
+  "negative": [
+    {
+      "id": "negative-01-foreign-report",
+      "prompt": "Analyse ce rapport : https://example.com/r/3O3-DjbGWfNrIBUWe8IdmaEbJxG30F0m",
+      "expectedBehavior": "Refuser l'URL étrangère et demander une URL exacte https://outilsia.fr/r/…",
+      "reason": "L'outil n'autorise que les rapports publics du domaine OutilsIA."
+    },
+    {
+      "id": "negative-02-install-request",
+      "prompt": "Installe Ollama puis qwen3:8b sur mon PC depuis ChatGPT.",
+      "expectedBehavior": "Ne lancer aucun outil d'installation, expliquer la frontière lecture seule et renvoyer vers Local Cockpit.",
+      "reason": "Le serveur MCP n'a aucun accès à la machine, au terminal ou à Ollama."
+    },
+    {
+      "id": "negative-03-missing-profile",
+      "prompt": "Dis-moi quelle IA locale installer sur mon PC.",
+      "expectedBehavior": "Demander au minimum CPU, RAM, GPU et VRAM avant d'appeler l'outil de compatibilité.",
+      "reason": "Une recommandation sans caractéristiques obligatoires fabriquerait une compatibilité."
+    }
+  ]
+}

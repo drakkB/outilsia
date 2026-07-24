@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Confidentialité du connecteur OutilsIA pour ChatGPT</title>
+  <meta name="description" content="Données reçues, finalités, destinataires, durées de conservation et contrôles du connecteur MCP OutilsIA pour ChatGPT.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://outilsia.fr/confidentialite-plugin-outilsia">
+  <link rel="stylesheet" href="/static/css/outilsia-chatgpt-app.css">
+</head>
+<body>
+  <a class="skip" href="#contenu">Aller au contenu</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/">Outils<span>IA</span></a>
+      <nav class="nav" aria-label="Navigation"><a href="/chatgpt-ia-locale">Connecteur ChatGPT</a><a href="/support-plugin-outilsia">Support</a></nav>
+    </div>
+  </header>
+  <main id="contenu">
+    <header class="legal-head">
+      <div class="wrap">
+        <span class="eyebrow">Politique dédiée au connecteur MCP</span>
+        <h1>Confidentialité du connecteur OutilsIA pour ChatGPT</h1>
+        <p>Version du 25 juillet 2026. Cette page complète la <a href="/politique-confidentialite">politique générale OutilsIA.fr</a> pour le serveur MCP accessible sur <span class="endpoint">https://outilsia.fr/mcp</span>.</p>
+      </div>
+    </header>
+    <div class="wrap legal-main">
+      <section class="legal-section">
+        <div class="notice"><strong>L'essentiel</strong><p>Le connecteur est sans compte et en lecture seule. Il reçoit uniquement les arguments d'outil nécessaires, ne reçoit pas l'intégralité de la conversation ChatGPT, ne scanne pas le PC et ne conserve pas les profils matériels ou résultats dans une base propre au connecteur.</p></div>
+      </section>
+
+      <section class="legal-section">
+        <h2>1. Responsable et périmètre</h2>
+        <p>Le service est édité par OutilsIA.fr. Les coordonnées du responsable et les droits RGPD figurent dans les <a href="/mentions-legales">mentions légales</a> et la <a href="/politique-confidentialite">politique générale</a>.</p>
+        <p>Cette politique couvre les quatre outils MCP OutilsIA : vérification d'un profil PC, analyse d'un rapport partagé, simulation d'upgrade et rendu de la fiche visuelle.</p>
+      </section>
+
+      <section class="legal-section">
+        <h2>2. Données traitées</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Cas</th><th>Données reçues</th><th>Finalité</th></tr></thead>
+            <tbody>
+              <tr><td>Profil déclaré</td><td>CPU, nombre de cœurs facultatif, RAM, GPU, fabricant facultatif, VRAM, mémoire unifiée facultative, stockage libre facultatif, OS facultatif et usage recherché.</td><td>Calculer une compatibilité et classer des modèles locaux.</td></tr>
+              <tr><td>Rapport partagé</td><td>URL publique exacte <span class="endpoint">outilsia.fr/r/…</span>, matériel anonymisé, modèles installés/compatibles et benchmark seulement s'il existe dans le rapport.</td><td>Relire une preuve créée volontairement dans Local Cockpit.</td></tr>
+              <tr><td>Simulation</td><td>Le même profil, plus une cible RAM et/ou VRAM supérieure.</td><td>Comparer les capacités avant/après sans modifier la machine.</td></tr>
+              <tr><td>Protection du service</td><td>Adresse réseau immédiatement transformée en identifiant SHA-256 salé et éphémère.</td><td>Limiter le nombre de requêtes par minute et prévenir les abus.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="legal-section">
+        <h2>3. Données non reçues par le connecteur</h2>
+        <ul>
+          <li>Aucun accès aux documents, photos, emails, mots de passe, cookies, historique web ou clés API du PC.</li>
+          <li>Aucun accès direct à Ollama, au terminal, à WSL, aux pilotes ou au système de fichiers.</li>
+          <li>Aucun numéro de carte bancaire, donnée de paiement ou achat.</li>
+          <li>Aucun identifiant de compte OutilsIA dans la réponse publique d'un rapport.</li>
+          <li>Aucun prompt privé ou réponse brute de modèle local dans les exports analysés par cette v1.</li>
+        </ul>
+      </section>
+
+      <section class="legal-section">
+        <h2>4. Destinataires et échanges</h2>
+        <p>Les arguments nécessaires sont transmis par l'hôte ChatGPT au serveur MCP OutilsIA. Le résultat structuré est renvoyé à ChatGPT afin de produire la réponse et la fiche visuelle. OpenAI traite la conversation et les appels d'outils selon les conditions associées au compte de l'utilisateur.</p>
+        <p>Le serveur OutilsIA appelle uniquement les API publiques ou déterministes d'OutilsIA.fr. Le widget n'intègre ni publicité, ni iframe, ni script de mesure d'audience tiers.</p>
+      </section>
+
+      <section class="legal-section">
+        <h2>5. Conservation</h2>
+        <ul>
+          <li><strong>Profils, simulations et résultats MCP :</strong> aucune conservation dans une base du connecteur ; traitement le temps de la requête.</li>
+          <li><strong>Limitation d'abus :</strong> identifiant réseau haché conservé en mémoire pour la minute en cours, puis éliminé lors du renouvellement/nettoyage ; jamais écrit par le code du connecteur.</li>
+          <li><strong>Logs d'infrastructure :</strong> les journaux de sécurité du site peuvent contenir IP, URL, user-agent et horodatage, au maximum six mois selon la politique générale.</li>
+          <li><strong>Rapport partagé :</strong> il reste disponible tant que la machine correspondante existe dans le compte OutilsIA. Supprimer la machine supprime aussi ses liens de partage.</li>
+        </ul>
+      </section>
+
+      <section class="legal-section">
+        <h2>6. Base légale et contrôles</h2>
+        <p>Le traitement du profil ou du rapport est nécessaire à l'exécution du service demandé. La prévention des abus repose sur l'intérêt légitime à maintenir un service disponible et sécurisé.</p>
+        <ul>
+          <li>Ne partagez pas une URL de rapport si vous ne souhaitez pas rendre son diagnostic accessible aux détenteurs du lien.</li>
+          <li>Supprimez la machine depuis votre compte OutilsIA pour désactiver ses rapports partagés.</li>
+          <li>Retirez le connecteur depuis ChatGPT pour ne plus l'utiliser.</li>
+          <li>Exercez vos droits ou signalez un incident via la page <a href="/contact">Contact</a>.</li>
+        </ul>
+      </section>
+
+      <section class="legal-section">
+        <h2>7. Sécurité et limites</h2>
+        <p>Les entrées sont validées par schéma, les URL de rapport étrangères sont refusées, les outils sont déclarés en lecture seule et l'endpoint public est limité en débit. Ces mesures réduisent les risques mais ne constituent pas une garantie absolue d'indisponibilité ou d'incident.</p>
+        <p>Cette politique sera mise à jour si le connecteur ajoute une authentification, des actions d'écriture, de nouvelles données ou un nouveau sous-traitant.</p>
+      </section>
+    </div>
+  </main>
+  <footer class="footer"><div class="wrap"><strong>OutilsIA.fr</strong><div class="footer-links"><a href="/chatgpt-ia-locale">Connecteur</a><a href="/conditions-plugin-outilsia">Conditions</a><a href="/support-plugin-outilsia">Support</a><a href="/politique-confidentialite">Politique générale</a></div></div></footer>
+</body>
+</html>

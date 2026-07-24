@@ -1,0 +1,34 @@
+{
+  "check_pc_for_local_ai": {
+    "readOnlyHint": true,
+    "readOnlyJustification": "L'outil envoie un profil matériel explicitement fourni à l'API déterministe de compatibilité et retourne un calcul. Il ne crée, ne modifie et ne supprime aucune donnée ou ressource.",
+    "openWorldHint": false,
+    "openWorldJustification": "L'outil n'écrit dans aucun système public ou tiers. Il effectue seulement une lecture/calcul sur l'infrastructure OutilsIA.",
+    "destructiveHint": false,
+    "destructiveJustification": "Aucune suppression, installation, commande, transaction ou action irréversible n'est possible."
+  },
+  "analyze_shared_report": {
+    "readOnlyHint": true,
+    "readOnlyJustification": "L'outil lit un rapport public OutilsIA déjà créé par l'utilisateur. Il n'altère ni le rapport, ni la machine, ni le compte.",
+    "openWorldHint": false,
+    "openWorldJustification": "La lecture d'une URL outilsia.fr/r/ existante ne publie, n'envoie et ne modifie aucun contenu externe.",
+    "destructiveHint": false,
+    "destructiveJustification": "L'outil ne peut pas révoquer, supprimer ou écraser un rapport ou une machine."
+  },
+  "simulate_hardware_upgrade": {
+    "readOnlyHint": true,
+    "readOnlyJustification": "L'outil calcule deux compatibilités en mémoire et compare les résultats. La RAM et la VRAM cibles sont hypothétiques.",
+    "openWorldHint": false,
+    "openWorldJustification": "La simulation ne commande aucun produit, ne modifie aucun profil persistant et ne déclenche aucune action externe.",
+    "destructiveHint": false,
+    "destructiveJustification": "Aucun achat, changement matériel, téléchargement ou écriture n'est effectué."
+  },
+  "render_machine_cockpit": {
+    "readOnlyHint": true,
+    "readOnlyJustification": "L'outil affiche une décision déjà produite sans la recalculer ni la sauvegarder.",
+    "openWorldHint": false,
+    "openWorldJustification": "Le rendu est local à l'interface ChatGPT et n'affecte aucun système public.",
+    "destructiveHint": false,
+    "destructiveJustification": "L'outil ne dispose d'aucune opération d'écriture ou d'action irréversible."
+  }
+}
