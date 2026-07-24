@@ -7,6 +7,7 @@ mod forgebench_candidate;
 mod forgebench_hidden;
 mod forgebench_isolation;
 mod forgebench_runner;
+mod forgebench_runtime;
 mod forgebench_sandbox;
 mod forgebench_vault;
 mod local_capability_bridge;
@@ -21,6 +22,7 @@ use forgebench::compile_forgebench_experiment;
 use forgebench_candidate::run_forgebench_ollama_candidate;
 use forgebench_isolation::probe_forgebench_isolation;
 use forgebench_runner::run_forgebench_reference_pilot;
+use forgebench_runtime::probe_forgebench_runtime;
 use forgebench_sandbox::{
     clear_forgebench_worker_sandbox, get_forgebench_worker_sandbox_status,
     prepare_forgebench_worker_sandbox,
@@ -5179,6 +5181,7 @@ pub fn run() {
             get_forgebench_worker_sandbox_status,
             clear_forgebench_worker_sandbox,
             probe_forgebench_isolation,
+            probe_forgebench_runtime,
             run_forgebench_reference_pilot,
             run_forgebench_ollama_candidate,
             start_local_capability_bridge,

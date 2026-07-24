@@ -131,7 +131,7 @@ for (const marker of [
   if (!referenceSource.includes(marker)) throw new Error(`visible reference marker missing: ${marker}`);
 }
 
-const rust = ["forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_hidden.rs", "forgebench_candidate.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
+const rust = ["forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runtime.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_hidden.rs", "forgebench_candidate.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri", "src", name), "utf8"))
   .join("\n");
 const js = readFileSync(resolve(root, "src", "app.js"), "utf8");
@@ -160,6 +160,11 @@ for (const needle of [
   "outilsia.forgebench_isolation_probe_result.v1",
   "BWRAP_CANARY_SCRIPT",
   '"worker_command_executed": false',
+  "outilsia.forgebench_runtime_probe_result.v1",
+  "npx --yes playwright install --with-deps chromium",
+  '"installation_started": false',
+  '"network_request_attempted": false',
+  '"paths_returned": false',
   "outilsia.forgebench_reference_pilot_result.v1",
   "deterministic_reference_fixture",
   "deterministic_visible_gate",
@@ -213,6 +218,9 @@ for (const needle of [
   "processus, réseau et accès au vault non isolés",
   "canari isolé vérifié",
   "pilote technique séparé disponible",
+  "Chromium vérifié",
+  "aucune installation lancée par OutilsIA",
+  "La commande reste inactive tant que vous ne la collez pas vous-même",
   "Worker de référence réussi · évaluateur indépendant 6/6",
   "Aucun Codex, Claude, Hermes ou modèle local exécuté",
   "holdout vérifié",

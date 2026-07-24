@@ -93,6 +93,21 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     for forbidden in ["workspace_relative", "hidden_seeds", "/home/", "C:\\Users\\"]:
         if forbidden in isolation_json:
             raise AssertionError(f"{label}: isolation result leaked {forbidden!r}")
+    runtime = proof["runtime"]
+    if runtime["schema"] != "outilsia.forgebench_runtime_probe_result.v1":
+        raise AssertionError(f"{label}: Chromium runtime schema mismatch")
+    if runtime["readiness"]["runtime_ready"] is not True or runtime["readiness"]["scientific_eligible"] is not False:
+        raise AssertionError(f"{label}: Chromium runtime readiness mismatch")
+    if runtime["requirements"]["chromium"]["launch_canary_passed"] is not True:
+        raise AssertionError(f"{label}: Chromium launch canary missing")
+    if runtime["security"]["installation_started"] is not False or runtime["security"]["network_request_attempted"] is not False:
+        raise AssertionError(f"{label}: Chromium probe claims an install or network request")
+    runtime_json = json.dumps(runtime, sort_keys=True)
+    for forbidden in ["browser_path", "executable_path", "/home/", "C:\\Users\\"]:
+        if forbidden in runtime_json:
+            raise AssertionError(f"{label}: Chromium runtime result leaked {forbidden!r}")
+    if page.locator("#copyForgeBenchRuntimeCommandBtn").is_visible():
+        raise AssertionError(f"{label}: install command is visible even though Chromium is ready")
     pilot = proof["pilot"]
     if pilot["schema"] != "outilsia.forgebench_reference_pilot_result.v1":
         raise AssertionError(f"{label}: reference pilot schema mismatch")
@@ -192,6 +207,12 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         "Namespaces utilisateur, montage, réseau et processus séparés",
         "aucun worker lancé",
         "pilote technique séparé disponible",
+        "Chromium isolé",
+        "Chromium vérifié",
+        "Chromium headless démarre dans Linux",
+        "cache Playwright",
+        "réseau isolé par Bubblewrap",
+        "aucune installation lancée par OutilsIA",
         "Pilote d'exécution",
         "transport isolé vérifié",
         "Worker de référence réussi · évaluateur indépendant 6/6",
@@ -214,6 +235,19 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     for forbidden in ["Projet tres secret", "api_key", "Bearer ", "/home/", "C:\\Users\\"]:
         if forbidden in text or forbidden in proof["markdown"]:
             raise AssertionError(f"{label}: private value rendered {forbidden!r}")
+    missing_runtime = page.evaluate("() => window.__OUTILSIA_TEST__.applyForgeBenchRuntimeMissingState()")
+    if missing_runtime["state"] != "installation guidée":
+        raise AssertionError(f"{label}: missing Chromium state is unclear {missing_runtime}")
+    if missing_runtime["copyVisible"] is not True or missing_runtime["candidateDisabled"] is not True:
+        raise AssertionError(f"{label}: missing Chromium guidance or execution gate failed {missing_runtime}")
+    if "Vérifier Chromium dans le runtime isolé" not in missing_runtime["arenaMissing"]:
+        raise AssertionError(f"{label}: Workstack Arena ignores missing Chromium {missing_runtime}")
+    if "La commande reste inactive tant que vous ne la collez pas vous-même" not in missing_runtime["panel"]:
+        raise AssertionError(f"{label}: explicit-install boundary missing {missing_runtime}")
+    if missing_runtime["executionTone"] != "action" or "à préparer" not in missing_runtime["executionSummary"]:
+        raise AssertionError(f"{label}: collapsed ForgeBench summary hides missing Chromium {missing_runtime}")
+    page.evaluate("() => window.__OUTILSIA_TEST__.applyForgeBenchState()")
+    page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceSection('workflows', '.forgebench-panel')")
 
     overflow = page.evaluate(
         """() => ({

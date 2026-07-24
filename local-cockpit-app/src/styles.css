@@ -3723,6 +3723,7 @@ dd {
 .forgebench-vault,
 .forgebench-sandbox,
 .forgebench-isolation,
+.forgebench-runtime,
 .forgebench-runner,
 .forgebench-candidate {
   background: rgba(13, 20, 24, 0.82);
@@ -3743,6 +3744,14 @@ dd {
   margin-top: 4px;
 }
 
+.forgebench-runtime {
+  border-color: rgba(91, 241, 205, 0.26);
+}
+
+#copyForgeBenchRuntimeCommandBtn[hidden] {
+  display: none;
+}
+
 .forgebench-runner {
   border-color: rgba(240, 138, 83, 0.28);
 }
@@ -3754,6 +3763,7 @@ dd {
 .forgebench-vault-heading,
 .forgebench-sandbox-heading,
 .forgebench-isolation-heading,
+.forgebench-runtime-heading,
 .forgebench-runner-heading,
 .forgebench-candidate-heading {
   align-items: center;
@@ -3765,6 +3775,7 @@ dd {
 .forgebench-vault-heading span,
 .forgebench-sandbox-heading span,
 .forgebench-isolation-heading span,
+.forgebench-runtime-heading span,
 .forgebench-runner-heading span,
 .forgebench-candidate-heading span,
 .forgebench-vault-box span,
@@ -3773,6 +3784,8 @@ dd {
 .forgebench-sandbox-box small,
 .forgebench-isolation-box span,
 .forgebench-isolation-box small,
+.forgebench-runtime-box span,
+.forgebench-runtime-box small,
 .forgebench-runner-box span,
 .forgebench-runner-box small,
 .forgebench-candidate-box span,
@@ -3785,6 +3798,7 @@ dd {
 .forgebench-vault-box,
 .forgebench-sandbox-box,
 .forgebench-isolation-box,
+.forgebench-runtime-box,
 .forgebench-runner-box,
 .forgebench-candidate-box {
   display: grid;
@@ -3798,6 +3812,8 @@ dd {
 .forgebench-sandbox-box small,
 .forgebench-isolation-box span,
 .forgebench-isolation-box small,
+.forgebench-runtime-box span,
+.forgebench-runtime-box small,
 .forgebench-runner-box span,
 .forgebench-runner-box small,
 .forgebench-candidate-box span,

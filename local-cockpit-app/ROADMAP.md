@@ -29,7 +29,7 @@ L'application reste centrée sur le diagnostic, l'installation consentie, la mes
 - [x] Commencer les titres de modules par l'action compréhensible et conserver le nom technique en sous-titre pour les preuves et les exports.
 - [x] Remplacer les états avant scan par un prérequis explicite et une commande **Analyser ce PC**, sans donnée avancée prématurée.
 - [x] Transformer l'échec d'analyse en parcours de reprise visible, sans exposer de chemin personnel dans l'interface.
-- [x] Replier les cinq étapes techniques de ForgeBench tout en gardant leur synthèse et leur état accessibles.
+- [x] Replier les six étapes techniques de ForgeBench tout en gardant leur synthèse et leur état accessibles.
 - [x] Garantir des cibles tactiles d'au moins 44 px, un focus clavier visible, des statuts mobiles non tronqués et un contraste lisible au survol.
 - [x] Faire du Bilan machine la première vue Accueil et replier les preuves secondaires du choix de modèle et du Hardware Doctor.
 - [x] Ouvrir Atelier IA sur Composer le plan, Compte sur la sauvegarde et placer les actions modèles avant Force/Usage/Limite.
@@ -283,6 +283,8 @@ Revue humaine du reçu v0 implémentée dans les sources le 14 juillet 2026, san
 
 Holdout Ollama v1 implémenté dans les sources le 15 juillet 2026, sans publication : le candidat termine sa génération, sa soumission est gelée et les 39 contrôles visibles passent avant toute lecture du vault. Un second processus bubblewrap/Chromium reçoit ensuite cinq seeds comme entrées runtime et vérifie cinq familles de holdout sur desktop et Android. Le vault n'est pas monté ; seeds, identifiants privés, observations, DOM et captures ne sortent pas. Cette preuve reste non scientifique parce que les familles de checks sont publiques dans le code, le vault n'est ni chiffré ni inaccessible aux processus du même compte, les candidats pairs n'ont pas tourné et l'énergie n'est pas mesurée.
 
+Préflight Chromium guidé v1 implémenté dans les sources le 24 juillet 2026, sans publication : après un canari Bubblewrap valide, OutilsIA lance une page headless minimale dans le runtime Linux ou WSL sans réseau, ne retourne aucun chemin et n'exécute aucun worker. Si Chromium manque, l'app distingue `npx`, Playwright Python ou l'absence d'installateur compatible, puis propose au maximum une commande Playwright bornée à copier. Aucun téléchargement, réseau ou privilège n'est déclenché par le préflight ; les candidats Ollama et Codex restent bloqués tant que le canari navigateur n'est pas vert.
+
 - [x] Détecter les CLI officielles par commande de version bornée, sans retourner leur chemin.
 - [x] Distinguer Windows natif, Linux natif, WSL par défaut, Ollama natif et Ollama WSL.
 - [x] Router par capacités et type de mission sans verrouiller la proposition sur une marque.
@@ -329,7 +331,7 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Exécuter le code candidat dans Chromium réellement isolé par bubblewrap, avec tests visibles et captures éphémères, avant toute affirmation de gameplay visible.
 - [x] Lancer Codex CLI en session éphémère sur la seule tâche Signal Maze publique, avec un essai borné, contrôle de la taille de sortie, vérification des références amont et suppression obligatoire du workspace.
 - [x] Afficher le reçu Codex desktop/mobile : worker invoqué, structure `7/7`, gameplay `39/39`, coût inconnu, absence de livraison et gate humaine.
-- [ ] Fournir un préflight/installateur guidé de Chromium dans Linux/WSL sans installation silencieuse ni élargissement du réseau du worker.
+- [x] Fournir un préflight/installateur guidé de Chromium dans Linux/WSL sans installation silencieuse ni élargissement du réseau du worker.
 - [ ] Généraliser les adaptateurs CLI au-delà du pilote Codex public sans élargir implicitement réseau, credentials, accès dépôt ou budget.
 - [x] Construire un évaluateur holdout Ollama séparé capable de consommer les seeds privés après gel du code sans les révéler au worker ni les retourner.
 - [ ] Remplacer les familles publiques et le vault même-utilisateur par une isolation et une politique de secret suffisantes avant toute affirmation scientifique.

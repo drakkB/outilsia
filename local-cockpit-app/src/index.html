@@ -513,9 +513,9 @@
             <summary>
               <span>
                 <strong>Préparation sécurisée et exécution</strong>
-                <small>Coffre local, espaces isolés, pilote puis candidat</small>
+                <small>Coffre, isolation, Chromium, pilote puis candidat</small>
               </span>
-              <span id="forgeBenchExecutionSummary">5 étapes avancées</span>
+              <span id="forgeBenchExecutionSummary">6 étapes avancées</span>
             </summary>
             <div class="forgebench-execution-body">
           <div class="forgebench-vault">
@@ -556,6 +556,19 @@
             </div>
             <div class="row-actions">
               <button id="probeForgeBenchIsolationBtn" type="button" disabled>Tester l'isolation</button>
+            </div>
+          </div>
+          <div class="forgebench-runtime">
+            <div class="forgebench-runtime-heading">
+              <strong>Chromium isolé</strong>
+              <span id="forgeBenchRuntimeState">isolation requise</span>
+            </div>
+            <div id="forgeBenchRuntimeBox" class="forgebench-runtime-box empty">
+              Vérifie que Chromium démarre réellement dans Linux ou WSL sans réseau avant tout code candidat.
+            </div>
+            <div class="row-actions">
+              <button id="probeForgeBenchRuntimeBtn" type="button" disabled>Vérifier Chromium</button>
+              <button id="copyForgeBenchRuntimeCommandBtn" type="button" hidden>Copier la commande</button>
             </div>
           </div>
           <div class="forgebench-runner">

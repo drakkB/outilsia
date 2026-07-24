@@ -64,6 +64,7 @@ const state = {
   forgeBenchHiddenSuite: null,
   forgeBenchWorkerSandbox: null,
   forgeBenchIsolation: null,
+  forgeBenchRuntime: null,
   forgeBenchReferencePilot: null,
   forgeBenchOllamaCandidate: null,
   evidenceLedger: null,
@@ -126,6 +127,8 @@ const FORGEBENCH_WORKER_SANDBOX_STATUS_SCHEMA = "outilsia.forgebench_worker_sand
 const FORGEBENCH_WORKER_SANDBOX_RECEIPT_SCHEMA = "outilsia.forgebench_worker_sandbox_receipt.v1";
 const FORGEBENCH_ISOLATION_PROBE_REQUEST_SCHEMA = "outilsia.forgebench_isolation_probe_request.v1";
 const FORGEBENCH_ISOLATION_PROBE_RESULT_SCHEMA = "outilsia.forgebench_isolation_probe_result.v1";
+const FORGEBENCH_RUNTIME_PROBE_REQUEST_SCHEMA = "outilsia.forgebench_runtime_probe_request.v1";
+const FORGEBENCH_RUNTIME_PROBE_RESULT_SCHEMA = "outilsia.forgebench_runtime_probe_result.v1";
 const FORGEBENCH_REFERENCE_PILOT_REQUEST_SCHEMA = "outilsia.forgebench_reference_pilot_request.v1";
 const FORGEBENCH_REFERENCE_PILOT_RESULT_SCHEMA = "outilsia.forgebench_reference_pilot_result.v1";
 const FORGEBENCH_OLLAMA_CANDIDATE_REQUEST_SCHEMA = "outilsia.forgebench_ollama_candidate_request.v3";
@@ -530,6 +533,10 @@ const els = {
   forgeBenchIsolationState: $("forgeBenchIsolationState"),
   forgeBenchIsolationBox: $("forgeBenchIsolationBox"),
   probeForgeBenchIsolationBtn: $("probeForgeBenchIsolationBtn"),
+  forgeBenchRuntimeState: $("forgeBenchRuntimeState"),
+  forgeBenchRuntimeBox: $("forgeBenchRuntimeBox"),
+  probeForgeBenchRuntimeBtn: $("probeForgeBenchRuntimeBtn"),
+  copyForgeBenchRuntimeCommandBtn: $("copyForgeBenchRuntimeCommandBtn"),
   forgeBenchRunnerState: $("forgeBenchRunnerState"),
   forgeBenchRunnerBox: $("forgeBenchRunnerBox"),
   runForgeBenchPilotBtn: $("runForgeBenchPilotBtn"),
@@ -718,6 +725,8 @@ let forgeBenchSandboxBusy = false;
 let forgeBenchSandboxError = "";
 let forgeBenchIsolationBusy = false;
 let forgeBenchIsolationError = "";
+let forgeBenchRuntimeBusy = false;
+let forgeBenchRuntimeError = "";
 let forgeBenchRunnerBusy = false;
 let forgeBenchRunnerError = "";
 let forgeBenchCandidateBusy = false;
@@ -956,12 +965,14 @@ function syncForgeBenchExecutionSummary() {
     els.forgeBenchVaultState,
     els.forgeBenchSandboxState,
     els.forgeBenchIsolationState,
+    els.forgeBenchRuntimeState,
     els.forgeBenchRunnerState,
     els.forgeBenchCandidateState
   ].map((node) => String(node?.textContent || "").trim().toLocaleLowerCase("fr"));
   const errors = statuses.filter((value) => /refusé|erreur|indisponible|ancien/.test(value)).length;
   const busy = statuses.filter((value) => /en cours|opération|préparation locale|génération locale|génération puis holdout/.test(value)).length;
-  const verified = statuses.filter((value) => /scellée localement|workspaces vérifiés|canari isolé vérifié|transport isolé vérifié|gameplay visible vérifié|holdout vérifié/.test(value)).length;
+  const verified = statuses.filter((value) => /scellée localement|workspaces vérifiés|canari isolé vérifié|chromium vérifié|transport isolé vérifié|gameplay visible vérifié|holdout vérifié/.test(value)).length;
+  const pending = statuses.filter((value) => /requis|à vérifier|à tester|installation guidée|non vérifié|non préparé|non scellé/.test(value)).length;
   if (errors) {
     els.forgeBenchExecutionSummary.textContent = `${errors} étape${errors > 1 ? "s" : ""} à corriger`;
     els.forgeBenchExecutionSummary.dataset.statusTone = "error";
@@ -972,9 +983,14 @@ function syncForgeBenchExecutionSummary() {
     els.forgeBenchExecutionSummary.dataset.statusTone = "action";
     return;
   }
+  if (pending && verified) {
+    els.forgeBenchExecutionSummary.textContent = `${verified}/6 vérifiées · ${pending} à préparer`;
+    els.forgeBenchExecutionSummary.dataset.statusTone = "action";
+    return;
+  }
   els.forgeBenchExecutionSummary.textContent = verified
-    ? `${verified}/5 étapes vérifiées`
-    : "5 étapes avancées";
+    ? `${verified}/6 étapes vérifiées`
+    : "6 étapes avancées";
   els.forgeBenchExecutionSummary.dataset.statusTone = verified ? "ready" : "neutral";
 }
 
@@ -12656,12 +12672,15 @@ async function probeForgeBenchIsolation() {
   forgeBenchIsolationBusy = true;
   forgeBenchIsolationError = "";
   state.forgeBenchIsolation = null;
+  state.forgeBenchRuntime = null;
   state.forgeBenchReferencePilot = null;
   state.forgeBenchOllamaCandidate = null;
   clearWorkstackArena(true);
+  forgeBenchRuntimeError = "";
   forgeBenchRunnerError = "";
   forgeBenchCandidateError = "";
   renderForgeBenchIsolationPanel();
+  renderForgeBenchRuntimePanel();
   renderForgeBenchRunnerPanel();
   renderForgeBenchCandidatePanel();
   setStatus("Test du backend d'isolation ForgeBench...");
@@ -12686,9 +12705,168 @@ async function probeForgeBenchIsolation() {
   } finally {
     forgeBenchIsolationBusy = false;
     renderForgeBenchIsolationPanel();
+    renderForgeBenchRuntimePanel();
     renderForgeBenchRunnerPanel();
     renderForgeBenchCandidatePanel();
     renderWorkstackArenaPanel();
+  }
+}
+
+function forgeBenchRuntimeReasonLabel(code) {
+  return ({
+    chromium_runtime_missing: "Chromium absent dans Linux/WSL",
+    bubblewrap_missing: "Bubblewrap absent dans Linux/WSL",
+    chromium_probe_timed_out: "le test Chromium a expiré",
+    chromium_launch_canary_failed: "Chromium est présent mais son démarrage isolé a échoué"
+  })[String(code || "")] || "runtime Chromium non vérifié";
+}
+
+function forgeBenchRuntimeResult(result = state.forgeBenchRuntime) {
+  const isolation = forgeBenchIsolationResult();
+  const runtimeReady = result?.readiness?.runtime_ready === true;
+  const blockers = Array.isArray(result?.readiness?.blockers) ? result.readiness.blockers : [];
+  const guidanceMode = String(result?.guidance?.mode || "");
+  const command = result?.guidance?.command;
+  const allowedCommands = [
+    "npx --yes playwright install --with-deps chromium",
+    "python3 -m playwright install --with-deps chromium"
+  ];
+  if (
+    result?.schema !== FORGEBENCH_RUNTIME_PROBE_RESULT_SCHEMA
+    || !isolation
+    || result?.selected_backend !== isolation.selected_backend
+    || result?.isolation_ref?.integrity_digest !== isolation.integrity?.digest
+    || result?.isolation_ref?.backend_ready !== true
+    || !/^[a-f0-9]{64}$/i.test(String(result?.integrity?.digest || ""))
+    || result?.requirements?.bubblewrap?.ready !== true
+    || result?.requirements?.chromium?.family !== "chromium"
+    || result?.requirements?.chromium?.launch_canary_passed !== runtimeReady
+    || result?.readiness?.browser_runtime_ready !== runtimeReady
+    || result?.readiness?.worker_browser_execution_ready !== runtimeReady
+    || result?.readiness?.scientific_eligible !== false
+    || result?.security?.probe_attempted !== true
+    || result?.security?.browser_launch_attempted !== true
+    || result?.security?.browser_launch_canary_succeeded !== runtimeReady
+    || result?.security?.installation_started !== false
+    || result?.security?.network_request_attempted !== false
+    || result?.security?.worker_started !== false
+    || result?.security?.credentials_read !== false
+    || result?.security?.paths_returned !== false
+    || result?.security?.raw_browser_output_returned !== false
+    || !["none", "copy_command", "manual"].includes(guidanceMode)
+    || result?.guidance?.requires_user_confirmation !== true
+    || (runtimeReady && (blockers.length !== 0 || guidanceMode !== "none" || command != null))
+    || (!runtimeReady && (
+      blockers.length !== 1
+      || !["chromium_runtime_missing", "bubblewrap_missing", "chromium_probe_timed_out", "chromium_launch_canary_failed"].includes(blockers[0])
+      || guidanceMode === "none"
+    ))
+    || (guidanceMode === "copy_command" && !allowedCommands.includes(String(command || "")))
+    || (guidanceMode !== "copy_command" && command != null)
+  ) return null;
+  return result;
+}
+
+function renderForgeBenchRuntimePanel() {
+  if (!els.forgeBenchRuntimeBox) return;
+  const isolationReady = forgeBenchIsolationResult()?.readiness?.isolation_backend_ready === true;
+  const result = forgeBenchRuntimeResult();
+  const command = result?.guidance?.command;
+  els.probeForgeBenchRuntimeBtn.disabled = !invoke || forgeBenchRuntimeBusy || !isolationReady;
+  els.copyForgeBenchRuntimeCommandBtn.hidden = !command;
+  els.copyForgeBenchRuntimeCommandBtn.disabled = forgeBenchRuntimeBusy || !command;
+  if (!invoke && !result?.test_mode) {
+    els.forgeBenchRuntimeState.textContent = "app native requise";
+    els.forgeBenchRuntimeBox.className = "forgebench-runtime-box empty";
+    els.forgeBenchRuntimeBox.textContent = "Le test Chromium isolé nécessite l'application Windows/Linux.";
+    return;
+  }
+  if (forgeBenchRuntimeBusy) {
+    els.forgeBenchRuntimeState.textContent = "test Chromium en cours";
+    els.forgeBenchRuntimeBox.className = "forgebench-runtime-box empty";
+    els.forgeBenchRuntimeBox.textContent = "Lancement d'une page minimale dans Chromium headless sous Bubblewrap, sans réseau ni code candidat.";
+    return;
+  }
+  if (forgeBenchRuntimeError) {
+    els.forgeBenchRuntimeState.textContent = "préflight refusé";
+    els.forgeBenchRuntimeBox.className = "forgebench-runtime-box empty";
+    els.forgeBenchRuntimeBox.innerHTML = `<strong>Runtime non vérifié</strong><span>${escapeHtml(forgeBenchRuntimeError)}</span>`;
+    return;
+  }
+  if (!result) {
+    els.forgeBenchRuntimeState.textContent = isolationReady ? "à vérifier" : "isolation requise";
+    els.forgeBenchRuntimeBox.className = "forgebench-runtime-box empty";
+    els.forgeBenchRuntimeBox.textContent = isolationReady
+      ? "Vérifie maintenant que Chromium démarre réellement dans le runtime isolé."
+      : "Teste d'abord l'isolation Bubblewrap sous Linux ou WSL.";
+    return;
+  }
+  const ready = result.readiness.runtime_ready === true;
+  els.forgeBenchRuntimeState.textContent = ready ? "Chromium vérifié" : "installation guidée";
+  els.forgeBenchRuntimeBox.className = `forgebench-runtime-box${ready ? "" : " empty"}`;
+  if (ready) {
+    const origin = result.requirements.chromium.origin === "playwright_cache" ? "cache Playwright" : "installation système";
+    const duration = Number(result.requirements.chromium.duration_ms || 0);
+    els.forgeBenchRuntimeBox.innerHTML = `
+      <strong>Chromium headless démarre dans ${escapeHtml(result.target_environment === "wsl_default" ? "WSL" : "Linux")}</strong>
+      <span>${escapeHtml(origin)} · canari ${escapeHtml(duration)} ms · réseau isolé par Bubblewrap</span>
+      <small>Aucun worker, secret ou dépôt utilisateur transmis · aucune installation lancée par OutilsIA</small>
+    `;
+    return;
+  }
+  const reason = forgeBenchRuntimeReasonLabel(result.readiness.blockers[0]);
+  els.forgeBenchRuntimeBox.innerHTML = `
+    <strong>${escapeHtml(reason)}</strong>
+    <span>${escapeHtml(result.guidance.detail || "Installe Chromium dans Linux/WSL puis relance ce contrôle.")}</span>
+    <small>${command ? "La commande reste inactive tant que vous ne la collez pas vous-même dans le terminal." : "Aucune commande automatique n'est lancée. Installez d'abord un outil Playwright pris en charge."}</small>
+  `;
+}
+
+async function probeForgeBenchRuntime() {
+  const isolation = forgeBenchIsolationResult();
+  if (!invoke || forgeBenchRuntimeBusy || isolation?.readiness?.isolation_backend_ready !== true) return null;
+  forgeBenchRuntimeBusy = true;
+  forgeBenchRuntimeError = "";
+  state.forgeBenchRuntime = null;
+  state.forgeBenchOllamaCandidate = null;
+  clearWorkstackArena(true);
+  forgeBenchCandidateError = "";
+  renderForgeBenchRuntimePanel();
+  renderForgeBenchCandidatePanel();
+  renderWorkstackArenaPanel();
+  setStatus("Vérification de Chromium dans le runtime isolé...");
+  try {
+    const result = await invoke("probe_forgebench_runtime", {
+      request: {
+        schema: FORGEBENCH_RUNTIME_PROBE_REQUEST_SCHEMA,
+        isolation_result: isolation
+      }
+    });
+    if (!forgeBenchRuntimeResult(result)) throw new Error("résultat natif du préflight Chromium non conforme");
+    state.forgeBenchRuntime = result;
+    const ready = result.readiness.runtime_ready === true;
+    setStatus(ready ? "Chromium isolé vérifié" : "Chromium doit être installé dans Linux/WSL", ready ? "ok" : "warn");
+    return result;
+  } catch (error) {
+    forgeBenchRuntimeError = String(error || "Préflight Chromium impossible");
+    setStatus(`Chromium ForgeBench : ${forgeBenchRuntimeError}`, "error");
+    return null;
+  } finally {
+    forgeBenchRuntimeBusy = false;
+    renderForgeBenchRuntimePanel();
+    renderForgeBenchCandidatePanel();
+    renderWorkstackArenaPanel();
+  }
+}
+
+async function copyForgeBenchRuntimeCommand() {
+  const command = forgeBenchRuntimeResult()?.guidance?.command;
+  if (!command) return;
+  try {
+    await navigator.clipboard.writeText(command);
+    setStatus("Commande d'installation Chromium copiée", "ok");
+  } catch (error) {
+    setStatus(`Copie de la commande impossible : ${error}`, "error");
   }
 }
 
@@ -13056,6 +13234,7 @@ function renderForgeBenchCandidatePanel() {
   const selectedId = syncForgeBenchCandidateModelControl();
   const candidate = forgeBenchExperimentOllamaCandidate();
   const isolationReady = forgeBenchIsolationResult()?.readiness?.isolation_backend_ready === true;
+  const browserRuntimeReady = forgeBenchRuntimeResult()?.readiness?.runtime_ready === true;
   const workspacesReady = forgeBenchSandboxMatchesExperiment();
   const referenceReady = Boolean(forgeBenchReferencePilotResult());
   const candidateMatches = Boolean(candidate && selectedId && candidate.candidate_id === selectedId);
@@ -13069,7 +13248,7 @@ function renderForgeBenchCandidatePanel() {
     && compiledHiddenSuite?.receipt_digest === vaultReceipt.integrity?.digest
   );
   const result = forgeBenchOllamaCandidateResult();
-  const ready = Boolean(invoke && candidateMatches && isolationReady && workspacesReady && referenceReady && hiddenSuiteReady);
+  const ready = Boolean(invoke && candidateMatches && isolationReady && browserRuntimeReady && workspacesReady && referenceReady && hiddenSuiteReady);
   els.runForgeBenchCandidateBtn.disabled = forgeBenchCandidateBusy || !ready;
   els.forgeBenchCandidateModel.disabled = forgeBenchCandidateBusy || !forgeBenchLocalModelCandidates().length;
   els.forgeBenchCandidateDuration.disabled = forgeBenchCandidateBusy;
@@ -13119,6 +13298,8 @@ function renderForgeBenchCandidatePanel() {
     els.forgeBenchCandidateBox.textContent = "Exécute d'abord le pilote technique de référence sur ce batch.";
   } else if (!hiddenSuiteReady) {
     els.forgeBenchCandidateBox.textContent = "Scelle la suite cachée puis recompile l'expérience : le reçu local doit correspondre avant tout holdout.";
+  } else if (!browserRuntimeReady) {
+    els.forgeBenchCandidateBox.textContent = "Vérifie Chromium dans le runtime isolé avant d'exécuter le code candidat.";
   } else if (!isolationReady || !workspacesReady) {
     els.forgeBenchCandidateBox.textContent = "Prépare les workspaces et vérifie l'isolation avant le candidat local.";
   } else {
@@ -13128,6 +13309,7 @@ function renderForgeBenchCandidatePanel() {
 
 async function runForgeBenchOllamaCandidate() {
   const isolation = forgeBenchIsolationResult();
+  const browserRuntime = forgeBenchRuntimeResult();
   const reference = forgeBenchReferencePilotResult();
   const candidate = forgeBenchExperimentOllamaCandidate();
   const selectedId = forgeBenchSelectedCandidateId();
@@ -13150,6 +13332,7 @@ async function runForgeBenchOllamaCandidate() {
     || !reference
     || !forgeBenchSandboxMatchesExperiment()
     || isolation?.readiness?.isolation_backend_ready !== true
+    || browserRuntime?.readiness?.runtime_ready !== true
     || !hiddenSuiteReady
     || ![180, 300, 600].includes(durationSeconds)
   ) return null;
@@ -13223,6 +13406,7 @@ function forgeBenchMarkdown(result = state.forgeBench) {
     `- Préflight scientifique : ${readiness.scientific_ready ? "prêt" : "bloqué"}`,
     `- Workspaces frais : ${forgeBenchSandboxMatchesExperiment() ? `${forgeBenchSandboxReceipt()?.workspaces_total || 0} préparés, sans exécution` : "non préparés pour ce préflight"}`,
     `- Backend d'isolation : ${forgeBenchIsolationResult()?.readiness?.isolation_backend_ready ? `${forgeBenchIsolationResult()?.selected_backend} (canari vérifié)` : "non vérifié"}`,
+    `- Chromium isolé : ${forgeBenchRuntimeResult()?.readiness?.runtime_ready ? "canari headless vérifié sans réseau" : "non vérifié"}`,
     `- Pilote technique isolé : ${forgeBenchReferencePilotResult() ? "worker de référence + évaluateur visible vérifiés" : "non exécuté"}`,
     `- Candidat Ollama local : ${localCandidate ? `${localCandidate.candidate.model_ref} généré, structure 7/7, visible 39/39, holdout 5/5` : "non exécuté"}`,
     `- Stack candidate exécutée : ${localCandidate ? "oui, adaptateur local prompt-only" : "non"}`,
@@ -13612,6 +13796,7 @@ function workstackArenaMissingSteps() {
   if (!candidateId || candidateId !== workstackArenaBoundCandidateId()) missing.push("Lier un Codex CLI disponible à la stack Codex Solo");
   if (!forgeBenchSandboxMatchesExperiment()) missing.push("Matérialiser les workspaces ForgeBench vérifiés");
   if (forgeBenchIsolationResult()?.readiness?.isolation_backend_ready !== true) missing.push("Vérifier le backend d'isolation");
+  if (forgeBenchRuntimeResult()?.readiness?.runtime_ready !== true) missing.push("Vérifier Chromium dans le runtime isolé");
   if (!forgeBenchReferencePilotResult()) missing.push("Valider le pilote technique de référence");
   if (!els.workstackArenaQuotaConsent?.checked) missing.push("Accepter le quota ou coût Codex inconnu pour ce run");
   if (!els.workstackArenaExecutionConsent?.checked) missing.push("Autoriser l'écriture et l'exécution dans le workspace jetable");
@@ -19849,6 +20034,53 @@ function installTestHarness() {
         readiness: { isolation_backend_ready: true, worker_execution_ready: false, scientific_eligible: false, blockers: ["worker_runner_not_implemented", "worker_process_not_started", "isolated_evaluator_not_implemented"] },
         integrity: { digest: "4".repeat(64) }
       };
+      state.forgeBenchRuntime = {
+        schema: FORGEBENCH_RUNTIME_PROBE_RESULT_SCHEMA,
+        contract_version: "2026-07-24",
+        probed_at_ms: Date.now(),
+        host_environment: "linux",
+        target_environment: "linux_native",
+        selected_backend: "linux-bwrap-native",
+        isolation_ref: {
+          schema: FORGEBENCH_ISOLATION_PROBE_RESULT_SCHEMA,
+          integrity_digest: "4".repeat(64),
+          backend_ready: true
+        },
+        requirements: {
+          bubblewrap: { ready: true, verified_by_isolation_canary: true },
+          chromium: { family: "chromium", launch_canary_passed: true, origin: "playwright_cache", duration_ms: 412 },
+          installer_tooling: { npx_available: true, python_playwright_available: false, distro_id: "ubuntu" }
+        },
+        readiness: {
+          runtime_ready: true,
+          browser_runtime_ready: true,
+          worker_browser_execution_ready: true,
+          scientific_eligible: false,
+          blockers: []
+        },
+        guidance: {
+          mode: "none",
+          title: "Aucune installation requise",
+          detail: "Chromium fonctionne déjà dans le runtime isolé.",
+          command: null,
+          requires_user_confirmation: true,
+          network_required_if_run: false,
+          administrator_may_be_required: false
+        },
+        security: {
+          probe_attempted: true,
+          browser_launch_attempted: true,
+          browser_launch_canary_succeeded: true,
+          installation_started: false,
+          network_request_attempted: false,
+          worker_started: false,
+          credentials_read: false,
+          paths_returned: false,
+          raw_browser_output_returned: false
+        },
+        integrity: { digest: "0".repeat(64) },
+        test_mode: true
+      };
       state.forgeBenchReferencePilot = {
         schema: FORGEBENCH_REFERENCE_PILOT_RESULT_SCHEMA,
         contract_version: "2026-07-13",
@@ -19894,6 +20126,7 @@ function installTestHarness() {
       forgeBenchVaultError = "";
       forgeBenchSandboxError = "";
       forgeBenchIsolationError = "";
+      forgeBenchRuntimeError = "";
       forgeBenchRunnerError = "";
       forgeBenchCandidateError = "";
       if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "forgebench_ollama_candidate_verified";
@@ -19901,6 +20134,7 @@ function installTestHarness() {
       renderForgeBenchPanel();
       renderForgeBenchSandboxPanel();
       renderForgeBenchIsolationPanel();
+      renderForgeBenchRuntimePanel();
       renderForgeBenchRunnerPanel();
       renderForgeBenchCandidatePanel();
       renderWorkstackArenaPanel();
@@ -19910,10 +20144,60 @@ function installTestHarness() {
         vault: state.forgeBenchHiddenSuite,
         sandbox: state.forgeBenchWorkerSandbox,
         isolation: state.forgeBenchIsolation,
+        runtime: state.forgeBenchRuntime,
         pilot: state.forgeBenchReferencePilot,
         candidate: state.forgeBenchOllamaCandidate,
         panel: els.forgeBenchBox?.textContent || "",
         markdown: forgeBenchMarkdown()
+      };
+    },
+    applyForgeBenchRuntimeMissingState() {
+      this.applyForgeBenchState();
+      state.forgeBenchRuntime = {
+        ...state.forgeBenchRuntime,
+        requirements: {
+          ...state.forgeBenchRuntime.requirements,
+          chromium: { family: "chromium", launch_canary_passed: false, origin: null, duration_ms: 0 }
+        },
+        readiness: {
+          runtime_ready: false,
+          browser_runtime_ready: false,
+          worker_browser_execution_ready: false,
+          scientific_eligible: false,
+          blockers: ["chromium_runtime_missing"]
+        },
+        guidance: {
+          mode: "copy_command",
+          title: "Chromium requis dans Linux/WSL",
+          detail: "npx est disponible dans ce runtime. La commande officielle Playwright installe Chromium et ses dépendances après votre confirmation.",
+          command: "npx --yes playwright install --with-deps chromium",
+          requires_user_confirmation: true,
+          network_required_if_run: true,
+          administrator_may_be_required: true
+        },
+        security: {
+          ...state.forgeBenchRuntime.security,
+          browser_launch_canary_succeeded: false
+        },
+        integrity: { digest: "9".repeat(64) }
+      };
+      state.forgeBenchOllamaCandidate = null;
+      state.workstackArena = null;
+      forgeBenchRuntimeError = "";
+      renderForgeBenchRuntimePanel();
+      renderForgeBenchCandidatePanel();
+      renderWorkstackArenaPanel();
+      syncForgeBenchExecutionSummary();
+      return {
+        result: state.forgeBenchRuntime,
+        state: els.forgeBenchRuntimeState?.textContent || "",
+        panel: els.forgeBenchRuntimeBox?.textContent || "",
+        copyVisible: !els.copyForgeBenchRuntimeCommandBtn?.hidden,
+        copyText: els.copyForgeBenchRuntimeCommandBtn?.textContent || "",
+        candidateDisabled: Boolean(els.runForgeBenchCandidateBtn?.disabled),
+        arenaMissing: workstackArenaMissingSteps(),
+        executionSummary: els.forgeBenchExecutionSummary?.textContent || "",
+        executionTone: els.forgeBenchExecutionSummary?.dataset?.statusTone || ""
       };
     },
     applyWorkstackArenaState() {
@@ -21439,6 +21723,8 @@ els.prepareForgeBenchSandboxBtn?.addEventListener("click", prepareForgeBenchSand
 els.refreshForgeBenchSandboxBtn?.addEventListener("click", () => loadForgeBenchSandbox(false));
 els.clearForgeBenchSandboxBtn?.addEventListener("click", clearForgeBenchSandbox);
 els.probeForgeBenchIsolationBtn?.addEventListener("click", probeForgeBenchIsolation);
+els.probeForgeBenchRuntimeBtn?.addEventListener("click", probeForgeBenchRuntime);
+els.copyForgeBenchRuntimeCommandBtn?.addEventListener("click", copyForgeBenchRuntimeCommand);
 els.runForgeBenchPilotBtn?.addEventListener("click", runForgeBenchReferencePilot);
 els.runForgeBenchCandidateBtn?.addEventListener("click", runForgeBenchOllamaCandidate);
 els.runWorkstackArenaBtn?.addEventListener("click", runWorkstackArenaCodexPilot);
@@ -21474,6 +21760,7 @@ for (const input of [els.forgeBenchBenchmark, els.forgeBenchClaimLevel, els.forg
     renderForgeBenchPanel();
     renderForgeBenchSandboxPanel();
     renderForgeBenchIsolationPanel();
+    renderForgeBenchRuntimePanel();
     renderForgeBenchRunnerPanel();
     renderForgeBenchCandidatePanel();
     renderEvidenceLedgerPanel();
@@ -21490,6 +21777,7 @@ els.forgeBenchStacks?.addEventListener("change", () => {
   renderForgeBenchPanel();
   renderForgeBenchSandboxPanel();
   renderForgeBenchIsolationPanel();
+  renderForgeBenchRuntimePanel();
   renderForgeBenchRunnerPanel();
   renderForgeBenchCandidatePanel();
   renderEvidenceLedgerPanel();
@@ -21505,6 +21793,7 @@ els.forgeBenchCandidateModel?.addEventListener("change", () => {
   renderForgeBenchPanel();
   renderForgeBenchSandboxPanel();
   renderForgeBenchIsolationPanel();
+  renderForgeBenchRuntimePanel();
   renderForgeBenchRunnerPanel();
   renderForgeBenchCandidatePanel();
   renderEvidenceLedgerPanel();
@@ -21872,6 +22161,7 @@ renderForgeBenchVaultPanel();
 renderForgeBenchPanel();
 renderForgeBenchSandboxPanel();
 renderForgeBenchIsolationPanel();
+renderForgeBenchRuntimePanel();
 renderForgeBenchRunnerPanel();
 renderForgeBenchCandidatePanel();
 renderWorkstackArenaPanel();

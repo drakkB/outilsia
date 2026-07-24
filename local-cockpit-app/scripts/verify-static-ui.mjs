@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
-const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_hidden.rs", "forgebench_candidate.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
+const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runtime.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_hidden.rs", "forgebench_candidate.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
