@@ -47,7 +47,7 @@ function negativeTest(test) {
 }
 
 const output = {
-  $schema: "https://developers.openai.com/plugins/schemas/chatgpt-app-submission.v1.json",
+  $schema: "https://developers.openai.com/apps-sdk/schemas/chatgpt-app-submission.v1.json",
   schema_version: 1,
   app_info: {
     display_name: listing.interface.displayName,

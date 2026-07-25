@@ -170,7 +170,7 @@ for (const name of TOOL_NAMES) {
 requireCondition(existsSync(importPath), "Missing chatgpt-app-submission.json.");
 const submissionImport = JSON.parse(readFileSync(importPath, "utf8"));
 requireCondition(
-  submissionImport.$schema === "https://developers.openai.com/plugins/schemas/chatgpt-app-submission.v1.json",
+  submissionImport.$schema === "https://developers.openai.com/apps-sdk/schemas/chatgpt-app-submission.v1.json",
   "Submission import uses the wrong schema URL.",
 );
 requireCondition(submissionImport.schema_version === 1, "Submission import schema_version must be 1.");
