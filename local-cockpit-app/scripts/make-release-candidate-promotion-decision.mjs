@@ -14,21 +14,46 @@ function sha256(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
-function argValue(name) {
-  const index = process.argv.indexOf(name);
-  return index === -1 ? "" : process.argv[index + 1] || "";
+function usage() {
+  console.log(`Usage:
+  node scripts/make-release-candidate-promotion-decision.mjs
+    [--candidate-dir <merged-rc>] [--registry-dir <dir>]
+    [--output <PROMOTION-DECISION.json>] [--replace]
+
+Creates a pending human-decision template. It never approves or deploys.`);
+}
+
+function parseArgs(argv) {
+  const opts = {
+    candidateDir: join(appRoot, ".artifacts", "release-candidate-merged"),
+    registryDir: join(appRoot, ".artifacts", "rc-smoke-registry"),
+    output: "",
+    replace: false,
+  };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--help" || arg === "-h") {
+      usage();
+      process.exit(0);
+    }
+    if (arg === "--candidate-dir") opts.candidateDir = resolve(argv[++index] || "");
+    else if (arg === "--registry-dir") opts.registryDir = resolve(argv[++index] || "");
+    else if (arg === "--output") opts.output = resolve(argv[++index] || "");
+    else if (arg === "--replace") opts.replace = true;
+    else fail(`Unknown argument: ${arg}`);
+  }
+  opts.output = opts.output || join(opts.registryDir, "PROMOTION-DECISION.json");
+  return opts;
 }
 
 try {
-  const candidateDir = resolve(argValue("--candidate-dir") || join(appRoot, ".artifacts", "release-candidate-merged"));
-  const registryDir = resolve(argValue("--registry-dir") || join(appRoot, ".artifacts", "rc-smoke-registry"));
-  const output = resolve(argValue("--output") || join(registryDir, "PROMOTION-DECISION.json"));
-  const candidatePath = join(candidateDir, "release-candidate.json");
-  const statusPath = join(registryDir, "RC-SMOKE-STATUS.json");
+  const opts = parseArgs(process.argv.slice(2));
+  const candidatePath = join(opts.candidateDir, "release-candidate.json");
+  const statusPath = join(opts.registryDir, "RC-SMOKE-STATUS.json");
   if (!existsSync(candidatePath)) fail(`Missing candidate manifest: ${candidatePath}`);
   if (!existsSync(statusPath)) fail(`Missing smoke status: ${statusPath}`);
-  if (existsSync(output) && !process.argv.includes("--replace")) {
-    fail(`Decision file already exists: ${output}. Pass --replace to recreate a pending template.`);
+  if (existsSync(opts.output) && !opts.replace) {
+    fail(`Decision file already exists: ${opts.output}. Pass --replace to recreate a pending template.`);
   }
   const candidate = JSON.parse(readFileSync(candidatePath, "utf8").replace(/^\uFEFF/, ""));
   const status = JSON.parse(readFileSync(statusPath, "utf8").replace(/^\uFEFF/, ""));
@@ -65,8 +90,8 @@ try {
       "Cette decision n'effectue aucun deploiement ; elle autorise seulement la preparation du pack de promotion.",
     ],
   };
-  writeFileSync(output, `${JSON.stringify(decision, null, 2)}\n`);
-  console.log(`promotion_decision_template=${output}`);
+  writeFileSync(opts.output, `${JSON.stringify(decision, null, 2)}\n`);
+  console.log(`promotion_decision_template=${opts.output}`);
   console.log(`decision=pending candidate=${candidate.label} build=${candidate.build_id}`);
   console.log(`smoke_status=${status.status} machines=${status.unique_machines}/${status.minimum_unique_machines}`);
 } catch (error) {
