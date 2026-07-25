@@ -1,6 +1,6 @@
 {
   "name": "outilsia-local-ai",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "interface": {
     "displayName": "OutilsIA Local Cockpit",
     "shortDescription": "Choisir une IA locale",
@@ -52,5 +52,5 @@
       "submission/assets/starter-03-report.png"
     ]
   },
-  "releaseNotes": "Version 0.2.1 de l'app OutilsIA en lecture seule. Le widget versionné v3 affiche désormais clairement les erreurs MCP, consomme l'enveloppe de résultat complète de ChatGPT et adapte sa hauteur au contenu. Les outils continuent d'analyser un profil déclaré, un rapport public anonymisé ou un upgrade simulé sans accès au PC, installation, achat ni tokens/s inventé."
+  "releaseNotes": "Version 0.2.2 de l'app OutilsIA en lecture seule. Le widget v3 reste la ressource officielle et le serveur conserve temporairement l'URI v2 comme alias rétrocompatible afin que les plugins développeur dont le catalogue est en cache puissent encore charger la fiche. Les outils continuent d'analyser un profil déclaré, un rapport public anonymisé ou un upgrade simulé sans accès au PC, installation, achat ni tokens/s inventé."
 }

@@ -13,8 +13,11 @@ import { z } from "zod";
 import { buildCompatibilityDecision, buildUpgradeDecision, decisionText, USAGES } from "./lib/decision.js";
 import { OutilsiaApi, OutilsiaApiError } from "./lib/outilsia-api.js";
 
-export const APP_VERSION = "0.2.1";
+export const APP_VERSION = "0.2.2";
 export const RESOURCE_URI = "ui://outilsia/machine-cockpit-v3.html";
+export const LEGACY_RESOURCE_URIS = [
+  "ui://outilsia/machine-cockpit-v2.html",
+];
 export const DEFAULT_WIDGET_DOMAIN = "https://chatgpt-local-cockpit.outilsia.fr";
 export const TOOL_NAMES = [
   "check_pc_for_local_ai",
@@ -218,20 +221,22 @@ export function createOutilsiaMcpServer({ api = new OutilsiaApi() } = {}) {
     { instructions: SERVER_INSTRUCTIONS },
   );
 
-  registerAppResource(
-    server,
-    "outilsia-machine-cockpit",
-    RESOURCE_URI,
-    {},
-    async () => ({
-      contents: [{
-        uri: RESOURCE_URI,
-        mimeType: RESOURCE_MIME_TYPE,
-        text: widgetHtml,
-        _meta: widgetMetadata(),
-      }],
-    }),
-  );
+  for (const [index, resourceUri] of [RESOURCE_URI, ...LEGACY_RESOURCE_URIS].entries()) {
+    registerAppResource(
+      server,
+      index === 0 ? "outilsia-machine-cockpit" : `outilsia-machine-cockpit-legacy-${index}`,
+      resourceUri,
+      {},
+      async () => ({
+        contents: [{
+          uri: resourceUri,
+          mimeType: RESOURCE_MIME_TYPE,
+          text: widgetHtml,
+          _meta: widgetMetadata(),
+        }],
+      }),
+    );
+  }
 
   registerAppTool(
     server,

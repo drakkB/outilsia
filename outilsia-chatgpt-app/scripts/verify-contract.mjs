@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import {
   APP_VERSION,
   DEFAULT_WIDGET_DOMAIN,
+  LEGACY_RESOURCE_URIS,
   RESOURCE_URI,
   SERVER_INSTRUCTIONS,
   TOOL_NAMES,
@@ -51,6 +52,10 @@ requireCondition(
   "The UI must use its dedicated production origin.",
 );
 requireCondition(RESOURCE_URI.includes("-v3.html"), "Widget resource URI must be versioned.");
+requireCondition(
+  LEGACY_RESOURCE_URIS.includes("ui://outilsia/machine-cockpit-v2.html"),
+  "The previous ChatGPT widget URI must remain readable for cached developer plugins.",
+);
 requireCondition(widget.includes("ui/initialize"), "Widget must initialize the MCP Apps bridge.");
 requireCondition(widget.includes("ui/notifications/tool-result"), "Widget must consume MCP tool results.");
 requireCondition(widget.includes("window.openai?.toolResponseMetadata"), "Widget must consume canonical ChatGPT tool metadata.");

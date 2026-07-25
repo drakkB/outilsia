@@ -6,6 +6,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import {
   createHttpServer,
   DEFAULT_WIDGET_DOMAIN,
+  LEGACY_RESOURCE_URIS,
   RESOURCE_URI,
   TOOL_NAMES,
 } from "../server.js";
@@ -88,6 +89,18 @@ test("MCP exposes four read-only tools and returns renderable structured data", 
   const resource = await client.readResource({ uri: RESOURCE_URI });
   assert.equal(resource.contents[0]?._meta?.ui?.domain, DEFAULT_WIDGET_DOMAIN);
   assert.equal(resource.contents[0]?._meta?.["openai/widgetDomain"], DEFAULT_WIDGET_DOMAIN);
+  const listedResources = await client.listResources();
+  assert.deepEqual(
+    listedResources.resources.map((item) => item.uri).sort(),
+    [RESOURCE_URI, ...LEGACY_RESOURCE_URIS].sort(),
+  );
+  for (const legacyUri of LEGACY_RESOURCE_URIS) {
+    const legacyResource = await client.readResource({ uri: legacyUri });
+    assert.equal(legacyResource.contents[0]?.uri, legacyUri);
+    assert.equal(legacyResource.contents[0]?.mimeType, "text/html;profile=mcp-app");
+    assert.equal(legacyResource.contents[0]?.text, resource.contents[0]?.text);
+    assert.equal(legacyResource.contents[0]?._meta?.ui?.domain, DEFAULT_WIDGET_DOMAIN);
+  }
 
   const result = await client.callTool({
     name: "check_pc_for_local_ai",

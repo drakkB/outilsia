@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   DEFAULT_WIDGET_DOMAIN,
+  LEGACY_RESOURCE_URIS,
   RESOURCE_URI,
   TOOL_NAMES,
 } from "../server.js";
@@ -105,6 +106,22 @@ try {
   for (const marker of ["toolResponseMetadata", "notifyIntrinsicHeight", "Analyse impossible"]) {
     if (!resourceContent?.text?.includes(marker)) {
       throw new Error(`Production widget is missing ${marker}.`);
+    }
+  }
+  const listedResources = await client.listResources();
+  const productionUris = listedResources.resources.map((item) => item.uri);
+  for (const legacyUri of LEGACY_RESOURCE_URIS) {
+    if (!productionUris.includes(legacyUri)) {
+      throw new Error(`Production is missing legacy widget alias ${legacyUri}.`);
+    }
+    const legacyResource = await client.readResource({ uri: legacyUri });
+    const legacyContent = legacyResource.contents[0];
+    if (
+      legacyContent?.mimeType !== resourceContent?.mimeType
+      || legacyContent?.text !== resourceContent?.text
+      || legacyContent?._meta?.ui?.domain !== DEFAULT_WIDGET_DOMAIN
+    ) {
+      throw new Error(`Legacy widget alias ${legacyUri} differs from the current widget.`);
     }
   }
 

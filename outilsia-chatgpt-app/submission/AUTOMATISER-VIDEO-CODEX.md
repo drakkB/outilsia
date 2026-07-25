@@ -16,6 +16,25 @@ La vidéo doit montrer les trois outils d'analyse, le widget OutilsIA et un
 refus hors périmètre. Elle ne doit montrer aucun email, token, écran Persona,
 identifiant interne ou autre onglet personnel.
 
+## Incident connu et correctif
+
+Le premier essai du 25 juillet 2026 a échoué après un appel outil pourtant
+réussi :
+
+```text
+Erreur lors du chargement de l'appli
+Failed to fetch template
+```
+
+Cause confirmée : le plugin enregistré dans ChatGPT avait conservé
+`ui://outilsia/machine-cockpit-v2.html`, tandis que le serveur public annonçait
+déjà `ui://outilsia/machine-cockpit-v3.html`. L'appel métier fonctionnait, mais
+ChatGPT tentait ensuite de lire un template `v2` absent.
+
+Le serveur `0.2.2` garde désormais `v3` comme ressource officielle et sert
+aussi `v2` comme alias rétrocompatible. Malgré cet alias, il faut actualiser le
+plugin avant la vidéo afin que le catalogue ChatGPT pointe vers `v3`.
+
 ## Architecture d'automatisation
 
 - `@Computer` : pilote directement la fenêtre Brave existante dans laquelle
@@ -38,6 +57,9 @@ fabriquer une vidéo à partir de captures ou de réponses simulées.
 7. Tous les onglets contenant un email, un compte, Persona, GitHub ou le
    portail OpenAI sont fermés.
 8. Le zoom Brave est à 100 % et la fenêtre est au moins en 1440 x 900.
+9. Dans la fiche du plugin, `Modèle de sortie` indique
+   `ui://outilsia/machine-cockpit-v3.html`, ou le serveur public `0.2.2` avec
+   alias `v2` a été vérifié.
 
 Si une précondition échoue, s'arrêter et expliquer précisément laquelle. Ne
 pas improviser un autre compte, un autre plugin ou une fausse démonstration.
@@ -58,8 +80,14 @@ Respecte tout le protocole. Utilise la session ChatGPT déjà connectée dans
 Brave. N'ouvre ni Chrome ni le navigateur intégré. Ne montre aucune
 information de compte et ne soumets aucun formulaire.
 Avant d'enregistrer, vérifie que le plugin OutilsIA est actif et que les trois
-outils d'analyse sont disponibles. Lance Xbox Game Bar uniquement lorsque la
-conversation propre est prête.
+outils d'analyse sont disponibles. Ouvre d'abord la fiche du plugin et clique
+sur "Actualiser". Vérifie que "Modèle de sortie" vaut
+ui://outilsia/machine-cockpit-v3.html. Si ChatGPT conserve v2, déconnecte puis
+reconnecte uniquement le plugin OutilsIA avec https://outilsia.fr/mcp.
+
+Exécute ensuite le préflight matériel SANS enregistrer. Le widget doit
+s'afficher, sans "Failed to fetch template". Crée seulement après cela une
+nouvelle conversation propre et lance Xbox Game Bar.
 
 Exécute les quatre scénarios dans l'ordre, attends chaque réponse complète,
 montre le widget quelques secondes et vérifie visuellement les critères.
@@ -77,16 +105,58 @@ la taille, la durée approximative et le résultat de chaque scénario.
 
 ## Protocole détaillé
 
-### 1. Préparer la conversation
+### 1. Actualiser le catalogue du plugin
+
+Cette étape se fait avant tout enregistrement.
 
 1. Utiliser la fenêtre Brave déjà ouverte sur `https://chatgpt.com/`.
+2. Ouvrir `Plugins`, puis la fiche `OutilsIA Local Cockpit`.
+3. Cliquer sur `Actualiser`.
+4. Vérifier que les quatre actions sont présentes.
+5. Vérifier que `Modèle de sortie` affiche :
+
+```text
+ui://outilsia/machine-cockpit-v3.html
+```
+
+Si `v2` reste affiché :
+
+1. déconnecter uniquement `OutilsIA Local Cockpit` ;
+2. le reconnecter en mode développeur avec `https://outilsia.fr/mcp` ;
+3. cliquer de nouveau sur `Actualiser` ;
+4. ne toucher à aucun autre plugin.
+
+### 2. Préflight obligatoire sans vidéo
+
+1. Créer une conversation temporaire neuve.
+2. Activer explicitement `OutilsIA Local Cockpit`.
+3. Envoyer le prompt du scénario matériel déclaré.
+4. Attendre la réponse et le rendu complet.
+5. Vérifier que la fiche visuelle contient le score, le matériel et les
+   modèles.
+6. Vérifier l'absence de `Failed to fetch template`.
+
+Si le widget échoue :
+
+1. cliquer une seule fois sur `Réessayer` ;
+2. si l'erreur persiste, recharger ChatGPT avec `Ctrl + Shift + R` ;
+3. refaire l'étape `Actualiser` du plugin ;
+4. relancer le préflight dans une nouvelle conversation.
+
+Ne pas contourner l'erreur avec une vidéo textuelle : la soumission annonce un
+widget et doit le montrer réellement. Si le second préflight échoue encore,
+arrêter et rapporter l'URI affichée dans `Modèle de sortie`.
+
+### 3. Préparer la conversation filmée
+
+1. Supprimer ou quitter la conversation temporaire de préflight.
 2. Créer une nouvelle conversation.
 3. Activer explicitement `OutilsIA Local Cockpit` dans le menu Plugins.
 4. Vérifier que le champ de saisie mentionne bien le plugin.
 5. Fermer les panneaux latéraux inutiles.
 6. Ne laisser visible que la conversation et maximiser Brave.
 
-### 2. Démarrer l'enregistrement
+### 4. Démarrer l'enregistrement
 
 Utiliser `Win + Alt + R`.
 
@@ -99,7 +169,7 @@ Si ce raccourci ne démarre pas l'enregistrement :
 
 Vérifier que l'indicateur d'enregistrement est visible avant de continuer.
 
-### 3. Scénario matériel déclaré
+### 5. Scénario matériel déclaré
 
 Saisir exactement :
 
@@ -120,7 +190,7 @@ Vérifier :
 
 Laisser le résultat visible trois secondes.
 
-### 4. Scénario rapport partagé
+### 6. Scénario rapport partagé
 
 Saisir exactement :
 
@@ -140,7 +210,7 @@ Vérifier :
 
 Laisser le résultat visible trois secondes.
 
-### 5. Scénario simulation d'upgrade
+### 7. Scénario simulation d'upgrade
 
 Saisir exactement :
 
@@ -160,7 +230,7 @@ Vérifier :
 
 Laisser le résultat visible trois secondes.
 
-### 6. Scénario négatif
+### 8. Scénario négatif
 
 Saisir exactement :
 
@@ -177,7 +247,7 @@ Vérifier :
 
 Laisser le refus visible trois secondes.
 
-### 7. Arrêter et récupérer le MP4
+### 9. Arrêter et récupérer le MP4
 
 Arrêter avec `Win + Alt + R`.
 
@@ -209,7 +279,7 @@ if ($result.Length -lt 2MB) {
 $result | Select-Object FullName, Length, LastWriteTime
 ```
 
-### 8. Contrôle visuel obligatoire
+### 10. Contrôle visuel obligatoire
 
 Ouvrir le MP4 avec le lecteur Windows et vérifier :
 
@@ -260,6 +330,8 @@ que la vidéo ne contient aucune donnée privée.
 ## Definition of Done
 
 - MP4 réel produit par une session ChatGPT Developer Mode.
+- Plugin actualisé sur le template `v3`.
+- Préflight widget réussi avant le début de l'enregistrement.
 - Trois outils positifs montrés.
 - Un refus hors périmètre montré.
 - Widget lisible et stable.
