@@ -61,6 +61,7 @@ test("a comfortable text profile recommends no immediate purchase and excludes i
     }],
   }), { usage: "assistant" });
   assert.equal(decision.purchase.priority, "none");
+  assert.equal(decision.purchase.upgrade, null);
   assert.equal(decision.recommended_models[0].name, "Qwen 3");
   assert.equal(decision.benchmark_evidence, null);
   assert.match(decision.limits.join(" "), /n'est inventée/i);
@@ -94,4 +95,37 @@ test("an upgrade with no catalog gain is explicitly rejected", () => {
   });
   assert.equal(decision.purchase.priority, "none");
   assert.match(decision.verdict, /ne débloque pas/i);
+});
+
+test("a VRAM-only simulation uses an honest GPU label and excludes unrelated media models", () => {
+  const qwen32 = {
+    ...qwen,
+    params: "32B",
+    status: "lent",
+    label: "Lent/offload",
+    vram_q4: 20,
+    ollama: "qwen3:32b",
+  };
+  const before = payload({ score: 54, vram: 11, compatible: [qwen] });
+  const after = payload({
+    score: 72,
+    vram: 16,
+    compatible: [qwen, qwen32, flux],
+    upgrades: [{ name: "GPU 24 Go", summary: "Plus de VRAM" }],
+  });
+  before.machine.gpu_name = "NVIDIA GeForce GTX 1080 Ti";
+  after.machine.gpu_name = "NVIDIA GeForce GTX 1080 Ti";
+
+  const decision = buildUpgradeDecision(before, after, {
+    usage: "gros_modeles",
+    targetRamGb: 32,
+    targetVramGb: 16,
+  });
+
+  assert.equal(decision.machine.gpu, "GPU cible simulé (16 Go VRAM)");
+  assert.equal(decision.simulated_target.ram_gb, 32);
+  assert.equal(decision.simulated_target.vram_gb, 16);
+  assert.equal(decision.unlocked_models.some((model) => model.name === "Flux Dev"), false);
+  assert.equal(decision.unlocked_models.some((model) => model.params === "32B"), true);
+  assert.match(decision.limits.join(" "), /ne détermine pas un modèle de GPU précis/i);
 });

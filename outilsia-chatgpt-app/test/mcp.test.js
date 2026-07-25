@@ -138,6 +138,10 @@ test("MCP exposes four read-only tools and returns renderable structured data", 
   assert.equal(simulation.isError, undefined);
   assert.equal(simulation.structuredContent.decision.decision_type, "upgrade_simulation");
   assert.equal(simulation.structuredContent.decision.score_gain > 0, true);
+  assert.equal(
+    simulation.structuredContent.decision.machine.gpu,
+    "GPU cible simulé (16 Go VRAM)",
+  );
 
   const rendered = await client.callTool({
     name: "render_machine_cockpit",

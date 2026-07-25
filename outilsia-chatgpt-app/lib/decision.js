@@ -198,7 +198,7 @@ export function buildCompatibilityDecision(payload, {
         summary: alreadyComfortable
           ? "La machine déclarée couvre déjà un usage local utile. Testez d'abord un modèle recommandé."
           : "Le catalogue ne justifie pas d'achat précis avec les informations fournies.",
-        upgrade: primaryUpgrade,
+        upgrade: null,
       }
     : {
         priority: "useful",
@@ -257,10 +257,19 @@ export function buildUpgradeDecision(beforePayload, afterPayload, {
   const beforeModels = new Set((beforePayload?.compatibility?.compatible || []).map(modelKey));
   const unlockedModels = (afterPayload?.compatibility?.compatible || [])
     .filter((model) => !beforeModels.has(modelKey(model)))
+    .filter((model) => (usage === "image" ? isMediaModel(model) : !isMediaModel(model)))
     .slice(0, 8)
     .map((model) => compactModel(model, usage));
   const scoreGain = after.score.value - before.score.value;
   const useful = scoreGain >= 5 || unlockedModels.length > 0;
+  const simulatedRamGb = targetRamGb || after.machine.ram_gb;
+  const simulatedVramGb = targetVramGb || after.machine.vram_gb;
+  const simulatedMachine = {
+    ...after.machine,
+    gpu: simulatedVramGb > before.machine.vram_gb
+      ? `GPU cible simulé (${simulatedVramGb} Go VRAM)`
+      : after.machine.gpu,
+  };
 
   return {
     ...after,
@@ -274,11 +283,12 @@ export function buildUpgradeDecision(beforePayload, afterPayload, {
       label: "simulation déterministe OutilsIA, sans modification du PC",
       is_real_scan: false,
     },
+    machine: simulatedMachine,
     baseline_score: before.score,
     score_gain: scoreGain,
     simulated_target: {
-      ram_gb: targetRamGb || after.machine.ram_gb,
-      vram_gb: targetVramGb || after.machine.vram_gb,
+      ram_gb: simulatedRamGb,
+      vram_gb: simulatedVramGb,
     },
     unlocked_models: unlockedModels,
     purchase: useful
@@ -295,7 +305,7 @@ export function buildUpgradeDecision(beforePayload, afterPayload, {
           upgrade: null,
         },
     limits: [
-      "Simulation basée sur les règles VRAM/RAM du catalogue, pas sur un benchmark du matériel cible.",
+      "Simulation basée sur les règles VRAM/RAM du catalogue, pas sur un benchmark; la VRAM seule ne détermine pas un modèle de GPU précis.",
       "Les performances réelles dépendent du runtime, de la quantification, du contexte et des pilotes.",
       "Aucun achat n'est effectué depuis ChatGPT.",
     ],
