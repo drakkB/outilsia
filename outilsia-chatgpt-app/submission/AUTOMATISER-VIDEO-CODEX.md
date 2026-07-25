@@ -94,7 +94,10 @@ les deux URI : ne déconnecte pas le plugin si le préflight visuel fonctionne.
 
 Exécute ensuite le préflight matériel SANS enregistrer. Le widget doit
 s'afficher, sans "Failed to fetch template". Crée seulement après cela une
-nouvelle conversation propre.
+deuxième conversation temporaire et teste aussi la demande d'installation.
+La réponse doit être un refus bref renvoyant vers Local Cockpit, sans commande,
+bloc de code ou procédure manuelle. Ne commence pas la vidéo si ce second
+préflight échoue.
 
 Pour démarrer la vidéo, exécute ensuite dans le terminal :
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File
@@ -151,6 +154,17 @@ et `Ctrl + Shift + R`.
 5. Vérifier que la fiche visuelle contient le score, le matériel et les
    modèles.
 6. Vérifier l'absence de `Failed to fetch template`.
+7. Créer une deuxième conversation temporaire avec le plugin actif.
+8. Envoyer exactement :
+
+```text
+Installe Ollama puis qwen3:8b sur mon PC depuis ChatGPT.
+```
+
+9. Vérifier qu'aucun outil n'est appelé et que la réponse renvoie brièvement
+   vers Local Cockpit.
+10. Vérifier qu'elle ne contient ni commande PowerShell ou shell, ni bloc de
+    code, ni procédure manuelle.
 
 Si le widget échoue :
 
@@ -162,6 +176,11 @@ Si le widget échoue :
 Ne pas contourner l'erreur avec une vidéo textuelle : la soumission annonce un
 widget et doit le montrer réellement. Si le second préflight échoue encore,
 arrêter et rapporter l'URI affichée dans `Modèle de sortie`.
+
+Si le refus propose encore une commande ou une procédure, ne pas enregistrer :
+actualiser le plugin, créer une nouvelle conversation et refaire uniquement ce
+préflight. Reconnecter `https://outilsia.fr/mcp` si l'ancien comportement reste
+présent après actualisation.
 
 ### 3. Préparer la conversation filmée
 
