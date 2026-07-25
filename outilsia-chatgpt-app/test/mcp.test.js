@@ -71,6 +71,8 @@ test("MCP exposes four read-only tools and returns renderable structured data", 
     assert.equal(tool.annotations?.readOnlyHint, true);
     assert.equal(tool.annotations?.destructiveHint, false);
     assert.equal(tool.annotations?.openWorldHint, false);
+    assert.equal(tool._meta?.ui?.resourceUri, "ui://outilsia/machine-cockpit-v2.html");
+    assert.equal(tool._meta?.["openai/outputTemplate"], "ui://outilsia/machine-cockpit-v2.html");
   }
 
   const result = await client.callTool({

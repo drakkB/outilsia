@@ -28,7 +28,8 @@ export const SERVER_INSTRUCTIONS = [
   "Utilise analyze_shared_report seulement pour une URL https://outilsia.fr/r/...",
   "Ne prétends jamais installer Ollama, un modèle ou un pilote : ces actions restent dans Local Cockpit.",
   "N'invente jamais de tokens/s.",
-  "Après un outil de données, appelle render_machine_cockpit avec la décision reçue.",
+  "Les outils d'analyse rendent directement la fiche OutilsIA.",
+  "Utilise render_machine_cockpit seulement pour réafficher une décision OutilsIA existante.",
   "Si la machine suffit déjà, recommande clairement de ne rien acheter.",
 ].join(" ");
 
@@ -151,6 +152,18 @@ function toolError(error) {
   };
 }
 
+function widgetToolMetadata(invoking, invoked, { modelVisible = true } = {}) {
+  return {
+    ui: {
+      ...(modelVisible ? { visibility: ["model"] } : {}),
+      resourceUri: RESOURCE_URI,
+    },
+    "openai/outputTemplate": RESOURCE_URI,
+    "openai/toolInvocation/invoking": invoking,
+    "openai/toolInvocation/invoked": invoked,
+  };
+}
+
 function widgetMetadata() {
   const widgetDomain = String(process.env.OUTILSIA_WIDGET_DOMAIN || "").trim();
   const ui = {
@@ -210,9 +223,10 @@ export function createOutilsiaMcpServer({ api = new OutilsiaApi() } = {}) {
       },
       outputSchema: decisionOutputSchema,
       annotations: readOnlyAnnotations,
-      _meta: {
-        ui: { visibility: ["model"] },
-      },
+      _meta: widgetToolMetadata(
+        "Analyse du profil matériel…",
+        "Compatibilité IA locale prête",
+      ),
     },
     async (args) => {
       try {
@@ -242,9 +256,10 @@ export function createOutilsiaMcpServer({ api = new OutilsiaApi() } = {}) {
       },
       outputSchema: decisionOutputSchema,
       annotations: readOnlyAnnotations,
-      _meta: {
-        ui: { visibility: ["model"] },
-      },
+      _meta: widgetToolMetadata(
+        "Lecture du rapport OutilsIA…",
+        "Rapport OutilsIA analysé",
+      ),
     },
     async (args) => {
       try {
@@ -277,9 +292,10 @@ export function createOutilsiaMcpServer({ api = new OutilsiaApi() } = {}) {
       },
       outputSchema: decisionOutputSchema,
       annotations: readOnlyAnnotations,
-      _meta: {
-        ui: { visibility: ["model"] },
-      },
+      _meta: widgetToolMetadata(
+        "Simulation de l'upgrade…",
+        "Simulation OutilsIA prête",
+      ),
     },
     async (args) => {
       try {
@@ -327,12 +343,11 @@ export function createOutilsiaMcpServer({ api = new OutilsiaApi() } = {}) {
       },
       outputSchema: decisionOutputSchema,
       annotations: readOnlyAnnotations,
-      _meta: {
-        ui: { resourceUri: RESOURCE_URI },
-        "openai/outputTemplate": RESOURCE_URI,
-        "openai/toolInvocation/invoking": "Préparation de la fiche OutilsIA…",
-        "openai/toolInvocation/invoked": "Fiche OutilsIA prête",
-      },
+      _meta: widgetToolMetadata(
+        "Préparation de la fiche OutilsIA…",
+        "Fiche OutilsIA prête",
+        { modelVisible: false },
+      ),
     },
     async (args) => decisionResult(args.decision, "Fiche OutilsIA affichée."),
   );

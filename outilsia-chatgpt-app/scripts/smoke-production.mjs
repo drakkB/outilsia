@@ -49,6 +49,12 @@ try {
     ) {
       throw new Error(`Invalid production annotations for ${tool.name}`);
     }
+    if (
+      tool._meta?.ui?.resourceUri !== "ui://outilsia/machine-cockpit-v2.html"
+      || tool._meta?.["openai/outputTemplate"] !== "ui://outilsia/machine-cockpit-v2.html"
+    ) {
+      throw new Error(`Missing production widget binding for ${tool.name}`);
+    }
   }
 
   const result = await client.callTool({

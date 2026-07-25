@@ -24,6 +24,14 @@ requireCondition(!server.includes("node:child_process"), "The MCP server must ne
 requireCondition(!server.includes("exec(") && !server.includes("spawn("), "The MCP server must not execute local processes.");
 requireCondition(SERVER_INSTRUCTIONS.includes("ne scanne jamais"), "Server instructions must reject fake scans.");
 requireCondition(SERVER_INSTRUCTIONS.includes("N'invente jamais de tokens/s"), "Server instructions must reject fabricated speed.");
+requireCondition(
+  SERVER_INSTRUCTIONS.includes("rendent directement la fiche"),
+  "Server instructions must document direct widget rendering.",
+);
+requireCondition(
+  server.includes("resourceUri: RESOURCE_URI"),
+  "Analysis tools must link directly to the widget resource.",
+);
 requireCondition(RESOURCE_URI.includes("-v2.html"), "Widget resource URI must be versioned.");
 requireCondition(widget.includes("ui/initialize"), "Widget must initialize the MCP Apps bridge.");
 requireCondition(widget.includes("ui/notifications/tool-result"), "Widget must consume MCP tool results.");
