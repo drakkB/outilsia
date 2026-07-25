@@ -3,8 +3,9 @@
 ## Prêt dans le dépôt
 
 - Serveur MCP public en lecture seule : `https://outilsia.fr/mcp`
-- Quatre outils avec schémas de sortie et annotations explicites
+- Trois outils d'analyse qui rendent directement le widget, plus un outil de rendu interne réservé à l'app
 - Widget versionné `machine-cockpit-v2.html`, sans iframe ni script tiers
+- Origine UI dédiée : `https://chatgpt-local-cockpit.outilsia.fr`
 - CSP limitée à `https://outilsia.fr`
 - Cinq tests positifs et trois tests négatifs
 - Trois prompts de démarrage
@@ -30,7 +31,7 @@
    https://outilsia.fr/.well-known/openai-apps-challenge
    ```
 
-7. Lancer `Scan Tools`, reporter les justifications de `tool-annotations.json` et corriger toute divergence.
+7. Lancer `Scan Tools`, vérifier que les trois outils d'analyse sont visibles au modèle, que `render_machine_cockpit` est réservé à l'app, puis reporter les justifications de `tool-annotations.json`.
 8. Téléverser le logo et une capture par prompt de démarrage.
 9. Enregistrer une courte démonstration montrant profil déclaré, rapport partagé, simulation et refus d'installation.
 10. Soumettre pour revue. Ne pas annoncer une publication avant l'approbation puis la publication manuelle.

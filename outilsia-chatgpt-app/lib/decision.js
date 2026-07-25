@@ -309,5 +309,5 @@ export function decisionText(decision) {
     : " Aucun tokens/s réel n'est disponible.";
   return `${decision.verdict} Score ${decision.score.value}/100. ${
     model?.ollama ? `Commande suggérée : ollama run ${model.ollama}.` : ""
-  } ${decision.purchase.headline}.${proof} Utilisez render_machine_cockpit pour afficher la fiche visuelle.`;
+  } ${decision.purchase.headline}.${proof} La fiche visuelle OutilsIA est jointe au résultat.`;
 }

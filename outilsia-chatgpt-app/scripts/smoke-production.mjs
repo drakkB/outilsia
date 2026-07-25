@@ -1,6 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { TOOL_NAMES } from "../server.js";
+import {
+  DEFAULT_WIDGET_DOMAIN,
+  RESOURCE_URI,
+  TOOL_NAMES,
+} from "../server.js";
 
 const baseUrl = String(process.env.OUTILSIA_PUBLIC_BASE_URL || "https://outilsia.fr").replace(/\/+$/, "");
 const pages = [
@@ -9,6 +13,7 @@ const pages = [
   "/conditions-plugin-outilsia",
   "/support-plugin-outilsia",
 ];
+const widgetHealthUrl = `${DEFAULT_WIDGET_DOMAIN}/healthz`;
 
 for (const path of pages) {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -17,6 +22,12 @@ for (const path of pages) {
   if (response.status !== 200) throw new Error(`${path} returned ${response.status}`);
   const body = await response.text();
   if (!body.includes("OutilsIA")) throw new Error(`${path} returned an unexpected document`);
+}
+const widgetHealth = await fetch(widgetHealthUrl, {
+  headers: { "user-agent": "OutilsIA-ChatGPT-App-Smoke/0.2" },
+});
+if (widgetHealth.status !== 200 || !(await widgetHealth.text()).includes("widget origin: ok")) {
+  throw new Error(`Dedicated widget origin failed at ${widgetHealthUrl}`);
 }
 
 const challenge = await fetch(`${baseUrl}/.well-known/openai-apps-challenge`, {
@@ -36,6 +47,25 @@ const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`));
 const client = new Client({ name: "outilsia-production-smoke", version: "0.2.0" });
 await client.connect(transport);
 try {
+  async function requireDecision(name, args, label) {
+    const result = await client.callTool({ name, arguments: args });
+    if (result.isError || !result.structuredContent?.decision) {
+      throw new Error(`${label} did not return a decision.`);
+    }
+    return result;
+  }
+
+  async function requireToolError(name, args, label) {
+    try {
+      const result = await client.callTool({ name, arguments: args });
+      if (!result.isError) throw new Error(`${label} unexpectedly succeeded.`);
+    } catch (error) {
+      const message = String(error?.message || error);
+      if (/unexpectedly succeeded/i.test(message)) throw error;
+      if (!/(invalid params|validation|mcp error -32602)/i.test(message)) throw error;
+    }
+  }
+
   const listed = await client.listTools();
   const names = listed.tools.map((tool) => tool.name).sort();
   if (names.join("|") !== [...TOOL_NAMES].sort().join("|")) {
@@ -56,10 +86,22 @@ try {
       throw new Error(`Missing production widget binding for ${tool.name}`);
     }
   }
+  const renderTool = listed.tools.find((tool) => tool.name === "render_machine_cockpit");
+  if (renderTool?._meta?.ui?.visibility?.join("|") !== "app") {
+    throw new Error("render_machine_cockpit must remain app-only.");
+  }
+  const resource = await client.readResource({ uri: RESOURCE_URI });
+  const resourceMeta = resource.contents[0]?._meta;
+  if (
+    resourceMeta?.ui?.domain !== DEFAULT_WIDGET_DOMAIN
+    || resourceMeta?.["openai/widgetDomain"] !== DEFAULT_WIDGET_DOMAIN
+  ) {
+    throw new Error("Production widget domain metadata is missing or stale.");
+  }
 
-  const result = await client.callTool({
-    name: "check_pc_for_local_ai",
-    arguments: {
+  const result = await requireDecision(
+    "check_pc_for_local_ai",
+    {
       cpu_name: "AMD Ryzen 7 7800X3D",
       cpu_cores: 8,
       ram_gb: 64,
@@ -69,15 +111,115 @@ try {
       os_name: "Windows 11",
       usage: "assistant",
     },
-  });
-  if (result.isError || !result.structuredContent?.decision) {
-    throw new Error("Production profile test did not return a decision.");
-  }
+    "Gaming PC profile",
+  );
   if (result.structuredContent.decision.benchmark_evidence !== null) {
     throw new Error("Declared production profile fabricated benchmark evidence.");
   }
+  if (/render_machine_cockpit/i.test(result.content?.[0]?.text || "")) {
+    throw new Error("Production response still asks for a redundant render tool.");
+  }
+
+  await requireDecision(
+    "check_pc_for_local_ai",
+    {
+      cpu_name: "Intel Core i7-4790K",
+      cpu_cores: 4,
+      ram_gb: 16,
+      gpu_name: "NVIDIA GeForce GTX 1080 Ti",
+      gpu_vendor: "NVIDIA",
+      vram_gb: 11,
+      os_name: "Windows 10",
+      usage: "francais",
+    },
+    "Old PC profile",
+  );
+
+  const cpuOnly = await requireDecision(
+    "check_pc_for_local_ai",
+    {
+      cpu_name: "Intel N100",
+      cpu_cores: 4,
+      ram_gb: 16,
+      gpu_name: "Aucun GPU dédié",
+      gpu_vendor: "Intel",
+      vram_gb: 0,
+      os_name: "Linux",
+      usage: "portable",
+    },
+    "CPU-only profile",
+  );
+  if (cpuOnly.structuredContent.decision.machine.vram_gb !== 0) {
+    throw new Error("CPU-only profile did not preserve 0 GB VRAM.");
+  }
+
+  const report = await requireDecision(
+    "analyze_shared_report",
+    {
+      report_url: "https://outilsia.fr/r/3O3-DjbGWfNrIBUWe8IdmaEbJxG30F0m",
+      usage: "assistant",
+    },
+    "Shared report",
+  );
+  if (report.structuredContent.decision.source.kind !== "shared_report") {
+    throw new Error("Shared report lost its source kind.");
+  }
+
+  const upgrade = await requireDecision(
+    "simulate_hardware_upgrade",
+    {
+      profile: {
+        cpu_name: "Intel Core i7-4790K",
+        cpu_cores: 4,
+        ram_gb: 16,
+        gpu_name: "NVIDIA GeForce GTX 1080 Ti",
+        gpu_vendor: "NVIDIA",
+        vram_gb: 11,
+        os_name: "Windows 10",
+      },
+      target_ram_gb: 32,
+      target_vram_gb: 16,
+      usage: "gros_modeles",
+    },
+    "Upgrade simulation",
+  );
+  if (upgrade.structuredContent.decision.decision_type !== "upgrade_simulation") {
+    throw new Error("Upgrade simulation returned the wrong decision type.");
+  }
+
+  await requireToolError(
+    "analyze_shared_report",
+    {
+      report_url: "https://example.com/r/3O3-DjbGWfNrIBUWe8IdmaEbJxG30F0m",
+      usage: "assistant",
+    },
+    "Foreign report URL",
+  );
+  await requireToolError(
+    "simulate_hardware_upgrade",
+    {
+      profile: {
+        cpu_name: "Intel Core i7-4790K",
+        ram_gb: 16,
+        gpu_name: "NVIDIA GeForce GTX 1080 Ti",
+        vram_gb: 11,
+      },
+      target_ram_gb: 16,
+      target_vram_gb: 11,
+      usage: "polyvalent",
+    },
+    "Non-upgrade simulation",
+  );
+  await requireToolError(
+    "check_pc_for_local_ai",
+    {
+      cpu_name: "PC inconnu",
+      ram_gb: 16,
+    },
+    "Incomplete hardware profile",
+  );
 } finally {
   await client.close();
 }
 
-console.log(`outilsia_chatgpt_production_smoke_ok pages=${pages.length} tools=${TOOL_NAMES.length} challenge=${challenge.status}`);
+console.log(`outilsia_chatgpt_production_smoke_ok pages=${pages.length} tools=${TOOL_NAMES.length} positive=5 negative=3 challenge=${challenge.status}`);

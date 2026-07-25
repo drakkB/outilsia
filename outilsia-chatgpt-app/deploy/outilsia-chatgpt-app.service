@@ -12,6 +12,7 @@ Environment=NODE_ENV=production
 Environment=HOST=127.0.0.1
 Environment=PORT=8787
 Environment=OUTILSIA_API_BASE_URL=https://outilsia.fr
+Environment=OUTILSIA_WIDGET_DOMAIN=https://chatgpt-local-cockpit.outilsia.fr
 Environment=OUTILSIA_REQUEST_TIMEOUT_MS=8000
 Environment=OUTILSIA_RATE_LIMIT_PER_MINUTE=120
 EnvironmentFile=-/etc/outilsia-chatgpt-app.env

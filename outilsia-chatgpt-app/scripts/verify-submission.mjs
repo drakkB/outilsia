@@ -1,13 +1,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { TOOL_NAMES } from "../server.js";
+import { DEFAULT_WIDGET_DOMAIN, TOOL_NAMES } from "../server.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(root, "..");
 const listing = JSON.parse(readFileSync(join(root, "submission", "listing.json"), "utf8"));
 const tests = JSON.parse(readFileSync(join(root, "submission", "test-cases.json"), "utf8"));
 const annotations = JSON.parse(readFileSync(join(root, "submission", "tool-annotations.json"), "utf8"));
+const portalFieldsPath = join(root, "submission", "PORTAL-FIELDS.md");
 const pages = {
   website: join(repoRoot, "server-work", "static", "pages", "chatgpt-ia-locale.html"),
   privacy: join(repoRoot, "server-work", "static", "pages", "confidentialite-plugin-outilsia.html"),
@@ -83,9 +84,15 @@ for (const [label, value] of Object.entries({
   termsOfServiceURL: ui.termsOfServiceURL,
   supportURL: ui.supportURL,
   mcpURL: listing.mcp.url,
+  widgetDomain: listing.mcp.widgetDomain,
 })) {
   requireCondition(value.startsWith("https://") && value.length <= 1_024, `${label} must be a public HTTPS URL.`);
 }
+const mcpUrl = new URL(listing.mcp.url);
+const widgetUrl = new URL(listing.mcp.widgetDomain);
+requireCondition(widgetUrl.origin === listing.mcp.widgetDomain, "widgetDomain must be an HTTPS origin without a path.");
+requireCondition(widgetUrl.hostname !== mcpUrl.hostname, "widgetDomain must use a dedicated host name.");
+requireCondition(listing.mcp.widgetDomain === DEFAULT_WIDGET_DOMAIN, "Submission and server widget domains differ.");
 
 const logoPath = resolveSubmissionAsset(listing.assets?.logo, "logo");
 const logo = pngDimensions(logoPath, "logo");
@@ -101,6 +108,10 @@ requireCondition(new Set(screenshots).size === screenshots.length, "Starter scre
 screenshots.forEach((relativePath, index) => {
   const path = resolveSubmissionAsset(relativePath, `starter screenshot ${index + 1}`);
   const image = pngDimensions(path, `starter screenshot ${index + 1}`);
+  requireCondition(
+    readFileSync(path).length >= 20_000,
+    `Starter screenshot ${index + 1} appears blank or incomplete.`,
+  );
   requireCondition(image.width === 706, `Starter screenshot ${index + 1} must be exactly 706px wide.`);
   requireCondition(
     image.height >= 400 && image.height <= 860,
@@ -108,10 +119,34 @@ screenshots.forEach((relativePath, index) => {
   );
 });
 
+requireCondition(existsSync(portalFieldsPath), "Missing portal copy/paste guide.");
+const portalFields = readFileSync(portalFieldsPath, "utf8");
+for (const value of [
+  listing.mcp.url,
+  listing.mcp.challengeBaseURL,
+  listing.mcp.widgetDomain,
+  ui.websiteURL,
+  ui.privacyPolicyURL,
+  ui.termsOfServiceURL,
+  ui.supportURL,
+]) {
+  requireCondition(portalFields.includes(value), `Portal guide missing ${value}`);
+}
+
 requireCondition(tests.positive.length === 5, "Submission requires exactly five positive tests.");
 requireCondition(tests.negative.length === 3, "Submission requires exactly three negative tests.");
 requireCondition(new Set(tests.positive.map((item) => item.id)).size === 5, "Positive test IDs must be unique.");
 requireCondition(new Set(tests.negative.map((item) => item.id)).size === 3, "Negative test IDs must be unique.");
+for (const test of tests.positive) {
+  requireCondition(
+    Array.isArray(test.expectedToolSequence) && test.expectedToolSequence.length === 1,
+    `${test.id} must render directly from one analysis tool.`,
+  );
+  requireCondition(
+    test.expectedToolSequence[0] !== "render_machine_cockpit",
+    `${test.id} must not ask the model to call the internal render tool.`,
+  );
+}
 
 requireCondition(Object.keys(annotations).sort().join("|") === [...TOOL_NAMES].sort().join("|"), "Annotation file must cover every tool.");
 for (const name of TOOL_NAMES) {

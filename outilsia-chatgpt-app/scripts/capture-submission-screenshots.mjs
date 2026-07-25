@@ -65,7 +65,10 @@ async function sharedReportDecision(reportUrl, usage) {
 
 function fixtureHtml(widget, decision) {
   const bootstrap = `<script>window.openai={toolOutput:${JSON.stringify(decision)},openExternal(){}};</script>`;
-  return widget.replace('<script type="module">', `${bootstrap}\n    <script type="module">`);
+  return widget.replace(
+    '<script type="module">',
+    `${bootstrap}\n    <script data-capture-script>`,
+  );
 }
 
 function capture(chrome, sourcePath, targetPath, profileName) {

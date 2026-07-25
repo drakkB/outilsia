@@ -1,7 +1,12 @@
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { RESOURCE_URI, SERVER_INSTRUCTIONS, TOOL_NAMES } from "../server.js";
+import {
+  DEFAULT_WIDGET_DOMAIN,
+  RESOURCE_URI,
+  SERVER_INSTRUCTIONS,
+  TOOL_NAMES,
+} from "../server.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const server = readFileSync(join(root, "server.js"), "utf8");
@@ -29,8 +34,20 @@ requireCondition(
   "Server instructions must document direct widget rendering.",
 );
 requireCondition(
+  !decision.includes("Utilisez render_machine_cockpit"),
+  "Analysis text must not ask the model for a redundant render call.",
+);
+requireCondition(
   server.includes("resourceUri: RESOURCE_URI"),
   "Analysis tools must link directly to the widget resource.",
+);
+requireCondition(
+  server.includes('visibility: modelVisible ? ["model", "app"] : ["app"]'),
+  "The internal render tool must not be exposed to the model.",
+);
+requireCondition(
+  DEFAULT_WIDGET_DOMAIN === "https://chatgpt-local-cockpit.outilsia.fr",
+  "The UI must use its dedicated production origin.",
 );
 requireCondition(RESOURCE_URI.includes("-v2.html"), "Widget resource URI must be versioned.");
 requireCondition(widget.includes("ui/initialize"), "Widget must initialize the MCP Apps bridge.");

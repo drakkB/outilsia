@@ -16,7 +16,7 @@ Application MCP en lecture seule pour utiliser le moteur de décision OutilsIA d
 | `check_pc_for_local_ai` | Estimer la compatibilité depuis un profil explicite | Aucune |
 | `analyze_shared_report` | Lire un rapport public `/r/...` anonymisé | Aucune |
 | `simulate_hardware_upgrade` | Comparer le profil avant/après RAM ou VRAM | Aucune |
-| `render_machine_cockpit` | Afficher le résultat dans un widget | Aucune |
+| `render_machine_cockpit` | Rendu interne réservé à l'app | Aucune |
 
 Une estimation déclarative ne doit jamais être présentée comme un scan. Les tokens/s ne sont affichés que lorsqu'un rapport partagé contient un benchmark réel.
 
@@ -43,15 +43,15 @@ Choisir `Streamable HTTP`, puis `http://127.0.0.1:8787/mcp`.
 
 ChatGPT exige une URL HTTPS publique terminée par `/mcp`. En mode développeur :
 
-1. Ouvrir `Réglages → Sécurité et connexion`, puis activer le mode développeur.
-2. Ouvrir `Réglages → Plugins` ou `chatgpt.com/plugins`.
+1. Ouvrir le menu `Plugins` en haut de ChatGPT Pro.
+2. Activer le mode développeur, puis sélectionner `+`.
 3. Sélectionner le bouton `+` et créer une app en mode développeur.
 4. Saisir l'URL publique `https://outilsia.fr/mcp`.
 5. Ouvrir une nouvelle conversation, activer OutilsIA depuis le menu `Plus`, puis tester un profil déclaré, un rapport partagé et une demande hors périmètre.
 
-Le domaine de widget dédié est configuré seulement pour la soumission publique avec `OUTILSIA_WIDGET_DOMAIN`. Il doit être unique à cette app et contrôlé par OutilsIA.
+Le domaine de widget dédié est `https://chatgpt-local-cockpit.outilsia.fr`. La variable `OUTILSIA_WIDGET_DOMAIN` permet de le surcharger pour une recette isolée.
 
-Le connecteur est disponible en bêta développeur. Il n'est pas présenté comme
+L'app est disponible en bêta développeur. Elle n'est pas présentée comme
 déjà approuvé ou publié dans l'annuaire public.
 
 ## Déploiement

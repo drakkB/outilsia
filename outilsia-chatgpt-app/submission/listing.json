@@ -4,7 +4,7 @@
   "interface": {
     "displayName": "OutilsIA Local Cockpit",
     "shortDescription": "Choisir une IA locale",
-    "longDescription": "OutilsIA aide à choisir un modèle d'IA locale à partir de faits matériels. Déclarez le CPU, la RAM, le GPU et la VRAM d'un PC, ou fournissez un rapport OutilsIA Local Cockpit déjà partagé. Le connecteur classe les modèles compatibles, distingue une estimation d'un benchmark réel, peut simuler un upgrade RAM/VRAM et affiche une fiche compacte dans la conversation. Tous les outils sont en lecture seule : ils ne scannent pas le PC, n'accèdent pas à Ollama, n'installent rien et n'effectuent aucun achat. Lorsqu'une machine suffit déjà, OutilsIA recommande explicitement de ne rien acheter.",
+    "longDescription": "L'app OutilsIA aide à choisir un modèle d'IA locale à partir de faits matériels. Déclarez le CPU, la RAM, le GPU et la VRAM d'un PC, ou fournissez un rapport OutilsIA Local Cockpit déjà partagé. L'app classe les modèles compatibles, distingue une estimation d'un benchmark réel, peut simuler un upgrade RAM/VRAM et affiche une fiche compacte dans la conversation. Tous les outils sont en lecture seule : ils ne scannent pas le PC, n'accèdent pas à Ollama, n'installent rien et n'effectuent aucun achat. Lorsqu'une machine suffit déjà, OutilsIA recommande explicitement de ne rien acheter.",
     "developerName": "OutilsIA.fr",
     "category": "Data & Analytics",
     "capabilities": [
@@ -30,7 +30,8 @@
     "url": "https://outilsia.fr/mcp",
     "authentication": "none",
     "challengeBaseURL": "https://outilsia.fr",
-    "widgetResource": "ui://outilsia/machine-cockpit-v2.html"
+    "widgetResource": "ui://outilsia/machine-cockpit-v2.html",
+    "widgetDomain": "https://chatgpt-local-cockpit.outilsia.fr"
   },
   "availability": {
     "languages": [
@@ -51,5 +52,5 @@
       "submission/assets/starter-03-report.png"
     ]
   },
-  "releaseNotes": "Soumission initiale du connecteur OutilsIA en lecture seule. Quatre outils permettent d'estimer un profil matériel déclaré, d'analyser un rapport public anonymisé, de simuler un upgrade RAM/VRAM et de rendre une fiche compacte. Aucun accès au PC, aucune installation, aucun achat et aucun tokens/s inventé."
+  "releaseNotes": "Soumission initiale de l'app OutilsIA en lecture seule. Trois outils d'analyse estiment un profil matériel déclaré, analysent un rapport public anonymisé ou simulent un upgrade RAM/VRAM ; chacun rend directement une fiche compacte. Un outil de rendu interne reste réservé à l'interface. Aucun accès au PC, aucune installation, aucun achat et aucun tokens/s inventé."
 }

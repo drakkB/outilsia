@@ -4,10 +4,9 @@
       "id": "positive-01-gaming-pc",
       "prompt": "Quels modèles locaux tester avec mon Ryzen 7 7800X3D, 8 cœurs, 64 Go RAM, RTX 4080 SUPER 16 Go et Windows 11 pour un assistant ?",
       "expectedToolSequence": [
-        "check_pc_for_local_ai",
-        "render_machine_cockpit"
+        "check_pc_for_local_ai"
       ],
-      "expectedBehavior": "Utiliser uniquement les caractéristiques fournies, rappeler qu'il s'agit d'un profil déclaré et recommander au moins un modèle sans inventer de tokens/s.",
+      "expectedBehavior": "Utiliser uniquement les caractéristiques fournies, rappeler qu'il s'agit d'un profil déclaré, recommander au moins un modèle sans inventer de tokens/s et afficher directement la fiche OutilsIA.",
       "expectedResultShape": "structuredContent.decision avec source.kind=declared_profile, score 0-100, recommended_models et benchmark_evidence=null.",
       "fixture": "Aucun compte ou identifiant requis."
     },
@@ -15,8 +14,7 @@
       "id": "positive-02-old-pc",
       "prompt": "Que puis-je lancer avec un Core i7-4790K, 4 cœurs, 16 Go RAM, une GTX 1080 Ti 11 Go et Windows 10 pour du français ?",
       "expectedToolSequence": [
-        "check_pc_for_local_ai",
-        "render_machine_cockpit"
+        "check_pc_for_local_ai"
       ],
       "expectedBehavior": "Proposer un premier modèle adapté au matériel ancien, garder les limites visibles et ne pas transformer l'estimation en benchmark.",
       "expectedResultShape": "Décision de compatibilité avec matériel compact, score, modèles classés et décision d'achat bornée.",
@@ -26,8 +24,7 @@
       "id": "positive-03-cpu-only",
       "prompt": "Mon mini-PC Intel N100, 4 cœurs, 16 Go RAM, sans GPU dédié et 0 Go VRAM peut-il tester une IA locale portable sous Linux ?",
       "expectedToolSequence": [
-        "check_pc_for_local_ai",
-        "render_machine_cockpit"
+        "check_pc_for_local_ai"
       ],
       "expectedBehavior": "Accepter vram_gb=0, privilégier un petit modèle et expliquer honnêtement la limite CPU-only.",
       "expectedResultShape": "Décision déclarative avec usage=portable, benchmark_evidence=null et au plus quatre modèles.",
@@ -37,8 +34,7 @@
       "id": "positive-04-shared-report",
       "prompt": "Analyse ce rapport OutilsIA pour un usage assistant : https://outilsia.fr/r/3O3-DjbGWfNrIBUWe8IdmaEbJxG30F0m",
       "expectedToolSequence": [
-        "analyze_shared_report",
-        "render_machine_cockpit"
+        "analyze_shared_report"
       ],
       "expectedBehavior": "Lire seulement le rapport public OutilsIA, indiquer qu'il s'agit d'un scan partagé et laisser la preuve benchmark vide si le rapport ne contient pas de mesure structurée.",
       "expectedResultShape": "source.kind=shared_report, source.is_real_scan=true, liens limités à OutilsIA et aucun identifiant de compte.",
@@ -48,8 +44,7 @@
       "id": "positive-05-upgrade",
       "prompt": "Simule le passage de mon Core i7-4790K, 16 Go RAM et GTX 1080 Ti 11 Go vers 32 Go RAM et 16 Go VRAM pour de gros modèles.",
       "expectedToolSequence": [
-        "simulate_hardware_upgrade",
-        "render_machine_cockpit"
+        "simulate_hardware_upgrade"
       ],
       "expectedBehavior": "Comparer le même profil avant/après, afficher le gain théorique et rappeler qu'aucun achat n'est effectué.",
       "expectedResultShape": "decision_type=upgrade_simulation avec baseline_score, score_gain, simulated_target, unlocked_models et limites.",

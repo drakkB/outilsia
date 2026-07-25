@@ -15,6 +15,7 @@ import { OutilsiaApi, OutilsiaApiError } from "./lib/outilsia-api.js";
 
 export const APP_VERSION = "0.2.0";
 export const RESOURCE_URI = "ui://outilsia/machine-cockpit-v2.html";
+export const DEFAULT_WIDGET_DOMAIN = "https://chatgpt-local-cockpit.outilsia.fr";
 export const TOOL_NAMES = [
   "check_pc_for_local_ai",
   "analyze_shared_report",
@@ -29,7 +30,7 @@ export const SERVER_INSTRUCTIONS = [
   "Ne prétends jamais installer Ollama, un modèle ou un pilote : ces actions restent dans Local Cockpit.",
   "N'invente jamais de tokens/s.",
   "Les outils d'analyse rendent directement la fiche OutilsIA.",
-  "Utilise render_machine_cockpit seulement pour réafficher une décision OutilsIA existante.",
+  "N'appelle pas un second outil de rendu après un outil d'analyse.",
   "Si la machine suffit déjà, recommande clairement de ne rien acheter.",
 ].join(" ");
 
@@ -61,14 +62,33 @@ const linkSchema = z.object({
   url: z.string().url(),
   kind: z.string(),
 });
+const scoreSchema = z.object({
+  value: z.number(),
+  label: z.string(),
+  summary: z.string(),
+});
+const upgradeSchema = z.object({
+  name: z.string(),
+  summary: z.string(),
+  target_vram_gb: z.number(),
+  target_ram_gb: z.number(),
+  price: z.string(),
+  guide_url: z.string(),
+});
+const blockedModelSchema = z.object({
+  name: z.string(),
+  params: z.string(),
+  required_vram_gb: z.number(),
+  reason: z.string(),
+});
 const decisionSchema = z.object({
   schema_version: z.literal("outilsia.chatgpt.decision.v1"),
-  decision_type: z.string(),
+  decision_type: z.enum(["compatibility", "upgrade_simulation"]),
   title: z.string(),
   verdict: z.string(),
   usage: usageSchema,
   source: z.object({
-    kind: z.string(),
+    kind: z.enum(["declared_profile", "shared_report", "upgrade_simulation"]),
     label: z.string(),
     is_real_scan: z.boolean(),
   }),
@@ -83,11 +103,7 @@ const decisionSchema = z.object({
     storage_free_gb: z.number(),
     os: z.string(),
   }),
-  score: z.object({
-    value: z.number(),
-    label: z.string(),
-    summary: z.string(),
-  }),
+  score: scoreSchema,
   recommended_models: z.array(modelSchema),
   benchmark_evidence: z.object({
     model: z.string(),
@@ -99,12 +115,19 @@ const decisionSchema = z.object({
     priority: z.string(),
     headline: z.string(),
     summary: z.string(),
-    upgrade: z.record(z.unknown()).nullable(),
+    upgrade: upgradeSchema.nullable(),
   }),
-  blocked_next: z.array(z.record(z.unknown())),
+  blocked_next: z.array(blockedModelSchema),
   links: z.array(linkSchema),
   limits: z.array(z.string()),
-}).passthrough();
+  baseline_score: scoreSchema.optional(),
+  score_gain: z.number().optional(),
+  simulated_target: z.object({
+    ram_gb: z.number(),
+    vram_gb: z.number(),
+  }).optional(),
+  unlocked_models: z.array(modelSchema).optional(),
+}).strict();
 
 const decisionOutputSchema = {
   decision: decisionSchema,
@@ -155,7 +178,7 @@ function toolError(error) {
 function widgetToolMetadata(invoking, invoked, { modelVisible = true } = {}) {
   return {
     ui: {
-      ...(modelVisible ? { visibility: ["model"] } : {}),
+      visibility: modelVisible ? ["model", "app"] : ["app"],
       resourceUri: RESOURCE_URI,
     },
     "openai/outputTemplate": RESOURCE_URI,
@@ -165,7 +188,9 @@ function widgetToolMetadata(invoking, invoked, { modelVisible = true } = {}) {
 }
 
 function widgetMetadata() {
-  const widgetDomain = String(process.env.OUTILSIA_WIDGET_DOMAIN || "").trim();
+  const widgetDomain = String(
+    process.env.OUTILSIA_WIDGET_DOMAIN || DEFAULT_WIDGET_DOMAIN,
+  ).trim();
   const ui = {
     prefersBorder: true,
     csp: {

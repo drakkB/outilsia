@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { createHttpServer, TOOL_NAMES } from "../server.js";
+import {
+  createHttpServer,
+  DEFAULT_WIDGET_DOMAIN,
+  RESOURCE_URI,
+  TOOL_NAMES,
+} from "../server.js";
 
 function compatibility(profile, withBenchmark = false) {
   const score = Number(profile.vram_gb) >= 16 ? 80 : 54;
@@ -74,6 +79,15 @@ test("MCP exposes four read-only tools and returns renderable structured data", 
     assert.equal(tool._meta?.ui?.resourceUri, "ui://outilsia/machine-cockpit-v2.html");
     assert.equal(tool._meta?.["openai/outputTemplate"], "ui://outilsia/machine-cockpit-v2.html");
   }
+  const renderTool = listed.tools.find((tool) => tool.name === "render_machine_cockpit");
+  assert.deepEqual(renderTool?._meta?.ui?.visibility, ["app"]);
+  for (const tool of listed.tools.filter((item) => item.name !== "render_machine_cockpit")) {
+    assert.deepEqual(tool._meta?.ui?.visibility, ["model", "app"]);
+  }
+
+  const resource = await client.readResource({ uri: RESOURCE_URI });
+  assert.equal(resource.contents[0]?._meta?.ui?.domain, DEFAULT_WIDGET_DOMAIN);
+  assert.equal(resource.contents[0]?._meta?.["openai/widgetDomain"], DEFAULT_WIDGET_DOMAIN);
 
   const result = await client.callTool({
     name: "check_pc_for_local_ai",
@@ -91,6 +105,8 @@ test("MCP exposes four read-only tools and returns renderable structured data", 
   assert.equal(result.isError, undefined);
   assert.equal(result.structuredContent.decision.score.value, 80);
   assert.equal(result.structuredContent.decision.purchase.priority, "none");
+  assert.match(result.content[0].text, /fiche visuelle OutilsIA est jointe/i);
+  assert.doesNotMatch(result.content[0].text, /render_machine_cockpit/i);
 
   const report = await client.callTool({
     name: "analyze_shared_report",
