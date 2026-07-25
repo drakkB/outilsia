@@ -204,7 +204,7 @@ function freshnessFor(artifacts) {
 
 function gitOutput(args) {
   const result = spawnSync("git", args, { cwd: repoRoot, encoding: "utf8" });
-  return result.status === 0 ? result.stdout.trim() : "";
+  return result.status === 0 ? result.stdout.trimEnd() : "";
 }
 
 function currentTrackedSourceDirty() {

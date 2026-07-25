@@ -7,6 +7,7 @@ const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(appRoot, "..");
 const workflowPath = join(repoRoot, ".github", "workflows", "local-cockpit-release-candidate.yml");
 const text = readFileSync(workflowPath, "utf8");
+const packager = readFileSync(join(appRoot, "scripts", "package-release-candidate.mjs"), "utf8");
 
 function fail(message) {
   throw new Error(message);
@@ -19,6 +20,9 @@ if (!text.includes("package:rc") || !text.includes("build-windows-release-candid
   fail("RC workflow must use the isolated packager on Windows and Linux");
 }
 if (!text.includes(".artifacts/release-candidate")) fail("RC workflow must write under .artifacts");
+if (!packager.includes("result.stdout.trimEnd()") || packager.includes("result.stdout.trim()")) {
+  fail("RC packager must preserve the leading Git porcelain status column");
+}
 
 const forbidden = [
   [/\bscp\b/i, "scp"],

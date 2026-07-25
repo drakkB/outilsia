@@ -92,6 +92,17 @@ function main() {
     && !Array.isArray(candidate.source.post_build_tracked_dirty_paths)) {
     fail("RC source.post_build_tracked_dirty_paths must be an array");
   }
+  for (const path of candidate.source?.post_build_tracked_dirty_paths || []) {
+    if (typeof path !== "string"
+      || !path
+      || path !== path.trim()
+      || path.startsWith("/")
+      || path.startsWith("\\")
+      || /^[A-Za-z]:/.test(path)
+      || path.split(/[\\/]/).includes("..")) {
+      fail(`Invalid RC post-build dirty path: ${path}`);
+    }
+  }
   if (!Array.isArray(candidate.files) || !candidate.files.length) fail("RC files must not be empty");
 
   const names = new Set();

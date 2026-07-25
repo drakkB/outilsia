@@ -70,6 +70,19 @@ try {
   ]);
   run("verify-release-candidate.mjs", ["--input", windows, "--require-platform", "windows-x64", "--require-freshness"]);
   run("verify-release-candidate.mjs", ["--input", linux, "--require-platform", "linux", "--require-freshness"]);
+  const windowsCandidate = JSON.parse(readFileSync(join(windows, "release-candidate.json"), "utf8"));
+  for (const expectedPath of [
+    "local-cockpit-app/src-tauri/Cargo.toml",
+    "local-cockpit-app/src-tauri/gen/schemas/desktop-schema.json",
+    "local-cockpit-app/src-tauri/gen/schemas/windows-schema.json",
+  ]) {
+    const suffix = expectedPath.replace(/^local-cockpit-app\//, "");
+    const recorded = (windowsCandidate.source?.post_build_tracked_dirty_paths || [])
+      .find((path) => path.endsWith(suffix));
+    if (recorded && recorded !== expectedPath) {
+      throw new Error(`RC post-build provenance path lost its Git porcelain prefix: ${recorded}`);
+    }
+  }
   run("make-release-candidate-kit.mjs", [
     "--candidate-dir", windows,
     "--output-dir", kit,
