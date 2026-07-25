@@ -8,6 +8,7 @@
 - Origine UI dédiée : `https://chatgpt-local-cockpit.outilsia.fr`
 - CSP limitée à `https://outilsia.fr`
 - Cinq tests positifs et trois tests négatifs
+- Fichier d'import officiel `chatgpt-app-submission.json`
 - Trois prompts de démarrage
 - Page produit, support, confidentialité et conditions dédiées
 - Challenge de domaine implémenté, désactivé tant que le portail n'a pas fourni le token
@@ -28,7 +29,9 @@
 
 1. Vérifier que le rôle OpenAI Platform possède `Apps Management: Write`.
 2. Créer une soumission `With MCP` sur le portail Plugins.
-3. Reporter les champs de `listing.json`.
+3. Importer `chatgpt-app-submission.json`, puis téléverser
+   `submission/assets/outilsia-local-cockpit-512.png` dans les deux champs
+   d'icône.
 4. Lorsque le portail fournit le challenge, écrire uniquement ce token dans `/etc/outilsia-chatgpt-app.env` :
 
    ```text

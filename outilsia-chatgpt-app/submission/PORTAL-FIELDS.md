@@ -1,25 +1,36 @@
 # Champs de soumission OpenAI - OutilsIA Local Cockpit
 
-Source structurée : `listing.json`. Cas de recette : `test-cases.json`.
+Importer d'abord `../chatgpt-app-submission.json`. Le fichier est généré depuis
+`listing.json`, `tool-annotations.json` et `test-cases.json` avec :
+
+```bash
+npm run generate:submission
+```
 
 ## Info
 
 - Plugin name : `OutilsIA Local Cockpit`
 - Short description : `Choisir une IA locale`
-- Developer identity : identité OutilsIA vérifiée dans l'organisation OpenAI
-- Developer name : `OutilsIA.fr`
-- Category : `Data & Analytics`
+- Developer identity : `OutilsIA.fr` (vérifiée)
+- Plugin author : `OutilsIA.fr`
+- Category : `Productivity`
 - Website : `https://outilsia.fr/chatgpt-ia-locale`
 - Support : `https://outilsia.fr/support-plugin-outilsia`
 - Privacy policy : `https://outilsia.fr/confidentialite-plugin-outilsia`
 - Terms : `https://outilsia.fr/conditions-plugin-outilsia`
-- Logo : `assets/outilsia-local-cockpit-512.png`
+- Directory icon : `assets/outilsia-local-cockpit-512.png`
+- Composer icon : `assets/outilsia-local-cockpit-512.png`
 
 La description longue et les capacités sont à copier depuis `listing.json`.
 
-Si la vérification individuelle impose le nom légal du développeur dans le
-champ public, utiliser exactement le libellé validé par OpenAI au lieu de
-forcer `OutilsIA.fr`. Ne pas deviner ce libellé avant la fin de la vérification.
+L'identité OpenAI de l'organisation est vérifiée. Ne pas sélectionner une autre
+organisation ou une identité personnelle différente au moment du dépôt.
+
+### Commerce
+
+Laisser décoché `My plugin links or directs users out of ChatGPT to make
+purchases`. La version soumise recommande éventuellement un upgrade, mais
+n'affiche aucun lien d'achat, ne commande rien et ne vend aucun bien.
 
 ## MCP
 
@@ -60,8 +71,9 @@ Téléverser la capture correspondante `starter-01`, `starter-02` ou
 
 ## Testing
 
-Reporter exactement les cinq cas positifs et trois cas négatifs de
-`test-cases.json`. Aucun compte, credential, MFA ou réseau privé n'est requis.
+Le fichier `chatgpt-app-submission.json` importe exactement cinq cas positifs
+et trois cas négatifs. Aucun compte, credential, MFA ou réseau privé n'est
+requis.
 
 Le rapport public de recette est :
 
@@ -75,6 +87,11 @@ Le rapport public de recette est :
 ## Release notes
 
 Copier `releaseNotes` depuis `listing.json`.
+
+## Skills
+
+Laisser vide. Cette première version est un plugin MCP avec widget, sans bundle
+de skills.
 
 ## Demo recording
 

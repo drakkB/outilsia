@@ -13,6 +13,7 @@ const repoRoot = resolve(root, "..");
 const listing = JSON.parse(readFileSync(join(root, "submission", "listing.json"), "utf8"));
 const tests = JSON.parse(readFileSync(join(root, "submission", "test-cases.json"), "utf8"));
 const annotations = JSON.parse(readFileSync(join(root, "submission", "tool-annotations.json"), "utf8"));
+const importPath = join(root, "chatgpt-app-submission.json");
 const portalFieldsPath = join(root, "submission", "PORTAL-FIELDS.md");
 const pages = {
   website: join(repoRoot, "server-work", "static", "pages", "chatgpt-ia-locale.html"),
@@ -165,6 +166,75 @@ for (const name of TOOL_NAMES) {
     requireCondition(String(item[key] || "").length >= 40, `${name}.${key} is too vague.`);
   }
 }
+
+requireCondition(existsSync(importPath), "Missing chatgpt-app-submission.json.");
+const submissionImport = JSON.parse(readFileSync(importPath, "utf8"));
+requireCondition(
+  submissionImport.$schema === "https://developers.openai.com/plugins/schemas/chatgpt-app-submission.v1.json",
+  "Submission import uses the wrong schema URL.",
+);
+requireCondition(submissionImport.schema_version === 1, "Submission import schema_version must be 1.");
+requireCondition(
+  submissionImport.app_info?.display_name === ui.displayName,
+  "Submission import display name differs from listing.json.",
+);
+requireCondition(
+  submissionImport.app_info?.subtitle === ui.shortDescription,
+  "Submission import subtitle differs from listing.json.",
+);
+requireCondition(
+  submissionImport.app_info?.description === ui.longDescription,
+  "Submission import description differs from listing.json.",
+);
+requireCondition(
+  submissionImport.app_info?.category === "PRODUCTIVITY",
+  "Submission import category must be PRODUCTIVITY.",
+);
+requireCondition(
+  Object.keys(submissionImport.tools || {}).sort().join("|") === [...TOOL_NAMES].sort().join("|"),
+  "Submission import must cover every MCP tool.",
+);
+for (const name of TOOL_NAMES) {
+  const imported = submissionImport.tools[name];
+  const source = annotations[name];
+  requireCondition(imported.annotations.readOnlyHint === source.readOnlyHint, `${name} readOnlyHint drift.`);
+  requireCondition(imported.annotations.openWorldHint === source.openWorldHint, `${name} openWorldHint drift.`);
+  requireCondition(imported.annotations.destructiveHint === source.destructiveHint, `${name} destructiveHint drift.`);
+  requireCondition(
+    imported.justifications.read_only_justification === source.readOnlyJustification,
+    `${name} read-only justification drift.`,
+  );
+  requireCondition(
+    imported.justifications.open_world_justification === source.openWorldJustification,
+    `${name} open-world justification drift.`,
+  );
+  requireCondition(
+    imported.justifications.destructive_justification === source.destructiveJustification,
+    `${name} destructive justification drift.`,
+  );
+}
+requireCondition(submissionImport.test_cases?.length === 5, "Submission import needs five positive tests.");
+requireCondition(
+  submissionImport.negative_test_cases?.length === 3,
+  "Submission import needs three negative tests.",
+);
+submissionImport.test_cases.forEach((test, index) => {
+  const source = tests.positive[index];
+  requireCondition(test.user_prompt === source.prompt, `Positive import test ${index + 1} prompt drift.`);
+  requireCondition(
+    test.tools_triggered === source.expectedToolSequence[0],
+    `Positive import test ${index + 1} tool drift.`,
+  );
+  requireCondition(test.file_attachment_urls === null, `Positive import test ${index + 1} needs no files.`);
+});
+submissionImport.negative_test_cases.forEach((test, index) => {
+  const source = tests.negative[index];
+  requireCondition(test.user_prompt === source.prompt, `Negative import test ${index + 1} prompt drift.`);
+  requireCondition(test.tools_triggered === null, `Negative import test ${index + 1} must trigger no tool.`);
+  requireCondition(test.file_attachment_urls === null, `Negative import test ${index + 1} needs no files.`);
+});
+const importText = JSON.stringify(submissionImport);
+requireCondition(!/C:\\\\Users|\/mnt\/|\/home\/|BEGIN [A-Z ]+ KEY/.test(importText), "Submission import leaks a local path or secret.");
 
 for (const [label, path] of Object.entries(pages)) {
   requireCondition(existsSync(path), `Missing ${label} page.`);

@@ -6,7 +6,7 @@
     "shortDescription": "Choisir une IA locale",
     "longDescription": "L'app OutilsIA aide à choisir un modèle d'IA locale à partir de faits matériels. Déclarez le CPU, la RAM, le GPU et la VRAM d'un PC, ou fournissez un rapport OutilsIA Local Cockpit déjà partagé. L'app classe les modèles compatibles, distingue une estimation d'un benchmark réel, peut simuler un upgrade RAM/VRAM et affiche une fiche compacte dans la conversation. Tous les outils sont en lecture seule : ils ne scannent pas le PC, n'accèdent pas à Ollama, n'installent rien et n'effectuent aucun achat. Lorsqu'une machine suffit déjà, OutilsIA recommande explicitement de ne rien acheter.",
     "developerName": "OutilsIA.fr",
-    "category": "Data & Analytics",
+    "category": "Productivity",
     "capabilities": [
       "Estimer la compatibilité d'un PC avec des modèles IA locaux",
       "Analyser un rapport anonymisé OutilsIA Local Cockpit",

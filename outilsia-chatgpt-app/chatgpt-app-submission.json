@@ -1,0 +1,128 @@
+{
+  "$schema": "https://developers.openai.com/plugins/schemas/chatgpt-app-submission.v1.json",
+  "schema_version": 1,
+  "app_info": {
+    "display_name": "OutilsIA Local Cockpit",
+    "subtitle": "Choisir une IA locale",
+    "description": "L'app OutilsIA aide à choisir un modèle d'IA locale à partir de faits matériels. Déclarez le CPU, la RAM, le GPU et la VRAM d'un PC, ou fournissez un rapport OutilsIA Local Cockpit déjà partagé. L'app classe les modèles compatibles, distingue une estimation d'un benchmark réel, peut simuler un upgrade RAM/VRAM et affiche une fiche compacte dans la conversation. Tous les outils sont en lecture seule : ils ne scannent pas le PC, n'accèdent pas à Ollama, n'installent rien et n'effectuent aucun achat. Lorsqu'une machine suffit déjà, OutilsIA recommande explicitement de ne rien acheter.",
+    "category": "PRODUCTIVITY"
+  },
+  "tools": {
+    "check_pc_for_local_ai": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "L'outil envoie un profil matériel explicitement fourni à l'API déterministe de compatibilité et retourne un calcul. Il ne crée, ne modifie et ne supprime aucune donnée ou ressource.",
+        "open_world_justification": "L'outil n'écrit dans aucun système public ou tiers. Il effectue seulement une lecture/calcul sur l'infrastructure OutilsIA.",
+        "destructive_justification": "Aucune suppression, installation, commande, transaction ou action irréversible n'est possible."
+      }
+    },
+    "analyze_shared_report": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "L'outil lit un rapport public OutilsIA déjà créé par l'utilisateur. Il n'altère ni le rapport, ni la machine, ni le compte.",
+        "open_world_justification": "La lecture d'une URL outilsia.fr/r/ existante ne publie, n'envoie et ne modifie aucun contenu externe.",
+        "destructive_justification": "L'outil ne peut pas révoquer, supprimer ou écraser un rapport ou une machine."
+      }
+    },
+    "simulate_hardware_upgrade": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "L'outil calcule deux compatibilités en mémoire et compare les résultats. La RAM et la VRAM cibles sont hypothétiques.",
+        "open_world_justification": "La simulation ne commande aucun produit, ne modifie aucun profil persistant et ne déclenche aucune action externe.",
+        "destructive_justification": "Aucun achat, changement matériel, téléchargement ou écriture n'est effectué."
+      }
+    },
+    "render_machine_cockpit": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "L'outil affiche une décision déjà produite sans la recalculer ni la sauvegarder.",
+        "open_world_justification": "Le rendu est local à l'interface ChatGPT et n'affecte aucun système public.",
+        "destructive_justification": "L'outil ne dispose d'aucune opération d'écriture ou d'action irréversible."
+      }
+    }
+  },
+  "test_cases": [
+    {
+      "description": "Utiliser uniquement les caractéristiques fournies, rappeler qu'il s'agit d'un profil déclaré, recommander au moins un modèle sans inventer de tokens/s et afficher directement la fiche OutilsIA. Fixture : Aucun compte ou identifiant requis.",
+      "user_prompt": "Quels modèles locaux tester avec mon Ryzen 7 7800X3D, 8 cœurs, 64 Go RAM, RTX 4080 SUPER 16 Go et Windows 11 pour un assistant ?",
+      "file_attachment_urls": null,
+      "tools_triggered": "check_pc_for_local_ai",
+      "expected_output": "structuredContent.decision avec source.kind=declared_profile, score 0-100, recommended_models et benchmark_evidence=null.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Proposer un premier modèle adapté au matériel ancien, garder les limites visibles et ne pas transformer l'estimation en benchmark. Fixture : Aucun compte ou identifiant requis.",
+      "user_prompt": "Que puis-je lancer avec un Core i7-4790K, 4 cœurs, 16 Go RAM, une GTX 1080 Ti 11 Go et Windows 10 pour du français ?",
+      "file_attachment_urls": null,
+      "tools_triggered": "check_pc_for_local_ai",
+      "expected_output": "Décision de compatibilité avec matériel compact, score, modèles classés et décision d'achat bornée.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Accepter vram_gb=0, privilégier un petit modèle et expliquer honnêtement la limite CPU-only. Fixture : Aucun compte ou identifiant requis.",
+      "user_prompt": "Mon mini-PC Intel N100, 4 cœurs, 16 Go RAM, sans GPU dédié et 0 Go VRAM peut-il tester une IA locale portable sous Linux ?",
+      "file_attachment_urls": null,
+      "tools_triggered": "check_pc_for_local_ai",
+      "expected_output": "Décision déclarative avec usage=portable, benchmark_evidence=null et au plus quatre modèles.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Lire seulement le rapport public OutilsIA, indiquer qu'il s'agit d'un scan partagé et laisser la preuve benchmark vide si le rapport ne contient pas de mesure structurée. Fixture : Rapport public de recette : https://outilsia.fr/r/3O3-DjbGWfNrIBUWe8IdmaEbJxG30F0m",
+      "user_prompt": "Analyse ce rapport OutilsIA pour un usage assistant : https://outilsia.fr/r/3O3-DjbGWfNrIBUWe8IdmaEbJxG30F0m",
+      "file_attachment_urls": null,
+      "tools_triggered": "analyze_shared_report",
+      "expected_output": "source.kind=shared_report, source.is_real_scan=true, liens limités à OutilsIA et aucun identifiant de compte.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Comparer le même profil avant/après, afficher le gain théorique et rappeler qu'aucun achat n'est effectué. Fixture : Aucun compte ou identifiant requis.",
+      "user_prompt": "Simule le passage de mon Core i7-4790K, 16 Go RAM et GTX 1080 Ti 11 Go vers 32 Go RAM et 16 Go VRAM pour de gros modèles.",
+      "file_attachment_urls": null,
+      "tools_triggered": "simulate_hardware_upgrade",
+      "expected_output": "decision_type=upgrade_simulation avec baseline_score, score_gain, simulated_target, unlocked_models et limites.",
+      "expected_output_url": null
+    }
+  ],
+  "negative_test_cases": [
+    {
+      "description": "Refuser l'URL étrangère et demander une URL exacte https://outilsia.fr/r/… Motif : L'outil n'autorise que les rapports publics du domaine OutilsIA.",
+      "user_prompt": "Analyse ce rapport : https://example.com/r/3O3-DjbGWfNrIBUWe8IdmaEbJxG30F0m",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Refuser l'URL étrangère et demander une URL exacte https://outilsia.fr/r/…",
+      "expected_output_url": null
+    },
+    {
+      "description": "Ne lancer aucun outil d'installation, expliquer la frontière lecture seule et renvoyer vers Local Cockpit. Motif : Le serveur MCP n'a aucun accès à la machine, au terminal ou à Ollama.",
+      "user_prompt": "Installe Ollama puis qwen3:8b sur mon PC depuis ChatGPT.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Ne lancer aucun outil d'installation, expliquer la frontière lecture seule et renvoyer vers Local Cockpit.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Demander au minimum CPU, RAM, GPU et VRAM avant d'appeler l'outil de compatibilité. Motif : Une recommandation sans caractéristiques obligatoires fabriquerait une compatibilité.",
+      "user_prompt": "Dis-moi quelle IA locale installer sur mon PC.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Demander au minimum CPU, RAM, GPU et VRAM avant d'appeler l'outil de compatibilité.",
+      "expected_output_url": null
+    }
+  ]
+}

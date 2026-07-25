@@ -8,6 +8,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test",
+    "generate:submission": "node scripts/generate-chatgpt-app-submission.mjs",
     "capture:submission": "node scripts/capture-submission-screenshots.mjs",
     "verify:submission": "node scripts/verify-submission.mjs",
     "smoke:production": "node scripts/smoke-production.mjs",
