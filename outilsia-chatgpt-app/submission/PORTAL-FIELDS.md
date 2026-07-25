@@ -17,6 +17,10 @@ Source structurée : `listing.json`. Cas de recette : `test-cases.json`.
 
 La description longue et les capacités sont à copier depuis `listing.json`.
 
+Si la vérification individuelle impose le nom légal du développeur dans le
+champ public, utiliser exactement le libellé validé par OpenAI au lieu de
+forcer `OutilsIA.fr`. Ne pas deviner ce libellé avant la fin de la vérification.
+
 ## MCP
 
 - Submission type : `With MCP`
@@ -71,6 +75,11 @@ Le rapport public de recette est :
 ## Release notes
 
 Copier `releaseNotes` depuis `listing.json`.
+
+## Demo recording
+
+Suivre `DEMO-RECORDING.md`, héberger la vidéo à une URL accessible sans
+connexion, puis reporter cette URL dans le champ demandé par le portail.
 
 ## Étape manuelle de vérification
 

@@ -12,6 +12,17 @@
 - Page produit, support, confidentialité et conditions dédiées
 - Challenge de domaine implémenté, désactivé tant que le portail n'a pas fourni le token
 - Logo 512 x 512 et trois captures 706 x 860
+- Script de démonstration reviewer-ready dans `DEMO-RECORDING.md`
+
+## État au 25 juillet 2026
+
+- Technique locale : prête (`npm run verify`)
+- Production : prête (`npm run smoke:production`)
+- Connexion en mode développeur : testée
+- Identité OpenAI : `Identity in review`
+- Challenge de domaine : en attente du token fourni par le portail
+- Vidéo : script prêt, enregistrement et URL encore à produire
+- Soumission publique : non lancée
 
 ## Actions humaines obligatoires dans le portail
 
@@ -33,7 +44,7 @@
 
 7. Lancer `Scan Tools`, vérifier que les trois outils d'analyse sont visibles au modèle, que `render_machine_cockpit` est réservé à l'app, puis reporter les justifications de `tool-annotations.json`.
 8. Téléverser le logo et une capture par prompt de démarrage.
-9. Enregistrer une courte démonstration montrant profil déclaré, rapport partagé, simulation et refus d'installation.
+9. Enregistrer la démonstration décrite dans `DEMO-RECORDING.md`, puis vérifier que son URL est lisible sans connexion.
 10. Soumettre pour revue. Ne pas annoncer une publication avant l'approbation puis la publication manuelle.
 
 ## Recette finale
