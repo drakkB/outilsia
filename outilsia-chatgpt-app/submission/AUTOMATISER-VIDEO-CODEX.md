@@ -37,14 +37,20 @@ plugin avant la vidéo afin que le catalogue ChatGPT pointe vers `v3`.
 
 ## Architecture d'automatisation
 
-- `@Computer` : pilote directement la fenêtre Brave existante dans laquelle
-  ChatGPT et le plugin OutilsIA sont déjà connectés, puis Xbox Game Bar.
-- PowerShell : retrouve, contrôle et renomme le dernier enregistrement.
+- `@Computer` : pilote uniquement la fenêtre Brave dans laquelle ChatGPT et le
+  plugin OutilsIA sont déjà connectés.
+- `OUTILSIA-VIDEO-RECORDER.ps1` : minimise les autres fenêtres, maximise Brave,
+  calcule sa zone écran puis lance FFmpeg sans overlay.
+- PowerShell : démarre et arrête proprement FFmpeg, puis vérifie le MP4 avec
+  `ffprobe`.
 - Humain : valide visuellement la vidéo avant toute publication.
 
 Ne pas utiliser Playwright pour cette recette : la preuve attendue porte sur la
 vraie session ChatGPT connectée, les appels MCP et le widget rendu. Ne pas
 fabriquer une vidéo à partir de captures ou de réponses simulées.
+
+Ne pas utiliser Xbox Game Bar : son overlay appartient à `GameBar.exe` et n'est
+pas pilotable de façon fiable par Computer Use lorsqu'il contrôle Brave.
 
 ## Préconditions
 
@@ -52,14 +58,16 @@ fabriquer une vidéo à partir de captures ou de réponses simulées.
 2. L'app Codex est ouverte avec le plugin `Computer Use` actif.
 3. Brave est ouvert sur la session ChatGPT déjà connectée.
 4. `OutilsIA Local Cockpit` est connecté dans ChatGPT Developer Mode.
-5. Xbox Game Bar est installée et l'enregistrement est autorisé.
+5. FFmpeg est installé. Le script sait retrouver automatiquement l'installation
+   `Gyan.FFmpeg` créée par `winget`, même si le terminal n'a pas rechargé son
+   `PATH`.
 6. Les notifications Windows et Brave sont désactivées temporairement.
 7. Tous les onglets contenant un email, un compte, Persona, GitHub ou le
    portail OpenAI sont fermés.
 8. Le zoom Brave est à 100 % et la fenêtre est au moins en 1440 x 900.
-9. Dans la fiche du plugin, `Modèle de sortie` indique
-   `ui://outilsia/machine-cockpit-v3.html`, ou le serveur public `0.2.2` avec
-   alias `v2` a été vérifié.
+9. Dans la fiche du plugin, `Modèle de sortie` indique `v3` ou encore `v2`.
+   Les deux URI sont servies par le serveur public `0.2.2` ; la réussite du
+   préflight visuel est le critère décisif.
 
 Si une précondition échoue, s'arrêter et expliquer précisément laquelle. Ne
 pas improviser un autre compte, un autre plugin ou une fausse démonstration.
@@ -81,22 +89,32 @@ Brave. N'ouvre ni Chrome ni le navigateur intégré. Ne montre aucune
 information de compte et ne soumets aucun formulaire.
 Avant d'enregistrer, vérifie que le plugin OutilsIA est actif et que les trois
 outils d'analyse sont disponibles. Ouvre d'abord la fiche du plugin et clique
-sur "Actualiser". Vérifie que "Modèle de sortie" vaut
-ui://outilsia/machine-cockpit-v3.html. Si ChatGPT conserve v2, déconnecte puis
-reconnecte uniquement le plugin OutilsIA avec https://outilsia.fr/mcp.
+sur "Actualiser". Note si "Modèle de sortie" indique v2 ou v3. Le serveur sert
+les deux URI : ne déconnecte pas le plugin si le préflight visuel fonctionne.
 
 Exécute ensuite le préflight matériel SANS enregistrer. Le widget doit
 s'afficher, sans "Failed to fetch template". Crée seulement après cela une
-nouvelle conversation propre et lance Xbox Game Bar.
+nouvelle conversation propre.
+
+Pour démarrer la vidéo, exécute ensuite dans le terminal :
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File
+"C:\Users\chris\outilsia-repo\outilsia-chatgpt-app\submission\OUTILSIA-VIDEO-RECORDER.ps1"
+-Action Start
+
+Continue uniquement si la commande retourne OUTILSIA_RECORDING_STARTED.
 
 Exécute les quatre scénarios dans l'ordre, attends chaque réponse complète,
 montre le widget quelques secondes et vérifie visuellement les critères.
 Arrête immédiatement si un outil échoue, si le widget reste vide, si une
 information privée apparaît ou si ChatGPT appelle un outil inattendu.
 
-À la fin, arrête l'enregistrement, retrouve le dernier MP4, copie-le vers :
-C:\Users\chris\Downloads\OutilsIA-ChatGPT-Submission\
-demo-outilsia-chatgpt-local-cockpit.mp4
+À la fin, arrête proprement l'enregistrement en exécutant dans le terminal :
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File
+"C:\Users\chris\outilsia-repo\outilsia-chatgpt-app\submission\OUTILSIA-VIDEO-RECORDER.ps1"
+-Action Stop
+
+Le script finalise directement :
+C:\Users\chris\Downloads\OutilsIA-ChatGPT-Submission\demo-outilsia-chatgpt-local-cockpit.mp4
 
 Contrôle ensuite que le fichier existe, dépasse 2 Mo et relis-le visuellement.
 Ne le publie pas et ne clique pas sur "Submit for Review". Donne-moi le chemin,
@@ -119,12 +137,10 @@ Cette étape se fait avant tout enregistrement.
 ui://outilsia/machine-cockpit-v3.html
 ```
 
-Si `v2` reste affiché :
-
-1. déconnecter uniquement `OutilsIA Local Cockpit` ;
-2. le reconnecter en mode développeur avec `https://outilsia.fr/mcp` ;
-3. cliquer de nouveau sur `Actualiser` ;
-4. ne toucher à aucun autre plugin.
+Si `v2` reste affiché, continuer : le serveur `0.2.2` conserve volontairement
+cet alias pour les catalogues ChatGPT en cache. Ne reconnecter le plugin avec
+`https://outilsia.fr/mcp` que si le préflight échoue encore après `Réessayer`
+et `Ctrl + Shift + R`.
 
 ### 2. Préflight obligatoire sans vidéo
 
@@ -158,16 +174,29 @@ arrêter et rapporter l'URI affichée dans `Modèle de sortie`.
 
 ### 4. Démarrer l'enregistrement
 
-Utiliser `Win + Alt + R`.
+Exécuter depuis le terminal de l'app Codex :
 
-Si ce raccourci ne démarre pas l'enregistrement :
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\chris\outilsia-repo\outilsia-chatgpt-app\submission\OUTILSIA-VIDEO-RECORDER.ps1" -Action Start
+```
 
-1. ouvrir Xbox Game Bar avec `Win + G` ;
-2. ouvrir le panneau `Capture` ;
-3. cliquer sur le bouton rond `Enregistrer` ;
-4. revenir immédiatement à Brave.
+Le script :
 
-Vérifier que l'indicateur d'enregistrement est visible avant de continuer.
+1. minimise toutes les autres fenêtres sans les fermer ;
+2. maximise et remet Brave au premier plan ;
+3. enregistre uniquement la zone de Brave ;
+4. réduit la vidéo à environ 1920 pixels de large ;
+5. limite automatiquement un enregistrement abandonné à 15 minutes.
+
+Continuer seulement si la sortie contient :
+
+```text
+OUTILSIA_RECORDING_STARTED
+```
+
+Ne pas ouvrir une autre application pendant la capture. Le script n'affiche
+aucun overlay, mais une fenêtre placée par-dessus Brave serait visible dans la
+vidéo.
 
 ### 5. Scénario matériel déclaré
 
@@ -249,34 +278,32 @@ Laisser le refus visible trois secondes.
 
 ### 9. Arrêter et récupérer le MP4
 
-Arrêter avec `Win + Alt + R`.
-
-Xbox Game Bar enregistre normalement dans :
-
-```text
-C:\Users\chris\Videos\Captures
-```
-
-Utiliser PowerShell pour retrouver le dernier fichier :
+Exécuter depuis le terminal de l'app Codex :
 
 ```powershell
-$capture = Get-ChildItem "$env:USERPROFILE\Videos\Captures" -Filter *.mp4 |
-  Sort-Object LastWriteTime -Descending |
-  Select-Object -First 1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\chris\outilsia-repo\outilsia-chatgpt-app\submission\OUTILSIA-VIDEO-RECORDER.ps1" -Action Stop
+```
 
-if (-not $capture) {
-  throw "Aucun enregistrement Game Bar trouvé."
-}
+Le script envoie `q` à FFmpeg afin de fermer proprement le conteneur MP4, puis
+utilise `ffprobe` pour afficher le chemin, la taille et la durée.
 
-$destination = "$env:USERPROFILE\Downloads\OutilsIA-ChatGPT-Submission\demo-outilsia-chatgpt-local-cockpit.mp4"
-Copy-Item $capture.FullName $destination -Force
+La sortie doit contenir :
 
-$result = Get-Item $destination
-if ($result.Length -lt 2MB) {
-  throw "La vidéo est trop petite pour constituer une démonstration complète."
-}
+```text
+OUTILSIA_RECORDING_STOPPED
+GracefulStop: True
+```
 
-$result | Select-Object FullName, Length, LastWriteTime
+Le fichier est directement écrit ici :
+
+```text
+C:\Users\chris\Downloads\OutilsIA-ChatGPT-Submission\demo-outilsia-chatgpt-local-cockpit.mp4
+```
+
+Si nécessaire, vérifier l'état sans arrêter :
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\chris\outilsia-repo\outilsia-chatgpt-app\submission\OUTILSIA-VIDEO-RECORDER.ps1" -Action Status
 ```
 
 ### 10. Contrôle visuel obligatoire
@@ -332,6 +359,8 @@ que la vidéo ne contient aucune donnée privée.
 - MP4 réel produit par une session ChatGPT Developer Mode.
 - Plugin actualisé sur le template `v3`.
 - Préflight widget réussi avant le début de l'enregistrement.
+- Capture FFmpeg démarrée sans overlay.
+- Arrêt FFmpeg gracieux confirmé.
 - Trois outils positifs montrés.
 - Un refus hors périmètre montré.
 - Widget lisible et stable.

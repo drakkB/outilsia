@@ -15,6 +15,8 @@ const tests = JSON.parse(readFileSync(join(root, "submission", "test-cases.json"
 const annotations = JSON.parse(readFileSync(join(root, "submission", "tool-annotations.json"), "utf8"));
 const importPath = join(root, "chatgpt-app-submission.json");
 const portalFieldsPath = join(root, "submission", "PORTAL-FIELDS.md");
+const videoGuidePath = join(root, "submission", "AUTOMATISER-VIDEO-CODEX.md");
+const videoRecorderPath = join(root, "submission", "OUTILSIA-VIDEO-RECORDER.ps1");
 const pages = {
   website: join(repoRoot, "server-work", "static", "pages", "chatgpt-ia-locale.html"),
   privacy: join(repoRoot, "server-work", "static", "pages", "confidentialite-plugin-outilsia.html"),
@@ -140,6 +142,34 @@ for (const value of [
 ]) {
   requireCondition(portalFields.includes(value), `Portal guide missing ${value}`);
 }
+
+requireCondition(existsSync(videoGuidePath), "Missing Codex video automation guide.");
+requireCondition(existsSync(videoRecorderPath), "Missing FFmpeg video recorder.");
+const videoGuide = readFileSync(videoGuidePath, "utf8");
+const videoRecorder = readFileSync(videoRecorderPath, "utf8");
+for (const marker of [
+  "OUTILSIA-VIDEO-RECORDER.ps1",
+  "OUTILSIA_RECORDING_STARTED",
+  "OUTILSIA_RECORDING_STOPPED",
+  "GracefulStop: True",
+]) {
+  requireCondition(videoGuide.includes(marker), `Video guide missing ${marker}`);
+}
+for (const marker of [
+  "OUTILSIA_RECORDING_STARTED",
+  "OUTILSIA_RECORDING_STOPPED",
+  "GracefulStop:",
+]) {
+  requireCondition(videoRecorder.includes(marker), `Video recorder missing ${marker}`);
+}
+requireCondition(
+  videoRecorder.includes('ValidateSet("Start", "Stop", "Status", "Worker")'),
+  "Video recorder must expose the four controlled actions.",
+);
+requireCondition(
+  videoRecorder.includes('"-i", "desktop"') && videoRecorder.includes("DwmGetWindowAttribute"),
+  "Video recorder must capture only the measured Brave screen region.",
+);
 
 requireCondition(tests.positive.length === 5, "Submission requires exactly five positive tests.");
 requireCondition(tests.negative.length === 3, "Submission requires exactly three negative tests.");
