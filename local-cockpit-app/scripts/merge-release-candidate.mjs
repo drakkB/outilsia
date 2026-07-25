@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, join, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -110,12 +111,19 @@ function main() {
     source: {
       ...first.source,
       tracked_dirty: candidates.some((candidate) => candidate.source?.tracked_dirty === true),
+      post_build_tracked_dirty: candidates.some((candidate) => candidate.source?.post_build_tracked_dirty === true),
+      post_build_tracked_dirty_paths: [...new Set(candidates.flatMap(
+        (candidate) => candidate.source?.post_build_tracked_dirty_paths || []
+      ))].sort(),
     },
     build_provenance: {
       ...first.build_provenance,
       artifact_platforms: platforms,
       merged_candidate: true,
       merged_input_count: candidates.length,
+      artifact_set_sha256: createHash("sha256")
+        .update(files.map((file) => `${file.sha256}  ${file.name}`).sort().join("\n"))
+        .digest("hex"),
     },
     freshness: {
       stale: candidates.some((candidate) => candidate.freshness?.stale !== false),
@@ -129,6 +137,8 @@ function main() {
     merged_from: candidates.map((candidate) => ({
       runner_os: candidate.build_provenance?.runner_os || "",
       platforms: candidate.build_provenance?.artifact_platforms || [],
+      source_commit: candidate.source?.commit || "",
+      artifact_set_sha256: candidate.build_provenance?.artifact_set_sha256 || "",
     })),
   };
   writeFileSync(join(opts.output, "release-candidate.json"), `${JSON.stringify(merged, null, 2)}\n`);

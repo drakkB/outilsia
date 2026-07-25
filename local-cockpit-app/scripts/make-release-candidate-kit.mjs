@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import {
   copyFileSync,
   existsSync,
@@ -13,10 +14,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const desktopRoot = existsSync("/mnt/c/Users/chris/Desktop")
-  ? "/mnt/c/Users/chris/Desktop/_OutilsIA"
-  : join(process.env.HOME || ".", "Desktop");
 const defaultCandidate = join(appRoot, ".artifacts", "release-candidate");
+const defaultKitRoot = join(appRoot, ".artifacts", "release-candidate-kit");
 
 function fail(message) {
   throw new Error(message);
@@ -88,7 +87,10 @@ function main() {
     "--require-freshness",
   ]);
   const candidate = JSON.parse(readFileSync(join(opts.candidate, "release-candidate.json"), "utf8"));
-  const output = opts.output || join(desktopRoot, `OutilsIA-Local-Cockpit-${candidate.label}-Test`);
+  const candidateManifestSha = createHash("sha256")
+    .update(readFileSync(join(opts.candidate, "release-candidate.json")))
+    .digest("hex");
+  const output = opts.output || join(defaultKitRoot, `OutilsIA-Local-Cockpit-${candidate.label}-Test`);
   prepareOutput(output, opts.replace);
 
   const windowsFiles = candidate.files.filter((file) => file.platform === "windows-x64");
@@ -177,6 +179,15 @@ function Require-True($Value, [string]$Label) {
 function Require-Text($Value, [string]$Label) {
   if ([string]::IsNullOrWhiteSpace([string]$Value)) { Fail "$Label est vide" }
 }
+function Get-Sha256Text([string]$Value) {
+  $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
+  $hash = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    return ([System.BitConverter]::ToString($hash.ComputeHash($bytes))).Replace("-", "").ToLowerInvariant()
+  } finally {
+    $hash.Dispose()
+  }
+}
 
 if ([string]::IsNullOrWhiteSpace($RecipePath)) {
   $local = Join-Path $root "RECETTE-RESULTAT.json"
@@ -198,6 +209,14 @@ try {
   $recipe = Get-Content -LiteralPath $RecipePath -Raw -Encoding UTF8 | ConvertFrom-Json
 } catch {
   Fail "JSON recette illisible: $($_.Exception.Message)"
+}
+$recipeSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $RecipePath).Hash.ToLowerInvariant()
+$recipeExportPath = Join-Path $root "RECETTE-SOURCE.json"
+Copy-Item -LiteralPath $RecipePath -Destination $recipeExportPath -Force
+$candidateManifestPath = Join-Path $root "release-candidate.json"
+$candidateManifestSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $candidateManifestPath).Hash.ToLowerInvariant()
+if ($candidateManifestSha -ne ${psString(candidateManifestSha)}) {
+  Fail "release-candidate.json ne correspond plus au kit signe"
 }
 if ([string]$recipe.app_version -ne $expectedVersion) {
   Fail "app_version=$($recipe.app_version), attendu $expectedVersion"
@@ -255,6 +274,22 @@ $gpu = [string]$recipe.machine_evidence.gpu
 if (![string]::IsNullOrWhiteSpace($gpu) -and $gpu -notmatch "non scann" -and $response.Content -notmatch [regex]::Escape($gpu)) {
   Fail "le rapport partage ne contient pas le GPU mesure: $gpu"
 }
+$reportBodySha = Get-Sha256Text ([string]$response.Content)
+$machineAnchor = [string]$env:COMPUTERNAME
+try {
+  $machineGuid = [string](Get-ItemProperty -LiteralPath "HKLM:\SOFTWARE\Microsoft\Cryptography" -Name MachineGuid -ErrorAction Stop).MachineGuid
+  if (![string]::IsNullOrWhiteSpace($machineGuid)) { $machineAnchor = $machineGuid }
+} catch {}
+$machineAnchorSha = Get-Sha256Text ($machineAnchor + "|" + $candidateManifestSha)
+$machineIdentity = @(
+  [string]$recipe.machine_evidence.cpu,
+  [string]$recipe.machine_evidence.gpu,
+  [string]$recipe.machine_evidence.ram_gb,
+  [string]$recipe.machine_evidence.vram_gb,
+  [string]$recipe.machine_evidence.os,
+  $machineAnchorSha
+) -join "|"
+$machineFingerprint = Get-Sha256Text $machineIdentity
 
 $result = [ordered]@{
   schema = "outilsia.local_cockpit_rc_smoke.v1"
@@ -265,16 +300,35 @@ $result = [ordered]@{
     label = ${psString(candidate.label)}
     build_id = $expectedBuild
     channel = "rc"
+    source_commit = ${psString(candidate.source?.commit || "")}
+    manifest_sha256 = $candidateManifestSha
+    artifact_set_sha256 = ${psString(candidate.build_provenance?.artifact_set_sha256 || "")}
     public_deploy_allowed = $false
   }
-  machine = $recipe.machine_evidence
+  machine = [ordered]@{
+    cpu = [string]$recipe.machine_evidence.cpu
+    ram_gb = [double]$ram
+    gpu = [string]$recipe.machine_evidence.gpu
+    vram_gb = [double]$recipe.machine_evidence.vram_gb
+    os = [string]$recipe.machine_evidence.os
+    anchor_sha256 = $machineAnchorSha
+    fingerprint_sha256 = $machineFingerprint
+  }
   benchmark = $recipe.benchmark_evidence
   shared_report = [ordered]@{
     url = $share
     http_status = [int]$response.StatusCode
     gpu_identity_matched = $true
+    body_sha256 = $reportBodySha
   }
-  source_recipe = [System.IO.Path]::GetFileName($RecipePath)
+  source_recipe = [ordered]@{
+    name = "RECETTE-SOURCE.json"
+    sha256 = $recipeSha
+  }
+  validator = [ordered]@{
+    schema = "outilsia.local_cockpit_rc_smoke_validator.v1"
+    network_rechecked = $true
+  }
   full_terrain_gate_complete = $false
   note = "Smoke RC valide. PromptForge, Dialogue, Arena et les cinq profils restent dans la recette terrain complete."
 }
@@ -308,7 +362,7 @@ pause
   write(join(output, "03-EXPORTER-LE-RESULTAT.cmd"), `@echo off
 setlocal
 cd /d "%~dp0"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$root='%~dp0'; $last=Join-Path $root 'LAST-RC-SMOKE.txt'; if(!(Test-Path $last)){Write-Host 'Lancez 02-VALIDER-LE-TEST.cmd avant export.' -ForegroundColor Red; exit 1}; $result=(Get-Content $last -Raw).Trim(); if(!(Test-Path $result)){Write-Host 'Resultat RC introuvable.' -ForegroundColor Red; exit 1}; $desktop=[Environment]::GetFolderPath('Desktop'); $stamp=[DateTimeOffset]::UtcNow.ToString('yyyyMMddHHmmss'); $zip=Join-Path $desktop ('OutilsIA-RC-Smoke-${candidate.build_id}-' + $env:COMPUTERNAME + '-' + $stamp + '.zip'); Compress-Archive -LiteralPath @($result,(Join-Path $root 'release-candidate.json'),(Join-Path $root 'SHA256SUMS.txt')) -DestinationPath $zip -Force; Write-Host ('RC_SMOKE_EXPORTED ' + $zip) -ForegroundColor Green"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$root='%~dp0'; $last=Join-Path $root 'LAST-RC-SMOKE.txt'; if(!(Test-Path $last)){Write-Host 'Lancez 02-VALIDER-LE-TEST.cmd avant export.' -ForegroundColor Red; exit 1}; $result=(Get-Content $last -Raw).Trim(); if(!(Test-Path $result)){Write-Host 'Resultat RC introuvable.' -ForegroundColor Red; exit 1}; $recipe=Join-Path $root 'RECETTE-SOURCE.json'; if(!(Test-Path $recipe)){Write-Host 'Recette source introuvable.' -ForegroundColor Red; exit 1}; $downloads=Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads'; $stamp=[DateTimeOffset]::UtcNow.ToString('yyyyMMddHHmmss'); $zip=Join-Path $downloads ('OutilsIA-RC-Smoke-${candidate.build_id}-' + $env:COMPUTERNAME + '-' + $stamp + '.zip'); Compress-Archive -LiteralPath @($result,$recipe,(Join-Path $root 'release-candidate.json'),(Join-Path $root 'SHA256SUMS.txt'),(Join-Path $root 'RC-KIT-MANIFEST.json')) -DestinationPath $zip -Force; Write-Host ('RC_SMOKE_EXPORTED ' + $zip) -ForegroundColor Green"
 if errorlevel 1 (
   echo.
   pause
@@ -391,10 +445,14 @@ PromptForge, Dialogue, Arena et le deuxième modèle restent optionnels pour ce 
       label: candidate.label,
       build_id: candidate.build_id,
       source_commit: candidate.source?.commit || "",
+      manifest_sha256: candidateManifestSha,
+      artifact_set_sha256: candidate.build_provenance?.artifact_set_sha256 || "",
     },
     public_deploy_allowed: false,
     windows_files: windowsFiles.map((file) => ({ name: file.name, sha256: file.sha256, kind: file.kind })),
     smoke_validator: "02-VALIDER-LE-TEST.cmd",
+    smoke_export_directory: "Downloads",
+    smoke_import_command: "npm run import:rc-smoke -- --candidate-dir <candidat-fusionne> --input <zip>",
     full_terrain_gate_unchanged: true,
   }, null, 2));
   console.log(`release_candidate_kit=${output}`);

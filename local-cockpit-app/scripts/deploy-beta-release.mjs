@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -17,6 +17,7 @@ const defaultRemotePagePath = "/var/www/outilsia/static/pages/telecharger-scanne
 function usage() {
   console.log(`Usage:
   node scripts/deploy-beta-release.mjs [--release-dir <dir>] [--remote <host>] [--remote-dir <dir>] [--deploy] [--require-freshness] [--include-public-page]
+    [--page <staged-download-page.html>] [--promotion-proof <PROMOTION-PROOF.json>]
 
 Default:
   --release-dir ${defaultReleaseDir}
@@ -38,6 +39,8 @@ function parseArgs(argv) {
     deploy: false,
     requireFreshness: false,
     includePublicPage: false,
+    pagePath: "",
+    promotionProofPath: "",
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -55,6 +58,14 @@ function parseArgs(argv) {
     }
     if (arg === "--include-public-page") {
       opts.includePublicPage = true;
+      continue;
+    }
+    if (arg === "--page") {
+      opts.pagePath = resolve(argv[++i] || "");
+      continue;
+    }
+    if (arg === "--promotion-proof") {
+      opts.promotionProofPath = resolve(argv[++i] || "");
       continue;
     }
     if (arg === "--release-dir") {
@@ -148,6 +159,46 @@ function validateRelease(releaseDir, options = {}) {
   };
 }
 
+function validatePromotionProof(validated, opts) {
+  const promoted = validated.release.build_provenance?.promoted_from_rc;
+  const defaultProof = join(opts.releaseDir, "PROMOTION-PROOF.json");
+  const proofPath = opts.promotionProofPath || (existsSync(defaultProof) ? defaultProof : "");
+  if (!promoted && !proofPath) return null;
+  if (!promoted) fail("Promotion proof was supplied for a release without promoted_from_rc provenance");
+  if (!proofPath || !existsSync(proofPath) || !statSync(proofPath).isFile()) {
+    fail("RC-promoted release requires PROMOTION-PROOF.json");
+  }
+  const proof = JSON.parse(readFileSync(proofPath, "utf8").replace(/^\uFEFF/, ""));
+  if (proof.schema !== "outilsia.local_cockpit_rc_promotion_proof.v1") fail("Unexpected promotion proof schema");
+  if (proof.public_deploy_executed !== false) fail("Promotion proof is already marked as deployed");
+  if (proof.rollback_required_before_deploy !== true) fail("Promotion proof must require rollback preparation");
+  if (proof.release_manifest_sha256 !== sha256(validated.releasePath)) {
+    fail("Promotion proof release manifest hash mismatch");
+  }
+  if (proof.candidate?.label !== promoted.label
+    || proof.candidate?.manifest_sha256 !== promoted.candidate_manifest_sha256
+    || proof.candidate?.artifact_set_sha256 !== promoted.candidate_artifact_set_sha256) {
+    fail("Promotion proof candidate identity mismatch");
+  }
+  if (proof.smoke_status_sha256 !== promoted.smoke_status_sha256
+    || proof.smoke_registry_sha256 !== promoted.smoke_registry_sha256
+    || proof.decision_sha256 !== promoted.decision_sha256) {
+    fail("Promotion proof evidence hash mismatch");
+  }
+  const bySha = new Map(validated.files.map((file) => [file.sha256, file]));
+  if (!Array.isArray(proof.artifact_identity)
+    || proof.artifact_identity.length !== validated.files.length
+    || proof.artifact_identity.some((item) => (
+      item.exact_bytes !== true
+      || !bySha.has(item.sha256)
+      || bySha.get(item.sha256).name !== item.public_name
+      || Number(bySha.get(item.sha256).size_bytes) !== Number(item.size_bytes)
+    ))) {
+    fail("Promotion proof artifact identity mismatch");
+  }
+  return { path: proofPath, sha256: sha256(proofPath) };
+}
+
 function cleanupLocalReleaseDir(releaseDir, keepNames) {
   for (const name of readdirSync(releaseDir)) {
     if (name === ".gitkeep" || name === "release.json") continue;
@@ -181,17 +232,24 @@ function deploy({ release, releasePath, files, pagePath }, opts) {
   const stagingDir = `${remoteDir}.upload_${buildToken}_${stamp}_${process.pid}`;
   const lockDir = `${remoteDir}.deploy_lock`;
   const ownerToken = `build=${buildToken} started=${stamp} pid=${process.pid}`;
+  const backupReleaseDir = `${backupDir}/release`;
+  const backupPageDir = `${backupDir}/page`;
   const prepareCommand = [
     "set -e",
+    ...(opts.requireRollbackSource ? [
+      `test -s ${shellQuote(`${remoteDir}/release.json`)}`,
+      ...(pagePath && remotePagePath ? [`test -s ${shellQuote(remotePagePath)}`] : []),
+    ] : []),
     `if [ -d ${shellQuote(lockDir)} ] && find ${shellQuote(lockDir)} -maxdepth 0 -mmin +120 -print -quit | grep -q .; then rm -rf ${shellQuote(lockDir)}; fi`,
     `if ! mkdir ${shellQuote(lockDir)}; then echo ${shellQuote(`release deploy already locked: ${lockDir}`)} >&2; exit 73; fi`,
     `printf '%s\n' ${shellQuote(ownerToken)} > ${shellQuote(`${lockDir}/owner`)}`,
-    `mkdir -p ${shellQuote(backupDir)}`,
+    `mkdir -p ${shellQuote(backupReleaseDir)}`,
+    `mkdir -p ${shellQuote(backupPageDir)}`,
     `mkdir -p ${shellQuote(remoteDir)}`,
-    `cp -a ${shellQuote(remoteDir)}/. ${shellQuote(backupDir)}/ 2>/dev/null || true`,
+    `cp -a ${shellQuote(remoteDir)}/. ${shellQuote(backupReleaseDir)}/ 2>/dev/null || true`,
     ...(pagePath && remotePagePath ? [
       `mkdir -p ${shellQuote(dirname(remotePagePath))}`,
-      `cp -a ${shellQuote(remotePagePath)} ${shellQuote(`${backupDir}/${basename(remotePagePath)}`)} 2>/dev/null || true`,
+      `cp -a ${shellQuote(remotePagePath)} ${shellQuote(`${backupPageDir}/${basename(remotePagePath)}`)} 2>/dev/null || true`,
     ] : []),
     `rm -rf ${shellQuote(stagingDir)}`,
     `mkdir -p ${shellQuote(stagingDir)}`,
@@ -216,20 +274,55 @@ function deploy({ release, releasePath, files, pagePath }, opts) {
       "assert all(hashlib.sha256((base / item['name']).read_bytes()).hexdigest() == item['sha256'] for item in data['files'])",
       "print('remote_release_ok', data['version'], len(data['files']))",
     ].join("; ");
+    const verifyActiveScript = [
+      "import hashlib, json, pathlib, sys",
+      "base = pathlib.Path(sys.argv[1])",
+      "page = pathlib.Path(sys.argv[2]) if sys.argv[2] else None",
+      "data = json.loads((base / 'release.json').read_text())",
+      "assert all((base / item['name']).exists() for item in data['files'])",
+      "assert all((base / item['name']).stat().st_size == int(item['size_bytes']) for item in data['files'])",
+      "assert all(hashlib.sha256((base / item['name']).read_bytes()).hexdigest() == item['sha256'] for item in data['files'])",
+      "text = page.read_text() if page else ''",
+      "assert not page or str(data['build_id']) in text",
+      "assert not page or all(item['name'] in text and item['sha256'] in text for item in data['files'])",
+      "print('remote_active_release_ok', data['version'], data['build_id'], len(data['files']))",
+    ].join("; ");
+    const restoreFilesScript = [
+      "import json,pathlib,shutil,sys",
+      "source=pathlib.Path(sys.argv[1])",
+      "target=pathlib.Path(sys.argv[2])",
+      "data=json.loads((source/'release.json').read_text())",
+      "target.mkdir(parents=True,exist_ok=True)",
+      "[shutil.copy2(source/item['name'],target/item['name']) for item in data['files']]",
+    ].join("; ");
+    const rollbackCommands = [
+      `if [ -s ${shellQuote(`${backupReleaseDir}/release.json`)} ]; then python3 -c ${shellQuote(restoreFilesScript)} ${shellQuote(backupReleaseDir)} ${shellQuote(remoteDir)}; fi`,
+      ...(pagePath && remotePagePath ? [
+        `if [ -s ${shellQuote(`${backupPageDir}/${basename(remotePagePath)}`)} ]; then cp -af ${shellQuote(`${backupPageDir}/${basename(remotePagePath)}`)} ${shellQuote(remotePagePath)}; fi`,
+      ] : []),
+      `if [ -s ${shellQuote(`${backupReleaseDir}/release.json`)} ]; then cp -af ${shellQuote(`${backupReleaseDir}/release.json`)} ${shellQuote(`${remoteDir}/release.json`)}; fi`,
+      "echo automatic_release_rollback_applied >&2",
+    ].join("; ");
     const verifyAndActivateCommand = [
       "set -e",
+      `rollback_release() { set +e; ${rollbackCommands}; }`,
+      "trap 'rollback_release' ERR",
       `test -s ${shellQuote(stagingDir)}/release.json`,
       `python3 -c ${shellQuote(verifyScript)} ${shellQuote(stagingDir)}`,
       ...files.map((file) => `mv -f ${shellQuote(`${stagingDir}/${file.name}`)} ${shellQuote(`${remoteDir}/${file.name}`)}`),
-      `mv -f ${shellQuote(`${stagingDir}/release.json`)} ${shellQuote(`${remoteDir}/release.json`)}`,
       ...(pagePath && remotePagePath ? [
         `mv -f ${shellQuote(`${stagingDir}/${basename(remotePagePath)}`)} ${shellQuote(remotePagePath)}`,
       ] : []),
+      `mv -f ${shellQuote(`${stagingDir}/release.json`)} ${shellQuote(`${remoteDir}/release.json`)}`,
+      `python3 -c ${shellQuote(verifyActiveScript)} ${shellQuote(remoteDir)} ${shellQuote(pagePath && remotePagePath ? remotePagePath : "")}`,
+      "trap - ERR",
       `rmdir ${shellQuote(stagingDir)}`,
       "echo release_activated",
+      `echo rollback_backup:${backupDir}`,
       "echo previous_release_files_retained_for_cache_transition",
     ].join("; ");
     run("ssh", [...sshOptions(opts), opts.remote, verifyAndActivateCommand]);
+    return { backupDir };
   } finally {
     const cleanupCommand = [
       `rm -rf ${shellQuote(stagingDir)}`,
@@ -247,8 +340,14 @@ try {
     opts.releaseDir,
     ...(opts.requireFreshness ? ["--require-freshness"] : []),
   ]);
-  const managesPublicPage = resolve(opts.releaseDir) === resolve(defaultReleaseDir) || opts.includePublicPage;
-  if (managesPublicPage) {
+  const managesPublicPage = resolve(opts.releaseDir) === resolve(defaultReleaseDir) || opts.includePublicPage || Boolean(opts.pagePath);
+  let localPagePath = "";
+  if (opts.pagePath) {
+    if (!existsSync(opts.pagePath) || !statSync(opts.pagePath).isFile()) {
+      fail(`Staged download page not found: ${opts.pagePath}`);
+    }
+    localPagePath = opts.pagePath;
+  } else if (managesPublicPage) {
     run("node", [
       join(appRoot, "scripts", "sync-download-page-release.mjs"),
       "--release",
@@ -256,16 +355,23 @@ try {
       "--page",
       defaultPagePath,
     ]);
+    localPagePath = defaultPagePath;
+  }
+  if (managesPublicPage) {
     run("node", [
       join(appRoot, "scripts", "verify-download-page-contract.mjs"),
       "--release-dir",
       opts.releaseDir,
+      "--page",
+      localPagePath,
       "--require-local-files",
       "--require-freshness",
     ]);
   }
   const validated = validateRelease(opts.releaseDir, { requireFreshness: opts.requireFreshness });
-  validated.pagePath = managesPublicPage ? defaultPagePath : "";
+  const promotionProof = validatePromotionProof(validated, opts);
+  opts.requireRollbackSource = Boolean(promotionProof);
+  validated.pagePath = localPagePath;
   cleanupLocalReleaseDir(opts.releaseDir, new Set(validated.files.map((file) => file.name)));
   console.log("release_valid", validated.release.version, `${validated.files.length} file(s)${opts.requireFreshness ? " freshness=ok" : ""}`);
   for (const file of validated.files) {
@@ -273,14 +379,29 @@ try {
   }
   if (!opts.deploy) {
     console.log(`dry_run remote=${opts.remote} remote_dir=${opts.remoteDir}`);
-    if (managesPublicPage) console.log(`download_page_ready ${defaultPagePath}`);
+    if (managesPublicPage) console.log(`download_page_ready ${localPagePath}`);
     console.log("Add --deploy to publish this release.");
     process.exit(0);
   }
   if (!opts.remote) {
     fail("Missing deploy target. Set OUTILSIA_DEPLOY_REMOTE or pass --remote <user@host>.");
   }
-  deploy(validated, opts);
+  const deployment = deploy(validated, opts);
+  if (promotionProof) {
+    const receiptPath = join(dirname(promotionProof.path), "DEPLOYMENT-RECEIPT.json");
+    writeFileSync(receiptPath, `${JSON.stringify({
+      schema: "outilsia.local_cockpit_deployment_receipt.v1",
+      deployed_at: new Date().toISOString(),
+      version: validated.release.version,
+      build_id: validated.release.build_id,
+      release_manifest_sha256: sha256(validated.releasePath),
+      promotion_proof_sha256: promotionProof.sha256,
+      rollback_backup: deployment.backupDir,
+      remote: opts.remote,
+      remote_dir: opts.remoteDir,
+    }, null, 2)}\n`);
+    console.log(`deployment_receipt=${receiptPath}`);
+  }
   console.log("deploy_complete");
 } catch (error) {
   console.error(error.message || String(error));

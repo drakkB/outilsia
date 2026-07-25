@@ -24,6 +24,15 @@ Vérification dédiée desktop, mobile et clavier :
 npm run verify:workspace-navigation
 ```
 
+## Release Candidate
+
+La RC privee, les preuves multi-machines, la decision humaine, la promotion
+exact-byte et le rollback atomique sont documentes dans
+[RELEASE-CANDIDATE-PROMOTION.md](RELEASE-CANDIDATE-PROMOTION.md).
+
+Le seuil smoke de deux machines n'est pas la validation terrain complete de
+cinq profils et ne permet jamais un deploiement automatique.
+
 ## Lancer en developpement
 
 ```bash

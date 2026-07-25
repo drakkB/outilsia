@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(appRoot, "..");
-const pagePath = join(repoRoot, "server-work", "static", "pages", "telecharger-scanner-ia-local.html");
+const defaultPagePath = join(repoRoot, "server-work", "static", "pages", "telecharger-scanner-ia-local.html");
 const defaultDownloadRoot = join(repoRoot, "server-work", "static", "downloads", "local-cockpit");
 
 function usage() {
@@ -13,6 +13,7 @@ function usage() {
   node scripts/verify-download-page-contract.mjs [--require-freshness]
   node scripts/verify-download-page-contract.mjs [--require-local-files]
   node scripts/verify-download-page-contract.mjs [--release-dir <candidate-dir>]
+  node scripts/verify-download-page-contract.mjs [--page <staged-download-page.html>]
 
 Checks that the public download page contract matches the local release manifest:
   page button, counter, build id, SHA256, changelog, freshness and tracked download URL.`);
@@ -23,7 +24,12 @@ function fail(message) {
 }
 
 function parseArgs(argv) {
-  const opts = { requireFreshness: false, requireLocalFiles: false, releaseDir: defaultDownloadRoot };
+  const opts = {
+    requireFreshness: false,
+    requireLocalFiles: false,
+    releaseDir: defaultDownloadRoot,
+    pagePath: defaultPagePath,
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") {
@@ -40,6 +46,10 @@ function parseArgs(argv) {
     }
     if (arg === "--release-dir") {
       opts.releaseDir = resolve(argv[++index] || "");
+      continue;
+    }
+    if (arg === "--page") {
+      opts.pagePath = resolve(argv[++index] || "");
       continue;
     }
     throw new Error(`Unknown argument: ${arg}`);
@@ -108,9 +118,9 @@ function main() {
   const opts = parseArgs(process.argv.slice(2));
   const releasePath = join(opts.releaseDir, "release.json");
   const downloadRoot = opts.releaseDir;
-  if (!existsSync(pagePath)) fail(`Download page not found: ${pagePath}`);
+  if (!existsSync(opts.pagePath)) fail(`Download page not found: ${opts.pagePath}`);
   if (!existsSync(releasePath)) fail(`Release manifest not found: ${releasePath}`);
-  const html = readFileSync(pagePath, "utf8");
+  const html = readFileSync(opts.pagePath, "utf8");
   const release = readJson(releasePath);
   const freshness = validateRelease(release, opts, downloadRoot);
 

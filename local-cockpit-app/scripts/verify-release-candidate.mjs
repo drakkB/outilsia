@@ -55,6 +55,12 @@ function sha256(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
+function artifactSetSha256(files) {
+  return createHash("sha256")
+    .update(files.map((file) => `${file.sha256}  ${file.name}`).sort().join("\n"))
+    .digest("hex");
+}
+
 function main() {
   const opts = parseArgs(process.argv.slice(2));
   const manifestPath = join(opts.input, "release-candidate.json");
@@ -77,7 +83,15 @@ function main() {
   if (String(candidate.build_provenance?.build_id || "") !== String(candidate.build_id)) {
     fail("RC provenance build_id mismatch");
   }
+  if (!/^[a-f0-9]{40}$/i.test(String(candidate.source?.commit || ""))) fail("RC source commit must be a full Git SHA");
+  if (String(candidate.build_provenance?.source_commit || "") !== String(candidate.source.commit)) {
+    fail("RC provenance source_commit mismatch");
+  }
   if (opts.clean && candidate.source?.tracked_dirty !== false) fail("RC source tree is tracked-dirty");
+  if (candidate.source?.post_build_tracked_dirty_paths !== undefined
+    && !Array.isArray(candidate.source.post_build_tracked_dirty_paths)) {
+    fail("RC source.post_build_tracked_dirty_paths must be an array");
+  }
   if (!Array.isArray(candidate.files) || !candidate.files.length) fail("RC files must not be empty");
 
   const names = new Set();
@@ -92,6 +106,9 @@ function main() {
     const allowed = platformExts[file.platform];
     if (!allowed || !allowed.has(extname(file.name).toLowerCase())) fail(`Invalid platform/extension: ${file.name}`);
     if (!/^[a-f0-9]{64}$/.test(file.sha256 || "")) fail(`Invalid SHA256: ${file.name}`);
+    if (!["setup", "portable", "msi", "appimage", "deb", "rpm", "dmg"].includes(file.kind)) {
+      fail(`Invalid RC artifact kind: ${file.name}`);
+    }
     const path = join(opts.input, file.name);
     if (!existsSync(path) || !statSync(path).isFile()) fail(`Missing RC artifact: ${file.name}`);
     if (statSync(path).size !== Number(file.size_bytes)) fail(`RC size mismatch: ${file.name}`);
@@ -99,6 +116,13 @@ function main() {
   }
 
   if (!names.has(candidate.primary_artifact?.name)) fail("primary_artifact must be listed in files");
+  if (candidate.primary_artifact.sha256 !== candidate.files.find((file) => file.name === candidate.primary_artifact.name)?.sha256) {
+    fail("primary_artifact must match its canonical files entry");
+  }
+  const expectedArtifactSet = artifactSetSha256(candidate.files);
+  if (candidate.build_provenance?.artifact_set_sha256 !== expectedArtifactSet) {
+    fail("RC provenance artifact_set_sha256 mismatch");
+  }
   const actualPlatforms = [...new Set(candidate.files.map((file) => file.platform))].sort();
   const provenancePlatforms = [...(candidate.build_provenance?.artifact_platforms || [])].sort();
   if (JSON.stringify(actualPlatforms) !== JSON.stringify(provenancePlatforms)) {

@@ -211,6 +211,14 @@ function currentTrackedSourceDirty() {
   return Boolean(gitOutput(["status", "--porcelain", "--untracked-files=no"]));
 }
 
+function currentTrackedSourceDirtyPaths() {
+  return gitOutput(["status", "--porcelain", "--untracked-files=no"])
+    .split(/\r?\n/)
+    .map((line) => line.slice(3).trim())
+    .filter(Boolean)
+    .sort();
+}
+
 function trackedSourceDirtyAtBuildStart() {
   const declared = String(process.env.OUTILSIA_RC_SOURCE_TRACKED_DIRTY_AT_START || "").trim().toLowerCase();
   if (declared === "true") return true;
@@ -267,6 +275,9 @@ function main() {
     || files.find((file) => file.platform === "linux" && file.kind === "appimage")
     || files[0];
   const sourceCommit = process.env.GITHUB_SHA || gitOutput(["rev-parse", "HEAD"]);
+  const artifactSetSha256 = createHash("sha256")
+    .update(files.map((file) => `${file.sha256}  ${file.name}`).sort().join("\n"))
+    .digest("hex");
   const manifest = {
     schema: "outilsia.local_cockpit_release_candidate.v1",
     ok: true,
@@ -281,6 +292,7 @@ function main() {
       commit: sourceCommit,
       tracked_dirty: trackedSourceDirtyAtBuildStart(),
       post_build_tracked_dirty: currentTrackedSourceDirty(),
+      post_build_tracked_dirty_paths: currentTrackedSourceDirtyPaths(),
     },
     deployment: {
       public_allowed: false,
@@ -305,6 +317,15 @@ function main() {
       node_arch: process.arch,
       artifact_platforms: platforms,
       source_commit: sourceCommit,
+      artifact_set_sha256: artifactSetSha256,
+      github: {
+        workflow: process.env.GITHUB_WORKFLOW || "",
+        run_id: process.env.GITHUB_RUN_ID || "",
+        run_attempt: process.env.GITHUB_RUN_ATTEMPT || "",
+        ref: process.env.GITHUB_REF || "",
+        sha: process.env.GITHUB_SHA || "",
+        repository: process.env.GITHUB_REPOSITORY || "",
+      },
     },
     freshness,
     primary_artifact: primary,

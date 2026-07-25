@@ -78,6 +78,19 @@ try {
   for (const required of ["START-HERE.html", "01-LANCER-LE-RC.cmd", "02-VALIDER-LE-TEST.cmd", "RC-KIT-MANIFEST.json"]) {
     if (!existsSync(join(kit, required))) throw new Error(`RC kit missing ${required}`);
   }
+  if (process.platform === "win32") {
+    const powershellSyntax = spawnSync("powershell.exe", [
+      "-NoProfile",
+      "-Command",
+      "[scriptblock]::Create((Get-Content -LiteralPath $env:OUTILSIA_PS_FILE -Raw)) | Out-Null",
+    ], {
+      encoding: "utf8",
+      env: { ...process.env, OUTILSIA_PS_FILE: join(kit, "Valider-test-express.ps1") },
+    });
+    if (powershellSyntax.status !== 0) {
+      throw new Error(`Generated RC validator has invalid PowerShell syntax\n${powershellSyntax.stderr}`);
+    }
+  }
   run("merge-release-candidate.mjs", [
     "--input", windows,
     "--input", linux,

@@ -105,6 +105,32 @@ try {
   if (String(release.build_provenance.build_id || "") !== String(release.build_id)) {
     fail("build_provenance.build_id must match release.build_id");
   }
+  const promotedFromRc = release.build_provenance.promoted_from_rc;
+  if (promotedFromRc !== undefined) {
+    if (!promotedFromRc || typeof promotedFromRc !== "object" || Array.isArray(promotedFromRc)) {
+      fail("build_provenance.promoted_from_rc must be an object");
+    }
+    if (promotedFromRc.exact_artifact_bytes !== true) {
+      fail("RC promotion must preserve exact artifact bytes");
+    }
+    if (promotedFromRc.full_terrain_gate_complete !== false) {
+      fail("RC promotion must not claim the full terrain gate");
+    }
+    if (Number(promotedFromRc.unique_smoke_machines || 0) < 2) {
+      fail("RC promotion requires at least two unique smoke machines");
+    }
+    for (const key of [
+      "candidate_manifest_sha256",
+      "candidate_artifact_set_sha256",
+      "smoke_status_sha256",
+      "smoke_registry_sha256",
+      "decision_sha256",
+    ]) {
+      if (!/^[a-f0-9]{64}$/i.test(String(promotedFromRc[key] || ""))) {
+        fail(`RC promotion provenance has invalid ${key}`);
+      }
+    }
+  }
   if (release.build_provenance.ci === true && !/^\d{11,14}$/.test(String(release.build_id))) {
     fail("CI release.build_id must be an 11-14 digit GitHub run identifier");
   }
@@ -141,6 +167,9 @@ try {
       fail(`Invalid URL for ${file.name}`);
     }
     if (!/^[a-f0-9]{64}$/i.test(file.sha256 || "")) fail(`Invalid SHA256 for ${file.name}`);
+    if (promotedFromRc && (!file.rc_source_name || !file.kind)) {
+      fail(`RC-promoted artifact must retain rc_source_name and kind: ${file.name}`);
+    }
     const path = join(opts.input, file.name);
     if (!existsSync(path)) fail(`Missing artifact file: ${file.name}`);
     const stat = statSync(path);
