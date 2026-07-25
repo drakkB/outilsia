@@ -23,6 +23,14 @@
     "destructiveHint": false,
     "destructiveJustification": "Aucun achat, changement matériel, téléchargement ou écriture n'est effectué."
   },
+  "explain_local_action_boundary": {
+    "readOnlyHint": true,
+    "readOnlyJustification": "L'outil retourne un message statique expliquant la frontière entre l'app ChatGPT et le logiciel desktop. Il ne lit ni ne modifie la machine.",
+    "openWorldHint": false,
+    "openWorldJustification": "L'outil ne publie rien, n'envoie aucun message externe et ne change aucun état public ; il fournit seulement une explication dans la conversation.",
+    "destructiveHint": false,
+    "destructiveJustification": "Aucune installation, commande, suppression, exécution locale ou autre action irréversible n'est disponible."
+  },
   "render_machine_cockpit": {
     "readOnlyHint": true,
     "readOnlyJustification": "L'outil affiche une décision déjà produite sans la recalculer ni la sauvegarder.",

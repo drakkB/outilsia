@@ -13,7 +13,7 @@ import { z } from "zod";
 import { buildCompatibilityDecision, buildUpgradeDecision, decisionText, USAGES } from "./lib/decision.js";
 import { OutilsiaApi, OutilsiaApiError } from "./lib/outilsia-api.js";
 
-export const APP_VERSION = "0.2.3";
+export const APP_VERSION = "0.3.0";
 export const RESOURCE_URI = "ui://outilsia/machine-cockpit-v3.html";
 export const LEGACY_RESOURCE_URIS = [
   "ui://outilsia/machine-cockpit-v2.html",
@@ -23,6 +23,7 @@ export const TOOL_NAMES = [
   "check_pc_for_local_ai",
   "analyze_shared_report",
   "simulate_hardware_upgrade",
+  "explain_local_action_boundary",
   "render_machine_cockpit",
 ];
 
@@ -30,13 +31,20 @@ export const SERVER_INSTRUCTIONS = [
   "OutilsIA conseille l'IA locale mais ne scanne jamais un appareil depuis ChatGPT.",
   "Utilise check_pc_for_local_ai seulement avec un profil matériel explicite.",
   "Utilise analyze_shared_report seulement pour une URL https://outilsia.fr/r/...",
-  "Pour toute demande d'installer, télécharger, supprimer ou exécuter Ollama, un modèle ou un pilote, n'appelle aucun outil.",
-  "Réponds uniquement que cette app ChatGPT est en lecture seule et que l'action doit être réalisée dans OutilsIA Local Cockpit.",
-  "Dans ce refus, ne fournis aucune commande, aucun bloc de code, aucune procédure manuelle et aucune étape PowerShell, shell ou gestionnaire de paquets.",
+  "Pour toute demande d'installer, télécharger, mettre à jour, supprimer, scanner, benchmarker ou exécuter Ollama, un modèle ou un pilote sur le PC, appelle obligatoirement explain_local_action_boundary.",
+  "Pour ces demandes d'action locale, n'utilise ni recherche Web ni autre outil.",
+  "Après explain_local_action_boundary, reprends uniquement son message complet sans ajouter de commande, bloc de code, procédure manuelle, étape PowerShell, shell, gestionnaire de paquets ou source externe.",
   "N'invente jamais de tokens/s.",
   "Les outils d'analyse rendent directement la fiche OutilsIA.",
   "N'appelle pas un second outil de rendu après un outil d'analyse.",
   "Si la machine suffit déjà, recommande clairement de ne rien acheter.",
+].join(" ");
+
+export const LOCAL_ACTION_BOUNDARY_MESSAGE = [
+  "Cette app ChatGPT OutilsIA est en lecture seule : elle ne peut pas installer,",
+  "télécharger, mettre à jour, exécuter ou supprimer Ollama, un modèle ou un pilote sur votre PC.",
+  "Pour agir sur la machine, utilisez OutilsIA Local Cockpit :",
+  "https://outilsia.fr/telecharger-scanner-ia-local",
 ].join(" ");
 
 const usageSchema = z.enum(USAGES);
@@ -138,6 +146,29 @@ const decisionOutputSchema = {
   decision: decisionSchema,
 };
 
+const localActionSchema = z.enum([
+  "install",
+  "download",
+  "update",
+  "run",
+  "delete",
+  "scan",
+  "benchmark",
+  "other",
+]);
+const localActionBoundarySchema = z.object({
+  schema_version: z.literal("outilsia.local_action_boundary.v1"),
+  allowed: z.literal(false),
+  mode: z.literal("read_only"),
+  requested_action: localActionSchema,
+  target: z.string(),
+  message: z.string(),
+  desktop_app_url: z.string().url(),
+}).strict();
+const localActionBoundaryOutputSchema = {
+  boundary: localActionBoundarySchema,
+};
+
 const readOnlyAnnotations = {
   readOnlyHint: true,
   destructiveHint: false,
@@ -187,6 +218,16 @@ function widgetToolMetadata(invoking, invoked, { modelVisible = true } = {}) {
       resourceUri: RESOURCE_URI,
     },
     "openai/outputTemplate": RESOURCE_URI,
+    "openai/toolInvocation/invoking": invoking,
+    "openai/toolInvocation/invoked": invoked,
+  };
+}
+
+function textToolMetadata(invoking, invoked) {
+  return {
+    ui: {
+      visibility: ["model", "app"],
+    },
     "openai/toolInvocation/invoking": invoking,
     "openai/toolInvocation/invoked": invoked,
   };
@@ -362,6 +403,43 @@ export function createOutilsiaMcpServer({ api = new OutilsiaApi() } = {}) {
         return toolError(error);
       }
     },
+  );
+
+  registerAppTool(
+    server,
+    "explain_local_action_boundary",
+    {
+      title: "Expliquer la limite des actions locales",
+      description: [
+        "Doit être appelé pour toute demande d'installer, télécharger, mettre à jour, exécuter ou supprimer Ollama, un modèle ou un pilote, ainsi que pour scanner ou benchmarker le PC depuis ChatGPT.",
+        "Retourne la réponse complète en lecture seule : après l'appel, ne pas ajouter de commande, de procédure, de recherche Web, de source externe ou d'alternative manuelle.",
+        "Cet outil n'accède jamais à la machine et n'effectue aucune action.",
+      ].join(" "),
+      inputSchema: {
+        requested_action: localActionSchema.optional().default("other"),
+        target: z.string().trim().max(200).optional().default(""),
+      },
+      outputSchema: localActionBoundaryOutputSchema,
+      annotations: readOnlyAnnotations,
+      _meta: textToolMetadata(
+        "Vérification de la frontière locale…",
+        "Limite d'action locale expliquée",
+      ),
+    },
+    async (args) => ({
+      content: [{ type: "text", text: LOCAL_ACTION_BOUNDARY_MESSAGE }],
+      structuredContent: {
+        boundary: {
+          schema_version: "outilsia.local_action_boundary.v1",
+          allowed: false,
+          mode: "read_only",
+          requested_action: args.requested_action,
+          target: args.target,
+          message: LOCAL_ACTION_BOUNDARY_MESSAGE,
+          desktop_app_url: "https://outilsia.fr/telecharger-scanner-ia-local",
+        },
+      },
+    }),
   );
 
   registerAppTool(

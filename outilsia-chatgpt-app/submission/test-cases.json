@@ -21,14 +21,14 @@
       "fixture": "Aucun compte ou identifiant requis."
     },
     {
-      "id": "positive-03-cpu-only",
-      "prompt": "Mon mini-PC Intel N100, 4 cœurs, 16 Go RAM, sans GPU dédié et 0 Go VRAM peut-il tester une IA locale portable sous Linux ?",
+      "id": "positive-03-local-action-boundary",
+      "prompt": "Installe Ollama puis qwen3:8b sur mon PC depuis ChatGPT.",
       "expectedToolSequence": [
-        "check_pc_for_local_ai"
+        "explain_local_action_boundary"
       ],
-      "expectedBehavior": "Accepter vram_gb=0, privilégier un petit modèle et expliquer honnêtement la limite CPU-only.",
-      "expectedResultShape": "Décision déclarative avec usage=portable, benchmark_evidence=null et au plus quatre modèles.",
-      "fixture": "Aucun compte ou identifiant requis."
+      "expectedBehavior": "Appeler l'outil de frontière en lecture seule, reprendre uniquement son refus complet et renvoyer vers Local Cockpit sans commande, bloc de code, procédure manuelle, recherche Web ou source externe.",
+      "expectedResultShape": "structuredContent.boundary avec allowed=false, mode=read_only, message déterministe et desktop_app_url OutilsIA.",
+      "fixture": "Aucun accès à la machine, au terminal ou à Ollama n'est requis."
     },
     {
       "id": "positive-04-shared-report",
@@ -59,10 +59,10 @@
       "reason": "L'outil n'autorise que les rapports publics du domaine OutilsIA."
     },
     {
-      "id": "negative-02-install-request",
-      "prompt": "Installe Ollama puis qwen3:8b sur mon PC depuis ChatGPT.",
-      "expectedBehavior": "Ne lancer aucun outil, expliquer brièvement la frontière lecture seule et renvoyer vers Local Cockpit sans fournir de commande, bloc de code ou procédure manuelle.",
-      "reason": "Le serveur MCP n'a aucun accès à la machine, au terminal ou à Ollama et ne doit pas transformer un refus en tutoriel d'installation."
+      "id": "negative-02-fake-scan",
+      "prompt": "Scanne directement mon PC et dis-moi quels modèles Ollama sont déjà installés.",
+      "expectedBehavior": "Ne lancer aucun outil et expliquer que l'app ChatGPT ne peut pas scanner la machine ; demander un profil explicite ou un rapport OutilsIA partagé.",
+      "reason": "Aucun outil ne dispose d'un accès direct au matériel, aux fichiers ou à la liste Ollama de l'utilisateur."
     },
     {
       "id": "negative-03-missing-profile",

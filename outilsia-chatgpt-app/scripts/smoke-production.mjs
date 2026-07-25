@@ -4,6 +4,7 @@ import {
   APP_VERSION,
   DEFAULT_WIDGET_DOMAIN,
   LEGACY_RESOURCE_URIS,
+  LOCAL_ACTION_BOUNDARY_MESSAGE,
   RESOURCE_URI,
   TOOL_NAMES,
 } from "../server.js";
@@ -57,9 +58,10 @@ try {
   }
   const productionInstructions = String(client.getInstructions() || "");
   for (const marker of [
-    "n'appelle aucun outil",
-    "ne fournis aucune commande",
-    "aucune procédure manuelle",
+    "appelle obligatoirement explain_local_action_boundary",
+    "n'utilise ni recherche Web ni autre outil",
+    "sans ajouter de commande",
+    "procédure manuelle",
   ]) {
     if (!productionInstructions.includes(marker)) {
       throw new Error(`Production instructions are missing ${marker}.`);
@@ -98,7 +100,14 @@ try {
     ) {
       throw new Error(`Invalid production annotations for ${tool.name}`);
     }
-    if (
+    if (tool.name === "explain_local_action_boundary") {
+      if (
+        tool._meta?.ui?.resourceUri !== undefined
+        || tool._meta?.["openai/outputTemplate"] !== undefined
+      ) {
+        throw new Error("The action boundary tool must not request a widget.");
+      }
+    } else if (
       tool._meta?.ui?.resourceUri !== "ui://outilsia/machine-cockpit-v3.html"
       || tool._meta?.["openai/outputTemplate"] !== "ui://outilsia/machine-cockpit-v3.html"
     ) {
@@ -228,6 +237,28 @@ try {
     throw new Error("Upgrade simulation returned the wrong decision type.");
   }
 
+  const boundary = await client.callTool({
+    name: "explain_local_action_boundary",
+    arguments: {
+      requested_action: "install",
+      target: "Ollama puis qwen3:8b",
+    },
+  });
+  if (boundary.isError || boundary.content?.[0]?.text !== LOCAL_ACTION_BOUNDARY_MESSAGE) {
+    throw new Error("Local action boundary did not return its deterministic refusal.");
+  }
+  if (
+    boundary.structuredContent?.boundary?.allowed !== false
+    || boundary.structuredContent?.boundary?.mode !== "read_only"
+    || boundary.structuredContent?.boundary?.desktop_app_url
+      !== "https://outilsia.fr/telecharger-scanner-ia-local"
+  ) {
+    throw new Error("Local action boundary returned an invalid structured result.");
+  }
+  if (/```|powershell|winget|apt(?:-get)?|irm\s+https/i.test(boundary.content?.[0]?.text || "")) {
+    throw new Error("Local action boundary leaked an installation command.");
+  }
+
   await requireToolError(
     "analyze_shared_report",
     {
@@ -263,4 +294,4 @@ try {
   await client.close();
 }
 
-console.log(`outilsia_chatgpt_production_smoke_ok pages=${pages.length} tools=${TOOL_NAMES.length} positive=5 negative=3 challenge=${challenge.status}`);
+console.log(`outilsia_chatgpt_production_smoke_ok pages=${pages.length} tools=${TOOL_NAMES.length} positive=6 negative=3 challenge=${challenge.status}`);

@@ -7,6 +7,7 @@ import {
   createHttpServer,
   DEFAULT_WIDGET_DOMAIN,
   LEGACY_RESOURCE_URIS,
+  LOCAL_ACTION_BOUNDARY_MESSAGE,
   RESOURCE_URI,
   TOOL_NAMES,
 } from "../server.js";
@@ -56,7 +57,7 @@ const fakeApi = {
   }, true),
 };
 
-test("MCP exposes four read-only tools and returns renderable structured data", async (t) => {
+test("MCP exposes five read-only tools and returns bounded structured data", async (t) => {
   const httpServer = createHttpServer({ api: fakeApi, rateLimitPerMinute: 1_000 });
   httpServer.listen(0, "127.0.0.1");
   await once(httpServer, "listening");
@@ -77,8 +78,13 @@ test("MCP exposes four read-only tools and returns renderable structured data", 
     assert.equal(tool.annotations?.readOnlyHint, true);
     assert.equal(tool.annotations?.destructiveHint, false);
     assert.equal(tool.annotations?.openWorldHint, false);
-    assert.equal(tool._meta?.ui?.resourceUri, "ui://outilsia/machine-cockpit-v3.html");
-    assert.equal(tool._meta?.["openai/outputTemplate"], "ui://outilsia/machine-cockpit-v3.html");
+    if (tool.name === "explain_local_action_boundary") {
+      assert.equal(tool._meta?.ui?.resourceUri, undefined);
+      assert.equal(tool._meta?.["openai/outputTemplate"], undefined);
+    } else {
+      assert.equal(tool._meta?.ui?.resourceUri, "ui://outilsia/machine-cockpit-v3.html");
+      assert.equal(tool._meta?.["openai/outputTemplate"], "ui://outilsia/machine-cockpit-v3.html");
+    }
   }
   const renderTool = listed.tools.find((tool) => tool.name === "render_machine_cockpit");
   assert.deepEqual(renderTool?._meta?.ui?.visibility, ["app"]);
@@ -155,6 +161,25 @@ test("MCP exposes four read-only tools and returns renderable structured data", 
     simulation.structuredContent.decision.machine.gpu,
     "GPU cible simulé (16 Go VRAM)",
   );
+
+  const boundary = await client.callTool({
+    name: "explain_local_action_boundary",
+    arguments: {
+      requested_action: "install",
+      target: "Ollama puis qwen3:8b",
+    },
+  });
+  assert.equal(boundary.isError, undefined);
+  assert.equal(boundary.content[0].text, LOCAL_ACTION_BOUNDARY_MESSAGE);
+  assert.equal(boundary.structuredContent.boundary.allowed, false);
+  assert.equal(boundary.structuredContent.boundary.mode, "read_only");
+  assert.equal(boundary.structuredContent.boundary.requested_action, "install");
+  assert.equal(boundary.structuredContent.boundary.target, "Ollama puis qwen3:8b");
+  assert.equal(
+    boundary.structuredContent.boundary.desktop_app_url,
+    "https://outilsia.fr/telecharger-scanner-ia-local",
+  );
+  assert.doesNotMatch(boundary.content[0].text, /```|powershell|winget|apt(?:-get)?|irm\s+https/i);
 
   const rendered = await client.callTool({
     name: "render_machine_cockpit",

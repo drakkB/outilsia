@@ -12,9 +12,10 @@ C:\Users\chris\Downloads\OutilsIA-ChatGPT-Submission\
 demo-outilsia-chatgpt-local-cockpit.mp4
 ```
 
-La vidéo doit montrer les trois outils d'analyse, le widget OutilsIA et un
-refus hors périmètre. Elle ne doit montrer aucun email, token, écran Persona,
-identifiant interne ou autre onglet personnel.
+La vidéo doit montrer les trois outils d'analyse, le widget OutilsIA et
+l'action read-only qui explique la frontière locale. Elle ne doit montrer
+aucun email, token, écran Persona, identifiant interne ou autre onglet
+personnel.
 
 ## Incident connu et correctif
 
@@ -31,7 +32,7 @@ Cause confirmée : le plugin enregistré dans ChatGPT avait conservé
 déjà `ui://outilsia/machine-cockpit-v3.html`. L'appel métier fonctionnait, mais
 ChatGPT tentait ensuite de lire un template `v2` absent.
 
-Le serveur `0.2.2` garde désormais `v3` comme ressource officielle et sert
+Le serveur garde `v3` comme ressource officielle et sert
 aussi `v2` comme alias rétrocompatible. Malgré cet alias, il faut actualiser le
 plugin avant la vidéo afin que le catalogue ChatGPT pointe vers `v3`.
 
@@ -66,7 +67,7 @@ pas pilotable de façon fiable par Computer Use lorsqu'il contrôle Brave.
    portail OpenAI sont fermés.
 8. Le zoom Brave est à 100 % et la fenêtre est au moins en 1440 x 900.
 9. Dans la fiche du plugin, `Modèle de sortie` indique `v3` ou encore `v2`.
-   Les deux URI sont servies par le serveur public `0.2.2` ; la réussite du
+   Les deux URI sont servies par le serveur public ; la réussite du
    préflight visuel est le critère décisif.
 
 Si une précondition échoue, s'arrêter et expliquer précisément laquelle. Ne
@@ -87,16 +88,17 @@ AUTOMATISER-VIDEO-CODEX.md
 Respecte tout le protocole. Utilise la session ChatGPT déjà connectée dans
 Brave. N'ouvre ni Chrome ni le navigateur intégré. Ne montre aucune
 information de compte et ne soumets aucun formulaire.
-Avant d'enregistrer, vérifie que le plugin OutilsIA est actif et que les trois
-outils d'analyse sont disponibles. Ouvre d'abord la fiche du plugin et clique
+Avant d'enregistrer, vérifie que le plugin OutilsIA est actif et que les cinq
+actions sont disponibles. Ouvre d'abord la fiche du plugin et clique
 sur "Actualiser". Note si "Modèle de sortie" indique v2 ou v3. Le serveur sert
 les deux URI : ne déconnecte pas le plugin si le préflight visuel fonctionne.
 
 Exécute ensuite le préflight matériel SANS enregistrer. Le widget doit
 s'afficher, sans "Failed to fetch template". Crée seulement après cela une
 deuxième conversation temporaire et teste aussi la demande d'installation.
-La réponse doit être un refus bref renvoyant vers Local Cockpit, sans commande,
-bloc de code ou procédure manuelle. Ne commence pas la vidéo si ce second
+L'action explain_local_action_boundary doit être appelée. Son refus doit
+renvoyer vers Local Cockpit sans commande, bloc de code, procédure manuelle,
+recherche Web ou source externe. Ne commence pas la vidéo si ce second
 préflight échoue.
 
 Pour démarrer la vidéo, exécute ensuite dans le terminal :
@@ -133,14 +135,23 @@ Cette étape se fait avant tout enregistrement.
 1. Utiliser la fenêtre Brave déjà ouverte sur `https://chatgpt.com/`.
 2. Ouvrir `Plugins`, puis la fiche `OutilsIA Local Cockpit`.
 3. Cliquer sur `Actualiser`.
-4. Vérifier que les quatre actions sont présentes.
+4. Vérifier que les cinq actions sont présentes :
+
+```text
+check_pc_for_local_ai
+analyze_shared_report
+simulate_hardware_upgrade
+explain_local_action_boundary
+render_machine_cockpit
+```
+
 5. Vérifier que `Modèle de sortie` affiche :
 
 ```text
 ui://outilsia/machine-cockpit-v3.html
 ```
 
-Si `v2` reste affiché, continuer : le serveur `0.2.2` conserve volontairement
+Si `v2` reste affiché, continuer : le serveur conserve volontairement
 cet alias pour les catalogues ChatGPT en cache. Ne reconnecter le plugin avec
 `https://outilsia.fr/mcp` que si le préflight échoue encore après `Réessayer`
 et `Ctrl + Shift + R`.
@@ -161,10 +172,10 @@ et `Ctrl + Shift + R`.
 Installe Ollama puis qwen3:8b sur mon PC depuis ChatGPT.
 ```
 
-9. Vérifier qu'aucun outil n'est appelé et que la réponse renvoie brièvement
-   vers Local Cockpit.
+9. Vérifier que seul `explain_local_action_boundary` est appelé et que la
+   réponse renvoie brièvement vers Local Cockpit.
 10. Vérifier qu'elle ne contient ni commande PowerShell ou shell, ni bloc de
-    code, ni procédure manuelle.
+    code, ni procédure manuelle, ni recherche Web, ni source externe.
 
 Si le widget échoue :
 
@@ -177,10 +188,11 @@ Ne pas contourner l'erreur avec une vidéo textuelle : la soumission annonce un
 widget et doit le montrer réellement. Si le second préflight échoue encore,
 arrêter et rapporter l'URI affichée dans `Modèle de sortie`.
 
-Si le refus propose encore une commande ou une procédure, ne pas enregistrer :
-actualiser le plugin, créer une nouvelle conversation et refaire uniquement ce
-préflight. Reconnecter `https://outilsia.fr/mcp` si l'ancien comportement reste
-présent après actualisation.
+Si l'outil de frontière n'est pas appelé, ou si le refus propose encore une
+commande, une procédure ou des sources Web, ne pas enregistrer : actualiser le
+plugin, créer une nouvelle conversation et refaire uniquement ce préflight.
+Reconnecter `https://outilsia.fr/mcp` si l'ancien comportement reste présent
+après actualisation.
 
 ### 3. Préparer la conversation filmée
 
@@ -278,7 +290,7 @@ Vérifier :
 
 Laisser le résultat visible trois secondes.
 
-### 8. Scénario négatif
+### 8. Scénario frontière locale
 
 Saisir exactement :
 
@@ -288,11 +300,13 @@ Installe Ollama puis qwen3:8b sur mon PC depuis ChatGPT.
 
 Vérifier :
 
-- aucun outil MCP d'installation n'est appelé ;
-- ChatGPT explique que l'app est en lecture seule ;
-- la réponse renvoie vers le logiciel Local Cockpit pour agir sur la machine ;
+- seul `explain_local_action_boundary` est appelé ;
+- cet outil est déclaré read-only et ne possède aucune capacité d'installation ;
+- la réponse reprend le message déterministe de l'outil et renvoie vers le
+  logiciel Local Cockpit pour agir sur la machine ;
 - aucune commande, aucun bloc de code et aucune procédure manuelle ne sont
-  proposés ou affichés.
+  proposés ou affichés ;
+- aucune recherche Web ni source externe n'est ajoutée.
 
 Laisser le refus visible trois secondes.
 
@@ -333,7 +347,8 @@ Ouvrir le MP4 avec le lecteur Windows et vérifier :
 - début et fin propres ;
 - texte lisible ;
 - quatre scénarios complets ;
-- trois outils attendus, aucun outil inattendu ;
+- trois outils d'analyse et l'outil de frontière attendus ;
+- aucun outil capable de modifier la machine ;
 - widget visible sans erreur ;
 - aucune notification ;
 - aucun email, token, identifiant d'organisation ou écran privé ;
@@ -381,8 +396,8 @@ que la vidéo ne contient aucune donnée privée.
 - Préflight widget réussi avant le début de l'enregistrement.
 - Capture FFmpeg démarrée sans overlay.
 - Arrêt FFmpeg gracieux confirmé.
-- Trois outils positifs montrés.
-- Un refus hors périmètre montré.
+- Trois outils d'analyse montrés.
+- L'outil read-only de frontière locale montré.
 - Widget lisible et stable.
 - Fichier supérieur à 2 Mo.
 - Relecture visuelle terminée.

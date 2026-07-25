@@ -4,7 +4,7 @@
   "app_info": {
     "display_name": "OutilsIA Local Cockpit",
     "subtitle": "Choisir une IA locale",
-    "description": "L'app OutilsIA aide à choisir un modèle d'IA locale à partir de faits matériels. Déclarez le CPU, la RAM, le GPU et la VRAM d'un PC, ou fournissez un rapport OutilsIA Local Cockpit déjà partagé. L'app classe les modèles compatibles, distingue une estimation d'un benchmark réel, peut simuler un upgrade RAM/VRAM et affiche une fiche compacte dans la conversation. Tous les outils sont en lecture seule : ils ne scannent pas le PC, n'accèdent pas à Ollama, n'installent rien et n'effectuent aucun achat. Lorsqu'une machine suffit déjà, OutilsIA recommande explicitement de ne rien acheter.",
+    "description": "L'app OutilsIA aide à choisir un modèle d'IA locale à partir de faits matériels. Déclarez le CPU, la RAM, le GPU et la VRAM d'un PC, ou fournissez un rapport OutilsIA Local Cockpit déjà partagé. L'app classe les modèles compatibles, distingue une estimation d'un benchmark réel, peut simuler un upgrade RAM/VRAM et affiche une fiche compacte dans la conversation. Tous les outils sont en lecture seule : ils ne scannent pas le PC, n'accèdent pas à Ollama, n'installent rien et n'effectuent aucun achat. Une action dédiée explique cette frontière sans transformer le refus en tutoriel. Lorsqu'une machine suffit déjà, OutilsIA recommande explicitement de ne rien acheter.",
     "category": "PRODUCTIVITY"
   },
   "tools": {
@@ -44,6 +44,18 @@
         "destructive_justification": "Aucun achat, changement matériel, téléchargement ou écriture n'est effectué."
       }
     },
+    "explain_local_action_boundary": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "L'outil retourne un message statique expliquant la frontière entre l'app ChatGPT et le logiciel desktop. Il ne lit ni ne modifie la machine.",
+        "open_world_justification": "L'outil ne publie rien, n'envoie aucun message externe et ne change aucun état public ; il fournit seulement une explication dans la conversation.",
+        "destructive_justification": "Aucune installation, commande, suppression, exécution locale ou autre action irréversible n'est disponible."
+      }
+    },
     "render_machine_cockpit": {
       "annotations": {
         "readOnlyHint": true,
@@ -75,11 +87,11 @@
       "expected_output_url": null
     },
     {
-      "description": "Accepter vram_gb=0, privilégier un petit modèle et expliquer honnêtement la limite CPU-only. Fixture : Aucun compte ou identifiant requis.",
-      "user_prompt": "Mon mini-PC Intel N100, 4 cœurs, 16 Go RAM, sans GPU dédié et 0 Go VRAM peut-il tester une IA locale portable sous Linux ?",
+      "description": "Appeler l'outil de frontière en lecture seule, reprendre uniquement son refus complet et renvoyer vers Local Cockpit sans commande, bloc de code, procédure manuelle, recherche Web ou source externe. Fixture : Aucun accès à la machine, au terminal ou à Ollama n'est requis.",
+      "user_prompt": "Installe Ollama puis qwen3:8b sur mon PC depuis ChatGPT.",
       "file_attachment_urls": null,
-      "tools_triggered": "check_pc_for_local_ai",
-      "expected_output": "Décision déclarative avec usage=portable, benchmark_evidence=null et au plus quatre modèles.",
+      "tools_triggered": "explain_local_action_boundary",
+      "expected_output": "structuredContent.boundary avec allowed=false, mode=read_only, message déterministe et desktop_app_url OutilsIA.",
       "expected_output_url": null
     },
     {
@@ -109,11 +121,11 @@
       "expected_output_url": null
     },
     {
-      "description": "Ne lancer aucun outil, expliquer brièvement la frontière lecture seule et renvoyer vers Local Cockpit sans fournir de commande, bloc de code ou procédure manuelle. Motif : Le serveur MCP n'a aucun accès à la machine, au terminal ou à Ollama et ne doit pas transformer un refus en tutoriel d'installation.",
-      "user_prompt": "Installe Ollama puis qwen3:8b sur mon PC depuis ChatGPT.",
+      "description": "Ne lancer aucun outil et expliquer que l'app ChatGPT ne peut pas scanner la machine ; demander un profil explicite ou un rapport OutilsIA partagé. Motif : Aucun outil ne dispose d'un accès direct au matériel, aux fichiers ou à la liste Ollama de l'utilisateur.",
+      "user_prompt": "Scanne directement mon PC et dis-moi quels modèles Ollama sont déjà installés.",
       "file_attachment_urls": null,
       "tools_triggered": null,
-      "expected_output": "Ne lancer aucun outil, expliquer brièvement la frontière lecture seule et renvoyer vers Local Cockpit sans fournir de commande, bloc de code ou procédure manuelle.",
+      "expected_output": "Ne lancer aucun outil et expliquer que l'app ChatGPT ne peut pas scanner la machine ; demander un profil explicite ou un rapport OutilsIA partagé.",
       "expected_output_url": null
     },
     {

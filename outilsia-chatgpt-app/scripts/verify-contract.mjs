@@ -21,7 +21,7 @@ function requireCondition(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-requireCondition(TOOL_NAMES.length === 4, "The v1 app must expose exactly four focused tools.");
+requireCondition(TOOL_NAMES.length === 5, "The app must expose exactly five focused tools.");
 for (const name of TOOL_NAMES) {
   requireCondition(server.includes(`"${name}"`), `Missing registered tool: ${name}`);
 }
@@ -32,10 +32,17 @@ requireCondition(!server.includes("exec(") && !server.includes("spawn("), "The M
 requireCondition(SERVER_INSTRUCTIONS.includes("ne scanne jamais"), "Server instructions must reject fake scans.");
 requireCondition(SERVER_INSTRUCTIONS.includes("N'invente jamais de tokens/s"), "Server instructions must reject fabricated speed.");
 requireCondition(
-  SERVER_INSTRUCTIONS.includes("n'appelle aucun outil")
-    && SERVER_INSTRUCTIONS.includes("ne fournis aucune commande")
-    && SERVER_INSTRUCTIONS.includes("aucune procédure manuelle"),
-  "Server instructions must refuse local actions without turning the refusal into an installation tutorial.",
+  SERVER_INSTRUCTIONS.includes("appelle obligatoirement explain_local_action_boundary")
+    && SERVER_INSTRUCTIONS.includes("n'utilise ni recherche Web ni autre outil")
+    && SERVER_INSTRUCTIONS.includes("sans ajouter de commande")
+    && SERVER_INSTRUCTIONS.includes("procédure manuelle"),
+  "Server instructions must route local actions through the deterministic boundary tool.",
+);
+requireCondition(
+  server.includes("LOCAL_ACTION_BOUNDARY_MESSAGE")
+    && server.includes('"explain_local_action_boundary"')
+    && server.includes("localActionBoundaryOutputSchema"),
+  "The local action boundary tool or its deterministic output is missing.",
 );
 requireCondition(
   SERVER_INSTRUCTIONS.includes("rendent directement la fiche"),

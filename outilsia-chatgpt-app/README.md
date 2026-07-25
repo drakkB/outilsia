@@ -7,16 +7,17 @@ Application MCP en lecture seule pour utiliser le moteur de décision OutilsIA d
 - ChatGPT reçoit un profil déclaré ou un rapport public OutilsIA, puis explique la compatibilité.
 - Le serveur MCP appelle les API déterministes d'OutilsIA et rend une fiche visuelle.
 - Local Cockpit reste seul à scanner le matériel, installer Ollama ou un modèle, lancer un benchmark et écrire sur la machine.
-- Une demande d'action locale reçoit un refus bref sans commande ni procédure manuelle.
+- Une demande d'action locale appelle une action explicative en lecture seule et reçoit un refus bref sans commande ni procédure manuelle.
 - Aucun appel OpenAI payant n'est nécessaire dans ce serveur. Le modèle hôte choisit et appelle les outils MCP.
 
-## Outils v0.2
+## Outils v0.3
 
 | Outil | Rôle | Écritures |
 |---|---|---|
 | `check_pc_for_local_ai` | Estimer la compatibilité depuis un profil explicite | Aucune |
 | `analyze_shared_report` | Lire un rapport public `/r/...` anonymisé | Aucune |
 | `simulate_hardware_upgrade` | Comparer le profil avant/après RAM ou VRAM | Aucune |
+| `explain_local_action_boundary` | Refuser proprement une action réservée au logiciel desktop | Aucune |
 | `render_machine_cockpit` | Rendu interne réservé à l'app | Aucune |
 
 Une estimation déclarative ne doit jamais être présentée comme un scan. Les tokens/s ne sont affichés que lorsqu'un rapport partagé contient un benchmark réel.
@@ -66,7 +67,7 @@ le backend web général.
 
 ## Variables
 
-Voir `.env.example`. Aucun secret n'est requis pour la v0.2 anonyme.
+Voir `.env.example`. Aucun secret n'est requis pour la v0.3 anonyme.
 
 `OUTILSIA_OPENAI_CHALLENGE_TOKEN` reste vide en fonctionnement normal. Lorsque
 le portail OpenAI fournit un challenge de domaine, placez le token exact dans

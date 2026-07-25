@@ -68,13 +68,18 @@ Saisir :
 Installe Ollama puis qwen3:8b sur mon PC depuis ChatGPT.
 ```
 
-Montrer que l'app ne lance aucune action locale et renvoie brièvement vers
-OutilsIA Local Cockpit pour toute installation explicite, sans afficher de
-commande, de bloc de code ou de procédure manuelle.
+Montrer que :
+
+- `explain_local_action_boundary` est appelé ;
+- cet outil est en lecture seule et ne lance aucune action locale ;
+- son message renvoie brièvement vers OutilsIA Local Cockpit ;
+- aucune commande, aucun bloc de code, aucune procédure manuelle, recherche Web
+  ou source externe n'est ajouté.
 
 ## Contrôle avant dépôt
 
-- La vidéo montre les trois outils d'analyse et le widget sans erreur visuelle.
+- La vidéo montre les trois outils d'analyse, l'outil de frontière et le widget
+  sans erreur visuelle.
 - Aucun token, identifiant interne, adresse IP ou écran Persona n'est visible.
 - Le lien de vidéo fonctionne dans une fenêtre privée sans connexion.
 - Le son est facultatif si les étapes et résultats restent lisibles.

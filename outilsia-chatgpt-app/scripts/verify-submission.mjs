@@ -178,13 +178,26 @@ requireCondition(new Set(tests.negative.map((item) => item.id)).size === 3, "Neg
 for (const test of tests.positive) {
   requireCondition(
     Array.isArray(test.expectedToolSequence) && test.expectedToolSequence.length === 1,
-    `${test.id} must render directly from one analysis tool.`,
+    `${test.id} must use exactly one public tool.`,
   );
   requireCondition(
     test.expectedToolSequence[0] !== "render_machine_cockpit",
     `${test.id} must not ask the model to call the internal render tool.`,
   );
 }
+const boundaryTest = tests.positive.find(
+  (test) => test.expectedToolSequence[0] === "explain_local_action_boundary",
+);
+requireCondition(boundaryTest, "Submission must include the local action boundary as a positive tool test.");
+requireCondition(
+  /sans commande/i.test(boundaryTest.expectedBehavior)
+    && /recherche Web/i.test(boundaryTest.expectedBehavior),
+  "Boundary test must forbid commands and web-search additions.",
+);
+requireCondition(
+  !tests.negative.some((test) => /Installe Ollama puis qwen3:8b/i.test(test.prompt)),
+  "The installation request must no longer be modeled as a no-tool negative case.",
+);
 
 requireCondition(Object.keys(annotations).sort().join("|") === [...TOOL_NAMES].sort().join("|"), "Annotation file must cover every tool.");
 for (const name of TOOL_NAMES) {

@@ -1,16 +1,17 @@
 {
   "name": "outilsia-local-ai",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "interface": {
     "displayName": "OutilsIA Local Cockpit",
     "shortDescription": "Choisir une IA locale",
-    "longDescription": "L'app OutilsIA aide à choisir un modèle d'IA locale à partir de faits matériels. Déclarez le CPU, la RAM, le GPU et la VRAM d'un PC, ou fournissez un rapport OutilsIA Local Cockpit déjà partagé. L'app classe les modèles compatibles, distingue une estimation d'un benchmark réel, peut simuler un upgrade RAM/VRAM et affiche une fiche compacte dans la conversation. Tous les outils sont en lecture seule : ils ne scannent pas le PC, n'accèdent pas à Ollama, n'installent rien et n'effectuent aucun achat. Lorsqu'une machine suffit déjà, OutilsIA recommande explicitement de ne rien acheter.",
+    "longDescription": "L'app OutilsIA aide à choisir un modèle d'IA locale à partir de faits matériels. Déclarez le CPU, la RAM, le GPU et la VRAM d'un PC, ou fournissez un rapport OutilsIA Local Cockpit déjà partagé. L'app classe les modèles compatibles, distingue une estimation d'un benchmark réel, peut simuler un upgrade RAM/VRAM et affiche une fiche compacte dans la conversation. Tous les outils sont en lecture seule : ils ne scannent pas le PC, n'accèdent pas à Ollama, n'installent rien et n'effectuent aucun achat. Une action dédiée explique cette frontière sans transformer le refus en tutoriel. Lorsqu'une machine suffit déjà, OutilsIA recommande explicitement de ne rien acheter.",
     "developerName": "OutilsIA.fr",
     "category": "Productivity",
     "capabilities": [
       "Estimer la compatibilité d'un PC avec des modèles IA locaux",
       "Analyser un rapport anonymisé OutilsIA Local Cockpit",
       "Simuler une hausse de RAM ou de VRAM sans modifier la machine",
+      "Expliquer les actions réservées au logiciel desktop sans fournir de commande",
       "Distinguer une estimation déclarative d'un benchmark réel",
       "Afficher une décision compacte avec deux actions au maximum"
     ],
@@ -52,5 +53,5 @@
       "submission/assets/starter-03-report.png"
     ]
   },
-  "releaseNotes": "Version 0.2.3 de l'app OutilsIA en lecture seule. Toute demande d'installation, de téléchargement, de suppression ou d'exécution locale doit désormais recevoir un refus bref renvoyant vers Local Cockpit, sans commande ni procédure manuelle. Le widget v3 reste la ressource officielle et l'URI v2 demeure un alias rétrocompatible pour les catalogues ChatGPT en cache."
+  "releaseNotes": "Version 0.3.0 de l'app OutilsIA en lecture seule. Une action dédiée traite désormais les demandes d'installation, de téléchargement, de mise à jour, de suppression, de scan, de benchmark ou d'exécution locale. Elle retourne un refus déterministe renvoyant vers Local Cockpit, sans commande, procédure manuelle ni recherche Web. Le widget v3 reste la ressource officielle et l'URI v2 demeure un alias rétrocompatible."
 }
