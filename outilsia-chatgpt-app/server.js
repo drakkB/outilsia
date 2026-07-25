@@ -13,8 +13,8 @@ import { z } from "zod";
 import { buildCompatibilityDecision, buildUpgradeDecision, decisionText, USAGES } from "./lib/decision.js";
 import { OutilsiaApi, OutilsiaApiError } from "./lib/outilsia-api.js";
 
-export const APP_VERSION = "0.2.0";
-export const RESOURCE_URI = "ui://outilsia/machine-cockpit-v2.html";
+export const APP_VERSION = "0.2.1";
+export const RESOURCE_URI = "ui://outilsia/machine-cockpit-v3.html";
 export const DEFAULT_WIDGET_DOMAIN = "https://chatgpt-local-cockpit.outilsia.fr";
 export const TOOL_NAMES = [
   "check_pc_for_local_ai",
@@ -139,7 +139,7 @@ const readOnlyAnnotations = {
   openWorldHint: false,
 };
 
-const widgetHtml = readFileSync(new URL("./public/machine-cockpit-v2.html", import.meta.url), "utf8");
+const widgetHtml = readFileSync(new URL("./public/machine-cockpit-v3.html", import.meta.url), "utf8");
 const rateLimitSalt = randomBytes(32).toString("hex");
 
 function profileFromArgs(args) {

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  APP_VERSION,
   DEFAULT_WIDGET_DOMAIN,
   RESOURCE_URI,
   SERVER_INSTRUCTIONS,
@@ -11,7 +12,7 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const server = readFileSync(join(root, "server.js"), "utf8");
 const decision = readFileSync(join(root, "lib", "decision.js"), "utf8");
-const widget = readFileSync(join(root, "public", "machine-cockpit-v2.html"), "utf8");
+const widget = readFileSync(join(root, "public", "machine-cockpit-v3.html"), "utf8");
 const readme = readFileSync(join(root, "README.md"), "utf8");
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 
@@ -49,15 +50,19 @@ requireCondition(
   DEFAULT_WIDGET_DOMAIN === "https://chatgpt-local-cockpit.outilsia.fr",
   "The UI must use its dedicated production origin.",
 );
-requireCondition(RESOURCE_URI.includes("-v2.html"), "Widget resource URI must be versioned.");
+requireCondition(RESOURCE_URI.includes("-v3.html"), "Widget resource URI must be versioned.");
 requireCondition(widget.includes("ui/initialize"), "Widget must initialize the MCP Apps bridge.");
 requireCondition(widget.includes("ui/notifications/tool-result"), "Widget must consume MCP tool results.");
+requireCondition(widget.includes("window.openai?.toolResponseMetadata"), "Widget must consume canonical ChatGPT tool metadata.");
+requireCondition(widget.includes("notifyIntrinsicHeight"), "Widget must report dynamic height changes.");
+requireCondition(widget.includes("Analyse impossible"), "Widget must render explicit tool errors.");
 requireCondition(!/<iframe\b/i.test(widget), "Widget must not embed subframes.");
 requireCondition(!/<script[^>]+\bsrc=/i.test(widget), "Widget scripts must be self-contained.");
 requireCondition(widget.includes(".slice(0, 2)"), "Widget must expose no more than two actions.");
 requireCondition(!decision.includes("buying_guides"), "MCP decisions must not expose buying-guide or affiliate links.");
 requireCondition(server.includes("OUTILSIA_OPENAI_CHALLENGE_TOKEN"), "Domain verification route is missing.");
 requireCondition(readme.includes("Local Cockpit reste seul"), "README must document the desktop boundary.");
+requireCondition(pkg.version === APP_VERSION, "Package and MCP server versions must match.");
 requireCondition(pkg.dependencies["@modelcontextprotocol/sdk"], "Missing MCP SDK dependency.");
 requireCondition(pkg.dependencies["@modelcontextprotocol/ext-apps"], "Missing MCP Apps dependency.");
 

@@ -9,7 +9,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(root, "..");
 const outputDir = join(root, "submission", "assets");
 const scratchDir = join(repoRoot, ".artifacts", "chatgpt-app-capture");
-const widgetPath = join(root, "public", "machine-cockpit-v2.html");
+const widgetPath = join(root, "public", "machine-cockpit-v3.html");
 const api = new OutilsiaApi();
 
 function requireCondition(condition, message) {

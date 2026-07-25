@@ -4,7 +4,7 @@
 
 - Serveur MCP public en lecture seule : `https://outilsia.fr/mcp`
 - Trois outils d'analyse qui rendent directement le widget, plus un outil de rendu interne réservé à l'app
-- Widget versionné `machine-cockpit-v2.html`, sans iframe ni script tiers
+- Widget versionné `machine-cockpit-v3.html`, sans iframe ni script tiers
 - Origine UI dédiée : `https://chatgpt-local-cockpit.outilsia.fr`
 - CSP limitée à `https://outilsia.fr`
 - Cinq tests positifs et trois tests négatifs

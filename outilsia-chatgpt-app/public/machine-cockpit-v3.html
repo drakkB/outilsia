@@ -164,6 +164,30 @@
         line-height: 1.45;
       }
       .empty { padding: 28px 20px; text-align: center; color: var(--muted); }
+      .error-state {
+        display: grid;
+        gap: 12px;
+        justify-items: start;
+        padding: 22px;
+      }
+      .error-mark {
+        display: grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        border: 2px solid var(--red);
+        border-radius: 50%;
+        color: var(--red);
+        font-size: 20px;
+        font-weight: 750;
+      }
+      .error-state h1 { font-size: 18px; }
+      .error-state p {
+        max-width: 58ch;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
       @media (max-width: 560px) {
         body { padding: 0; }
         .shell { border-right: 0; border-left: 0; border-radius: 0; }
@@ -198,12 +222,13 @@
     </style>
   </head>
   <body>
-    <main class="shell" id="app">
+    <main class="shell" id="app" aria-live="polite">
       <div class="empty">Préparation de la fiche OutilsIA…</div>
     </main>
     <script type="module">
       const app = document.querySelector("#app");
       let currentDecision = null;
+      let bridgeReady = false;
 
       const escapeHtml = (value) => String(value ?? "")
         .replaceAll("&", "&amp;")
@@ -216,9 +241,33 @@
         <div class="metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>
       `;
 
+      const reportIntrinsicHeight = () => {
+        window.requestAnimationFrame(() => {
+          const height = Math.ceil(Math.max(
+            document.body.scrollHeight,
+            document.documentElement.scrollHeight,
+          ));
+          if (typeof window.openai?.notifyIntrinsicHeight === "function") {
+            try {
+              Promise.resolve(window.openai.notifyIntrinsicHeight(height)).catch(() => {});
+            } catch {
+              // The shared MCP size notification below remains available as a fallback.
+            }
+            return;
+          }
+          if (bridgeReady) {
+            rpcNotify("ui/notifications/size-changed", {
+              width: Math.ceil(window.innerWidth),
+              height,
+            });
+          }
+        });
+      };
+
       const render = (decision) => {
         if (!decision?.schema_version) return;
         currentDecision = decision;
+        app.dataset.state = "ready";
         const machine = decision.machine || {};
         const score = decision.score || {};
         const models = Array.isArray(decision.recommended_models) ? decision.recommended_models : [];
@@ -304,13 +353,73 @@
           </nav>
           <div class="limits">${limits.map((limit) => `<div>${escapeHtml(limit)}</div>`).join("")}</div>
         `;
+        reportIntrinsicHeight();
+      };
+
+      const renderError = (message) => {
+        currentDecision = null;
+        app.dataset.state = "error";
+        app.innerHTML = `
+          <div class="error-state" role="alert">
+            <div class="error-mark" aria-hidden="true">!</div>
+            <h1>Analyse impossible</h1>
+            <p>${escapeHtml(message || "OutilsIA n'a pas pu produire la fiche. Vérifiez les informations fournies puis relancez l'analyse.")}</p>
+            <button class="link" type="button" data-url="https://outilsia.fr/chatgpt-ia-locale" data-kind="help">
+              Voir le guide OutilsIA
+            </button>
+          </div>
+        `;
+        reportIntrinsicHeight();
+      };
+
+      const toolResultCandidates = (value) => {
+        if (!value || typeof value !== "object") return [];
+        return [
+          value.mcp_tool_result,
+          value.call_tool_result?.result,
+          value.call_tool_result,
+          value.result,
+          value,
+        ].filter((candidate) => candidate && typeof candidate === "object");
+      };
+
+      const decisionFromCandidate = (candidate) => (
+        candidate?.structuredContent?.decision
+        || candidate?.decision
+        || (candidate?.structuredContent?.schema_version ? candidate.structuredContent : null)
+        || (candidate?.schema_version ? candidate : null)
+      );
+
+      const toolResultText = (candidates) => {
+        for (const candidate of candidates) {
+          if (!Array.isArray(candidate.content)) continue;
+          const text = candidate.content
+            .filter((block) => block?.type === "text" && typeof block.text === "string")
+            .map((block) => block.text.trim())
+            .filter(Boolean)
+            .join("\n");
+          if (text) return text;
+        }
+        return "";
       };
 
       const updateFromToolResult = (result) => {
-        const decision = result?.structuredContent?.decision
-          || result?.decision
-          || result?.structuredContent;
-        if (decision) render(decision);
+        const candidates = toolResultCandidates(result);
+        const decision = candidates
+          .map(decisionFromCandidate)
+          .find((candidate) => candidate?.schema_version);
+        if (decision) {
+          render(decision);
+          return true;
+        }
+        const failed = result?.status === "error"
+          || candidates.some((candidate) => candidate.isError === true);
+        const message = toolResultText(candidates);
+        if (failed || message) {
+          renderError(message);
+          return true;
+        }
+        return false;
       };
 
       app.addEventListener("click", (event) => {
@@ -319,7 +428,7 @@
         const url = button.dataset.url;
         if (!url?.startsWith("https://outilsia.fr/")) return;
         if (typeof window.openai?.openExternal === "function") {
-          window.openai.openExternal({ href: url });
+          window.openai.openExternal({ href: url, redirectUrl: false });
         } else {
           window.open(url, "_blank", "noopener,noreferrer");
         }
@@ -350,23 +459,33 @@
         }
         if (message.method === "ui/notifications/tool-result") {
           updateFromToolResult(message.params);
+        } else if (message.method === "ui/notifications/tool-cancelled") {
+          renderError(message.params?.reason || "L'analyse a été annulée.");
         }
       }, { passive: true });
 
       const initialize = async () => {
         try {
           await rpcRequest("ui/initialize", {
-            appInfo: { name: "outilsia-machine-cockpit", version: "0.2.0" },
+            appInfo: { name: "outilsia-machine-cockpit", version: "0.2.1" },
             appCapabilities: {},
             protocolVersion: "2026-01-26",
           });
           rpcNotify("ui/notifications/initialized", {});
+          bridgeReady = true;
+          reportIntrinsicHeight();
         } catch (error) {
           console.error("MCP Apps bridge initialization failed:", error);
         }
       };
 
-      if (window.openai?.toolOutput) updateFromToolResult({ structuredContent: window.openai.toolOutput });
+      const metadataHandled = updateFromToolResult(window.openai?.toolResponseMetadata);
+      if (!metadataHandled && window.openai?.toolOutput) {
+        updateFromToolResult({ structuredContent: window.openai.toolOutput });
+      }
+      if (typeof ResizeObserver === "function") {
+        new ResizeObserver(reportIntrinsicHeight).observe(app);
+      }
       initialize();
     </script>
   </body>

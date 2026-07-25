@@ -1,7 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_WIDGET_DOMAIN, TOOL_NAMES } from "../server.js";
+import {
+  APP_VERSION,
+  DEFAULT_WIDGET_DOMAIN,
+  RESOURCE_URI,
+  TOOL_NAMES,
+} from "../server.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(root, "..");
@@ -52,6 +57,7 @@ function pngDimensions(path, label) {
 const ui = listing.interface;
 requireCondition(/^[a-z0-9][a-z0-9_-]{0,63}$/.test(listing.name), "Invalid package name.");
 requireCondition(/^\d+\.\d+\.\d+/.test(listing.version), "Version must be semantic.");
+requireCondition(listing.version === APP_VERSION, "Submission and MCP server versions differ.");
 oneLineWithin(ui.displayName, 30, "displayName");
 oneLineWithin(ui.shortDescription, 30, "shortDescription");
 requireCondition(ui.longDescription.length <= 4_000, "longDescription exceeds 4000 characters.");
@@ -93,6 +99,7 @@ const widgetUrl = new URL(listing.mcp.widgetDomain);
 requireCondition(widgetUrl.origin === listing.mcp.widgetDomain, "widgetDomain must be an HTTPS origin without a path.");
 requireCondition(widgetUrl.hostname !== mcpUrl.hostname, "widgetDomain must use a dedicated host name.");
 requireCondition(listing.mcp.widgetDomain === DEFAULT_WIDGET_DOMAIN, "Submission and server widget domains differ.");
+requireCondition(listing.mcp.widgetResource === RESOURCE_URI, "Submission and server widget resources differ.");
 
 const logoPath = resolveSubmissionAsset(listing.assets?.logo, "logo");
 const logo = pngDimensions(logoPath, "logo");

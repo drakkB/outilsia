@@ -1,6 +1,6 @@
 {
   "name": "outilsia-local-ai",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "interface": {
     "displayName": "OutilsIA Local Cockpit",
     "shortDescription": "Choisir une IA locale",
@@ -30,7 +30,7 @@
     "url": "https://outilsia.fr/mcp",
     "authentication": "none",
     "challengeBaseURL": "https://outilsia.fr",
-    "widgetResource": "ui://outilsia/machine-cockpit-v2.html",
+    "widgetResource": "ui://outilsia/machine-cockpit-v3.html",
     "widgetDomain": "https://chatgpt-local-cockpit.outilsia.fr"
   },
   "availability": {
@@ -52,5 +52,5 @@
       "submission/assets/starter-03-report.png"
     ]
   },
-  "releaseNotes": "Soumission initiale de l'app OutilsIA en lecture seule. Trois outils d'analyse estiment un profil matériel déclaré, analysent un rapport public anonymisé ou simulent un upgrade RAM/VRAM ; chacun rend directement une fiche compacte. Un outil de rendu interne reste réservé à l'interface. Aucun accès au PC, aucune installation, aucun achat et aucun tokens/s inventé."
+  "releaseNotes": "Version 0.2.1 de l'app OutilsIA en lecture seule. Le widget versionné v3 affiche désormais clairement les erreurs MCP, consomme l'enveloppe de résultat complète de ChatGPT et adapte sa hauteur au contenu. Les outils continuent d'analyser un profil déclaré, un rapport public anonymisé ou un upgrade simulé sans accès au PC, installation, achat ni tokens/s inventé."
 }

@@ -17,21 +17,24 @@ const widgetHealthUrl = `${DEFAULT_WIDGET_DOMAIN}/healthz`;
 
 for (const path of pages) {
   const response = await fetch(`${baseUrl}${path}`, {
-    headers: { "user-agent": "OutilsIA-ChatGPT-App-Smoke/0.2" },
+    headers: { "user-agent": "OutilsIA-ChatGPT-App-Smoke/0.2.1" },
   });
   if (response.status !== 200) throw new Error(`${path} returned ${response.status}`);
   const body = await response.text();
   if (!body.includes("OutilsIA")) throw new Error(`${path} returned an unexpected document`);
+  if (path === "/chatgpt-ia-locale" && !body.includes("machine-cockpit-v3")) {
+    throw new Error("Public ChatGPT app page still advertises a stale widget.");
+  }
 }
 const widgetHealth = await fetch(widgetHealthUrl, {
-  headers: { "user-agent": "OutilsIA-ChatGPT-App-Smoke/0.2" },
+  headers: { "user-agent": "OutilsIA-ChatGPT-App-Smoke/0.2.1" },
 });
 if (widgetHealth.status !== 200 || !(await widgetHealth.text()).includes("widget origin: ok")) {
   throw new Error(`Dedicated widget origin failed at ${widgetHealthUrl}`);
 }
 
 const challenge = await fetch(`${baseUrl}/.well-known/openai-apps-challenge`, {
-  headers: { "user-agent": "OutilsIA-ChatGPT-App-Smoke/0.2" },
+  headers: { "user-agent": "OutilsIA-ChatGPT-App-Smoke/0.2.1" },
 });
 if (![200, 404].includes(challenge.status)) {
   throw new Error(`Domain challenge returned ${challenge.status}`);
@@ -44,7 +47,7 @@ if (challenge.status === 200) {
 }
 
 const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`));
-const client = new Client({ name: "outilsia-production-smoke", version: "0.2.0" });
+const client = new Client({ name: "outilsia-production-smoke", version: "0.2.1" });
 await client.connect(transport);
 try {
   async function requireDecision(name, args, label) {
@@ -80,8 +83,8 @@ try {
       throw new Error(`Invalid production annotations for ${tool.name}`);
     }
     if (
-      tool._meta?.ui?.resourceUri !== "ui://outilsia/machine-cockpit-v2.html"
-      || tool._meta?.["openai/outputTemplate"] !== "ui://outilsia/machine-cockpit-v2.html"
+      tool._meta?.ui?.resourceUri !== "ui://outilsia/machine-cockpit-v3.html"
+      || tool._meta?.["openai/outputTemplate"] !== "ui://outilsia/machine-cockpit-v3.html"
     ) {
       throw new Error(`Missing production widget binding for ${tool.name}`);
     }
@@ -91,12 +94,18 @@ try {
     throw new Error("render_machine_cockpit must remain app-only.");
   }
   const resource = await client.readResource({ uri: RESOURCE_URI });
-  const resourceMeta = resource.contents[0]?._meta;
+  const resourceContent = resource.contents[0];
+  const resourceMeta = resourceContent?._meta;
   if (
     resourceMeta?.ui?.domain !== DEFAULT_WIDGET_DOMAIN
     || resourceMeta?.["openai/widgetDomain"] !== DEFAULT_WIDGET_DOMAIN
   ) {
     throw new Error("Production widget domain metadata is missing or stale.");
+  }
+  for (const marker of ["toolResponseMetadata", "notifyIntrinsicHeight", "Analyse impossible"]) {
+    if (!resourceContent?.text?.includes(marker)) {
+      throw new Error(`Production widget is missing ${marker}.`);
+    }
   }
 
   const result = await requireDecision(

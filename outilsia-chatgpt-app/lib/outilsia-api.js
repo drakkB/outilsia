@@ -75,7 +75,7 @@ export class OutilsiaApi {
         headers: {
           accept: "application/json",
           ...(body === undefined ? {} : { "content-type": "application/json" }),
-          "user-agent": "OutilsIA-ChatGPT-App/0.1",
+          "user-agent": "OutilsIA-ChatGPT-App/0.2.1",
         },
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: controller.signal,

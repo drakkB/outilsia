@@ -28,7 +28,7 @@ forcer `OutilsIA.fr`. Ne pas deviner ce libellé avant la fin de la vérificatio
 - Authentication : `None`
 - Demo credentials : aucun
 - Challenge Base URL : `https://outilsia.fr`
-- Widget resource : `ui://outilsia/machine-cockpit-v2.html`
+- Widget resource : `ui://outilsia/machine-cockpit-v3.html`
 - Dedicated widget domain : `https://chatgpt-local-cockpit.outilsia.fr`
 
 ### CSP
