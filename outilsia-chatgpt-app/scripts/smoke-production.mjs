@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
+  APP_VERSION,
   DEFAULT_WIDGET_DOMAIN,
   LEGACY_RESOURCE_URIS,
   RESOURCE_URI,
@@ -51,6 +52,20 @@ const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`));
 const client = new Client({ name: "outilsia-production-smoke", version: "0.2.1" });
 await client.connect(transport);
 try {
+  if (client.getServerVersion()?.version !== APP_VERSION) {
+    throw new Error(`Production server version differs from ${APP_VERSION}.`);
+  }
+  const productionInstructions = String(client.getInstructions() || "");
+  for (const marker of [
+    "n'appelle aucun outil",
+    "ne fournis aucune commande",
+    "aucune procédure manuelle",
+  ]) {
+    if (!productionInstructions.includes(marker)) {
+      throw new Error(`Production instructions are missing ${marker}.`);
+    }
+  }
+
   async function requireDecision(name, args, label) {
     const result = await client.callTool({ name, arguments: args });
     if (result.isError || !result.structuredContent?.decision) {

@@ -32,6 +32,12 @@ requireCondition(!server.includes("exec(") && !server.includes("spawn("), "The M
 requireCondition(SERVER_INSTRUCTIONS.includes("ne scanne jamais"), "Server instructions must reject fake scans.");
 requireCondition(SERVER_INSTRUCTIONS.includes("N'invente jamais de tokens/s"), "Server instructions must reject fabricated speed.");
 requireCondition(
+  SERVER_INSTRUCTIONS.includes("n'appelle aucun outil")
+    && SERVER_INSTRUCTIONS.includes("ne fournis aucune commande")
+    && SERVER_INSTRUCTIONS.includes("aucune procédure manuelle"),
+  "Server instructions must refuse local actions without turning the refusal into an installation tutorial.",
+);
+requireCondition(
   SERVER_INSTRUCTIONS.includes("rendent directement la fiche"),
   "Server instructions must document direct widget rendering.",
 );

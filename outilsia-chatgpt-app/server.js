@@ -13,7 +13,7 @@ import { z } from "zod";
 import { buildCompatibilityDecision, buildUpgradeDecision, decisionText, USAGES } from "./lib/decision.js";
 import { OutilsiaApi, OutilsiaApiError } from "./lib/outilsia-api.js";
 
-export const APP_VERSION = "0.2.2";
+export const APP_VERSION = "0.2.3";
 export const RESOURCE_URI = "ui://outilsia/machine-cockpit-v3.html";
 export const LEGACY_RESOURCE_URIS = [
   "ui://outilsia/machine-cockpit-v2.html",
@@ -30,7 +30,9 @@ export const SERVER_INSTRUCTIONS = [
   "OutilsIA conseille l'IA locale mais ne scanne jamais un appareil depuis ChatGPT.",
   "Utilise check_pc_for_local_ai seulement avec un profil matériel explicite.",
   "Utilise analyze_shared_report seulement pour une URL https://outilsia.fr/r/...",
-  "Ne prétends jamais installer Ollama, un modèle ou un pilote : ces actions restent dans Local Cockpit.",
+  "Pour toute demande d'installer, télécharger, supprimer ou exécuter Ollama, un modèle ou un pilote, n'appelle aucun outil.",
+  "Réponds uniquement que cette app ChatGPT est en lecture seule et que l'action doit être réalisée dans OutilsIA Local Cockpit.",
+  "Dans ce refus, ne fournis aucune commande, aucun bloc de code, aucune procédure manuelle et aucune étape PowerShell, shell ou gestionnaire de paquets.",
   "N'invente jamais de tokens/s.",
   "Les outils d'analyse rendent directement la fiche OutilsIA.",
   "N'appelle pas un second outil de rendu après un outil d'analyse.",

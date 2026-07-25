@@ -61,8 +61,8 @@
     {
       "id": "negative-02-install-request",
       "prompt": "Installe Ollama puis qwen3:8b sur mon PC depuis ChatGPT.",
-      "expectedBehavior": "Ne lancer aucun outil d'installation, expliquer la frontière lecture seule et renvoyer vers Local Cockpit.",
-      "reason": "Le serveur MCP n'a aucun accès à la machine, au terminal ou à Ollama."
+      "expectedBehavior": "Ne lancer aucun outil, expliquer brièvement la frontière lecture seule et renvoyer vers Local Cockpit sans fournir de commande, bloc de code ou procédure manuelle.",
+      "reason": "Le serveur MCP n'a aucun accès à la machine, au terminal ou à Ollama et ne doit pas transformer un refus en tutoriel d'installation."
     },
     {
       "id": "negative-03-missing-profile",

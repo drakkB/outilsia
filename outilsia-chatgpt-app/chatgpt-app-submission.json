@@ -109,11 +109,11 @@
       "expected_output_url": null
     },
     {
-      "description": "Ne lancer aucun outil d'installation, expliquer la frontière lecture seule et renvoyer vers Local Cockpit. Motif : Le serveur MCP n'a aucun accès à la machine, au terminal ou à Ollama.",
+      "description": "Ne lancer aucun outil, expliquer brièvement la frontière lecture seule et renvoyer vers Local Cockpit sans fournir de commande, bloc de code ou procédure manuelle. Motif : Le serveur MCP n'a aucun accès à la machine, au terminal ou à Ollama et ne doit pas transformer un refus en tutoriel d'installation.",
       "user_prompt": "Installe Ollama puis qwen3:8b sur mon PC depuis ChatGPT.",
       "file_attachment_urls": null,
       "tools_triggered": null,
-      "expected_output": "Ne lancer aucun outil d'installation, expliquer la frontière lecture seule et renvoyer vers Local Cockpit.",
+      "expected_output": "Ne lancer aucun outil, expliquer brièvement la frontière lecture seule et renvoyer vers Local Cockpit sans fournir de commande, bloc de code ou procédure manuelle.",
       "expected_output_url": null
     },
     {

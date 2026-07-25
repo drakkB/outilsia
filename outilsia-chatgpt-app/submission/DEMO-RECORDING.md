@@ -68,8 +68,9 @@ Saisir :
 Installe Ollama puis qwen3:8b sur mon PC depuis ChatGPT.
 ```
 
-Montrer que l'app ne lance aucune action locale et renvoie vers OutilsIA Local
-Cockpit pour toute installation explicite.
+Montrer que l'app ne lance aucune action locale et renvoie brièvement vers
+OutilsIA Local Cockpit pour toute installation explicite, sans afficher de
+commande, de bloc de code ou de procédure manuelle.
 
 ## Contrôle avant dépôt
 
@@ -78,4 +79,3 @@ Cockpit pour toute installation explicite.
 - Le lien de vidéo fonctionne dans une fenêtre privée sans connexion.
 - Le son est facultatif si les étapes et résultats restent lisibles.
 - La vidéo ne présente pas l'app comme déjà approuvée ou publiée.
-

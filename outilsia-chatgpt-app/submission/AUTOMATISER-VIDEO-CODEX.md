@@ -272,7 +272,8 @@ Vérifier :
 - aucun outil MCP d'installation n'est appelé ;
 - ChatGPT explique que l'app est en lecture seule ;
 - la réponse renvoie vers le logiciel Local Cockpit pour agir sur la machine ;
-- aucune commande n'est exécutée.
+- aucune commande, aucun bloc de code et aucune procédure manuelle ne sont
+  proposés ou affichés.
 
 Laisser le refus visible trois secondes.
 

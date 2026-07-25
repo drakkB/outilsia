@@ -7,6 +7,7 @@ Application MCP en lecture seule pour utiliser le moteur de décision OutilsIA d
 - ChatGPT reçoit un profil déclaré ou un rapport public OutilsIA, puis explique la compatibilité.
 - Le serveur MCP appelle les API déterministes d'OutilsIA et rend une fiche visuelle.
 - Local Cockpit reste seul à scanner le matériel, installer Ollama ou un modèle, lancer un benchmark et écrire sur la machine.
+- Une demande d'action locale reçoit un refus bref sans commande ni procédure manuelle.
 - Aucun appel OpenAI payant n'est nécessaire dans ce serveur. Le modèle hôte choisit et appelle les outils MCP.
 
 ## Outils v0.2
