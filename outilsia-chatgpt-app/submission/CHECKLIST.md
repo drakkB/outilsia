@@ -19,33 +19,32 @@
 - Technique locale : prête (`npm run verify`)
 - Production : prête (`npm run smoke:production`)
 - Connexion en mode développeur : testée
-- Identité OpenAI : `Identity in review`
+- Identité OpenAI : vérifiée pour l'organisation `OutilsIA.fr`
 - Challenge de domaine : en attente du token fourni par le portail
 - Vidéo : script prêt, enregistrement et URL encore à produire
 - Soumission publique : non lancée
 
-## Actions humaines obligatoires dans le portail
+## Actions humaines restantes dans le portail
 
-1. Vérifier l'identité individuelle ou professionnelle utilisée pour publier OutilsIA.
-2. Vérifier que le rôle OpenAI Platform possède `Apps Management: Write`.
-3. Créer une soumission `With MCP` sur le portail Plugins.
-4. Reporter les champs de `listing.json`.
-5. Lorsque le portail fournit le challenge, écrire uniquement ce token dans `/etc/outilsia-chatgpt-app.env` :
+1. Vérifier que le rôle OpenAI Platform possède `Apps Management: Write`.
+2. Créer une soumission `With MCP` sur le portail Plugins.
+3. Reporter les champs de `listing.json`.
+4. Lorsque le portail fournit le challenge, écrire uniquement ce token dans `/etc/outilsia-chatgpt-app.env` :
 
    ```text
    OUTILSIA_OPENAI_CHALLENGE_TOKEN=<token exact du portail>
    ```
 
-6. Redémarrer `outilsia-chatgpt-app`, puis vérifier :
+5. Redémarrer `outilsia-chatgpt-app`, puis vérifier :
 
    ```text
    https://outilsia.fr/.well-known/openai-apps-challenge
    ```
 
-7. Lancer `Scan Tools`, vérifier que les trois outils d'analyse sont visibles au modèle, que `render_machine_cockpit` est réservé à l'app, puis reporter les justifications de `tool-annotations.json`.
-8. Téléverser le logo et une capture par prompt de démarrage.
-9. Enregistrer la démonstration décrite dans `DEMO-RECORDING.md`, puis vérifier que son URL est lisible sans connexion.
-10. Soumettre pour revue. Ne pas annoncer une publication avant l'approbation puis la publication manuelle.
+6. Lancer `Scan Tools`, vérifier que les trois outils d'analyse sont visibles au modèle, que `render_machine_cockpit` est réservé à l'app, puis reporter les justifications de `tool-annotations.json`.
+7. Téléverser le logo et une capture par prompt de démarrage.
+8. Enregistrer la démonstration décrite dans `DEMO-RECORDING.md`, puis vérifier que son URL est lisible sans connexion.
+9. Soumettre pour revue. Ne pas annoncer une publication avant l'approbation puis la publication manuelle.
 
 ## Recette finale
 
