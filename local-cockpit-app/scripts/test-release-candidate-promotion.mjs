@@ -19,6 +19,7 @@ import { preparePromotion } from "./promote-release-candidate.mjs";
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(appRoot, "..");
 const pageTemplate = join(repoRoot, "server-work", "static", "pages", "telecharger-scanner-ia-local.html");
+const fixtureBuildId = "301234567891";
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -112,14 +113,14 @@ try {
     "--artifact", setup,
     "--output-dir", windowsDir,
     "--rc", "4",
-    "--build-id", "fixturepromotion",
+    "--build-id", fixtureBuildId,
     "--replace",
   ]);
   run("package-release-candidate.mjs", [
     "--artifact", appImage,
     "--output-dir", linuxDir,
     "--rc", "4",
-    "--build-id", "fixturepromotion",
+    "--build-id", fixtureBuildId,
     "--replace",
   ]);
   run("merge-release-candidate.mjs", [
@@ -398,7 +399,7 @@ try {
   const rollback = spawnSync("node", [
     join(appRoot, "scripts", "rollback-beta-release.mjs"),
     "--backup-dir", "/var/backups/outilsia-local-cockpit/release_20260725010101",
-    "--expected-current-build", "fixturepromotion",
+    "--expected-current-build", fixtureBuildId,
   ], { cwd: appRoot, encoding: "utf8" });
   if (rollback.status !== 0 || !rollback.stdout.includes("dry_run=true")) {
     throw new Error(`Rollback dry-run contract failed\n${rollback.stdout}\n${rollback.stderr}`);
