@@ -182,7 +182,7 @@ for candidate in /usr/lib/chromium/chromium /usr/lib/chromium-browser/chromium-b
   if [ -x "$candidate" ]; then browser_host="$candidate"; browser_origin='system'; break; fi
 done
 if [ -z "$browser_host" ] && [ -n "${HOME:-}" ]; then
-  for candidate in "$HOME"/.cache/ms-playwright/chromium-*/chrome-linux*/chrome "$HOME"/.cache/ms-playwright/chromium_headless_shell-*/chrome-linux*/headless_shell; do
+  for candidate in "$HOME"/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux*/chrome-headless-shell "$HOME"/.cache/ms-playwright/chromium_headless_shell-*/chrome-linux*/headless_shell "$HOME"/.cache/ms-playwright/chromium-*/chrome-linux*/chrome; do
     if [ -x "$candidate" ]; then browser_host="$candidate"; browser_origin='playwright_cache'; break; fi
   done
 fi

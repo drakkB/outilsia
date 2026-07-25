@@ -27,6 +27,7 @@ for (const required of [
   "android-landscape 844 390",
   "checks_per_viewport=13",
   "screenshots_total=3",
+  "chrome-headless-shell-linux*/chrome-headless-shell",
 ]) {
   if (!evaluatorScript.includes(required)) throw new Error(`browser evaluator missing ${required}`);
 }
@@ -47,7 +48,7 @@ const browserCandidates = [
   "/opt/google/chrome/google-chrome",
 ];
 const hasSystemBrowser = browserCandidates.some((path) => spawnSync("test", ["-x", path]).status === 0);
-const playwrightBrowser = spawnSync("sh", ["-lc", "for f in \"$HOME\"/.cache/ms-playwright/chromium-*/chrome-linux*/chrome \"$HOME\"/.cache/ms-playwright/chromium_headless_shell-*/chrome-linux*/headless_shell; do [ -x \"$f\" ] && { printf '%s' \"$f\"; exit 0; }; done; exit 1"], { encoding: "utf8" });
+const playwrightBrowser = spawnSync("sh", ["-lc", "for f in \"$HOME\"/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux*/chrome-headless-shell \"$HOME\"/.cache/ms-playwright/chromium_headless_shell-*/chrome-linux*/headless_shell \"$HOME\"/.cache/ms-playwright/chromium-*/chrome-linux*/chrome; do [ -x \"$f\" ] && { printf '%s' \"$f\"; exit 0; }; done; exit 1"], { encoding: "utf8" });
 if (!hasSystemBrowser && playwrightBrowser.status !== 0) throw new Error("Chromium is required for the ForgeBench browser runtime test");
 
 const temporary = mkdtempSync(resolve(tmpdir(), "outilsia-forgebench-browser-"));
@@ -72,7 +73,12 @@ writeFileSync(
 const expectedFiles = [".outilsia-run-contract.json", "game.js", "index.html", "styles.css"];
 const digest = createHash("sha256").update(`${expectedFiles.map((name) => `${name}:${createHash("sha256").update(readFileSync(resolve(workspace, name))).digest("hex")}`).join("\n")}\n`).digest("hex");
 const runScript = (script, timeout) => spawnSync("sh", ["-c", script], { cwd: run, encoding: "utf8", timeout, maxBuffer: 4 * 1024 * 1024 });
-const diagnostic = (result) => [result.stdout, result.stderr].filter(Boolean).join(" | ").replace(/\s+/g, " ").slice(0, 1600);
+const diagnostic = (result) => [
+  result.error ? `${result.error.code || result.error.name}: ${result.error.message}` : "",
+  result.signal ? `signal=${result.signal}` : "",
+  result.stdout,
+  result.stderr,
+].filter(Boolean).join(" | ").replace(/\s+/g, " ").slice(0, 1600);
 const pngDimensions = (path) => {
   const bytes = readFileSync(path);
   if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new Error(`${path} is not PNG`);
