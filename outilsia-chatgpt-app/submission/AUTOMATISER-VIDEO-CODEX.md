@@ -396,7 +396,7 @@ Une séquence mobile complémentaire peut montrer seulement :
 Après validation, le fichier pourra être publié sous :
 
 ```text
-https://outilsia.fr/media/demo-outilsia-chatgpt-local-cockpit.mp4
+https://outilsia.fr/static/media/demo-outilsia-chatgpt-local-cockpit.mp4
 ```
 
 La publication et le remplissage du champ `Demo Recording URL` sont une étape

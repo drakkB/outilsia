@@ -84,3 +84,11 @@ Montrer que :
 - Le lien de vidéo fonctionne dans une fenêtre privée sans connexion.
 - Le son est facultatif si les étapes et résultats restent lisibles.
 - La vidéo ne présente pas l'app comme déjà approuvée ou publiée.
+
+## Vidéo validée
+
+`https://outilsia.fr/static/media/demo-outilsia-chatgpt-local-cockpit.mp4`
+
+La copie validée dure 300,8 secondes, utilise H.264 en 1920 x 1050 à 24
+images/s et ne contient pas d'audio. Son SHA256 est
+`c83ca491dd120cd8d26009cf660eaa81c08954edcfd6b5283116adcf36cb4557`.

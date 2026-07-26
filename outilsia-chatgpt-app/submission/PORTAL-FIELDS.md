@@ -18,6 +18,7 @@ npm run generate:submission
 - Support : `https://outilsia.fr/support-plugin-outilsia`
 - Privacy policy : `https://outilsia.fr/confidentialite-plugin-outilsia`
 - Terms : `https://outilsia.fr/conditions-plugin-outilsia`
+- Demo recording : `https://outilsia.fr/static/media/demo-outilsia-chatgpt-local-cockpit.mp4`
 - Directory icon : `assets/outilsia-local-cockpit-512.png`
 - Composer icon : `assets/outilsia-local-cockpit-512.png`
 
@@ -49,11 +50,12 @@ n'affiche aucun lien d'achat, ne commande rien et ne vend aucun bien.
 - Frame domains : aucun
 - Redirect domains : `https://outilsia.fr`
 
-Après `Scan Tools`, trois outils doivent être visibles au modèle :
+Après `Scan Tools`, quatre outils doivent être visibles au modèle :
 
 1. `check_pc_for_local_ai`
 2. `analyze_shared_report`
 3. `simulate_hardware_upgrade`
+4. `explain_local_action_boundary`
 
 `render_machine_cockpit` doit avoir `ui.visibility=["app"]`. C'est un outil de
 rendu interne, pas une seconde étape demandée au modèle.
@@ -95,8 +97,16 @@ de skills.
 
 ## Demo recording
 
-Suivre `DEMO-RECORDING.md`, héberger la vidéo à une URL accessible sans
-connexion, puis reporter cette URL dans le champ demandé par le portail.
+URL publique validée sans connexion :
+
+`https://outilsia.fr/static/media/demo-outilsia-chatgpt-local-cockpit.mp4`
+
+- Durée : `300.833333` secondes
+- Format : H.264, 1920 x 1050, 24 images/s, sans audio
+- Taille : `3334564` octets
+- SHA256 : `c83ca491dd120cd8d26009cf660eaa81c08954edcfd6b5283116adcf36cb4557`
+- Scénarios : profil déclaré, rapport partagé, simulation d'upgrade et frontière
+  d'action locale
 
 ## Étape manuelle de vérification
 

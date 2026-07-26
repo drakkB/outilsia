@@ -22,7 +22,10 @@
 - Connexion en mode développeur : testée
 - Identité OpenAI : vérifiée pour l'organisation `OutilsIA.fr`
 - Challenge de domaine : en attente du token fourni par le portail
-- Vidéo : script prêt, enregistrement et URL encore à produire
+- Vidéo : validée et publique à
+  `https://outilsia.fr/static/media/demo-outilsia-chatgpt-local-cockpit.mp4`
+  (H.264, 300,8 s, SHA256
+  `c83ca491dd120cd8d26009cf660eaa81c08954edcfd6b5283116adcf36cb4557`)
 - Soumission publique : non lancée
 
 ## Actions humaines restantes dans le portail
@@ -46,7 +49,8 @@
 
 6. Lancer `Scan Tools`, vérifier que les trois outils d'analyse et `explain_local_action_boundary` sont visibles au modèle, que `render_machine_cockpit` est réservé à l'app, puis reporter les justifications de `tool-annotations.json`.
 7. Téléverser le logo et une capture par prompt de démarrage.
-8. Enregistrer la démonstration décrite dans `DEMO-RECORDING.md`, puis vérifier que son URL est lisible sans connexion.
+8. Reporter l'URL de démonstration validée indiquée ci-dessus dans le champ
+   `Demo Recording URL`.
 9. Soumettre pour revue. Ne pas annoncer une publication avant l'approbation puis la publication manuelle.
 
 ## Recette finale

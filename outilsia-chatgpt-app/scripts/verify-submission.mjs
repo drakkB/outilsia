@@ -19,6 +19,8 @@ const videoGuidePath = join(root, "submission", "AUTOMATISER-VIDEO-CODEX.md");
 const videoRecorderPath = join(root, "submission", "OUTILSIA-VIDEO-RECORDER.ps1");
 const windowRecorderManifestPath = join(root, "submission", "window-recorder", "Cargo.toml");
 const windowRecorderSourcePath = join(root, "submission", "window-recorder", "src", "main.rs");
+const demoVideoUrl = "https://outilsia.fr/static/media/demo-outilsia-chatgpt-local-cockpit.mp4";
+const demoVideoSha256 = "c83ca491dd120cd8d26009cf660eaa81c08954edcfd6b5283116adcf36cb4557";
 const pages = {
   website: join(repoRoot, "server-work", "static", "pages", "chatgpt-ia-locale.html"),
   privacy: join(repoRoot, "server-work", "static", "pages", "confidentialite-plugin-outilsia.html"),
@@ -144,6 +146,11 @@ for (const value of [
 ]) {
   requireCondition(portalFields.includes(value), `Portal guide missing ${value}`);
 }
+requireCondition(portalFields.includes(demoVideoUrl), "Portal guide missing the validated demo URL.");
+requireCondition(
+  portalFields.includes(demoVideoSha256),
+  "Portal guide missing the validated demo SHA256.",
+);
 
 requireCondition(existsSync(videoGuidePath), "Missing Codex video automation guide.");
 requireCondition(existsSync(videoRecorderPath), "Missing video recorder controller.");
@@ -158,6 +165,7 @@ for (const marker of [
   "OUTILSIA_RECORDING_STARTED",
   "OUTILSIA_RECORDING_STOPPED",
   "GracefulStop: True",
+  demoVideoUrl,
 ]) {
   requireCondition(videoGuide.includes(marker), `Video guide missing ${marker}`);
 }
