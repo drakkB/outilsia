@@ -36,6 +36,10 @@ const PRIVATE_WORKLOAD_CATALOG = globalThis.__OUTILSIA_PRIVATE_WORKLOAD_PACKS__ 
   response_keys: ["answer", "evidence", "action"],
   packs: []
 };
+const RELEASE_UPDATE_POLICY = globalThis.__OUTILSIA_RELEASE_UPDATE_POLICY__;
+if (!RELEASE_UPDATE_POLICY) {
+  throw new Error("Release update policy is unavailable.");
+}
 
 const state = {
   scan: null,
@@ -1413,9 +1417,10 @@ function renderDesktopManifest(payload) {
     features.memoryforge_export ? "MemoryForge" : null,
     features.obsidian_vault_export ? "Obsidian" : null
   ].filter(Boolean);
+  const launched = state.appBuildInfo || {};
   els.desktopManifestText.textContent = [
-    `Canal ${manifest.channel || "beta"}`,
-    `app ${manifest.current_version || "0.1.0"}`,
+    `Application ${launched.app_version || manifest.current_version || "0.1.0"}`,
+    launched.channel === "rc" ? "candidat de test" : null,
     manifest.catalog_version ? `catalogue ${manifest.catalog_version}` : null,
     manifest.content_signals_version ? `signaux ${manifest.content_signals_version}` : null,
     enabled.length ? enabled.join(" + ") : null
@@ -1443,9 +1448,9 @@ async function loadAppBuildInfo() {
   try {
     state.appBuildInfo = invoke
       ? await invoke("get_app_build_info")
-      : { app_version: "0.1.1", build_id: "browser-demo", source_commit: "" };
+      : { app_version: "0.1.1", channel: "demo", build_id: "browser-demo", source_commit: "", target_os: "", target_arch: "" };
   } catch (_) {
-    state.appBuildInfo = { app_version: "0.1.1", build_id: "unknown-build", source_commit: "" };
+    state.appBuildInfo = { app_version: "0.1.1", channel: "beta", build_id: "unknown-build", source_commit: "", target_os: "", target_arch: "" };
   }
 }
 
@@ -1487,11 +1492,42 @@ function shortHash(hash) {
   return hash ? `${hash.slice(0, 12)}...${hash.slice(-8)}` : "";
 }
 
+function normalizeDesktopPlatform(value = "", arch = "") {
+  return RELEASE_UPDATE_POLICY.normalizeDesktopPlatform(value, arch);
+}
+
+function currentDesktopPlatform() {
+  const launched = state.appBuildInfo || {};
+  const buildPlatform = normalizeDesktopPlatform(launched.target_os, launched.target_arch);
+  if (buildPlatform) return buildPlatform;
+  const scanPlatform = normalizeDesktopPlatform(`${state.scan?.os_name || ""} ${state.scan?.os_version || ""}`);
+  if (scanPlatform) return scanPlatform;
+  const browserPlatform = normalizeDesktopPlatform(
+    `${globalThis.navigator?.userAgent || ""} ${globalThis.navigator?.platform || ""}`,
+    globalThis.navigator?.userAgentData?.architecture || ""
+  );
+  return browserPlatform || "unknown";
+}
+
+function releaseArtifactExtension(file = {}) {
+  return RELEASE_UPDATE_POLICY.artifactExtension(file);
+}
+
+function releaseArtifactForPlatform(release = {}, platform = currentDesktopPlatform()) {
+  return RELEASE_UPDATE_POLICY.artifactForPlatform(release, platform);
+}
+
+function releaseUpdateStatus(release = state.release || {}) {
+  return RELEASE_UPDATE_POLICY.updateStatus(state.appBuildInfo || {}, release);
+}
+
 function releaseProof() {
   const manifest = state.desktopManifest || {};
   const release = state.release || {};
   const launched = state.appBuildInfo || {};
-  const file = release.primary_download || {};
+  const targetPlatform = currentDesktopPlatform();
+  const file = releaseArtifactForPlatform(release, targetPlatform) || {};
+  const update = releaseUpdateStatus(release);
   const freshness = release.freshness || null;
   return {
     app_version: launched.app_version || manifest.current_version || release.version || "0.1.1",
@@ -1501,6 +1537,11 @@ function releaseProof() {
     source_commit: launched.source_commit || "",
     public_build_id: release.build_id || "",
     build_matches_public: Boolean(launched.build_id && release.build_id && launched.build_id === release.build_id),
+    update_status: update.key,
+    update_available: update.update_available,
+    target_os: launched.target_os || "",
+    target_arch: launched.target_arch || "",
+    target_platform: targetPlatform,
     published_at: release.published_at || "",
     file_name: file.name || "",
     original_name: file.original_name || "",
@@ -1724,60 +1765,82 @@ async function copyBetaReport() {
 
 function renderReleaseFallback(manifest = state.desktopManifest || demoDesktopManifest()) {
   const downloadUrl = absoluteOutisiaUrl(manifest.download_url || "https://outilsia.fr/telecharger-scanner-ia-local");
-  els.releaseTitle.textContent = `Canal ${manifest.channel || "beta"} - app ${manifest.current_version || "0.1.0"}`;
+  const launchedVersion = state.appBuildInfo?.app_version || manifest.current_version || "0.1.0";
+  els.releaseTitle.textContent = `Version ${launchedVersion} · vérification indisponible`;
   els.releaseText.textContent = manifest.release_feed_url
-    ? "Vérification du build app en attente."
-    : "Page officielle disponible. Aucun flux release configuré dans ce manifeste.";
+    ? "Le manifeste public n'a pas répondu. L'application locale reste utilisable."
+    : "La page officielle reste disponible, mais aucun manifeste de version n'est configuré.";
   els.releaseDownloadBtn.href = downloadUrl;
   els.releaseDownloadBtn.dataset.openUrl = downloadUrl;
-  els.releaseDownloadBtn.textContent = "Page téléchargement";
+  els.releaseDownloadBtn.textContent = "Voir les téléchargements";
   els.releaseDownloadBtn.removeAttribute("download");
 }
 
 function renderReleaseMetadata(release) {
   const manifest = state.desktopManifest || demoDesktopManifest();
-  const launchedBuild = String(state.appBuildInfo?.build_id || "");
-  const launchedChannel = String(state.appBuildInfo?.channel || "");
-  const isReleaseCandidate = launchedChannel === "rc";
-  const file = release?.primary_download;
-  if (!release?.ok || !file?.url) {
+  if (!release?.ok) {
     renderReleaseFallback(manifest);
     if (manifest.release_feed_url) {
-      els.releaseText.textContent = "Aucun binaire public détecté pour l'instant. La page téléchargement reste la source officielle.";
+      els.releaseText.textContent = "Aucune version publique vérifiable n'a été détectée. La page téléchargement reste la source officielle.";
     }
     return;
   }
-  const url = absoluteOutisiaUrl(file.url);
-  const size = formatBytes(file.size_bytes);
-  const buildMismatch = Boolean(
-    launchedBuild
-    && !["local-dev", "browser-demo", "unknown-build"].includes(launchedBuild)
-    && release.build_id
-    && launchedBuild !== release.build_id
-  );
-  els.releaseTitle.textContent = isReleaseCandidate
-    ? `OutilsIA Local Cockpit ${state.appBuildInfo?.app_version || ""}-rc`
-    : `${release.product || "OutilsIA Local Cockpit"} ${release.label || release.version || "beta"}`;
-  els.releaseText.textContent = (isReleaseCandidate
-    ? [
-        "Candidat privé, non publié",
-        launchedBuild ? `build ${launchedBuild}` : null,
-        release.build_id ? `release publique ${release.build_id}` : null,
-        "garder ce binaire pendant la recette"
-      ]
-    : [
-        buildMismatch ? "Mise à jour disponible" : "Bêta prête",
-        launchedBuild ? `lancée ${launchedBuild}` : null,
-        release.build_id ? `build ${release.build_id}` : null,
-        file.platform || "desktop",
-        size || null,
-        file.sha256 ? `sha ${shortHash(file.sha256)}` : null,
-        release.published_at ? `publié ${release.published_at.slice(0, 10)}` : null
-      ]).filter(Boolean).join(" - ");
+  const update = releaseUpdateStatus(release);
+  const targetPlatform = currentDesktopPlatform();
+  const file = releaseArtifactForPlatform(release, targetPlatform);
+  const launchedBuild = String(state.appBuildInfo?.build_id || "");
+  const installedVersion = update.installed_version || state.appBuildInfo?.app_version || "?";
+  const publicVersion = update.public_version || release.version || "?";
+  const platformLabels = {
+    "windows-x64": "Windows x64",
+    "windows-arm64": "Windows ARM64",
+    linux: "Linux",
+    macos: "macOS",
+    unknown: "système inconnu"
+  };
+  const platformLabel = platformLabels[targetPlatform] || targetPlatform;
+  const titleByStatus = {
+    current: `Application à jour · ${publicVersion}`,
+    update: `Mise à jour disponible · ${publicVersion}`,
+    candidate: `Candidat de test · ${installedVersion}`,
+    candidate_ahead: `Version candidate · ${installedVersion}`,
+    local: `Build local · ${installedVersion}`,
+    different: `Version à vérifier · ${installedVersion}`,
+    unavailable: `Version ${installedVersion} · vérification indisponible`
+  };
+  els.releaseTitle.textContent = titleByStatus[update.key] || titleByStatus.different;
+
+  const stateLabel = {
+    current: "Cette installation correspond au build public",
+    update: `Version installée ${installedVersion}`,
+    candidate: "Candidat privé, non publié",
+    candidate_ahead: `Version publique actuelle ${publicVersion}`,
+    local: `Build local face à la version publique ${publicVersion}`,
+    different: `Build différent de la version publique ${publicVersion}`
+  }[update.key] || "État de version non déterminé";
+  els.releaseText.textContent = [
+    stateLabel,
+    launchedBuild && !["local-dev", "browser-demo", "unknown-build"].includes(launchedBuild) ? `build lancé ${launchedBuild}` : null,
+    release.build_id ? `build public ${release.build_id}` : null,
+    file ? `${platformLabel} ${releaseArtifactExtension(file).replace(".", "").toUpperCase()}` : `aucun paquet ${platformLabel}`,
+    file?.size_bytes ? formatBytes(file.size_bytes) : null,
+    file?.sha256 ? `SHA ${shortHash(file.sha256)}` : null
+  ].filter(Boolean).join(" · ");
+
+  const pageUrl = absoluteOutisiaUrl(manifest.download_url || "https://outilsia.fr/telecharger-scanner-ia-local");
+  const canDirectUpdate = update.update_available
+    && file?.url
+    && ["windows-x64", "windows-arm64", "macos"].includes(targetPlatform);
+  const url = canDirectUpdate ? absoluteOutisiaUrl(file.url) : pageUrl;
   els.releaseDownloadBtn.href = url;
   els.releaseDownloadBtn.dataset.openUrl = url;
-  els.releaseDownloadBtn.textContent = isReleaseCandidate ? "Voir la release publique" : "Télécharger l'app";
-  els.releaseDownloadBtn.setAttribute("download", file.name || "");
+  els.releaseDownloadBtn.textContent = canDirectUpdate
+    ? "Télécharger la mise à jour"
+    : update.update_available && targetPlatform === "linux"
+      ? "Choisir le paquet Linux"
+      : "Voir les téléchargements";
+  if (canDirectUpdate) els.releaseDownloadBtn.setAttribute("download", file.name || "");
+  else els.releaseDownloadBtn.removeAttribute("download");
 }
 
 async function loadReleaseMetadata() {
@@ -1802,7 +1865,7 @@ async function loadReleaseMetadata() {
   } catch (error) {
     state.release = null;
     renderReleaseFallback(manifest);
-    els.releaseText.textContent = "Flux release indisponible. La page téléchargement reste accessible.";
+    els.releaseText.textContent = "Vérification en ligne indisponible. La page téléchargement reste accessible.";
   }
 }
 

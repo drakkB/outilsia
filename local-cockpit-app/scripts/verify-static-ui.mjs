@@ -12,6 +12,7 @@ const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "work
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
 const privateWorkloadCatalog = readFileSync(resolve(root, "src/private-workload-packs.js"), "utf8");
+const releaseUpdatePolicy = readFileSync(resolve(root, "src/release-update-policy.js"), "utf8");
 const forgeBenchContract = readFileSync(resolve(root, "forgebench/signal-maze-v1.json"), "utf8");
 const workstackNotice = readFileSync(resolve(root, "NOTICE-UTILISATION-WORKSTACK.md"), "utf8");
 
@@ -52,6 +53,11 @@ const requiredFeatureText = [
   ["js workspace persistence", js, "WORKSPACE_TAB_STORAGE_KEY"],
   ["css workspace isolation", readFileSync(resolve(root, "src/styles.css"), "utf8"), "data-workspace-tab=\"workflows\""],
   ["html runtime driver matrix", html, "runtime-driver-matrix.js"],
+  ["html release update policy", html, "release-update-policy.js"],
+  ["release platform policy", releaseUpdatePolicy, "artifactForPlatform"],
+  ["release update status policy", releaseUpdatePolicy, "updateStatus"],
+  ["rust target operating system", rust, "target_os"],
+  ["rust target architecture", rust, "target_arch"],
   ["generated runtime driver matrix schema", runtimeDriverMatrix, "outilsia.runtime_driver_matrix.v1"],
   ["js runtime driver intelligence schema", js, "outilsia.runtime_driver_intelligence.v1"],
   ["js runtime driver no silent install", js, "automatic_driver_install_supported: false"],

@@ -545,29 +545,43 @@ button.first-test-primary:not(:disabled):hover {
 }
 
 .release-strip {
-  align-items: center;
+  align-items: start;
   display: grid;
-  gap: 8px;
+  gap: 10px;
   grid-template-columns: minmax(0, 1fr) auto;
   margin-bottom: 8px;
   min-height: 48px;
-  padding: 8px 10px;
+  padding: 11px 12px;
 }
 
-.release-strip .label,
-.release-strip p,
 .release-strip #selfTestResult {
   display: none;
 }
 
+.release-strip .label {
+  color: var(--muted-2);
+  display: block;
+  margin-bottom: 3px;
+}
+
+.release-strip p {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 4px 0 0;
+}
+
 .release-strip strong {
   display: block;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .release-strip .row-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
+  justify-content: flex-end;
 }
 
 .release-strip .row-actions button,
@@ -575,6 +589,30 @@ button.first-test-primary:not(:disabled):hover {
   font-size: 12px;
   min-height: 32px;
   padding-inline: 8px;
+}
+
+.release-recipe-tools {
+  border-top: 1px solid var(--line-soft);
+  grid-column: 1 / -1;
+  padding-top: 8px;
+}
+
+.release-recipe-tools summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.release-recipe-tools[open] .row-actions {
+  justify-content: flex-start;
+  margin-top: 8px;
+}
+
+.release-strip #selfTestResult.ok,
+.release-strip #selfTestResult.bad {
+  display: grid;
+  grid-column: 1 / -1;
 }
 
 .workspace-nav {

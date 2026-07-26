@@ -224,6 +224,8 @@ pub struct AppBuildInfo {
     channel: String,
     build_id: String,
     source_commit: String,
+    target_os: String,
+    target_arch: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -764,6 +766,8 @@ fn get_app_build_info() -> AppBuildInfo {
             .unwrap_or("local-dev")
             .to_string(),
         source_commit: option_env!("GITHUB_SHA").unwrap_or("").to_string(),
+        target_os: std::env::consts::OS.to_string(),
+        target_arch: std::env::consts::ARCH.to_string(),
     }
 }
 
@@ -5822,5 +5826,7 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603|2026-06-15|PCI\\VEN_10DE|
         assert_eq!(info.app_version, env!("CARGO_PKG_VERSION"));
         assert!(!info.channel.trim().is_empty());
         assert!(!info.build_id.trim().is_empty());
+        assert_eq!(info.target_os, std::env::consts::OS);
+        assert_eq!(info.target_arch, std::env::consts::ARCH);
     }
 }

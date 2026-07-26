@@ -310,6 +310,12 @@ def check_download_page(base_url: str) -> dict[str, object]:
         and "réponses brutes exclues" in text
         and "ne compte jamais comme validation physique" in text
     )
+    release_update_ok = (
+        "Version &amp; mise à jour · candidat source" in text
+        and "AppImage, DEB ou RPM" in text
+        and "jamais un EXE Windows" in text
+        and "aucune mise à jour silencieusement" in text
+    )
     return {
         "status": result.get("status"),
         "title_signal_ok": "Scanner PC IA locale" in text,
@@ -327,6 +333,7 @@ def check_download_page(base_url: str) -> dict[str, object]:
         "digital_twin_ok": digital_twin_ok,
         "runtime_driver_ok": runtime_driver_ok,
         "private_workload_ok": private_workload_ok,
+        "release_update_ok": release_update_ok,
         **faq,
         "ok": result.get("status") == 200
         and "Scanner PC IA locale" in text
@@ -343,6 +350,7 @@ def check_download_page(base_url: str) -> dict[str, object]:
         and digital_twin_ok
         and runtime_driver_ok
         and private_workload_ok
+        and release_update_ok
         and faq["faq_visible_ok"],
     }
 
@@ -407,6 +415,12 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         and "réponses brutes" in text
         and "ne compte jamais comme validation physique" in text
     )
+    release_update_ok = (
+        "Version &amp; mise à jour · candidat source" in text
+        and "AppImage, DEB ou RPM" in text
+        and "jamais l'EXE Windows" in text
+        and "aucune installation silencieuse" in text
+    )
     return {
         "status": result.get("status"),
         "canonical_ok": canonical == absolute(base_url, "/scanner-ia-local"),
@@ -422,6 +436,7 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         "digital_twin_ok": digital_twin_ok,
         "runtime_driver_ok": runtime_driver_ok,
         "private_workload_ok": private_workload_ok,
+        "release_update_ok": release_update_ok,
         **faq,
         "ok": result.get("status") == 200
         and canonical == absolute(base_url, "/scanner-ia-local")
@@ -437,6 +452,7 @@ def check_scanner_hub(base_url: str) -> dict[str, object]:
         and digital_twin_ok
         and runtime_driver_ok
         and private_workload_ok
+        and release_update_ok
         and faq["faq_visible_ok"],
     }
 
@@ -714,11 +730,11 @@ def write_markdown(report: dict[str, object], path: Path) -> None:
     lines += ["", "## Téléchargement et screenshots", ""]
     hub = report["scanner_hub"]
     lines.append(
-        f"- `/scanner-ia-local` status={hub['status']} canonical={hub['canonical_ok']} download={hub['download_link_ok']} proof_engine={hub['proof_engine_ok']} objective_arena={hub['objective_arena_ok']} recommendation_engine={hub['recommendation_engine_ok']} flight_recorder={hub['flight_recorder_ok']} digital_twin={hub['digital_twin_ok']} hardware_truth={hub['hardware_truth_ok']} runtime_driver={hub['runtime_driver_ok']} faq_visible={hub['faq_visible_ok']} doctor_passport={hub['doctor_passport_ok']} terrain_caveat={hub['terrain_caveat_ok']}"
+        f"- `/scanner-ia-local` status={hub['status']} canonical={hub['canonical_ok']} download={hub['download_link_ok']} proof_engine={hub['proof_engine_ok']} objective_arena={hub['objective_arena_ok']} recommendation_engine={hub['recommendation_engine_ok']} flight_recorder={hub['flight_recorder_ok']} digital_twin={hub['digital_twin_ok']} hardware_truth={hub['hardware_truth_ok']} runtime_driver={hub['runtime_driver_ok']} release_update={hub['release_update_ok']} faq_visible={hub['faq_visible_ok']} doctor_passport={hub['doctor_passport_ok']} terrain_caveat={hub['terrain_caveat_ok']}"
     )
     dp = report["download_page"]
     lines.append(
-        f"- `/telecharger-scanner-ia-local` status={dp['status']} title={dp['title_signal_ok']} screenshots={dp['screenshot_refs_ok']} static_links={dp['static_links_ok']} proof_engine={dp['proof_engine_ok']} objective_arena={dp['objective_arena_ok']} recommendation_engine={dp['recommendation_engine_ok']} flight_recorder={dp['flight_recorder_ok']} digital_twin={dp['digital_twin_ok']} hardware_truth={dp['hardware_truth_ok']} runtime_driver={dp['runtime_driver_ok']} faq_visible={dp['faq_visible_ok']} doctor_passport={dp['doctor_passport_ok']} terrain_caveat={dp['terrain_caveat_ok']}"
+        f"- `/telecharger-scanner-ia-local` status={dp['status']} title={dp['title_signal_ok']} screenshots={dp['screenshot_refs_ok']} static_links={dp['static_links_ok']} proof_engine={dp['proof_engine_ok']} objective_arena={dp['objective_arena_ok']} recommendation_engine={dp['recommendation_engine_ok']} flight_recorder={dp['flight_recorder_ok']} digital_twin={dp['digital_twin_ok']} hardware_truth={dp['hardware_truth_ok']} runtime_driver={dp['runtime_driver_ok']} release_update={dp['release_update_ok']} faq_visible={dp['faq_visible_ok']} doctor_passport={dp['doctor_passport_ok']} terrain_caveat={dp['terrain_caveat_ok']}"
     )
     manifest = report["release_manifest"]
     lines.append(

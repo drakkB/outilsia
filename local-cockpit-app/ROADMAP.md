@@ -1,6 +1,6 @@
 # OutilsIA Local Cockpit - Roadmap produit
 
-Mise à jour : 2026-07-26
+Mise à jour : 2026-07-27
 
 ## Cap produit
 
@@ -70,6 +70,10 @@ physiques et la décision de promotion ne sont pas terminés.
 - [x] Préparer un build Authenticode optionnel par empreinte du magasin Windows, SHA-256, timestamp RFC 3161, vérification SignTool et reçu lié aux artefacts.
 - [x] Refuser une release dite stable si la signature est valide mais non horodatée ; conserver le mode RC non signé explicite.
 - [x] Réaligner la RC Windows sur la distribution publique : portable de recette, setup NSIS et MSI obligatoire.
+- [x] Comparer la version réellement lancée au manifeste public sans confondre candidat, build local et mise à jour.
+- [x] Sélectionner uniquement un artefact natif : EXE sous Windows, choix AppImage/DEB/RPM sous Linux, aucun repli inter-plateforme.
+- [x] Afficher dans Compte une maintenance lisible avec version installée/publique, build, format, taille et SHA, sans installation automatique.
+- [x] Verrouiller Windows, Linux, ARM64, macOS/Darwin, RC et builds opaques par tests de politique et recette Playwright.
 - [ ] Tester les deux Core i7 et importer leurs rapports réseau réels.
 - [ ] Compléter CPU-only, RTX 3060 12 Go et RTX 4080/4090.
 - [ ] Approuver puis promouvoir les mêmes octets uniquement après lecture des preuves.

@@ -101,6 +101,19 @@
       <p class="fine">Le Machine Replay Lab détecte les régressions de décision dans le code. Cette matrice synthétique ne mesure pas ces machines et ne compte jamais comme preuve terrain physique.</p>
     </section>
 
+    <section class="wrap panel" id="version-mise-a-jour-cockpit" style="margin-bottom:18px;border-color:rgba(34,197,94,.34);background:linear-gradient(135deg,rgba(34,197,94,.08),rgba(15,23,42,.94),rgba(103,232,249,.05))">
+      <span class="pill">Version &amp; mise à jour · candidat source</span>
+      <h2>Le cockpit choisit le bon téléchargement pour Windows ou Linux.</h2>
+      <p class="muted">Dans le candidat source postérieur au build public actuel, l'espace Compte compare la version réellement lancée au manifeste public. Il distingue une mise à jour d'un candidat de test plus récent et ne propose jamais un EXE Windows à une application Linux.</p>
+      <div class="proof" style="margin-top:14px">
+        <div><strong>Windows x64</strong><span>L'EXE natif est prioritaire ; le MSI reste disponible sur la page complète.</span></div>
+        <div><strong>Linux</strong><span>L'utilisateur choisit AppImage, DEB ou RPM au lieu de recevoir un format arbitraire.</span></div>
+        <div><strong>Preuve visible</strong><span>Version installée, build public, format, taille et SHA sont affichés ensemble.</span></div>
+        <div><strong>Pas de rétrogradation</strong><span>Une RC ou une source 0.1.2 face au public 0.1.1 reste identifiée comme candidate.</span></div>
+      </div>
+      <p class="fine">Cette fonction appartient au candidat source et n'est pas incluse dans le build public actuel. Elle ouvre un fichier ou la page de choix après action explicite ; elle n'installe aucune mise à jour silencieusement.</p>
+    </section>
+
     <section class="wrap panel" style="margin-bottom:18px;border-color:rgba(34,197,94,.32)">
       <h2>Ce que mesure réellement le benchmark Ollama</h2>
       <p class="muted">Le build courant utilise l'API locale Ollama avec <code>think:false</code>. Le rapport distingue les métriques natives de l'API d'un éventuel repli estimé.</p>

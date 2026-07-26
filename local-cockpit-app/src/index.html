@@ -14,7 +14,7 @@
           <p class="eyebrow">OutilsIA Local Cockpit</p>
           <h1>Votre PC est-il prêt pour l'IA locale ?</h1>
           <p class="hero-lead">Scannez la machine, vérifiez Qwen, Llama, Hermes ou Mistral, puis gardez la config dans votre compte OutilsIA.</p>
-          <p id="desktopManifestText" class="manifest-line">Canal bêta - moteur de recommandations OutilsIA.</p>
+          <p id="desktopManifestText" class="manifest-line">Application locale - catalogue OutilsIA.</p>
           <div class="signal-row" aria-hidden="true">
             <span></span><span></span><span></span><span></span><span></span>
           </div>
@@ -106,18 +106,23 @@
 
       <section class="release-strip advanced-panel" aria-live="polite">
         <div>
-          <span class="label">Maintenance app</span>
-          <strong id="releaseTitle">Release non vérifiée</strong>
-          <p id="releaseText">Le manifeste indiquera la page officielle et le flux de release.</p>
+          <span class="label">Version de l'application</span>
+          <strong id="releaseTitle">Version non vérifiée</strong>
+          <p id="releaseText">OutilsIA comparera cette installation à la version publique adaptée à votre système.</p>
         </div>
-        <div class="row-actions">
-          <button id="releaseRefreshBtn" type="button">Vérifier release</button>
-          <button id="selfTestBtn" type="button">Auto-test</button>
-          <button id="copyBetaReportBtn" type="button">Copier rapport app</button>
-          <button id="topCopyWindowsRecipeBtn" type="button" disabled>Copier recette</button>
-          <button id="topDownloadWindowsRecipeBtn" type="button" disabled>Télécharger recette</button>
-          <a id="releaseDownloadBtn" class="ghost-btn" href="https://outilsia.fr/telecharger-scanner-ia-local" data-open-url="https://outilsia.fr/telecharger-scanner-ia-local">Page téléchargement</a>
+        <div class="row-actions release-main-actions">
+          <button id="releaseRefreshBtn" type="button">Vérifier la version</button>
+          <button id="selfTestBtn" type="button">Tester l'app</button>
+          <a id="releaseDownloadBtn" class="ghost-btn" href="https://outilsia.fr/telecharger-scanner-ia-local" data-open-url="https://outilsia.fr/telecharger-scanner-ia-local">Voir les téléchargements</a>
         </div>
+        <details class="release-recipe-tools">
+          <summary>Outils de recette</summary>
+          <div class="row-actions">
+            <button id="copyBetaReportBtn" type="button">Copier rapport app</button>
+            <button id="topCopyWindowsRecipeBtn" type="button" disabled>Copier recette</button>
+            <button id="topDownloadWindowsRecipeBtn" type="button" disabled>Télécharger recette</button>
+          </div>
+        </details>
         <p id="selfTestResult" class="self-test-result">Auto-test non lancé.</p>
       </section>
 
@@ -1183,6 +1188,7 @@
 
     <script src="./runtime-driver-matrix.js"></script>
     <script src="./private-workload-packs.js"></script>
+    <script src="./release-update-policy.js"></script>
     <script src="./app.js"></script>
     <script src="./agent-adapter-policy.js"></script>
   </body>
