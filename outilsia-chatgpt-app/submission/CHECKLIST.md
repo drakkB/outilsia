@@ -15,7 +15,7 @@
 - Logo 512 x 512 et trois captures 706 x 860
 - Script de démonstration reviewer-ready dans `DEMO-RECORDING.md`
 
-## État au 25 juillet 2026
+## État au 26 juillet 2026
 
 - Technique locale : prête (`npm run verify`)
 - Production : prête (`npm run smoke:production`)
@@ -26,9 +26,23 @@
   `https://outilsia.fr/static/media/demo-outilsia-chatgpt-local-cockpit.mp4`
   (H.264, 300,8 s, SHA256
   `c83ca491dd120cd8d26009cf660eaa81c08954edcfd6b5283116adcf36cb4557`)
-- Soumission publique : non lancée
+- Soumission : déposée pour revue OpenAI le 26 juillet 2026
+- Publication dans le répertoire : en attente d'approbation, non lancée
 
 ## Actions humaines restantes dans le portail
+
+La soumission initiale est terminée. Conserver le challenge de domaine actif
+pendant la revue, puis :
+
+1. Surveiller le statut et les éventuelles demandes du reviewer.
+2. Répondre aux demandes sans modifier silencieusement le périmètre des outils.
+3. Après approbation, relire la fiche approuvée avant de choisir la date de
+   publication dans le répertoire.
+
+## Recette de resoumission
+
+Les étapes ci-dessous servent uniquement à une future version ou à une demande
+de correction du reviewer.
 
 1. Vérifier que le rôle OpenAI Platform possède `Apps Management: Write`.
 2. Créer une soumission `With MCP` sur le portail Plugins.
