@@ -20,8 +20,18 @@ if (!text.includes("package:rc") || !text.includes("build-windows-release-candid
   fail("RC workflow must use the isolated packager on Windows and Linux");
 }
 if (!text.includes(".artifacts/release-candidate")) fail("RC workflow must write under .artifacts");
+if (!text.includes("inspect-windows-authenticode.ps1")) {
+  fail("RC workflow must rebuild when the Windows Authenticode inspector changes");
+}
 if (!packager.includes("result.stdout.trimEnd()") || packager.includes("result.stdout.trim()")) {
   fail("RC packager must preserve the leading Git porcelain status column");
+}
+for (const marker of ["inspect-windows-authenticode.ps1", "outilsia.windows_authenticode.v1", "AUTHENTICODE.json"]) {
+  if (!packager.includes(marker)) fail(`RC packager must preserve signing evidence: ${marker}`);
+}
+if (!packager.includes("Inspect one artifact per process")
+  || !packager.includes("for (const file of windowsFiles)")) {
+  fail("RC packager must inspect Windows artifacts individually before aggregation");
 }
 
 const forbidden = [

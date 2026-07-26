@@ -98,12 +98,22 @@ function main() {
   for (const file of windowsFiles) copyFileSync(join(opts.candidate, file.name), join(output, file.name));
   copyFileSync(join(opts.candidate, "release-candidate.json"), join(output, "release-candidate.json"));
   copyFileSync(join(opts.candidate, "SHA256SUMS.txt"), join(output, "SHA256SUMS.txt"));
+  copyFileSync(join(opts.candidate, "AUTHENTICODE.json"), join(output, "AUTHENTICODE.json"));
 
   const portable = windowsFiles.find((file) => file.kind === "portable") || null;
   const setup = windowsFiles.find((file) => file.kind === "setup") || windowsFiles[0];
+  const signingStatus = candidate.code_signing?.status || "unverified";
+  const signingByName = new Map((candidate.code_signing?.files || []).map((file) => [file.name, file]));
+  const signingLabel = signingStatus === "valid"
+    ? "Signature Authenticode valide"
+    : signingStatus === "not_signed"
+      ? "Bêta non signée · SHA256 vérifiés"
+      : signingStatus === "mixed_or_invalid"
+        ? "Signature absente ou invalide · ne pas promouvoir"
+        : "Statut de signature non vérifié · contrôle requis";
   const createdAt = String(candidate.created_at || "");
   const expectedFileRows = windowsFiles
-    .map((file) => `  @{ Name = ${psString(file.name)}; Sha256 = ${psString(file.sha256)} }`)
+    .map((file) => `  @{ Name = ${psString(file.name)}; Sha256 = ${psString(file.sha256)}; Authenticode = ${psString(signingByName.get(file.name)?.status || "unverified")} }`)
     .join(",\n");
 
   write(join(output, "Verifier-et-lancer.ps1"), String.raw`param(
@@ -122,6 +132,17 @@ foreach ($item in $files) {
   $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
   if ($actual -ne $item.Sha256) { throw "SHA256 invalide pour $($item.Name): $actual" }
   Write-Host "SHA OK $($item.Name)" -ForegroundColor Green
+  $signature = Get-AuthenticodeSignature -LiteralPath $path
+  $actualAuthenticode = switch ([string]$signature.Status) {
+    "Valid" { "valid" }
+    "NotSigned" { "not_signed" }
+    default { "invalid" }
+  }
+  if ($item.Authenticode -ne "unverified" -and $actualAuthenticode -ne $item.Authenticode) {
+    throw "Statut Authenticode inattendu pour $($item.Name): $actualAuthenticode, attendu $($item.Authenticode)"
+  }
+  $tone = if ($actualAuthenticode -eq "valid") { "Green" } elseif ($actualAuthenticode -eq "not_signed") { "Yellow" } else { "Red" }
+  Write-Host "Authenticode $actualAuthenticode $($item.Name)" -ForegroundColor $tone
 }
 $manifest = Get-Content -LiteralPath (Join-Path $root "release-candidate.json") -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($manifest.channel -ne "release-candidate") { throw "Canal RC invalide" }
@@ -404,6 +425,7 @@ pause
     <span class="status">CANDIDAT PRIVÉ · NON PUBLIÉ</span>
     <h1>OutilsIA Local Cockpit ${html(candidate.label)}</h1>
     <div class="meta">build ${html(candidate.build_id)} · canal rc · ${windowsFiles.length} artefact(s) Windows</div>
+    <div class="meta">${html(signingLabel)}</div>
   </div></header>
   <main>
     <p class="intro">Ce parcours vérifie le cœur du produit sur une vraie machine en cinq étapes. Il produit une preuve réseau et chiffrée sans imposer toute la recette longue.</p>
@@ -421,6 +443,7 @@ pause
 - Canal embarqué : \`rc\`
 - Publication publique : interdite par le manifeste
 - Release publique actuelle : inchangée
+- Authenticode Windows : \`${signingStatus}\`
 
 Ouvrir \`START-HERE.html\`, puis suivre \`01\` → \`02\` → \`03\`.
 
@@ -433,6 +456,32 @@ Le test express exige :
 5. rapport OutilsIA partagé et joignable.
 
 PromptForge, Dialogue, Arena et le deuxième modèle restent optionnels pour ce smoke RC, mais obligatoires dans la validation terrain finale.
+`);
+  write(join(output, "CAMPAGNE-5-MACHINES.md"), `# Campagne terrain OutilsIA Local Cockpit ${candidate.label}
+
+Toutes les machines doivent utiliser ce même candidat :
+
+- version : \`${candidate.version}\`
+- build : \`${candidate.build_id}\`
+- commit : \`${candidate.source?.commit || ""}\`
+- canal : \`rc\`
+
+| Ordre | Machine réelle | Profil terrain complet | But |
+|---:|---|---|---|
+| 1 | Tour Core i7 + GTX 1080 Ti 11 Go | \`core_i7_gtx_1080_ti\` | Vérifier Pascal, pilote, runtime, offload et modèle léger. |
+| 2 | Deuxième Core i7 / vieux portable | \`old_laptop\` | Vérifier le parcours débutant et la recommandation prudente. |
+| 3 | Machine sans GPU dédié utilisé | \`cpu_only\` | Prouver une exécution CPU via Ollama, pas seulement une VRAM à zéro. |
+| 4 | RTX 3060 12 Go | \`rtx_3060_12gb\` | Valider le palier grand public 12 Go. |
+| 5 | RTX 4080 ou RTX 4090 | \`rtx_4080_4090\` | Valider le haut de gamme et les modèles plus ambitieux. |
+
+## Règles
+
+1. Produire un rapport partagé différent sur chaque machine.
+2. Ne jamais recopier ou éditer une fiche pour simuler un autre PC.
+3. Garder la recette source, le résultat smoke, le manifeste RC et les SHA dans chaque ZIP exporté.
+4. Les deux premiers PC suffisent au seuil de promotion bêta RC, après décision humaine explicite.
+5. Seules les cinq fiches longues valident la campagne terrain complète.
+6. Un statut Authenticode \`${signingStatus}\` doit rester présenté tel quel ; \`not_signed\` ou \`unverified\` ne signifie jamais « signé ».
 `);
   write(join(output, "EXPECTED-APP-VERSION.txt"), candidate.version);
   write(join(output, "EXPECTED-BUILD-ID.txt"), candidate.build_id);
@@ -449,10 +498,19 @@ PromptForge, Dialogue, Arena et le deuxième modèle restent optionnels pour ce 
       artifact_set_sha256: candidate.build_provenance?.artifact_set_sha256 || "",
     },
     public_deploy_allowed: false,
+    code_signing: candidate.code_signing,
     windows_files: windowsFiles.map((file) => ({ name: file.name, sha256: file.sha256, kind: file.kind })),
     smoke_validator: "02-VALIDER-LE-TEST.cmd",
     smoke_export_directory: "Downloads",
     smoke_import_command: "npm run import:rc-smoke -- --candidate-dir <candidat-fusionne> --input <zip>",
+    campaign_order: [
+      "core_i7_gtx_1080_ti",
+      "old_laptop",
+      "cpu_only",
+      "rtx_3060_12gb",
+      "rtx_4080_4090",
+    ],
+    first_promotion_checkpoint_after_unique_machines: 2,
     full_terrain_gate_unchanged: true,
   }, null, 2));
   console.log(`release_candidate_kit=${output}`);

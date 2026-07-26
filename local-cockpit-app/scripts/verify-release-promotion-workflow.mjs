@@ -42,6 +42,9 @@ requireAll(promotion, [
   'decision.decision !== "approve_public_beta"',
   "validateSmokeRegistry",
   "publish_exact_rc_artifact_bytes",
+  "windows_signing_status_acknowledged",
+  "promotedCodeSigning",
+  "code_signing: codeSigning",
   "exact_artifact_bytes: true",
   "public_deploy_executed: false",
   "syncDownloadPage",
@@ -81,6 +84,11 @@ requireAll(kit, [
   "fingerprint_sha256",
   "manifest_sha256",
   "artifact_set_sha256",
+  "AUTHENTICODE.json",
+  "Get-AuthenticodeSignature",
+  "CAMPAGNE-5-MACHINES.md",
+  "core_i7_gtx_1080_ti",
+  "old_laptop",
   "Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads'",
 ], "RC field kit");
 

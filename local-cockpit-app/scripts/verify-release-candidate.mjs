@@ -61,6 +61,76 @@ function artifactSetSha256(files) {
     .digest("hex");
 }
 
+function validateAuthenticode(candidate, input) {
+  const report = candidate.code_signing;
+  if (report?.schema !== "outilsia.windows_authenticode.v1") {
+    fail("RC code_signing schema is missing or invalid");
+  }
+  const reportPath = join(input, "AUTHENTICODE.json");
+  if (!existsSync(reportPath)) fail("RC AUTHENTICODE.json is missing");
+  const standalone = JSON.parse(readFileSync(reportPath, "utf8").replace(/^\uFEFF/, ""));
+  if (JSON.stringify(standalone) !== JSON.stringify(report)) {
+    fail("RC AUTHENTICODE.json does not match candidate.code_signing");
+  }
+  const windowsFiles = candidate.files.filter((file) => file.platform === "windows-x64");
+  const signatureFiles = Array.isArray(report.files) ? report.files : [];
+  if (!windowsFiles.length) {
+    if (report.status !== "not_applicable" || report.verified_on_windows !== false || signatureFiles.length) {
+      fail("Non-Windows RC must use code_signing.status=not_applicable");
+    }
+    return report.status;
+  }
+  if (!["valid", "not_signed", "mixed_or_invalid", "unverified"].includes(report.status)) {
+    fail(`Invalid RC code signing status: ${report.status}`);
+  }
+  if (signatureFiles.length !== windowsFiles.length) {
+    fail("RC code signing file count does not match Windows artifacts");
+  }
+  const byName = new Map(signatureFiles.map((file) => [file.name, file]));
+  for (const artifact of windowsFiles) {
+    const signature = byName.get(artifact.name);
+    if (!signature) fail(`RC code signing entry missing: ${artifact.name}`);
+    if (signature.sha256 !== artifact.sha256) fail(`RC code signing SHA256 mismatch: ${artifact.name}`);
+    if (!["valid", "not_signed", "invalid", "unverified"].includes(signature.status)) {
+      fail(`Invalid Authenticode file status: ${artifact.name}`);
+    }
+    if (Object.hasOwn(signature, "status_message")) {
+      fail(`Authenticode evidence must not export native messages or local paths: ${artifact.name}`);
+    }
+  }
+  if (byName.size !== windowsFiles.length) fail("RC code signing contains unexpected files");
+
+  const statuses = [...new Set(signatureFiles.map((file) => file.status))];
+  let expectedStatus = "mixed_or_invalid";
+  if (report.verified_on_windows === false) {
+    if (statuses.some((status) => status !== "unverified")) {
+      fail("Unverified Authenticode report may only contain unverified file statuses");
+    }
+    expectedStatus = "unverified";
+  } else {
+    if (report.inspector !== "Get-AuthenticodeSignature") fail("Windows Authenticode inspector is invalid");
+    if (statuses.length === 1 && statuses[0] === "valid") expectedStatus = "valid";
+    else if (statuses.length === 1 && statuses[0] === "not_signed") expectedStatus = "not_signed";
+  }
+  if (report.status !== expectedStatus) {
+    fail(`RC code signing aggregate status mismatch: ${report.status} != ${expectedStatus}`);
+  }
+  const allValid = report.status === "valid";
+  if (report.all_valid !== allValid
+    || report.identity_claim_allowed !== allValid
+    || report.stable_release_ready !== allValid) {
+    fail("RC code signing claims do not match the verified status");
+  }
+  if (allValid) {
+    for (const signature of signatureFiles) {
+      if (!String(signature.signer_subject || "").trim() || !String(signature.signer_thumbprint || "").trim()) {
+        fail(`Valid Authenticode entry lacks signer identity: ${signature.name}`);
+      }
+    }
+  }
+  return report.status;
+}
+
 function main() {
   const opts = parseArgs(process.argv.slice(2));
   const manifestPath = join(opts.input, "release-candidate.json");
@@ -134,6 +204,7 @@ function main() {
   if (candidate.build_provenance?.artifact_set_sha256 !== expectedArtifactSet) {
     fail("RC provenance artifact_set_sha256 mismatch");
   }
+  const signingStatus = validateAuthenticode(candidate, opts.input);
   const actualPlatforms = [...new Set(candidate.files.map((file) => file.platform))].sort();
   const provenancePlatforms = [...(candidate.build_provenance?.artifact_platforms || [])].sort();
   if (JSON.stringify(actualPlatforms) !== JSON.stringify(provenancePlatforms)) {
@@ -153,7 +224,7 @@ function main() {
   }
   console.log(
     `release_candidate_ok label=${candidate.label} build_id=${candidate.build_id} ` +
-    `platforms=${actualPlatforms.join(",")} files=${candidate.files.length}`
+    `platforms=${actualPlatforms.join(",")} files=${candidate.files.length} signing=${signingStatus}`
   );
 }
 

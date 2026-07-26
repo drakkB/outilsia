@@ -71,6 +71,18 @@ try {
   run("verify-release-candidate.mjs", ["--input", windows, "--require-platform", "windows-x64", "--require-freshness"]);
   run("verify-release-candidate.mjs", ["--input", linux, "--require-platform", "linux", "--require-freshness"]);
   const windowsCandidate = JSON.parse(readFileSync(join(windows, "release-candidate.json"), "utf8"));
+  if (windowsCandidate.code_signing?.schema !== "outilsia.windows_authenticode.v1") {
+    throw new Error("Windows RC is missing Authenticode evidence");
+  }
+  if (process.platform === "win32" && windowsCandidate.code_signing.verified_on_windows !== true) {
+    throw new Error("Windows RC Authenticode evidence was not inspected on Windows");
+  }
+  if (process.platform === "win32" && windowsCandidate.code_signing.files?.length !== 2) {
+    throw new Error("Windows RC must inspect every Windows artifact independently");
+  }
+  if (process.platform !== "win32" && windowsCandidate.code_signing.status !== "unverified") {
+    throw new Error(`Non-Windows fixture should remain unverified, got ${windowsCandidate.code_signing.status}`);
+  }
   for (const expectedPath of [
     "local-cockpit-app/src-tauri/Cargo.toml",
     "local-cockpit-app/src-tauri/gen/schemas/desktop-schema.json",
@@ -88,7 +100,7 @@ try {
     "--output-dir", kit,
     "--replace",
   ]);
-  for (const required of ["START-HERE.html", "01-LANCER-LE-RC.cmd", "02-VALIDER-LE-TEST.cmd", "RC-KIT-MANIFEST.json"]) {
+  for (const required of ["START-HERE.html", "CAMPAGNE-5-MACHINES.md", "01-LANCER-LE-RC.cmd", "02-VALIDER-LE-TEST.cmd", "RC-KIT-MANIFEST.json", "AUTHENTICODE.json"]) {
     if (!existsSync(join(kit, required))) throw new Error(`RC kit missing ${required}`);
   }
   if (process.platform === "win32") {
@@ -131,6 +143,20 @@ try {
   if (hash(readFileSync(publicReleasePath)) !== hash(publicBefore)) {
     throw new Error("RC pipeline mutated public release.json");
   }
+
+  const originalManifest = readFileSync(candidatePath);
+  const originalAuthenticode = readFileSync(join(merged, "AUTHENTICODE.json"));
+  const falseSigningClaim = {
+    ...candidate.code_signing,
+    all_valid: true,
+    identity_claim_allowed: true,
+    stable_release_ready: true,
+  };
+  writeFileSync(candidatePath, `${JSON.stringify({ ...candidate, code_signing: falseSigningClaim }, null, 2)}\n`);
+  writeFileSync(join(merged, "AUTHENTICODE.json"), `${JSON.stringify(falseSigningClaim, null, 2)}\n`);
+  expectFailure("verify-release-candidate.mjs", ["--input", merged], "claims do not match");
+  writeFileSync(candidatePath, originalManifest);
+  writeFileSync(join(merged, "AUTHENTICODE.json"), originalAuthenticode);
 
   const tampered = candidate.files[0];
   writeFileSync(join(merged, tampered.name), "tampered");

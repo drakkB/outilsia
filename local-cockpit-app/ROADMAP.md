@@ -32,7 +32,7 @@ L'audit externe est utilisé comme regard produit, pas comme source de vérité.
 1. **Vérité de release obligatoire** : aucune fonction candidate n'est attribuée au téléchargement public avant vérification du manifeste, des octets servis et de la recette native.
 2. **Preuve physique prioritaire** : tester d'abord les deux Core i7 disponibles, dont la tour GTX 1080 Ti, puis compléter CPU-only, RTX 3060 12 Go et RTX 4080/4090 avec rapports réseau cohérents.
 3. **Signature Windows** : documenter coût, fournisseur, conservation de clé et pipeline de signature ; ne jamais afficher « signé » avant un `Get-AuthenticodeSignature` valide sur EXE et MSI téléchargés.
-4. **Funnel mesurable sans contenu privé** : suivre seulement `scan_success`, `recommended_model_install_success` et `first_benchmark_success`, localement par défaut et en agrégé uniquement avec consentement. Aucun prompt, réponse, nom de fichier ou modèle personnel n'entre dans ces métriques.
+4. **Funnel mesurable sans contenu privé** : suivre seulement `scan_success`, `recommended_model_ready` et `first_benchmark_success`, localement par défaut. Aucun prompt, réponse, nom de fichier, modèle personnel ou identifiant machine n'entre dans ces métriques ; aucun envoi automatique n'existe.
 5. **Divulgation progressive** : conserver Workstacks, ForgeBench, Ledger et Router en mode avancé. Évaluer après les tests physiques s'ils doivent rester masqués jusqu'au premier benchmark réussi ; ne pas introduire ce verrou avant d'avoir observé de vrais utilisateurs.
 6. **Résultat décisionnel compact** : viser une synthèse immédiatement visible en quatre faits maximum : potentiel machine, modèle conseillé ou testé, preuve mesurée, prochaine action ou absence d'achat utile.
 7. **Positionnement stable** : « OutilsIA est la couche de décision de l'IA locale. On dit ce que le PC peut réellement faire, on le prouve et on indique s'il faut upgrader ou non. »
@@ -47,6 +47,29 @@ L'audit externe est utilisé comme regard produit, pas comme source de vérité.
 5. Mesure du funnel réel avant toute extension grand public des Workstacks.
 
 Ne pas lancer maintenant un orchestrateur multi-agents généraliste, un leaderboard présenté comme scientifique ou une installation distante depuis ChatGPT. Ces pistes restent subordonnées à la fluidité et à la preuve du parcours diagnostic → modèle recommandé → benchmark → rapport.
+
+## Candidat 0.1.2 - promotion honnête et campagne physique
+
+État au 26 juillet 2026 : la chaîne candidate conserve maintenant l'identité
+source/build/canal, la preuve Authenticode de chaque artefact Windows et un
+funnel d'activation strictement local. Le build public reste `0.1.1`
+(`291439601671`) et les sources `0.1.2` restent candidates tant que les essais
+physiques et la décision de promotion ne sont pas terminés.
+
+- [x] Mesurer localement le premier scan, le modèle conseillé prêt et le premier benchmark réussi, sans prompt, réponse, modèle, chemin ni identifiant machine.
+- [x] Réinitialiser ces jalons au changement d'identité de build et conserver seulement la première date de chaque étape.
+- [x] Lier les fiches terrain à la version, au build, au canal et au commit source.
+- [x] Inspecter EXE et MSI sur Windows avec `Get-AuthenticodeSignature`, puis lier chaque statut au SHA-256 exact.
+- [x] Interdire toute revendication d'éditeur signé lorsque le statut n'est pas `valid`.
+- [x] Préserver la preuve de signature de la RC jusqu'au manifeste public et au reçu de promotion.
+- [x] Vérifier séparément la vérité des sources, du manifeste public et des pages scanner/téléchargement.
+- [x] Générer dans le kit privé un guide de campagne ordonné : Core i7 + GTX 1080 Ti, second Core i7, CPU-only, RTX 3060 12 Go, RTX 4080/4090.
+- [x] Conserver deux seuils honnêtes : smoke RC à deux machines uniques et terrain complet à cinq profils.
+- [ ] Produire la RC privée Windows/Linux depuis CI et confirmer son statut Authenticode natif.
+- [ ] Tester les deux Core i7 et importer leurs rapports réseau réels.
+- [ ] Compléter CPU-only, RTX 3060 12 Go et RTX 4080/4090.
+- [ ] Approuver puis promouvoir les mêmes octets uniquement après lecture des preuves.
+- [ ] Étudier l'achat et la conservation sécurisée d'un certificat de signature ; aucun secret de signature ne doit entrer dans Git.
 
 ## Livré dans les sources - Navigation par espaces
 

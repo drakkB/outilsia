@@ -200,7 +200,7 @@ async function validateSmokeRegistry(registryDir, status, identity, candidate, d
   };
 }
 
-function validateDecision(decision, identity, smokeStatusPath) {
+function validateDecision(decision, identity, smokeStatusPath, candidate) {
   if (decision.schema !== "outilsia.local_cockpit_rc_promotion_decision.v1") fail("Unexpected promotion decision schema");
   if (decision.decision !== "approve_public_beta") fail("Promotion decision is not approve_public_beta");
   assertIdentity(decision.candidate, identity, "decision.candidate");
@@ -210,12 +210,22 @@ function validateDecision(decision, identity, smokeStatusPath) {
   if (decidedAt > Date.now() + 10 * 60 * 1000) fail("Promotion decision is in the future");
   if (!String(decision.decided_by || "").trim()) fail("Promotion decision decided_by is required");
   if (String(decision.reason || "").trim().length < 20) fail("Promotion decision reason must explain the approval");
+  const candidateSigning = candidate.code_signing || {};
+  if (String(decision.windows_code_signing?.status || "") !== String(candidateSigning.status || "")) {
+    fail("Promotion decision Windows signing status does not match the candidate");
+  }
+  if (decision.windows_code_signing?.verified_on_windows !== (candidateSigning.verified_on_windows === true)
+    || decision.windows_code_signing?.identity_claim_allowed !== (candidateSigning.identity_claim_allowed === true)
+    || decision.windows_code_signing?.stable_release_ready !== (candidateSigning.stable_release_ready === true)) {
+    fail("Promotion decision Windows signing claims do not match the candidate");
+  }
   const acknowledgements = decision.acknowledgements || {};
   for (const key of [
     "publish_exact_rc_artifact_bytes",
     "full_terrain_gate_incomplete",
     "public_claim_limited_to_beta",
     "rollback_prepared",
+    "windows_signing_status_acknowledged",
   ]) {
     if (acknowledgements[key] !== true) fail(`Promotion decision acknowledgement missing: ${key}`);
   }
@@ -240,6 +250,24 @@ function downloadsByPlatform(files) {
     groups[file.platform].push(file);
     return groups;
   }, {});
+}
+
+function promotedCodeSigning(candidate, files) {
+  const source = candidate.code_signing || {};
+  const publicByRcName = new Map(files.map((file) => [file.rc_source_name, file]));
+  return {
+    ...source,
+    files: (source.files || []).map((signature) => {
+      const target = publicByRcName.get(signature.name);
+      if (!target) fail(`Promoted Authenticode entry has no public artifact: ${signature.name}`);
+      if (target.sha256 !== signature.sha256) fail(`Promoted Authenticode SHA256 mismatch: ${signature.name}`);
+      return {
+        ...signature,
+        name: target.name,
+        rc_source_name: signature.name,
+      };
+    }),
+  };
 }
 
 export async function preparePromotion(opts, dependencies = {}) {
@@ -271,7 +299,7 @@ export async function preparePromotion(opts, dependencies = {}) {
     candidate,
     dependencies,
   );
-  validateDecision(decision, identity, smokeStatusPath);
+  validateDecision(decision, identity, smokeStatusPath, candidate);
   prepareOutput(opts.output, opts.replace);
 
   const artifactIdentity = [];
@@ -306,6 +334,7 @@ export async function preparePromotion(opts, dependencies = {}) {
     || files.find((file) => file.platform === "windows-x64" && file.kind === "portable")
     || files[0];
   const platforms = [...new Set(files.map((file) => file.platform))].sort();
+  const codeSigning = promotedCodeSigning(candidate, files);
   const publishedAt = new Date().toISOString();
   const release = {
     ok: true,
@@ -349,12 +378,14 @@ export async function preparePromotion(opts, dependencies = {}) {
       allow_stale: false,
       stale: false,
     },
+    code_signing: codeSigning,
     primary_download: primary,
     downloads_by_platform: downloadsByPlatform(files),
     files,
   };
   const releasePath = join(opts.output, "release.json");
   writeFileSync(releasePath, `${JSON.stringify(release, null, 2)}\n`);
+  writeFileSync(join(opts.output, "AUTHENTICODE.json"), `${JSON.stringify(codeSigning, null, 2)}\n`);
   const promotionProof = {
     schema: "outilsia.local_cockpit_rc_promotion_proof.v1",
     created_at: publishedAt,
@@ -364,6 +395,7 @@ export async function preparePromotion(opts, dependencies = {}) {
     decision_sha256: sha256(opts.decision),
     release_manifest_sha256: sha256(releasePath),
     artifact_identity: artifactIdentity,
+    code_signing: codeSigning,
     public_deploy_executed: false,
     rollback_required_before_deploy: true,
   };

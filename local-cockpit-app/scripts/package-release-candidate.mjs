@@ -162,6 +162,93 @@ function sha256(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
+function unverifiedAuthenticode(files, status = "unverified") {
+  const windowsFiles = files.filter((file) => file.platform === "windows-x64");
+  const applicable = windowsFiles.length > 0;
+  return {
+    schema: "outilsia.windows_authenticode.v1",
+    inspected_at: new Date().toISOString(),
+    inspector: applicable ? "not_available_on_this_runner" : "not_applicable",
+    verified_on_windows: false,
+    status: applicable ? status : "not_applicable",
+    all_valid: false,
+    identity_claim_allowed: false,
+    stable_release_ready: false,
+    files: windowsFiles.map((file) => ({
+      name: file.name,
+      sha256: file.sha256,
+      status,
+      native_status: "",
+      signer_subject: "",
+      signer_thumbprint: "",
+      timestamp_present: false,
+      timestamp_subject: "",
+      timestamp_thumbprint: "",
+    })),
+  };
+}
+
+function inspectWindowsAuthenticode(files, outputDir) {
+  const windowsFiles = files.filter((file) => file.platform === "windows-x64");
+  if (!windowsFiles.length) return unverifiedAuthenticode(files);
+  if (process.platform !== "win32") return unverifiedAuthenticode(files);
+  const script = join(appRoot, "scripts", "inspect-windows-authenticode.ps1");
+  const inspectedFiles = [];
+  const inspectedAt = [];
+  for (const file of windowsFiles) {
+    // PowerShell -File does not bind several trailing values to one array
+    // parameter reliably. Inspect one artifact per process and aggregate here.
+    const result = spawnSync("powershell.exe", [
+      "-NoProfile",
+      "-ExecutionPolicy", "Bypass",
+      "-File", script,
+      "-ArtifactPath", join(outputDir, file.name),
+    ], { cwd: appRoot, encoding: "utf8" });
+    if (result.status !== 0) {
+      fail(`Authenticode inspection failed for ${file.name}: ${result.stderr || result.stdout}`);
+    }
+    let report;
+    try {
+      report = JSON.parse(String(result.stdout || "").replace(/^\uFEFF/, "").trim());
+    } catch (error) {
+      fail(`Authenticode report is not valid JSON for ${file.name}: ${error.message}`);
+    }
+    if (report?.schema !== "outilsia.windows_authenticode.v1"
+      || report.verified_on_windows !== true
+      || !Array.isArray(report.files)
+      || report.files.length !== 1) {
+      fail(`Authenticode inspector returned an invalid single-file report: ${file.name}`);
+    }
+    const signature = report.files[0];
+    if (!signature || signature.sha256 !== file.sha256) {
+      fail(`Authenticode report is not bound to candidate artifact: ${file.name}`);
+    }
+    if (signature.name !== file.name) {
+      fail(`Authenticode report has the wrong artifact name: ${signature.name}`);
+    }
+    inspectedFiles.push(signature);
+    inspectedAt.push(String(report.inspected_at || ""));
+  }
+  const statuses = new Set(inspectedFiles.map((file) => file.status));
+  const status = statuses.size === 1 && statuses.has("valid")
+    ? "valid"
+    : statuses.size === 1 && statuses.has("not_signed")
+      ? "not_signed"
+      : "mixed_or_invalid";
+  const allValid = status === "valid";
+  return {
+    schema: "outilsia.windows_authenticode.v1",
+    inspected_at: inspectedAt.sort().at(-1) || new Date().toISOString(),
+    inspector: "Get-AuthenticodeSignature",
+    verified_on_windows: true,
+    status,
+    all_valid: allValid,
+    identity_claim_allowed: allValid,
+    stable_release_ready: allValid,
+    files: inspectedFiles,
+  };
+}
+
 function newestSource() {
   let newest = { path: "", mtimeMs: 0 };
   const visit = (path) => {
@@ -278,6 +365,7 @@ function main() {
   const artifactSetSha256 = createHash("sha256")
     .update(files.map((file) => `${file.sha256}  ${file.name}`).sort().join("\n"))
     .digest("hex");
+  const codeSigning = inspectWindowsAuthenticode(files, opts.outputDir);
   const manifest = {
     schema: "outilsia.local_cockpit_release_candidate.v1",
     ok: true,
@@ -328,10 +416,12 @@ function main() {
       },
     },
     freshness,
+    code_signing: codeSigning,
     primary_artifact: primary,
     files,
   };
   writeFileSync(join(opts.outputDir, "release-candidate.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  writeFileSync(join(opts.outputDir, "AUTHENTICODE.json"), `${JSON.stringify(codeSigning, null, 2)}\n`);
   writeFileSync(
     join(opts.outputDir, "SHA256SUMS.txt"),
     `${files.map((file) => `${file.sha256}  ${file.name}`).join("\n")}\n`

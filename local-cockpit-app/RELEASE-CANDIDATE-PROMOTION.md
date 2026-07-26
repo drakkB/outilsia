@@ -7,6 +7,14 @@ La RC n'est jamais publiee automatiquement. Le seuil smoke et la decision
 humaine autorisent seulement la creation d'un pack de promotion. Le deploiement
 reste une commande separee et exige `--deploy`.
 
+Etat de reference au 26 juillet 2026 :
+
+- sources : `0.1.2`, candidat prive uniquement ;
+- public : `0.1.1`, build `291439601671` ;
+- terrain `0.1.2` : `0/5`, aucune fixture ne compte comme machine ;
+- Authenticode public Windows : `NotSigned` ;
+- app ChatGPT : contrat gele pendant son examen.
+
 ## Frontiere de preuve
 
 Deux niveaux ne doivent pas etre confondus :
@@ -35,6 +43,7 @@ Chaque resultat importe doit conserver et verifier :
 
 - version, build, canal RC et commit source ;
 - SHA256 du manifeste candidat et de l'ensemble des artefacts ;
+- statut Authenticode lie au nom et au SHA256 de chaque artefact Windows ;
 - ancre physique Windows hachee avec le manifeste de cette RC, non reutilisable
   pour suivre une machine entre deux releases ;
 - empreinte materielle uniquement hachee ;
@@ -55,6 +64,22 @@ Le registre refuse :
 
 Deux passages du meme PC restent dans l'historique, mais seule la mesure la plus
 recente de son ancre physique compte dans le seuil.
+
+## Mesure d'activation locale
+
+La RC conserve localement trois jalons, chacun avec sa premiere date :
+
+1. `scan_success` ;
+2. `recommended_model_ready` ;
+3. `first_benchmark_success`.
+
+Le document `outilsia.activation_funnel.v1` ne contient ni identifiant machine,
+ni modele, ni prompt, ni reponse, ni chemin de fichier. Il n'est jamais envoye
+automatiquement. Il est lie a la version, au build et au canal, puis remis a
+zero lorsqu'une nouvelle identite de build fiable est detectee.
+
+La fiche terrain peut embarquer ce resume pour mesurer le parcours, mais il ne
+remplace aucune preuve materielle ou reseau.
 
 ## 1. Preparer la RC privee
 
@@ -90,7 +115,32 @@ npm run kit:rc -- \
 
 Le kit reste prive. Il n'utilise pas le repertoire public du site.
 
+Le candidat Windows contient aussi `AUTHENTICODE.json`. Sur un runner Windows,
+le packager execute `Get-AuthenticodeSignature` sur chaque EXE/MSI et lie le
+resultat au SHA256 exact. Les statuts acceptes sont :
+
+- `valid` : tous les artefacts Windows sont signes et l'identite est lisible ;
+- `not_signed` : aucun artefact n'a de signature valide ;
+- `mixed_or_invalid` : signatures heterogenes ou invalides ;
+- `unverified` : inspection Windows impossible sur ce runner ;
+- `not_applicable` : aucun artefact Windows.
+
+Seul `valid` autorise une revendication d'identite signee. `NotSigned` n'empeche
+pas une beta privee ou publique explicitement non signee, mais interdit toute
+mention contraire. Aucun certificat, PFX ou mot de passe n'entre dans le depot.
+
 ## 2. Tester une machine Windows
+
+Ordre de campagne recommande :
+
+1. tour Core i7 + GTX 1080 Ti : `core_i7_gtx_1080_ti` ;
+2. second Core i7 ou vieux portable : `old_laptop` ;
+3. machine sans GPU exploitable : `cpu_only` ;
+4. RTX 3060 12 Go : `rtx_3060_12gb` ;
+5. RTX 4080 ou 4090 : `rtx_4080_4090`.
+
+Les deux premiers profils ouvrent seulement le seuil smoke RC. Les cinq profils
+sont necessaires pour annoncer une validation terrain complete.
 
 Sur chaque PC physique :
 
@@ -168,8 +218,11 @@ Christophe, renseigner :
 }
 ```
 
-Ne modifier ni l'identite candidate, ni les SHA, ni les quatre
-acknowledgements.
+Ne modifier ni l'identite candidate, ni les SHA, ni les cinq
+acknowledgements. L'acknowledgement
+`windows_signing_status_acknowledged` confirme uniquement que le statut
+Authenticode a ete lu ; il ne transforme jamais un fichier non signe en fichier
+signe.
 
 ## 5. Preparer le pack de promotion
 
@@ -250,6 +303,8 @@ page puis le manifeste en dernier.
 Avant commit :
 
 ```bash
+npm run verify:activation-funnel
+npm run verify:product-truth
 npm run test:release-candidate
 npm run test:release-candidate:promotion
 npm run verify:release-candidate:workflow
@@ -267,4 +322,16 @@ Le test de promotion couvre notamment :
 - preservation exacte des octets ;
 - artefact modifie avant deploiement ;
 - page statique synchronisee ;
+- preuve Authenticode preservee et liee aux artefacts exacts ;
+- refus d'une revendication signee incoherente ;
+- coherence source, candidat, public et pages du site ;
 - dry-run de rollback.
+
+References officielles :
+
+- Tauri, distribution et signature :
+  `https://v2.tauri.app/distribute/`
+- Microsoft, `Get-AuthenticodeSignature` :
+  `https://learn.microsoft.com/powershell/module/microsoft.powershell.security/get-authenticodesignature`
+- Microsoft, SignTool :
+  `https://learn.microsoft.com/windows/win32/seccrypto/signtool`

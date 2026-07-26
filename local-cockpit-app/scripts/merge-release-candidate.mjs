@@ -95,6 +95,20 @@ function main() {
   const files = [...byName.values()].sort((left, right) => left.name.localeCompare(right.name));
   const platforms = [...new Set(files.map((file) => file.platform))].sort();
   const first = candidates[0];
+  const windowsCandidate = candidates.find((candidate) =>
+    candidate.files.some((file) => file.platform === "windows-x64")
+  );
+  const codeSigning = windowsCandidate?.code_signing || {
+    schema: "outilsia.windows_authenticode.v1",
+    inspected_at: new Date().toISOString(),
+    inspector: "not_applicable",
+    verified_on_windows: false,
+    status: "not_applicable",
+    all_valid: false,
+    identity_claim_allowed: false,
+    stable_release_ready: false,
+    files: [],
+  };
   const primary = files.find((file) => file.platform === "windows-x64" && file.kind === "setup")
     || files.find((file) => file.platform === "windows-x64" && file.kind === "portable")
     || files.find((file) => file.platform === "linux" && file.kind === "appimage")
@@ -132,6 +146,7 @@ function main() {
       oldest_artifact: oldestArtifact.oldest_artifact,
       oldest_artifact_mtime_ms: oldestArtifact.oldest_artifact_mtime_ms,
     },
+    code_signing: codeSigning,
     primary_artifact: primary,
     files,
     merged_from: candidates.map((candidate) => ({
@@ -139,9 +154,11 @@ function main() {
       platforms: candidate.build_provenance?.artifact_platforms || [],
       source_commit: candidate.source?.commit || "",
       artifact_set_sha256: candidate.build_provenance?.artifact_set_sha256 || "",
+      code_signing_status: candidate.code_signing?.status || "not_applicable",
     })),
   };
   writeFileSync(join(opts.output, "release-candidate.json"), `${JSON.stringify(merged, null, 2)}\n`);
+  writeFileSync(join(opts.output, "AUTHENTICODE.json"), `${JSON.stringify(codeSigning, null, 2)}\n`);
   writeFileSync(join(opts.output, "SHA256SUMS.txt"), `${files.map((file) => `${file.sha256}  ${file.name}`).join("\n")}\n`);
   runVerifier(opts.output);
   console.log(`release_candidate_merged label=${merged.label} build_id=${merged.build_id} platforms=${platforms.join(",")}`);

@@ -319,6 +319,12 @@ try {
       artifact_set_sha256: mergedCandidate.build_provenance.artifact_set_sha256,
     },
     smoke_status_sha256: sha256File(statusPath),
+    windows_code_signing: {
+      status: mergedCandidate.code_signing.status,
+      verified_on_windows: mergedCandidate.code_signing.verified_on_windows === true,
+      identity_claim_allowed: mergedCandidate.code_signing.identity_claim_allowed === true,
+      stable_release_ready: mergedCandidate.code_signing.stable_release_ready === true,
+    },
     decided_at: new Date().toISOString(),
     decided_by: "test-suite",
     reason: "Two unique network-verified fixture machines passed the deterministic promotion contract.",
@@ -327,6 +333,7 @@ try {
       full_terrain_gate_incomplete: true,
       public_claim_limited_to_beta: true,
       rollback_prepared: true,
+      windows_signing_status_acknowledged: true,
     },
   };
   const pendingDecisionPath = join(registryDir, "PROMOTION-DECISION-PENDING.json");
@@ -362,6 +369,17 @@ try {
   const candidateHashes = new Set(mergedCandidate.files.map((file) => file.sha256));
   if (!release.files.every((file) => candidateHashes.has(file.sha256))) {
     throw new Error("Promotion rebuilt or changed RC artifact bytes");
+  }
+  if (release.code_signing?.schema !== "outilsia.windows_authenticode.v1"
+    || release.code_signing.status !== mergedCandidate.code_signing.status) {
+    throw new Error("Promotion did not preserve Authenticode evidence");
+  }
+  if (release.code_signing.files.some((file) => !release.files.some(
+    (artifact) => artifact.name === file.name
+      && artifact.rc_source_name === file.rc_source_name
+      && artifact.sha256 === file.sha256
+  ))) {
+    throw new Error("Promoted Authenticode evidence is not bound to public artifact identities");
   }
   if (new Set(release.files.map((file) => file.name)).size !== release.files.length) {
     throw new Error("Promotion produced duplicate public artifact names");

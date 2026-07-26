@@ -17,6 +17,7 @@ on:
       - "local-cockpit-app/src-tauri/**"
       - "local-cockpit-app/scripts/*release-candidate*"
       - "local-cockpit-app/scripts/*rc-smoke*"
+      - "local-cockpit-app/scripts/inspect-windows-authenticode.ps1"
       - "local-cockpit-app/scripts/release-metadata.mjs"
       - "local-cockpit-app/scripts/deploy-beta-release.mjs"
       - "local-cockpit-app/scripts/rollback-beta-release.mjs"

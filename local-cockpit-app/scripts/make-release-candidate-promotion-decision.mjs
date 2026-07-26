@@ -75,6 +75,12 @@ try {
       network_verified_machines: status.network_verified_machines,
       minimum_unique_machines: status.minimum_unique_machines,
     },
+    windows_code_signing: {
+      status: candidate.code_signing?.status || "unverified",
+      verified_on_windows: candidate.code_signing?.verified_on_windows === true,
+      identity_claim_allowed: candidate.code_signing?.identity_claim_allowed === true,
+      stable_release_ready: candidate.code_signing?.stable_release_ready === true,
+    },
     decided_at: "",
     decided_by: "",
     reason: "",
@@ -83,10 +89,12 @@ try {
       full_terrain_gate_incomplete: true,
       public_claim_limited_to_beta: true,
       rollback_prepared: true,
+      windows_signing_status_acknowledged: true,
     },
     instructions: [
       "Ne remplacer decision par approve_public_beta qu'apres lecture de RC-SMOKE-DECISION.html.",
       "Renseigner decided_at en ISO, decided_by et une raison explicite.",
+      `Authenticode Windows constaté : ${candidate.code_signing?.status || "unverified"}. Ne jamais revendiquer une signature si ce statut n'est pas valid.`,
       "Cette decision n'effectue aucun deploiement ; elle autorise seulement la preparation du pack de promotion.",
     ],
   };

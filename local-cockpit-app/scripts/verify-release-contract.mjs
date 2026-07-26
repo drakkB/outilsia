@@ -13,6 +13,41 @@ const platformExts = {
   linux: new Set([".appimage", ".deb", ".rpm"]),
   macos: new Set([".dmg"]),
 };
+const releaseFeatureContracts = {
+  "0.1.1": {
+    features: [
+      "upgrade_digital_twin_v1",
+      "hardware_truth_v1",
+      "hardware_doctor_v2",
+      "ai_capability_passport_v1",
+      "model_autopilot_v1",
+      "flight_recorder_v1",
+    ],
+    notes: [
+      "Upgrade Digital Twin v1",
+      "Hardware Truth v1",
+      "Hardware Doctor 2.0",
+      "AI Capability Passport v1",
+      "Model Autopilot v1",
+    ],
+  },
+  "0.1.2": {
+    features: [
+      "upgrade_digital_twin_v1",
+      "runtime_driver_intelligence_v1",
+      "private_workload_packs_v1",
+      "local_capability_bridge_v1",
+      "install_safety_preflight_v1",
+    ],
+    notes: [
+      "Upgrade Digital Twin v1",
+      "Runtime & Driver Intelligence v1",
+      "Private Workload Packs v1",
+      "Local Capability Bridge v1",
+      "Install Safety Preflight v1",
+    ],
+  },
+};
 
 function usage() {
   console.log(`Usage:
@@ -134,12 +169,14 @@ try {
   if (release.build_provenance.ci === true && !/^\d{11,14}$/.test(String(release.build_id))) {
     fail("CI release.build_id must be an 11-14 digit GitHub run identifier");
   }
-  const requiredFeatures = ["upgrade_digital_twin_v1", "runtime_driver_intelligence_v1", "private_workload_packs_v1", "local_capability_bridge_v1", "install_safety_preflight_v1"];
+  const featureContract = releaseFeatureContracts[release.version];
+  if (!featureContract) fail(`No explicit feature contract for release ${release.version}`);
+  const requiredFeatures = featureContract.features;
   if (!Array.isArray(release.features)) fail("release.features must be an array");
   for (const feature of requiredFeatures) {
     if (!release.features.includes(feature)) fail(`release.features must include ${feature}`);
   }
-  const requiredNotes = ["Upgrade Digital Twin v1", "Runtime & Driver Intelligence v1", "Private Workload Packs v1", "Local Capability Bridge v1", "Install Safety Preflight v1"];
+  const requiredNotes = featureContract.notes;
   if (!Array.isArray(release.release_notes)) fail("release.release_notes must be an array");
   for (const label of requiredNotes) {
     if (!release.release_notes.some((note) => String(note).includes(label))) {
@@ -176,6 +213,70 @@ try {
     if (!stat.isFile()) fail(`Artifact is not a file: ${file.name}`);
     if (stat.size !== Number(file.size_bytes)) fail(`Size mismatch for ${file.name}`);
     if (sha256(path) !== file.sha256) fail(`SHA256 mismatch for ${file.name}`);
+  }
+
+  if (promotedFromRc && release.code_signing?.schema !== "outilsia.windows_authenticode.v1") {
+    fail("RC-promoted release must preserve Windows Authenticode evidence");
+  }
+  if (release.code_signing !== undefined) {
+    const signing = release.code_signing;
+    if (signing?.schema !== "outilsia.windows_authenticode.v1") fail("Invalid release.code_signing schema");
+    if (!["valid", "not_signed", "mixed_or_invalid", "unverified", "not_applicable"].includes(signing.status)) {
+      fail(`Invalid release.code_signing status: ${signing.status}`);
+    }
+    const windowsFiles = release.files.filter((file) => file.platform === "windows-x64");
+    const signatureFiles = Array.isArray(signing.files) ? signing.files : [];
+    if (signatureFiles.length !== windowsFiles.length) fail("release.code_signing file count mismatch");
+    const byName = new Map(signatureFiles.map((file) => [file.name, file]));
+    for (const artifact of windowsFiles) {
+      const signature = byName.get(artifact.name);
+      if (!signature) fail(`release.code_signing entry missing: ${artifact.name}`);
+      if (signature.sha256 !== artifact.sha256) fail(`release.code_signing SHA256 mismatch: ${artifact.name}`);
+      if (!["valid", "not_signed", "invalid", "unverified"].includes(signature.status)) {
+        fail(`Invalid release Authenticode file status: ${artifact.name}`);
+      }
+      if (Object.hasOwn(signature, "status_message")) {
+        fail(`release.code_signing must not expose native messages or local paths: ${artifact.name}`);
+      }
+      if (promotedFromRc && signature.rc_source_name !== artifact.rc_source_name) {
+        fail(`release.code_signing RC identity mismatch: ${artifact.name}`);
+      }
+    }
+    if (byName.size !== windowsFiles.length) fail("release.code_signing contains unexpected files");
+    const statuses = [...new Set(signatureFiles.map((file) => file.status))];
+    let expectedSigningStatus = "mixed_or_invalid";
+    if (!windowsFiles.length) {
+      expectedSigningStatus = "not_applicable";
+      if (signing.verified_on_windows !== false || signatureFiles.length) {
+        fail("Non-Windows release must use non-applicable signing evidence");
+      }
+    } else if (signing.verified_on_windows === false) {
+      if (statuses.some((status) => status !== "unverified")) {
+        fail("Unverified release signing evidence may only contain unverified file statuses");
+      }
+      expectedSigningStatus = "unverified";
+    } else {
+      if (signing.inspector !== "Get-AuthenticodeSignature") {
+        fail("Release Authenticode inspector is invalid");
+      }
+      if (statuses.length === 1 && statuses[0] === "valid") expectedSigningStatus = "valid";
+      else if (statuses.length === 1 && statuses[0] === "not_signed") expectedSigningStatus = "not_signed";
+    }
+    if (signing.status !== expectedSigningStatus) {
+      fail(`release.code_signing aggregate status mismatch: ${signing.status} != ${expectedSigningStatus}`);
+    }
+    const allValid = signing.status === "valid";
+    if (signing.all_valid !== allValid
+      || signing.identity_claim_allowed !== allValid
+      || signing.stable_release_ready !== allValid) {
+      fail("release.code_signing claims do not match its status");
+    }
+    if (allValid && signatureFiles.some((file) => (
+      !String(file.signer_subject || "").trim()
+      || !String(file.signer_thumbprint || "").trim()
+    ))) {
+      fail("Valid release Authenticode evidence must identify every signer");
+    }
   }
 
   if (release.build_provenance.ci === true) {

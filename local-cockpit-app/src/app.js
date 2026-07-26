@@ -91,6 +91,13 @@ const FLIGHT_RECORDER_STORE_KEY = "outilsia.localCockpit.flightRecorder.v1";
 const PROMPT_LIBRARY_KEY = "outilsia.localCockpit.promptLibrary.v1";
 const CHAT_HISTORY_KEY = "outilsia.localCockpit.chatHistory.v1";
 const FIELD_TEST_PROFILE_KEY = "outilsia.localCockpit.fieldTestProfile.v1";
+const ACTIVATION_FUNNEL_KEY = "outilsia.localCockpit.activationFunnel.v1";
+const ACTIVATION_FUNNEL_SCHEMA = "outilsia.activation_funnel.v1";
+const ACTIVATION_MILESTONES = [
+  "scan_success",
+  "recommended_model_ready",
+  "first_benchmark_success"
+];
 const MACHINE_REPLAY_SNAPSHOT_SCHEMA = "outilsia.machine_replay_snapshot.v1";
 const USAGE_PROFILE_KEY = "outilsia.localCockpit.usageProfile.v1";
 const UPGRADE_SIM_TARGET_KEY = "outilsia.localCockpit.upgradeSimTarget.v1";
@@ -1507,6 +1514,126 @@ function releaseProof() {
   };
 }
 
+function activationBuildIdentity() {
+  const proof = releaseProof();
+  return {
+    app_version: String(proof.app_version || ""),
+    build_id: String(proof.build_id || ""),
+    release_channel: String(proof.channel || "")
+  };
+}
+
+function activationIdentityComparable(identity = {}) {
+  return Boolean(
+    identity.app_version
+    && identity.build_id
+    && identity.build_id !== "unknown-build"
+  );
+}
+
+function activationIdentityKey(identity = {}) {
+  return [
+    identity.app_version || "",
+    identity.build_id || "",
+    identity.release_channel || ""
+  ].join("|");
+}
+
+function emptyActivationFunnel(identity = activationBuildIdentity()) {
+  return {
+    schema: ACTIVATION_FUNNEL_SCHEMA,
+    created_at: new Date().toISOString(),
+    build: { ...identity },
+    milestones: Object.fromEntries(ACTIVATION_MILESTONES.map((key) => [key, null])),
+    privacy: {
+      local_only: true,
+      uploaded_automatically: false,
+      contains_prompt: false,
+      contains_model_output: false,
+      contains_machine_identifier: false,
+      contains_file_path: false
+    }
+  };
+}
+
+function readActivationFunnel() {
+  const currentIdentity = activationBuildIdentity();
+  try {
+    const raw = window.localStorage?.getItem(ACTIVATION_FUNNEL_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed?.schema === ACTIVATION_FUNNEL_SCHEMA && parsed.milestones && parsed.build) {
+      const identityChanged = activationIdentityComparable(currentIdentity)
+        && (
+          !activationIdentityComparable(parsed.build)
+          || activationIdentityKey(currentIdentity) !== activationIdentityKey(parsed.build)
+        );
+      if (!identityChanged) return parsed;
+    }
+  } catch (_) {
+    // A corrupt optional local metric must never affect the product workflow.
+  }
+  return emptyActivationFunnel(currentIdentity);
+}
+
+function writeActivationFunnel(funnel) {
+  try {
+    window.localStorage?.setItem(ACTIVATION_FUNNEL_KEY, JSON.stringify(funnel));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function recordActivationMilestone(key, at = new Date().toISOString()) {
+  if (!ACTIVATION_MILESTONES.includes(key)) return activationFunnelSnapshot();
+  const funnel = readActivationFunnel();
+  if (!funnel.milestones[key]) {
+    funnel.milestones[key] = at;
+    funnel.updated_at = at;
+    writeActivationFunnel(funnel);
+  }
+  return activationFunnelSnapshot(funnel);
+}
+
+function resetActivationFunnel() {
+  try {
+    window.localStorage?.removeItem(ACTIVATION_FUNNEL_KEY);
+  } catch (_) {
+    // Local storage is optional.
+  }
+  return activationFunnelSnapshot(emptyActivationFunnel());
+}
+
+function activationFunnelSnapshot(source = readActivationFunnel()) {
+  const milestones = Object.fromEntries(ACTIVATION_MILESTONES.map((key) => {
+    const firstAt = String(source?.milestones?.[key] || "");
+    return [key, {
+      reached: Boolean(firstAt),
+      first_at: firstAt
+    }];
+  }));
+  const scanAt = Date.parse(milestones.scan_success.first_at || "");
+  const benchmarkAt = Date.parse(milestones.first_benchmark_success.first_at || "");
+  const elapsedMs = Number.isFinite(scanAt) && Number.isFinite(benchmarkAt) && benchmarkAt >= scanAt
+    ? benchmarkAt - scanAt
+    : null;
+  return {
+    schema: ACTIVATION_FUNNEL_SCHEMA,
+    build: { ...(source?.build || activationBuildIdentity()) },
+    privacy: {
+      local_only: true,
+      uploaded_automatically: false,
+      contains_prompt: false,
+      contains_model_output: false,
+      contains_machine_identifier: false,
+      contains_file_path: false
+    },
+    milestones,
+    completed: ACTIVATION_MILESTONES.every((key) => milestones[key].reached),
+    scan_to_first_benchmark_ms: elapsedMs
+  };
+}
+
 function betaReportMarkdown() {
   const proof = releaseProof();
   const scan = state.scan || {};
@@ -2370,6 +2497,15 @@ function recommendedModelState() {
     title: model ? modelTitle(model) : "",
     info: ref ? modelInfo(ref) : null
   };
+}
+
+function recordRecommendedModelReady() {
+  if (!state.scan || !state.compatibility) return activationFunnelSnapshot();
+  const recommended = recommendedModelState();
+  if (recommended.ref && recommended.installed) {
+    return recordActivationMilestone("recommended_model_ready");
+  }
+  return activationFunnelSnapshot();
 }
 
 function modelSignalText(model) {
@@ -4217,6 +4353,7 @@ function renderScan(scan) {
 function renderCompatibility(payload) {
   state.compatibility = payload;
   state.upgradeDigitalTwinRun = null;
+  recordRecommendedModelReady();
   const compatibility = payload.compatibility || payload;
   const score = normalizeScore(compatibility.score ?? compatibility.compatibility_score ?? null);
   els.scoreText.textContent = score === null ? "--" : `${score}/100`;
@@ -14666,6 +14803,7 @@ function fieldTestFirst30sProof({ scan = {}, report = {}, action = {}, profile =
 
 function fieldTestMachineEntry() {
   const scan = state.scan || {};
+  const release = releaseProof();
   const report = readinessReport();
   const action = primaryActionState();
   const profile = fieldTestProfile();
@@ -14690,6 +14828,10 @@ function fieldTestMachineEntry() {
   return {
     profile: fieldProfile.profile,
     tested_at: new Date().toISOString(),
+    app_version: release.app_version || "",
+    build_id: release.build_id || "",
+    release_channel: release.channel || "",
+    source_commit: release.source_commit || "",
     profile_source: fieldProfile.source,
     profile_inferred: fieldProfile.inferred,
     machine_label: scan.name || [scan.gpu_name, scan.cpu_name].filter(Boolean).join(" / ") || "Machine OutilsIA",
@@ -14802,6 +14944,7 @@ function fieldTestMachineEntry() {
     recommendation_engine_confidence: recommendation?.confidence || "",
     recommendation_engine_checks: recommendation?.winner?.checks || "",
     report_ok: Boolean(state.scan && benchmark?.success && lastShareReportUrl),
+    activation_funnel: activationFunnelSnapshot(),
     first_30s: fieldTestFirst30sProof({ scan, report, action, profile, benchmark, upgrade }),
     share_url: lastShareReportUrl || "",
     notes: [
@@ -14820,6 +14963,8 @@ function fieldTestEntryPayload() {
     generated_at: new Date().toISOString(),
     app_version: proof.app_version || "0.1.1",
     build_id: proof.build_id || "",
+    release_channel: proof.channel || "",
+    source_commit: proof.source_commit || "",
     source: "outilsia-local-cockpit-single-machine-export",
     machines: [fieldTestMachineEntry()],
     notes: "Fiche terrain unitaire. Réunir les cinq profils requis dans FIELD-TESTS.json avant import final."
@@ -15053,6 +15198,7 @@ function renderFieldTestPanel() {
     return;
   }
   const proofStatus = fieldTestProofStatus();
+  const activation = activationFunnelSnapshot();
   els.fieldTestState.textContent = proofStatus.complete
     ? "fiche prête"
     : `${proofStatus.missing.length} preuve(s) manquante(s)`;
@@ -15068,6 +15214,7 @@ function renderFieldTestPanel() {
       <span>Profil exporté : ${escapeHtml(fieldProfile.label)} · source : ${escapeHtml(fieldProfile.source)}${fieldProfile.source === "manual" ? ` · auto aurait choisi ${escapeHtml(FIELD_TEST_PROFILE_LABELS[fieldProfile.inferred] || fieldProfile.inferred)}` : ""}</span>
       <span>Runtime : ${escapeHtml(profile.ollamaReady ? ollamaRuntimeLabel(state.scan) : "à installer")} · modèles installés : ${escapeHtml(profile.installedCount)} · benchmark : ${profile.benchmarkReady ? "oui" : "non"}</span>
       <span>${escapeHtml(doctorLine)}</span>
+      <span>Activation locale : analyse ${activation.milestones.scan_success.reached ? "faite" : "à faire"} · modèle conseillé ${activation.milestones.recommended_model_ready.reached ? "prêt" : "à préparer"} · premier benchmark ${activation.milestones.first_benchmark_success.reached ? "fait" : "à lancer"}. Aucune télémétrie.</span>
     </div>
     <div class="field-test-steps">
       ${profile.nextActions.map((action, index) => `
@@ -15561,6 +15708,8 @@ async function scanMachine() {
     const scan = invoke ? await invoke("scan_machine") : demoScan();
     if (invoke) state.optimisticInstalledModels = [];
     renderScan(scan);
+    recordActivationMilestone("scan_success");
+    renderFieldTestPanel();
     await refreshAuthState().catch(() => {});
     setStatus("Scan termine", "ok");
     renderPrimaryAction();
@@ -16699,6 +16848,7 @@ async function runBenchmark(options = {}) {
       tuning: activeTuning?.tuning || null
     };
     state.benchmark = normalizedResult;
+    if (normalizedResult.success) recordActivationMilestone("first_benchmark_success");
     renderBenchmark(normalizedResult);
     appendBenchmarkToConsole(normalizedResult);
     saveBenchmarkHistoryEntry(normalizedResult);
@@ -20755,6 +20905,7 @@ function installTestHarness() {
         ARENA_RUN_KEY,
         RECOMMENDATION_RUN_KEY,
         FIELD_TEST_PROFILE_KEY,
+        ACTIVATION_FUNNEL_KEY,
         USAGE_PROFILE_KEY,
         CHAT_HISTORY_KEY,
         PROMPT_LIBRARY_KEY
@@ -21449,6 +21600,9 @@ function installTestHarness() {
     effectiveFieldTestProfile: () => effectiveFieldTestProfile(),
     fieldTestEntry: () => fieldTestMachineEntry(),
     fieldTestPayload: () => fieldTestEntryPayload(),
+    activationFunnel: () => activationFunnelSnapshot(),
+    recordActivationMilestone,
+    resetActivationFunnel,
     pdfHtml: () => premiumReportHtml()
   };
 }
