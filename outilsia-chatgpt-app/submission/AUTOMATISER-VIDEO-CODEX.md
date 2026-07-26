@@ -40,11 +40,19 @@ plugin avant la vidéo afin que le catalogue ChatGPT pointe vers `v3`.
 
 - `@Computer` : pilote uniquement la fenêtre Brave dans laquelle ChatGPT et le
   plugin OutilsIA sont déjà connectés.
-- `OUTILSIA-VIDEO-RECORDER.ps1` : minimise les autres fenêtres, maximise Brave,
-  calcule sa zone écran puis lance FFmpeg sans overlay.
-- PowerShell : démarre et arrête proprement FFmpeg, puis vérifie le MP4 avec
-  `ffprobe`.
+- `OUTILSIA-VIDEO-RECORDER.ps1` : identifie le `MainWindowHandle` de Brave,
+  restaure la fenêtre puis lance le helper Rust `window-recorder`.
+- `window-recorder` : utilise Windows Graphics Capture pour enregistrer
+  uniquement la fenêtre Brave, même si Terminal ou une autre application passe
+  devant.
+- PowerShell : arrête proprement le helper, normalise le MP4 en H.264 avec
+  FFmpeg puis le vérifie avec `ffprobe`.
 - Humain : valide visuellement la vidéo avant toute publication.
+
+`gdigrab hwnd=...` a été testé sur cette machine et rejeté : Brave accéléré
+produisait une vidéo noire. La capture de région du bureau a également été
+rejetée après un test d'occlusion réel. Windows Graphics Capture est la voie
+validée.
 
 Ne pas utiliser Playwright pour cette recette : la preuve attendue porte sur la
 vraie session ChatGPT connectée, les appels MCP et le widget rendu. Ne pas
@@ -62,11 +70,13 @@ pas pilotable de façon fiable par Computer Use lorsqu'il contrôle Brave.
 5. FFmpeg est installé. Le script sait retrouver automatiquement l'installation
    `Gyan.FFmpeg` créée par `winget`, même si le terminal n'a pas rechargé son
    `PATH`.
-6. Les notifications Windows et Brave sont désactivées temporairement.
-7. Tous les onglets contenant un email, un compte, Persona, GitHub ou le
+6. Rust/Cargo Windows est disponible pour compiler le helper au premier
+   lancement. Les lancements suivants réutilisent le binaire local.
+7. Les notifications Windows et Brave sont désactivées temporairement.
+8. Tous les onglets contenant un email, un compte, Persona, GitHub ou le
    portail OpenAI sont fermés.
-8. Le zoom Brave est à 100 % et la fenêtre est au moins en 1440 x 900.
-9. Dans la fiche du plugin, `Modèle de sortie` indique `v3` ou encore `v2`.
+9. Le zoom Brave est à 100 % et la fenêtre est au moins en 1440 x 900.
+10. Dans la fiche du plugin, `Modèle de sortie` indique `v3` ou encore `v2`.
    Les deux URI sont servies par le serveur public ; la réussite du
    préflight visuel est le critère décisif.
 
@@ -107,6 +117,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File
 -Action Start
 
 Continue uniquement si la commande retourne OUTILSIA_RECORDING_STARTED.
+Vérifie aussi qu'elle retourne SourceMode: windows_graphics_capture.
 
 Exécute les quatre scénarios dans l'ordre, attends chaque réponse complète,
 montre le widget quelques secondes et vérifie visuellement les critères.
@@ -213,21 +224,22 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\chris\outilsia
 
 Le script :
 
-1. minimise toutes les autres fenêtres sans les fermer ;
-2. maximise et remet Brave au premier plan ;
-3. enregistre uniquement la zone de Brave ;
-4. réduit la vidéo à environ 1920 pixels de large ;
+1. restaure, maximise et remet Brave au premier plan ;
+2. compile le helper Rust local uniquement s'il est absent ou périmé ;
+3. transmet le handle natif de Brave à Windows Graphics Capture ;
+4. enregistre uniquement les pixels de cette fenêtre, sans le bureau ;
 5. limite automatiquement un enregistrement abandonné à 15 minutes.
 
 Continuer seulement si la sortie contient :
 
 ```text
 OUTILSIA_RECORDING_STARTED
+SourceMode: windows_graphics_capture
 ```
 
-Ne pas ouvrir une autre application pendant la capture. Le script n'affiche
-aucun overlay, mais une fenêtre placée par-dessus Brave serait visible dans la
-vidéo.
+Terminal, Explorer ou une autre fenêtre peuvent passer devant Brave sans entrer
+dans le MP4. Éviter malgré tout les autres applications pendant la démonstration
+afin de ne pas perturber les interactions Computer Use.
 
 ### 5. Scénario matériel déclaré
 
@@ -318,8 +330,10 @@ Exécuter depuis le terminal de l'app Codex :
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\chris\outilsia-repo\outilsia-chatgpt-app\submission\OUTILSIA-VIDEO-RECORDER.ps1" -Action Stop
 ```
 
-Le script envoie `q` à FFmpeg afin de fermer proprement le conteneur MP4, puis
-utilise `ffprobe` pour afficher le chemin, la taille et la durée.
+Le script envoie un signal d'arrêt au helper Windows Graphics Capture, attend la
+fermeture propre de son MP4 source, puis utilise FFmpeg pour produire un H.264
+sans audio d'environ 1920 pixels de large. `ffprobe` contrôle ensuite le chemin,
+la taille et la durée.
 
 La sortie doit contenir :
 
@@ -394,8 +408,10 @@ que la vidéo ne contient aucune donnée privée.
 - MP4 réel produit par une session ChatGPT Developer Mode.
 - Plugin actualisé sur le template `v3`.
 - Préflight widget réussi avant le début de l'enregistrement.
-- Capture FFmpeg démarrée sans overlay.
-- Arrêt FFmpeg gracieux confirmé.
+- Capture de fenêtre démarrée sans overlay.
+- Capture confirmée en `SourceMode: windows_graphics_capture`.
+- Arrêt Windows Graphics Capture gracieux confirmé.
+- MP4 final normalisé en H.264 et validé par `ffprobe`.
 - Trois outils d'analyse montrés.
 - L'outil read-only de frontière locale montré.
 - Widget lisible et stable.

@@ -1,0 +1,9 @@
+[package]
+name = "outilsia-window-recorder"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+parking_lot = "0.12.5"
+windows-capture = "2.0.0"

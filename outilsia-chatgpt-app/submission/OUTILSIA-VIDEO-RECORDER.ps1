@@ -2,11 +2,10 @@
 param(
   [ValidateSet("Start", "Stop", "Status", "Worker")]
   [string]$Action = "Status",
-  [int]$Left = 0,
-  [int]$Top = 0,
-  [int]$Width = 0,
-  [int]$Height = 0,
-  [string]$OutputPath = ""
+  [long]$WindowHandle = 0,
+  [int]$SourceProcessId = 0,
+  [string]$OutputPath = "",
+  [string]$WindowTitlePattern = "ChatGPT"
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,15 +14,30 @@ $runtimeDir = Join-Path $env:TEMP "outilsia-chatgpt-video"
 $statePath = Join-Path $runtimeDir "state.json"
 $donePath = Join-Path $runtimeDir "done.json"
 $stopPath = Join-Path $runtimeDir "stop.signal"
-$logPath = Join-Path $runtimeDir "ffmpeg.log"
+$readyPath = Join-Path $runtimeDir "ready.signal"
+$stdoutPath = Join-Path $runtimeDir "window-recorder.stdout.log"
+$stderrPath = Join-Path $runtimeDir "window-recorder.stderr.log"
+$rawOutputPath = Join-Path $runtimeDir "window-capture-source.mp4"
 $defaultOutput = Join-Path $env:USERPROFILE "Downloads\OutilsIA-ChatGPT-Submission\demo-outilsia-chatgpt-local-cockpit.mp4"
+$recorderProject = Join-Path $PSScriptRoot "window-recorder"
+$recorderExe = Join-Path $recorderProject "target\release\outilsia-window-recorder.exe"
+
+function Find-CommandPath {
+  param([Parameter(Mandatory = $true)][string]$Name)
+
+  $command = Get-Command $Name -ErrorAction SilentlyContinue
+  if ($command) {
+    return $command.Source
+  }
+  return $null
+}
 
 function Find-FFmpegTool {
   param([Parameter(Mandatory = $true)][string]$Name)
 
-  $command = Get-Command "$Name.exe" -ErrorAction SilentlyContinue
+  $command = Find-CommandPath -Name "$Name.exe"
   if ($command) {
-    return $command.Source
+    return $command
   }
 
   $packageRoot = Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Packages"
@@ -37,7 +51,6 @@ function Find-FFmpegTool {
   if (-not $candidate) {
     throw "$Name.exe not found. Install Gyan.FFmpeg with winget first."
   }
-
   return $candidate.FullName
 }
 
@@ -56,122 +69,14 @@ function Get-RunningProcess {
   return Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
 }
 
-if ($Action -eq "Worker") {
-  if ($Width -lt 320 -or $Height -lt 240 -or -not $OutputPath) {
-    throw "Worker received an invalid capture rectangle or output path."
-  }
-
-  New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
-  $ffmpeg = Find-FFmpegTool -Name "ffmpeg"
-  $targetWidth = [Math]::Min(1920, $Width)
-  if (($targetWidth % 2) -ne 0) {
-    $targetWidth--
-  }
-  $targetHeight = [int][Math]::Floor(($Height * $targetWidth / $Width) / 2) * 2
-
-  $arguments = @(
-    "-hide_banner",
-    "-loglevel", "warning",
-    "-y",
-    "-f", "gdigrab",
-    "-framerate", "24",
-    "-draw_mouse", "1",
-    "-offset_x", $Left,
-    "-offset_y", $Top,
-    "-video_size", "${Width}x${Height}",
-    "-i", "desktop",
-    "-t", "900",
-    "-vf", "scale=${targetWidth}:${targetHeight}",
-    "-an",
-    "-c:v", "libx264",
-    "-preset", "veryfast",
-    "-crf", "20",
-    "-pix_fmt", "yuv420p",
-    "-movflags", "+faststart",
-    $OutputPath
-  )
-
-  $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-  $startInfo.FileName = $ffmpeg
-  $startInfo.Arguments = $arguments -join " "
-  $startInfo.UseShellExecute = $false
-  $startInfo.CreateNoWindow = $true
-  $startInfo.RedirectStandardInput = $true
-  $startInfo.RedirectStandardError = $true
-
-  $process = New-Object System.Diagnostics.Process
-  $process.StartInfo = $startInfo
-  if (-not $process.Start()) {
-    throw "FFmpeg did not start."
-  }
-  $stderrTask = $process.StandardError.ReadToEndAsync()
-
-  @{
-    ffmpeg_pid = $process.Id
-    worker_pid = $PID
-    output_path = $OutputPath
-    started_at = (Get-Date).ToString("o")
-    source_width = $Width
-    source_height = $Height
-    output_width = $targetWidth
-    output_height = $targetHeight
-  } | ConvertTo-Json | Set-Content $statePath -Encoding UTF8
-
-  $gracefulStop = $false
-  while (-not $process.HasExited) {
-    if (Test-Path $stopPath) {
-      $process.StandardInput.WriteLine("q")
-      $process.StandardInput.Flush()
-      $gracefulStop = $true
-      if (-not $process.WaitForExit(30000)) {
-        $process.Kill()
-      }
-      break
-    }
-    Start-Sleep -Milliseconds 250
-  }
-
-  $process.WaitForExit()
-  $stderrTask.Result | Set-Content $logPath -Encoding UTF8
-  @{
-    exit_code = $process.ExitCode
-    graceful_stop = $gracefulStop
-    output_path = $OutputPath
-    finished_at = (Get-Date).ToString("o")
-  } | ConvertTo-Json | Set-Content $donePath -Encoding UTF8
-  exit $process.ExitCode
-}
-
-if ($Action -eq "Start") {
-  New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
-  $existing = Read-State
-  if ($existing -and (Get-RunningProcess -ProcessId ([int]$existing.ffmpeg_pid))) {
-    throw "A recording is already running with FFmpeg PID $($existing.ffmpeg_pid)."
-  }
-
-  Remove-Item $statePath, $donePath, $stopPath, $logPath -Force -ErrorAction SilentlyContinue
-  $OutputPath = $defaultOutput
-  New-Item -ItemType Directory -Path (Split-Path $OutputPath -Parent) -Force | Out-Null
-  Remove-Item $OutputPath -Force -ErrorAction SilentlyContinue
-
-  $brave = Get-Process brave -ErrorAction SilentlyContinue |
-    Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -match "ChatGPT" } |
-    Select-Object -First 1
-  if (-not $brave) {
-    throw "No visible Brave window with ChatGPT in its title was found."
+function Initialize-CaptureWindowApi {
+  if ("OutilsiaCaptureWindow" -as [type]) {
+    return
   }
 
   Add-Type @"
 using System;
 using System.Runtime.InteropServices;
-
-[StructLayout(LayoutKind.Sequential)]
-public struct OutilsiaCaptureRect {
-  public int Left;
-  public int Top;
-  public int Right;
-  public int Bottom;
-}
 
 public static class OutilsiaCaptureWindow {
   [DllImport("user32.dll")]
@@ -181,74 +86,192 @@ public static class OutilsiaCaptureWindow {
   public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
 
   [DllImport("user32.dll")]
-  public static extern bool GetWindowRect(IntPtr hWnd, out OutilsiaCaptureRect rect);
-
-  [DllImport("dwmapi.dll")]
-  public static extern int DwmGetWindowAttribute(
-    IntPtr hWnd,
-    int attribute,
-    out OutilsiaCaptureRect rect,
-    int size
-  );
+  public static extern bool IsIconic(IntPtr hWnd);
 }
 "@
+}
 
-  (New-Object -ComObject Shell.Application).MinimizeAll()
-  Start-Sleep -Milliseconds 500
+function Ensure-WindowRecorder {
+  $sourceFiles = Get-ChildItem $recorderProject -Recurse -File |
+    Where-Object { $_.FullName -notlike "*\target\*" }
+  $latestSource = $sourceFiles |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+  $binary = Get-Item $recorderExe -ErrorAction SilentlyContinue
+  $needsBuild = -not $binary -or ($latestSource -and $latestSource.LastWriteTime -gt $binary.LastWriteTime)
+  if (-not $needsBuild) {
+    return $recorderExe
+  }
+
+  $cargo = Find-CommandPath -Name "cargo.exe"
+  if (-not $cargo) {
+    throw "cargo.exe is required once to build the Windows Graphics Capture helper."
+  }
+
+  Write-Output "OUTILSIA_RECORDER_BUILDING"
+  & $cargo build --release --manifest-path (Join-Path $recorderProject "Cargo.toml")
+  if ($LASTEXITCODE -ne 0 -or -not (Test-Path $recorderExe)) {
+    throw "The Windows Graphics Capture helper build failed."
+  }
+  return $recorderExe
+}
+
+function Get-RecorderLogs {
+  $parts = @()
+  foreach ($path in @($stdoutPath, $stderrPath)) {
+    if (Test-Path $path) {
+      $parts += Get-Content $path -Raw
+    }
+  }
+  $details = ($parts | Where-Object { $_ }) -join "`n"
+  if (-not $details) {
+    return "No recorder log."
+  }
+  return $details.Trim()
+}
+
+if ($Action -eq "Worker") {
+  if ($WindowHandle -le 0 -or $SourceProcessId -le 0 -or -not $OutputPath) {
+    throw "Worker received an invalid Brave window or output path."
+  }
+  $sourceProcess = Get-Process -Id $SourceProcessId -ErrorAction SilentlyContinue
+  if (-not $sourceProcess) {
+    throw "The Brave process selected for recording is no longer running."
+  }
+  $sourceProcess.Refresh()
+  if ($sourceProcess.MainWindowHandle.ToInt64() -ne $WindowHandle) {
+    throw "The Brave window handle changed before capture started."
+  }
+  if (-not (Test-Path $recorderExe)) {
+    throw "The Windows Graphics Capture helper is missing."
+  }
+
+  $helperArguments = @(
+    "--hwnd", $WindowHandle,
+    "--output", ('"{0}"' -f $rawOutputPath),
+    "--stop-file", ('"{0}"' -f $stopPath),
+    "--ready-file", ('"{0}"' -f $readyPath),
+    "--frame-rate", 24,
+    "--bitrate", 8000000,
+    "--max-seconds", 900
+  )
+  $recorder = Start-Process -FilePath $recorderExe `
+    -ArgumentList $helperArguments `
+    -WindowStyle Hidden `
+    -RedirectStandardOutput $stdoutPath `
+    -RedirectStandardError $stderrPath `
+    -PassThru
+
+  $deadline = (Get-Date).AddSeconds(20)
+  while (-not (Test-Path $readyPath) -and -not $recorder.HasExited -and (Get-Date) -lt $deadline) {
+    Start-Sleep -Milliseconds 200
+  }
+  if (-not (Test-Path $readyPath)) {
+    if (-not $recorder.HasExited) {
+      Stop-Process -Id $recorder.Id -Force -ErrorAction SilentlyContinue
+    }
+    throw "Windows Graphics Capture did not produce its first frame."
+  }
+
+  @{
+    recorder_pid = $recorder.Id
+    worker_pid = $PID
+    output_path = $OutputPath
+    raw_output_path = $rawOutputPath
+    started_at = (Get-Date).ToString("o")
+    source_mode = "windows_graphics_capture"
+    source_window_handle = $WindowHandle
+    source_process_id = $SourceProcessId
+  } | ConvertTo-Json | Set-Content $statePath -Encoding UTF8
+
+  $recorder.WaitForExit()
+  @{
+    exit_code = $recorder.ExitCode
+    graceful_stop = (Test-Path $stopPath)
+    raw_output_path = $rawOutputPath
+    finished_at = (Get-Date).ToString("o")
+  } | ConvertTo-Json | Set-Content $donePath -Encoding UTF8
+  exit $recorder.ExitCode
+}
+
+if ($Action -eq "Start") {
+  New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
+  $existing = Read-State
+  if ($existing -and (Get-RunningProcess -ProcessId ([int]$existing.recorder_pid))) {
+    throw "A recording is already running with recorder PID $($existing.recorder_pid)."
+  }
+
+  Remove-Item `
+    $statePath,
+    $donePath,
+    $stopPath,
+    $readyPath,
+    $stdoutPath,
+    $stderrPath,
+    $rawOutputPath `
+    -Force `
+    -ErrorAction SilentlyContinue
+  if (-not $OutputPath) {
+    $OutputPath = $defaultOutput
+  }
+  New-Item -ItemType Directory -Path (Split-Path $OutputPath -Parent) -Force | Out-Null
+  Remove-Item $OutputPath -Force -ErrorAction SilentlyContinue
+
+  $brave = Get-Process brave -ErrorAction SilentlyContinue |
+    Where-Object {
+      $_.MainWindowHandle -ne 0 `
+        -and $_.MainWindowTitle -like "*$WindowTitlePattern*"
+    } |
+    Select-Object -First 1
+  if (-not $brave) {
+    throw "No visible Brave window matching '$WindowTitlePattern' was found."
+  }
+
+  Initialize-CaptureWindowApi
+  [OutilsiaCaptureWindow]::ShowWindowAsync($brave.MainWindowHandle, 9) | Out-Null
+  Start-Sleep -Milliseconds 400
   [OutilsiaCaptureWindow]::ShowWindowAsync($brave.MainWindowHandle, 3) | Out-Null
   [OutilsiaCaptureWindow]::SetForegroundWindow($brave.MainWindowHandle) | Out-Null
-  Start-Sleep -Milliseconds 1000
-
-  $rect = New-Object OutilsiaCaptureRect
-  $rectSize = [Runtime.InteropServices.Marshal]::SizeOf([type][OutilsiaCaptureRect])
-  $dwmResult = [OutilsiaCaptureWindow]::DwmGetWindowAttribute(
-    $brave.MainWindowHandle,
-    9,
-    [ref]$rect,
-    $rectSize
-  )
-  if ($dwmResult -ne 0) {
-    [OutilsiaCaptureWindow]::GetWindowRect($brave.MainWindowHandle, [ref]$rect) | Out-Null
+  Start-Sleep -Milliseconds 800
+  if ([OutilsiaCaptureWindow]::IsIconic($brave.MainWindowHandle)) {
+    throw "Brave remained minimized after the restore attempt."
   }
 
-  $captureWidth = $rect.Right - $rect.Left
-  $captureHeight = $rect.Bottom - $rect.Top
-  if ($captureWidth -lt 320 -or $captureHeight -lt 240) {
-    throw "Brave capture rectangle is invalid: ${captureWidth}x${captureHeight}."
+  $helper = Ensure-WindowRecorder
+  if (-not $helper) {
+    throw "The Windows Graphics Capture helper is unavailable."
   }
-
   $workerArguments = @(
     "-NoProfile",
     "-ExecutionPolicy", "Bypass",
     "-File", $PSCommandPath,
     "-Action", "Worker",
-    "-Left", $rect.Left,
-    "-Top", $rect.Top,
-    "-Width", $captureWidth,
-    "-Height", $captureHeight,
-    "-OutputPath", $OutputPath
+    "-WindowHandle", $brave.MainWindowHandle.ToInt64(),
+    "-SourceProcessId", $brave.Id,
+    "-OutputPath", ('"{0}"' -f $OutputPath)
   )
   $worker = Start-Process -FilePath "$PSHOME\powershell.exe" `
     -ArgumentList $workerArguments `
     -WindowStyle Hidden `
     -PassThru
 
-  $deadline = (Get-Date).AddSeconds(15)
-  do {
-    Start-Sleep -Milliseconds 250
-    $state = Read-State
-  } while (-not $state -and (Get-Date) -lt $deadline -and -not $worker.HasExited)
-
-  if (-not $state) {
-    $details = if (Test-Path $logPath) { Get-Content $logPath -Raw } else { "No FFmpeg log." }
-    throw "Recorder did not start. $details"
+  $deadline = (Get-Date).AddSeconds(20)
+  while (-not (Test-Path $statePath) -and -not $worker.HasExited -and (Get-Date) -lt $deadline) {
+    Start-Sleep -Milliseconds 200
   }
+  if (-not (Test-Path $statePath)) {
+    if (-not $worker.HasExited) {
+      Stop-Process -Id $worker.Id -Force -ErrorAction SilentlyContinue
+    }
+    throw "Windows Graphics Capture did not start. $(Get-RecorderLogs)"
+  }
+  $state = Read-State
 
   Write-Output "OUTILSIA_RECORDING_STARTED"
-  Write-Output "FFmpeg PID: $($state.ffmpeg_pid)"
-  Write-Output "Source: $($state.source_width)x$($state.source_height)"
-  Write-Output "Output: $($state.output_width)x$($state.output_height)"
-  Write-Output "File: $($state.output_path)"
+  Write-Output "Recorder PID: $($state.recorder_pid)"
+  Write-Output "SourceMode: windows_graphics_capture"
+  Write-Output "SourceWindow: $($brave.MainWindowTitle)"
+  Write-Output "File: $OutputPath"
   exit 0
 }
 
@@ -258,31 +281,66 @@ if ($Action -eq "Stop") {
     throw "No OutilsIA recording state was found."
   }
 
-  New-Item -ItemType File -Path $stopPath -Force | Out-Null
+  if (Get-RunningProcess -ProcessId ([int]$state.recorder_pid)) {
+    New-Item -ItemType File -Path $stopPath -Force | Out-Null
+  }
+
   $deadline = (Get-Date).AddSeconds(45)
   while (-not (Test-Path $donePath) -and (Get-Date) -lt $deadline) {
-    Start-Sleep -Milliseconds 250
+    Start-Sleep -Milliseconds 200
   }
   if (-not (Test-Path $donePath)) {
-    throw "FFmpeg did not finalize the recording within 45 seconds."
+    throw "The Windows Graphics Capture helper did not finalize within 45 seconds."
   }
-
   $done = Get-Content $donePath -Raw | ConvertFrom-Json
   if ([int]$done.exit_code -ne 0) {
-    $details = if (Test-Path $logPath) { Get-Content $logPath -Raw } else { "No FFmpeg log." }
-    throw "FFmpeg exited with code $($done.exit_code). $details"
-  }
-  if (-not (Test-Path $done.output_path)) {
-    throw "FFmpeg reported success but the MP4 is missing."
+    throw "The Windows Graphics Capture helper exited with code $($done.exit_code). $(Get-RecorderLogs)"
   }
 
-  $file = Get-Item $done.output_path
+  if (-not (Test-Path $done.raw_output_path)) {
+    throw "The Windows Graphics Capture source MP4 is missing. $(Get-RecorderLogs)"
+  }
+
+  $ffmpeg = Find-FFmpegTool -Name "ffmpeg"
+  $scaleFilter = "scale='min(1920,iw)':-2,setsar=1"
+  & $ffmpeg `
+    -hide_banner `
+    -loglevel warning `
+    -y `
+    -i $done.raw_output_path `
+    -map 0:v:0 `
+    -vf $scaleFilter `
+    -an `
+    -c:v libx264 `
+    -preset veryfast `
+    -crf 20 `
+    -pix_fmt yuv420p `
+    -movflags +faststart `
+    $state.output_path
+  if ($LASTEXITCODE -ne 0) {
+    throw "FFmpeg could not normalize the window recording."
+  }
+
+  if (-not (Test-Path $state.output_path)) {
+    throw "FFmpeg reported success but the final MP4 is missing."
+  }
+  $file = Get-Item $state.output_path
   $ffprobe = Find-FFmpegTool -Name "ffprobe"
   $probeText = (& $ffprobe -v error -show_entries format=duration,size -of json $file.FullName) -join "`n"
   $probe = $probeText | ConvertFrom-Json
   $duration = [Math]::Round([double]$probe.format.duration, 1)
+  if ($duration -le 0 -or $file.Length -le 0) {
+    throw "The final MP4 failed validation."
+  }
 
-  Remove-Item $statePath, $stopPath -Force -ErrorAction SilentlyContinue
+  Remove-Item `
+    $done.raw_output_path,
+    $statePath,
+    $donePath,
+    $stopPath,
+    $readyPath `
+    -Force `
+    -ErrorAction SilentlyContinue
   Write-Output "OUTILSIA_RECORDING_STOPPED"
   Write-Output "File: $($file.FullName)"
   Write-Output "Bytes: $($file.Length)"
@@ -292,17 +350,17 @@ if ($Action -eq "Stop") {
 }
 
 $state = Read-State
-if ($state -and (Get-RunningProcess -ProcessId ([int]$state.ffmpeg_pid))) {
+if ($state -and (Get-RunningProcess -ProcessId ([int]$state.recorder_pid))) {
   Write-Output "OUTILSIA_RECORDING_RUNNING"
-  Write-Output "FFmpeg PID: $($state.ffmpeg_pid)"
+  Write-Output "Recorder PID: $($state.recorder_pid)"
+  Write-Output "SourceMode: $($state.source_mode)"
   Write-Output "File: $($state.output_path)"
   exit 0
 }
-if (Test-Path $donePath) {
-  $done = Get-Content $donePath -Raw | ConvertFrom-Json
-  Write-Output "OUTILSIA_RECORDING_FINISHED"
-  Write-Output "ExitCode: $($done.exit_code)"
-  Write-Output "File: $($done.output_path)"
+if ($state -and (Test-Path $donePath)) {
+  Write-Output "OUTILSIA_RECORDING_SOURCE_FINISHED"
+  Write-Output "Run -Action Stop to validate and normalize the MP4."
+  Write-Output "File: $($state.output_path)"
   exit 0
 }
 Write-Output "OUTILSIA_RECORDING_IDLE"

@@ -17,6 +17,8 @@ const importPath = join(root, "chatgpt-app-submission.json");
 const portalFieldsPath = join(root, "submission", "PORTAL-FIELDS.md");
 const videoGuidePath = join(root, "submission", "AUTOMATISER-VIDEO-CODEX.md");
 const videoRecorderPath = join(root, "submission", "OUTILSIA-VIDEO-RECORDER.ps1");
+const windowRecorderManifestPath = join(root, "submission", "window-recorder", "Cargo.toml");
+const windowRecorderSourcePath = join(root, "submission", "window-recorder", "src", "main.rs");
 const pages = {
   website: join(repoRoot, "server-work", "static", "pages", "chatgpt-ia-locale.html"),
   privacy: join(repoRoot, "server-work", "static", "pages", "confidentialite-plugin-outilsia.html"),
@@ -144,9 +146,13 @@ for (const value of [
 }
 
 requireCondition(existsSync(videoGuidePath), "Missing Codex video automation guide.");
-requireCondition(existsSync(videoRecorderPath), "Missing FFmpeg video recorder.");
+requireCondition(existsSync(videoRecorderPath), "Missing video recorder controller.");
+requireCondition(existsSync(windowRecorderManifestPath), "Missing Windows Graphics Capture helper manifest.");
+requireCondition(existsSync(windowRecorderSourcePath), "Missing Windows Graphics Capture helper source.");
 const videoGuide = readFileSync(videoGuidePath, "utf8");
 const videoRecorder = readFileSync(videoRecorderPath, "utf8");
+const windowRecorderManifest = readFileSync(windowRecorderManifestPath, "utf8");
+const windowRecorderSource = readFileSync(windowRecorderSourcePath, "utf8");
 for (const marker of [
   "OUTILSIA-VIDEO-RECORDER.ps1",
   "OUTILSIA_RECORDING_STARTED",
@@ -167,8 +173,28 @@ requireCondition(
   "Video recorder must expose the four controlled actions.",
 );
 requireCondition(
-  videoRecorder.includes('"-i", "desktop"') && videoRecorder.includes("DwmGetWindowAttribute"),
-  "Video recorder must capture only the measured Brave screen region.",
+  videoRecorder.includes('source_mode = "windows_graphics_capture"')
+    && videoRecorder.includes("Ensure-WindowRecorder")
+    && videoRecorder.includes("outilsia-window-recorder.exe")
+    && !videoRecorder.includes('"-i", "desktop"')
+    && !videoRecorder.includes('$captureSource = "hwnd=$WindowHandle"'),
+  "Video recorder must use the dedicated Windows Graphics Capture helper instead of desktop capture.",
+);
+requireCondition(
+  videoRecorder.includes("-map 0:v:0")
+    && videoRecorder.includes("-c:v libx264")
+    && videoRecorder.includes("-an")
+    && videoRecorder.includes('Find-FFmpegTool -Name "ffprobe"'),
+  "Video recorder must normalize the window capture to a silent H.264 MP4 and validate it.",
+);
+requireCondition(
+  windowRecorderManifest.includes('windows-capture = "2.0.0"')
+    && windowRecorderSource.includes("Window::from_raw_hwnd")
+    && windowRecorderSource.includes("Capture::start_free_threaded")
+    && windowRecorderSource.includes("VideoEncoder::new")
+    && windowRecorderSource.includes("SecondaryWindowSettings::Exclude")
+    && windowRecorderSource.includes("RedrawWindow"),
+  "Window helper must capture one HWND through Windows Graphics Capture and preserve real-time frames.",
 );
 
 requireCondition(tests.positive.length === 5, "Submission requires exactly five positive tests.");
