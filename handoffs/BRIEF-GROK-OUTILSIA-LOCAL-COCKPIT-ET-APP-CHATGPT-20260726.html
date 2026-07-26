@@ -1,0 +1,2457 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OutilsIA - Dossier complet pour Grok : Local Cockpit Rust et app ChatGPT</title>
+  <meta name="description" content="Dossier de contexte technique et produit sur OutilsIA Local Cockpit, l'application desktop Rust/Tauri et l'app ChatGPT MCP en lecture seule.">
+  <style>
+    :root {
+      --paper: #f4f7f6;
+      --panel: #ffffff;
+      --ink: #18211f;
+      --muted: #5d6965;
+      --line: #d6dfdc;
+      --green: #166b46;
+      --green-soft: #e8f4ed;
+      --blue: #175cd3;
+      --blue-soft: #eaf1ff;
+      --amber: #9a5b05;
+      --amber-soft: #fff3dc;
+      --coral: #b33d34;
+      --coral-soft: #fff0ed;
+      --teal: #0d7081;
+      --teal-soft: #e5f5f7;
+      --charcoal: #252d2b;
+      --code: #101815;
+      --shadow: 0 10px 28px rgba(21, 39, 33, 0.08);
+      --radius: 7px;
+      --content: 1180px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+      line-height: 1.62;
+      letter-spacing: 0;
+    }
+
+    a {
+      color: var(--blue);
+      text-underline-offset: 3px;
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+    }
+
+    code,
+    pre {
+      font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+    }
+
+    code {
+      overflow-wrap: anywhere;
+    }
+
+    .skip {
+      position: fixed;
+      top: 8px;
+      left: 8px;
+      z-index: 100;
+      transform: translateY(-180%);
+      padding: 10px 14px;
+      color: white;
+      background: var(--charcoal);
+      border-radius: 4px;
+    }
+
+    .skip:focus {
+      transform: translateY(0);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      color: white;
+      background: var(--charcoal);
+      border-bottom: 3px solid var(--green);
+    }
+
+    .topbar-inner {
+      width: min(var(--content), calc(100% - 32px));
+      min-height: 62px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .brand {
+      flex: 0 0 auto;
+      color: white;
+      font-size: 20px;
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    .brand span {
+      color: #66d19e;
+    }
+
+    .topbar-title {
+      color: #cbd7d3;
+      font-size: 13px;
+    }
+
+    .topbar nav {
+      margin-left: auto;
+      display: flex;
+      gap: 7px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+
+    .topbar nav a {
+      flex: 0 0 auto;
+      padding: 7px 9px;
+      color: #e8efec;
+      border: 1px solid #46504d;
+      border-radius: 4px;
+      font-size: 12px;
+      text-decoration: none;
+    }
+
+    .topbar nav a:hover,
+    .topbar nav a:focus-visible {
+      background: #3a4541;
+      outline: none;
+    }
+
+    main {
+      width: min(var(--content), calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .intro {
+      padding: 34px 0 22px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
+      gap: 28px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      margin-bottom: 12px;
+      color: var(--green);
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+      margin-top: 0;
+      line-height: 1.22;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      max-width: 780px;
+      margin-bottom: 16px;
+      font-size: 46px;
+    }
+
+    h2 {
+      margin-bottom: 16px;
+      font-size: 30px;
+    }
+
+    h3 {
+      margin-bottom: 10px;
+      font-size: 20px;
+    }
+
+    h4 {
+      margin-bottom: 7px;
+      font-size: 16px;
+    }
+
+    p {
+      margin: 0 0 14px;
+    }
+
+    .lead {
+      max-width: 780px;
+      color: #3c4945;
+      font-size: 19px;
+    }
+
+    .meta-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .pill,
+    .status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 750;
+      line-height: 1.2;
+    }
+
+    .pill {
+      color: #34413d;
+      background: white;
+      border: 1px solid var(--line);
+    }
+
+    .intro-visual {
+      overflow: hidden;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .intro-visual img {
+      width: 100%;
+      aspect-ratio: 1200 / 630;
+      object-fit: cover;
+    }
+
+    .intro-visual figcaption {
+      padding: 10px 13px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .truth-strip {
+      margin: 8px 0 32px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .truth {
+      min-width: 0;
+      padding: 18px;
+      border-right: 1px solid var(--line);
+    }
+
+    .truth:last-child {
+      border-right: 0;
+    }
+
+    .truth strong {
+      display: block;
+      margin: 8px 0 5px;
+      font-size: 18px;
+    }
+
+    .truth p {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .status.public {
+      color: var(--green);
+      background: var(--green-soft);
+    }
+
+    .status.candidate {
+      color: var(--amber);
+      background: var(--amber-soft);
+    }
+
+    .status.review {
+      color: var(--blue);
+      background: var(--blue-soft);
+    }
+
+    .status.blocked {
+      color: var(--coral);
+      background: var(--coral-soft);
+    }
+
+    .section {
+      margin: 0 0 28px;
+      padding: 28px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      scroll-margin-top: 88px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .section-head p {
+      max-width: 760px;
+      color: var(--muted);
+    }
+
+    .callout {
+      margin: 18px 0;
+      padding: 16px 18px;
+      border-left: 4px solid var(--green);
+      background: var(--green-soft);
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+
+    .callout.warning {
+      border-color: var(--amber);
+      background: var(--amber-soft);
+    }
+
+    .callout.danger {
+      border-color: var(--coral);
+      background: var(--coral-soft);
+    }
+
+    .callout.info {
+      border-color: var(--blue);
+      background: var(--blue-soft);
+    }
+
+    .callout p:last-child,
+    .card p:last-child,
+    .truth p:last-child {
+      margin-bottom: 0;
+    }
+
+    .grid-2,
+    .grid-3,
+    .grid-4 {
+      display: grid;
+      gap: 14px;
+    }
+
+    .grid-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .grid-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .card {
+      min-width: 0;
+      padding: 16px;
+      background: #fbfcfc;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .card p,
+    .card li {
+      color: #43504c;
+      font-size: 14px;
+    }
+
+    .card .kicker {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--teal);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .metric {
+      display: block;
+      margin: 6px 0 4px;
+      font-size: 27px;
+      font-weight: 850;
+      line-height: 1;
+    }
+
+    .architecture {
+      margin: 18px 0;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .architecture .node {
+      position: relative;
+      min-height: 116px;
+      padding: 16px;
+      background: #f8faf9;
+      border: 1px solid var(--line);
+      border-top: 4px solid var(--green);
+      border-radius: var(--radius);
+    }
+
+    .architecture .node:nth-child(2) {
+      border-top-color: var(--blue);
+    }
+
+    .architecture .node:nth-child(3) {
+      border-top-color: var(--teal);
+    }
+
+    .architecture .node:nth-child(4) {
+      border-top-color: var(--amber);
+    }
+
+    .architecture .node:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      top: 41px;
+      right: -18px;
+      z-index: 2;
+      width: 26px;
+      height: 26px;
+      display: grid;
+      place-items: center;
+      color: white;
+      background: var(--charcoal);
+      border-radius: 50%;
+      font-weight: 800;
+    }
+
+    .architecture strong {
+      display: block;
+      margin-bottom: 7px;
+    }
+
+    .architecture span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    table {
+      width: 100%;
+      min-width: 720px;
+      border-collapse: collapse;
+      background: white;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      padding: 11px 13px;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid var(--line);
+    }
+
+    th {
+      color: #2b3834;
+      background: #eef3f1;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    ul,
+    ol {
+      margin-top: 8px;
+      padding-left: 22px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    .compact li {
+      margin-bottom: 3px;
+    }
+
+    pre {
+      margin: 16px 0;
+      padding: 17px;
+      color: #eaf4ef;
+      background: var(--code);
+      border: 1px solid #2f3b36;
+      border-radius: var(--radius);
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .flow {
+      margin: 17px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .flow span {
+      padding: 8px 11px;
+      background: #f8faf9;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .flow b {
+      color: var(--muted);
+    }
+
+    .timeline {
+      position: relative;
+      margin: 10px 0 0;
+      padding-left: 28px;
+    }
+
+    .timeline::before {
+      content: "";
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      left: 8px;
+      width: 2px;
+      background: var(--line);
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 18px;
+    }
+
+    .timeline-item::before {
+      content: "";
+      position: absolute;
+      top: 6px;
+      left: -26px;
+      width: 11px;
+      height: 11px;
+      background: var(--green);
+      border: 3px solid white;
+      border-radius: 50%;
+      box-shadow: 0 0 0 1px var(--line);
+    }
+
+    .timeline-item strong {
+      display: block;
+    }
+
+    .timeline-item p {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    details {
+      margin: 9px 0;
+      background: #fbfcfc;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    summary {
+      padding: 12px 14px;
+      cursor: pointer;
+      font-weight: 750;
+    }
+
+    details > div {
+      padding: 0 14px 14px;
+    }
+
+    .prompt-box {
+      padding: 18px;
+      color: #eef7f2;
+      background: var(--charcoal);
+      border-left: 5px solid #66d19e;
+      border-radius: var(--radius);
+    }
+
+    .prompt-box pre {
+      margin-bottom: 0;
+      background: #111916;
+    }
+
+    .footer {
+      width: min(var(--content), calc(100% - 32px));
+      margin: 0 auto;
+      padding: 8px 0 40px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 960px) {
+      .topbar-inner {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        padding: 10px 0;
+      }
+
+      .topbar nav {
+        width: 100%;
+        margin-left: 0;
+      }
+
+      .intro {
+        grid-template-columns: 1fr;
+      }
+
+      .truth-strip,
+      .grid-3,
+      .grid-4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .truth:nth-child(2) {
+        border-right: 0;
+      }
+
+      .truth:last-child {
+        grid-column: 1 / -1;
+        border-top: 1px solid var(--line);
+      }
+
+      .architecture {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .architecture .node::after {
+        display: none;
+      }
+    }
+
+    @media (max-width: 640px) {
+      main,
+      .topbar-inner,
+      .footer {
+        width: min(100% - 20px, var(--content));
+      }
+
+      h1 {
+        font-size: 34px;
+      }
+
+      h2 {
+        font-size: 25px;
+      }
+
+      .section {
+        padding: 20px 16px;
+      }
+
+      .truth-strip,
+      .grid-2,
+      .grid-3,
+      .grid-4,
+      .architecture {
+        grid-template-columns: 1fr;
+      }
+
+      .truth,
+      .truth:nth-child(2),
+      .truth:last-child {
+        grid-column: auto;
+        border-right: 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .truth:first-child {
+        border-top: 0;
+      }
+
+      .section-head {
+        display: block;
+      }
+    }
+
+    @media print {
+      body {
+        background: white;
+      }
+
+      .topbar,
+      .skip {
+        display: none;
+      }
+
+      main,
+      .footer {
+        width: 100%;
+      }
+
+      .section,
+      .truth-strip,
+      .intro-visual {
+        box-shadow: none;
+        break-inside: avoid;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#contenu">Aller au contenu</a>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#contenu">Outils<span>IA</span></a>
+      <span class="topbar-title">Dossier technique et produit pour Grok</span>
+      <nav aria-label="Sommaire">
+        <a href="#verite">État réel</a>
+        <a href="#desktop">App Rust</a>
+        <a href="#workstacks">Workstacks</a>
+        <a href="#chatgpt">App ChatGPT</a>
+        <a href="#roadmap">Roadmap</a>
+        <a href="#mission-grok">Mission Grok</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="contenu">
+    <section class="intro">
+      <div>
+        <span class="eyebrow">Document de contexte complet · 26 juillet 2026</span>
+        <h1>OutilsIA Local Cockpit et l’app ChatGPT OutilsIA</h1>
+        <p class="lead">
+          Ce document donne à Grok une vue fidèle du produit, de son architecture,
+          de ses fonctions, de ses preuves et de ses limites. Il distingue
+          volontairement le logiciel desktop Rust/Tauri, les fonctions encore
+          candidates et l’app ChatGPT MCP soumise à OpenAI.
+        </p>
+        <div class="meta-line">
+          <span class="pill">Desktop Windows + Linux</span>
+          <span class="pill">Rust + Tauri 2</span>
+          <span class="pill">Ollama natif + WSL</span>
+          <span class="pill">MCP Apps read-only</span>
+          <span class="pill">Soumission OpenAI en revue</span>
+        </div>
+      </div>
+      <figure class="intro-visual">
+        <img src="../server-work/static/images/local-cockpit/og-local-cockpit-1200x630.jpg"
+             alt="Capture réelle d'OutilsIA Local Cockpit avec score matériel, modèle conseillé et preuve locale">
+        <figcaption>
+          Capture produit réelle. Le cockpit part du matériel, recommande des
+          modèles, mesure localement et conserve la provenance.
+        </figcaption>
+      </figure>
+    </section>
+
+    <section id="verite" class="truth-strip" aria-label="Trois niveaux de vérité">
+      <article class="truth">
+        <span class="status public">PUBLIC</span>
+        <strong>Desktop 0.1.1 bêta</strong>
+        <p>
+          Build public <code>291439601671</code>, publié le 11 juillet 2026 :
+          Windows EXE/MSI et Linux AppImage/DEB/RPM, cinq artefacts avec SHA-256.
+        </p>
+      </article>
+      <article class="truth">
+        <span class="status candidate">SOURCES CANDIDATES</span>
+        <strong>Desktop 0.1.2</strong>
+        <p>
+          Navigation par espaces, Runtime & Driver Intelligence, tests privés,
+          passerelle locale et Atelier IA sont dans les sources, mais ne doivent
+          pas être attribués automatiquement au build public.
+        </p>
+      </article>
+      <article class="truth">
+        <span class="status review">EN REVUE</span>
+        <strong>App ChatGPT 0.3.0</strong>
+        <p>
+          Serveur MCP public, widget v3, cinq outils read-only, vidéo réelle et
+          dossier soumis à OpenAI le 26 juillet 2026. Pas encore approuvé ni
+          publié dans le répertoire.
+        </p>
+      </article>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>1. Résumé stratégique</h2>
+          <p>
+            OutilsIA ne cherche pas à devenir un énième chat local. Sa valeur est
+            la décision : comprendre la machine, choisir le bon runtime et le bon
+            modèle, mesurer le résultat, recommander l’action suivante et conserver
+            une preuve bornée.
+          </p>
+        </div>
+        <span class="status public">POSITIONNEMENT CENTRAL</span>
+      </div>
+
+      <div class="callout">
+        <strong>La promesse en une phrase</strong>
+        <p>
+          OutilsIA dit ce que ce PC peut réellement faire en IA locale, installe
+          et teste le bon modèle avec consentement, puis rend cette capacité
+          exploitable sans confondre estimation, mesure et preuve.
+        </p>
+      </div>
+
+      <div class="grid-3">
+        <article class="card">
+          <span class="kicker">Avant OutilsIA</span>
+          <h3>Choix au hasard</h3>
+          <p>
+            L’utilisateur compare des listes de modèles, des tailles théoriques
+            et des forums sans savoir ce qui fonctionne sur sa machine exacte.
+          </p>
+        </article>
+        <article class="card">
+          <span class="kicker">Avec le cockpit</span>
+          <h3>Décision mesurée</h3>
+          <p>
+            Matériel, runtime, modèle installé, tokens/s, placement GPU/RAM,
+            limites, upgrade utile ou conclusion « n’achetez rien ».
+          </p>
+        </article>
+        <article class="card">
+          <span class="kicker">Écosystème</span>
+          <h3>Capacité réutilisable</h3>
+          <p>
+            Rapport, PDF, MemoryForge, Passport et pont local permettent à
+            d’autres produits de consommer une capacité déjà préparée.
+          </p>
+        </article>
+      </div>
+
+      <div class="callout warning">
+        <strong>Le piège à éviter</strong>
+        <p>
+          Le volume de fonctions ne doit pas faire perdre le cœur « analyser,
+          décider, tester ». Les fonctions avancées restent regroupées dans
+          Atelier IA et ne doivent pas rendre le premier parcours plus complexe.
+        </p>
+      </div>
+    </section>
+
+    <section id="desktop" class="section">
+      <div class="section-head">
+        <div>
+          <h2>2. OutilsIA Local Cockpit : architecture desktop</h2>
+          <p>
+            L’application est un client Tauri 2. Le front HTML/CSS/JavaScript
+            présente les décisions ; le backend Rust exécute les sondes, pilote
+            les runtimes locaux et borne les opérations.
+          </p>
+        </div>
+        <span class="status candidate">SOURCE 0.1.2</span>
+      </div>
+
+      <div class="architecture" aria-label="Architecture desktop">
+        <div class="node">
+          <strong>Interface Tauri</strong>
+          <span>Sept espaces, actions consenties, rapports, historique et navigation focalisée.</span>
+        </div>
+        <div class="node">
+          <strong>Backend Rust</strong>
+          <span>Sondes bornées, commandes Tauri, timeouts, validation, stockage local et SHA-256.</span>
+        </div>
+        <div class="node">
+          <strong>Runtimes locaux</strong>
+          <span>Ollama Windows, Ollama Linux, Ollama WSL, GPU NVIDIA/AMD/Intel ou CPU.</span>
+        </div>
+        <div class="node">
+          <strong>OutilsIA.fr</strong>
+          <span>Catalogue, compte, rapports publics, signaux modèles, téléchargement et SEO/GEO.</span>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <article class="card">
+          <h3>Socle technique</h3>
+          <ul class="compact">
+            <li>Rust et Tauri 2 pour les commandes natives.</li>
+            <li>Frontend sans framework lourd.</li>
+            <li>Build Windows et Linux.</li>
+            <li>Service distant limité au catalogue, compte et partage.</li>
+            <li>Calculs et actions locales réalisés sur la machine.</li>
+            <li>Timeouts sur les commandes externes et sortie bornée.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Règles d’autonomie</h3>
+          <ul class="compact">
+            <li>Aucun téléchargement implicite pendant une comparaison.</li>
+            <li>Aucune installation ou suppression sans clic explicite.</li>
+            <li>Aucun benchmark lancé par une simple navigation.</li>
+            <li>Aucun secret exporté dans rapport, Passport ou Ledger.</li>
+            <li>Aucune donnée inconnue transformée en zéro.</li>
+            <li>Aucune fixture présentée comme test physique.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>3. Parcours et navigation</h2>
+          <p>
+            Les sources 0.1.2 remplacent l’ancienne page verticale interminable
+            par sept espaces persistants. Un menu de section n’affiche qu’un
+            module à la fois, sans perdre l’état des formulaires.
+          </p>
+        </div>
+        <span class="status candidate">À PUBLIER APRÈS RECETTE</span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Espace</th>
+              <th>Question utilisateur</th>
+              <th>Modules principaux</th>
+              <th>Action attendue</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Accueil</strong></td>
+              <td>Où en est ma machine ?</td>
+              <td>Bilan, verdict, preuves, prochaine action</td>
+              <td>Comprendre en moins de 30 secondes</td>
+            </tr>
+            <tr>
+              <td><strong>Machine</strong></td>
+              <td>Qu’est-ce qui limite mon PC ?</td>
+              <td>Hardware Doctor, drivers, Digital Twin, terrain</td>
+              <td>Diagnostiquer ou simuler un upgrade</td>
+            </tr>
+            <tr>
+              <td><strong>Modèles</strong></td>
+              <td>Quoi installer ou supprimer ?</td>
+              <td>Compatibles, installés, catalogue, commandes</td>
+              <td>Gérer les modèles Ollama</td>
+            </tr>
+            <tr>
+              <td><strong>Tests</strong></td>
+              <td>Quel modèle est réellement meilleur ici ?</td>
+              <td>Benchmark, Arena, tests privés, Autopilot, Recorder</td>
+              <td>Mesurer avec le même protocole</td>
+            </tr>
+            <tr>
+              <td><strong>Assistant</strong></td>
+              <td>Comment utiliser mon modèle ?</td>
+              <td>Dialogue, PromptForge, bibliothèque, MemoryForge</td>
+              <td>Questionner et conserver le résultat utile</td>
+            </tr>
+            <tr>
+              <td><strong>Atelier IA</strong></td>
+              <td>Comment orchestrer et prouver un travail ?</td>
+              <td>Passport, Bridge, Workstacks, ForgeBench, Ledger</td>
+              <td>Préparer un workflow borné</td>
+            </tr>
+            <tr>
+              <td><strong>Compte</strong></td>
+              <td>Comment retrouver et partager ?</td>
+              <td>Sauvegarde, rapport, feedback, historique</td>
+              <td>Synchroniser sans déplacer l’exécution locale</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout info">
+        <strong>UX visée</strong>
+        <p>
+          Une ouverture neuve arrive sur Accueil &gt; Bilan machine. Chaque
+          dépendance incomplète possède un bouton qui ouvre exactement son
+          prérequis, mais ne l’exécute jamais automatiquement.
+        </p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>4. Diagnostic matériel et vérité des mesures</h2>
+          <p>
+            Hardware Truth et Hardware Doctor évitent les diagnostics trop
+            confiants. Le système sépare mesure, signal, estimation et inconnu.
+          </p>
+        </div>
+        <span class="status public">SOCLE PUBLIC</span>
+      </div>
+
+      <div class="grid-4">
+        <article class="card">
+          <span class="kicker">CPU</span>
+          <h3>Processeur</h3>
+          <p>Nom, cœurs, plateforme et potentiel CPU, sans déduire une vitesse modèle non mesurée.</p>
+        </article>
+        <article class="card">
+          <span class="kicker">Mémoire</span>
+          <h3>RAM</h3>
+          <p>Capacité, nombre de modules et fréquence. Aucun faux single/dual/quad channel déduit du nombre de barrettes.</p>
+        </article>
+        <article class="card">
+          <span class="kicker">Accélérateur</span>
+          <h3>GPU et VRAM</h3>
+          <p>Nom, fournisseur, VRAM dédiée ou mémoire unifiée. Une sonde muette reste « inconnue ».</p>
+        </article>
+        <article class="card">
+          <span class="kicker">Système</span>
+          <h3>OS et stockage</h3>
+          <p>Windows, Linux, WSL, volumes et réserve avant téléchargement, sans exporter le chemin personnel.</p>
+        </article>
+      </div>
+
+      <h3>Signaux avancés</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Signal</th>
+              <th>Ce qui est observé</th>
+              <th>Ce qui n’est pas prétendu</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Driver GPU</td>
+              <td>Famille, version et page officielle pertinente</td>
+              <td>Un pilote présent ne prouve pas l’offload du modèle</td>
+            </tr>
+            <tr>
+              <td>PCIe / ReBAR</td>
+              <td>Valeur uniquement si le système l’expose</td>
+              <td>Pas de conseil BIOS inventé si inconnu</td>
+            </tr>
+            <tr>
+              <td>Thermiques</td>
+              <td>Instantané daté de température, charge ou puissance</td>
+              <td>Pas de diagnostic de throttling sans évolution mesurée</td>
+            </tr>
+            <tr>
+              <td>CUDA / ROCm / Vulkan</td>
+              <td>API signalée et support documenté</td>
+              <td>Pas de raccourci « CUDA présent = modèle sur GPU »</td>
+            </tr>
+            <tr>
+              <td>Ollama <code>/api/ps</code></td>
+              <td><code>size_vram / size</code> après un vrai benchmark</td>
+              <td>Pas de placement GPU/RAM estimé quand la mesure manque</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warning">
+        <strong>Cas legacy important</strong>
+        <p>
+          Une GTX 1080 Ti Pascal ne doit pas recevoir un conseil CUDA 13. Le
+          moteur candidat connaît la limite toolkit 12.x et la branche pilote
+          legacy documentée. L’app ouvre seulement une page officielle après
+          consentement ; elle n’installe pas silencieusement un pilote.
+        </p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>5. NVIDIA, AMD, Intel et mémoire unifiée</h2>
+          <p>
+            Le produit ne réduit pas l’IA locale à CUDA. Il conserve le backend
+            probable et exige une preuve d’exécution avant de conclure.
+          </p>
+        </div>
+        <span class="status candidate">INTELLIGENCE DRIVER CANDIDATE</span>
+      </div>
+
+      <div class="grid-2">
+        <article class="card">
+          <h3>NVIDIA</h3>
+          <ul>
+            <li>CUDA comme backend principal quand supporté.</li>
+            <li>Détection des branches driver et cas Pascal legacy.</li>
+            <li>Retest CPU avec <code>num_gpu=0</code> après erreur CUDA.</li>
+            <li>Offload prouvé seulement après mesure Ollama.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>AMD</h3>
+          <ul>
+            <li>ROCm/HIP, Vulkan ou CPU selon OS et matériel.</li>
+            <li>Strix Halo traité comme mémoire unifiée, pas comme VRAM dédiée fictive.</li>
+            <li>Windows et Linux ne reçoivent pas la même promesse.</li>
+            <li>Le support framework et le support Ollama restent séparés.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Intel</h3>
+          <ul>
+            <li>Arc et iGPU distingués.</li>
+            <li>Vulkan expérimental signalé comme tel.</li>
+            <li>Conseil vers la page officielle ou le pilote OEM selon le cas.</li>
+            <li>Aucune conversion automatique en support Ollama garanti.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>CPU et mémoire unifiée</h3>
+          <ul>
+            <li>CPU-only reste un profil valide, avec modèles légers.</li>
+            <li>Apple/Strix Halo conservent un champ mémoire unifiée.</li>
+            <li>La mémoire totale ne devient pas arbitrairement de la VRAM.</li>
+            <li>Le modèle test léger reste la preuve de départ.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>6. Windows, Linux et WSL</h2>
+          <p>
+            Un modèle peut être installé dans Ollama Windows, Ollama WSL ou les
+            deux. Le runtime exact fait partie de l’identité du modèle et de la
+            preuve.
+          </p>
+        </div>
+        <span class="status public">ROUTAGE CORRIGÉ</span>
+      </div>
+
+      <div class="flow" aria-label="Parcours runtime">
+        <span>Scanner l’OS</span><b>→</b>
+        <span>Détecter Ollama natif</span><b>→</b>
+        <span>Détecter WSL</span><b>→</b>
+        <span>Lister les modèles par source</span><b>→</b>
+        <span>Router l’action vers la bonne source</span>
+      </div>
+
+      <div class="grid-3">
+        <article class="card">
+          <h3>Détection robuste</h3>
+          <p>
+            Les commandes de scan ont des timeouts. La sortie UTF-16 de
+            <code>wsl.exe</code> est décodée. Un runtime lent ne doit plus geler
+            toute la fenêtre.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Installation WSL neutre</h3>
+          <p>
+            L’app utilise <code>wsl.exe --install</code> sans forcer Ubuntu.
+            La distribution par défaut est ensuite détectée et nommée.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Action par modèle</h3>
+          <p>
+            Tester, dialoguer, benchmarker ou supprimer un modèle installé
+            seulement en WSL reste dans WSL, sans téléchargement natif caché.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>7. Modèles, installation et catalogue vivant</h2>
+          <p>
+            Le catalogue ne se limite pas à « compatible ou non ». Il associe
+            taille, usage, runtime, limites, commande Ollama et prochaine action.
+          </p>
+        </div>
+        <span class="status public">CŒUR PRODUIT</span>
+      </div>
+
+      <div class="grid-3">
+        <article class="card">
+          <h3>Détecter</h3>
+          <p>
+            Lister les modèles installés par runtime et éviter les faux alias
+            entre tags, tailles et familles.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Installer</h3>
+          <p>
+            Vérifier stockage, taille haute, réserve, runtime ciblé et consentement
+            avant le premier octet.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Gérer</h3>
+          <p>
+            Tester, dialoguer, benchmarker, copier la commande ou supprimer avec
+            action explicite et suivi visible.
+          </p>
+        </article>
+      </div>
+
+      <h3>Familles et usages pris en compte</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Usage</th>
+              <th>Exemples de familles</th>
+              <th>Décision recherchée</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Polyvalent / français</td>
+              <td>Qwen, Gemma, Mistral</td>
+              <td>Qualité générale, naturel, vitesse</td>
+            </tr>
+            <tr>
+              <td>Assistant / mémoire</td>
+              <td>Hermes, Qwen</td>
+              <td>Instruction, persona, synthèse, workflows</td>
+            </tr>
+            <tr>
+              <td>Code</td>
+              <td>Qwen, DeepSeek et modèles spécialisés</td>
+              <td>Structure, correction, explication</td>
+            </tr>
+            <tr>
+              <td>Petit PC</td>
+              <td>0.6B à 4B quantifiés</td>
+              <td>Valider Ollama et conserver une latence acceptable</td>
+            </tr>
+            <tr>
+              <td>Gros modèles</td>
+              <td>27B, 32B, MoE</td>
+              <td>Mesurer l’offload et le confort réel, pas seulement le chargement</td>
+            </tr>
+            <tr>
+              <td>Image / audio</td>
+              <td>Signaux catalogue distincts</td>
+              <td>Ne pas les confondre avec les commandes Ollama texte</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout info">
+        <strong>Hermes : exemple de correction de vérité</strong>
+        <p>
+          <code>hermes3:8b</code> est un assistant léger. Le modèle
+          <code>nous-hermes2-mixtral:8x7b</code> pèse environ 26 Go en Q4 :
+          sur 16 Go de VRAM il fonctionne avec offload, mais n’est pas présenté
+          comme rapide. Une mesure physique a donné 4,1 tok/s en 48,3 s avec
+          33,3 % d’offload GPU sur RTX 4080 SUPER.
+        </p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>8. Mesure, comparaison et recommandation</h2>
+          <p>
+            Le cockpit sépare la compatibilité théorique du comportement
+            observé. Une recommandation peut utiliser des preuves, mais ne doit
+            jamais inventer une performance.
+          </p>
+        </div>
+        <span class="status public">PREUVE LOCALE</span>
+      </div>
+
+      <div class="grid-4">
+        <article class="card">
+          <span class="kicker">Benchmark</span>
+          <h3>Mesure Ollama</h3>
+          <p>Latence, tokens/s, durée, succès, runtime et placement GPU/RAM.</p>
+        </article>
+        <article class="card">
+          <span class="kicker">Arena locale</span>
+          <h3>Même protocole</h3>
+          <p>Baseline, assistant et candidat distinct, sans téléchargement pendant la campagne.</p>
+        </article>
+        <article class="card">
+          <span class="kicker">Engine v2</span>
+          <h3>Choix par usage</h3>
+          <p>Chat, code, mémoire, français, portable ou polyvalent, avec preuves comparées.</p>
+        </article>
+        <article class="card">
+          <span class="kicker">Autopilot</span>
+          <h3>Réglages</h3>
+          <p>Rapide, équilibré et qualité sur un modèle installé, puis application et rollback explicites.</p>
+        </article>
+      </div>
+
+      <div class="callout warning">
+        <strong>Timeout honnête</strong>
+        <p>
+          Un dépassement de délai signifie « test incomplet », pas
+          « incompatible ». Les modèles lourds peuvent recevoir une fenêtre de
+          120 secondes quand l’offload RAM est probable.
+        </p>
+      </div>
+
+      <h3>Preuves utilisées par la comparaison</h3>
+      <ul>
+        <li>réponse structurée quand le test l’exige ;</li>
+        <li>respect de l’instruction ;</li>
+        <li>mémoire courte ;</li>
+        <li>calcul simple ;</li>
+        <li>français naturel ;</li>
+        <li>action ou format demandé ;</li>
+        <li>vitesse, latence et ressources réellement mesurées.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>9. Assistant local, PromptForge et MemoryForge</h2>
+          <p>
+            Ces fonctions utilisent les modèles déjà installés. Elles complètent
+            le diagnostic sans transformer OutilsIA en simple application de chat.
+          </p>
+        </div>
+        <span class="status public">COMPLÉMENT D’USAGE</span>
+      </div>
+
+      <div class="grid-3">
+        <article class="card">
+          <h3>Dialogue local</h3>
+          <p>
+            Interroger un modèle Ollama depuis l’app, avec modèle et runtime
+            explicites. La conversation reste distincte du benchmark.
+          </p>
+        </article>
+        <article class="card">
+          <h3>PromptForge</h3>
+          <p>
+            Transformer un prompt flou en instruction bornée, le réutiliser dans
+            benchmark ou dialogue et conserver une bibliothèque locale.
+          </p>
+        </article>
+        <article class="card">
+          <h3>MemoryForge / Obsidian</h3>
+          <p>
+            Exporter machine, modèles, preuves, décisions et bilans durables,
+            sans recopier tous les prompts, logs ou réponses brutes.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>10. Hardware Doctor, Passport, Digital Twin et Recorder</h2>
+          <p>
+            Ces quatre modules transforment le scan ponctuel en dossier de
+            capacité et en historique de décision.
+          </p>
+        </div>
+        <span class="status public">BUILD 291439601671</span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Module</th>
+              <th>Rôle</th>
+              <th>Sortie</th>
+              <th>Limite assumée</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Hardware Doctor 2.0</strong></td>
+              <td>Expliquer les goulots et la qualité des preuves</td>
+              <td>Score, contrôles, mesures, inconnues</td>
+              <td>Pas de certitude sans sonde</td>
+            </tr>
+            <tr>
+              <td><strong>AI Capability Passport</strong></td>
+              <td>Transporter un profil borné</td>
+              <td>JSON + SHA-256 canonique</td>
+              <td>L’empreinte n’est pas une identité</td>
+            </tr>
+            <tr>
+              <td><strong>Upgrade Digital Twin</strong></td>
+              <td>Comparer RAM, GPU/VRAM, SSD, alimentation et boîtier</td>
+              <td>Avant/après, modèles débloqués, inconnues</td>
+              <td>Peut conclure qu’aucun achat n’est utile</td>
+            </tr>
+            <tr>
+              <td><strong>Flight Recorder</strong></td>
+              <td>Détecter les régressions entre deux états</td>
+              <td>Écart perf, offload, runtime, thermiques</td>
+              <td>Corrélation signalée, causalité non inventée</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>11. Rapports, PDF, compte et preuve terrain</h2>
+          <p>
+            Le produit peut partager une décision, mais la preuve physique
+            multi-machines possède une gate distincte et plus stricte.
+          </p>
+        </div>
+        <span class="status blocked">TERRAIN FORMEL 0/5</span>
+      </div>
+
+      <div class="grid-2">
+        <article class="card">
+          <h3>Exports disponibles</h3>
+          <ul>
+            <li>rapport machine lisible ;</li>
+            <li>rapport public contrôlé par l’utilisateur ;</li>
+            <li>PDF matériel, modèles et upgrade ;</li>
+            <li>MemoryForge / Obsidian ;</li>
+            <li>AI Capability Passport JSON ;</li>
+            <li>fiche terrain structurée.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Profils terrain visés</h3>
+          <ul>
+            <li>vieux portable ;</li>
+            <li>Core i7 + GTX 1080 Ti ;</li>
+            <li>CPU-only ;</li>
+            <li>RTX 3060 12 Go ;</li>
+            <li>RTX 4080 / 4090.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="callout danger">
+        <strong>État honnête</strong>
+        <p>
+          Des essais réels ont déjà révélé et corrigé des bugs, mais le dossier
+          formel n’a pas encore cinq fiches réseau cohérentes et plausibles. Le
+          site peut annoncer une bêta Windows/Linux, pas une validation
+          multi-machines complète.
+        </p>
+      </div>
+
+      <h3>Gate anti-fausse preuve</h3>
+      <ul>
+        <li>profil matériel cohérent avec le rapport public ;</li>
+        <li>URL de rapport réellement joignable ;</li>
+        <li>GPU cohérent avec le profil déclaré ;</li>
+        <li>date de test plausible ;</li>
+        <li>tokens/s et durée soumis à des bornes ;</li>
+        <li>déduplication des rapports et des machines ;</li>
+        <li>fixtures synthétiques explicitement exclues de la preuve physique.</li>
+      </ul>
+    </section>
+
+    <section id="workstacks" class="section">
+      <div class="section-head">
+        <div>
+          <h2>12. Atelier IA : Workstacks et orchestration</h2>
+          <p>
+            Ce chantier répond à un problème plus large : les utilisateurs
+            disposent de modèles locaux, de Codex, Claude Code, Hermes, Kimi,
+            interfaces web et API, mais ne savent pas composer un système
+            traçable, économique et sûr.
+          </p>
+        </div>
+        <span class="status candidate">SOURCES NON PUBLIÉES</span>
+      </div>
+
+      <div class="callout">
+        <strong>Idée directrice</strong>
+        <p>
+          Le modèle n’est pas le produit. Le produit est la chaîne de travail :
+          objectif, rôles, permissions, budget, exécution bornée, vérification
+          indépendante, décision humaine et preuve durable.
+        </p>
+      </div>
+
+      <div class="architecture" aria-label="Chaîne Workstack">
+        <div class="node">
+          <strong>Board Observer</strong>
+          <span>Lit une carte de travail sans écrire dans le board.</span>
+        </div>
+        <div class="node">
+          <strong>Workstack Composer</strong>
+          <span>Compile objectif, rôles, budget, interdits et gate humaine.</span>
+        </div>
+        <div class="node">
+          <strong>Capability Router</strong>
+          <span>Détecte les capacités disponibles sans lire les jetons.</span>
+        </div>
+        <div class="node">
+          <strong>ForgeBench + Ledger</strong>
+          <span>Évalue un protocole borné et chaîne les reçus minimaux.</span>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Module</th>
+              <th>Ce qu’il fait aujourd’hui</th>
+              <th>Ce qu’il ne fait pas</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Board Observer</td>
+              <td>Lit Planka en HTTPS, filtre les cartes et efface la clé du formulaire</td>
+              <td>Pas de commentaire, déplacement ou lancement</td>
+            </tr>
+            <tr>
+              <td>Workstack Composer</td>
+              <td>Produit un plan déterministe signé</td>
+              <td>Pas de worktree, fusion ou publication</td>
+            </tr>
+            <tr>
+              <td>Capability Router</td>
+              <td>Sonde versions de Codex, Claude, Hermes, Kimi et modèles Ollama</td>
+              <td>Pas de compte, quota, token, repo ou run</td>
+            </tr>
+            <tr>
+              <td>Agent Adapter Policy</td>
+              <td>Publie les permissions et budgets de chaque adaptateur</td>
+              <td>Le registre ne vaut ni autorisation ni consentement</td>
+            </tr>
+            <tr>
+              <td>ForgeBench</td>
+              <td>Prépare Signal Maze, référence, isolation et holdout borné</td>
+              <td>Pas encore de classement scientifique</td>
+            </tr>
+            <tr>
+              <td>Workstack Arena</td>
+              <td>Pilote Codex uniquement sur Signal Maze public</td>
+              <td>Pas de projet utilisateur ou carte arbitraire</td>
+            </tr>
+            <tr>
+              <td>Evidence Ledger</td>
+              <td>Chaîne des preuves minimales et leurs empreintes</td>
+              <td>Pas de prompt, sortie brute, credential ou preuve de qualité globale</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>13. ForgeBench et Signal Maze v1</h2>
+          <p>
+            ForgeBench est le laboratoire expérimental pour comparer des
+            arrangements d’IA sur la même petite tâche, avec règles publiques,
+            isolation, mesures séparées et holdout.
+          </p>
+        </div>
+        <span class="status candidate">EXPLORATOIRE</span>
+      </div>
+
+      <div class="grid-3">
+        <article class="card">
+          <h3>Contrat visible</h3>
+          <p>
+            Mini-jeu 9 × 9, starter scellé, règles, API DOM, trois seeds, trois
+            viewports et contrôles clavier, souris et tactile.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Isolation</h3>
+          <p>
+            Bubblewrap sous Linux/WSL, réseau coupé, workspace jetable, racine
+            hôte masquée et Chromium séparé.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Holdout</h3>
+          <p>
+            Le code est gelé avant lecture des seeds privés. Le vault n’est pas
+            monté ; seuls compteurs et empreintes ressortent.
+          </p>
+        </article>
+      </div>
+
+      <h3>Adaptateurs réellement exécutables dans les sources</h3>
+      <ul>
+        <li>
+          <strong>Ollama local :</strong> un modèle déjà installé produit trois
+          fichiers bornés, passe 7 groupes statiques, 39 contrôles visibles puis
+          cinq familles de holdout.
+        </li>
+        <li>
+          <strong>Codex CLI :</strong> un seul essai sur Signal Maze public,
+          budget 3/5/10 minutes, sortie maximale 512 Kio, deux consentements et
+          revue humaine obligatoire.
+        </li>
+        <li>
+          <strong>Claude Code, Hermes et Kimi :</strong> détection seulement.
+          Aucun scope d’exécution n’est encore autorisé.
+        </li>
+      </ul>
+
+      <div class="callout danger">
+        <strong>Pas encore scientifique</strong>
+        <p>
+          Les familles de checks sont publiques, le vault n’est pas chiffré au
+          repos ni isolé de tous les processus du même utilisateur, les candidats
+          pairs complets n’ont pas tourné et l’énergie n’est pas mesurée.
+          <code>scientific_eligible=false</code> et
+          <code>winner_declared=false</code> restent obligatoires.
+        </p>
+      </div>
+
+      <h3>Score futur, non encore publié</h3>
+      <pre>50 % résultat + 20 % efficacité + 15 % vitesse + 15 % coût
+
+Règles :
+- publier aussi chaque dimension brute ;
+- ne jamais transformer un coût inconnu en zéro ;
+- afficher la frontière de Pareto ;
+- comparer des runs réellement équivalents ;
+- ne déclarer aucun gagnant sans candidats pairs et protocole complet.</pre>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>14. Evidence Ledger : ce qu’il prouve</h2>
+          <p>
+            Le Ledger est une chaîne locale de reçus minimaux. Il évite le
+            classique « l’agent a dit que c’était fait » sans pour autant
+            prétendre garantir la qualité générale.
+          </p>
+        </div>
+        <span class="status candidate">CONTRAT V1</span>
+      </div>
+
+      <div class="grid-2">
+        <article class="card">
+          <h3>Il peut prouver</h3>
+          <ul>
+            <li>contrat valide au moment de l’ajout ;</li>
+            <li>empreinte SHA-256 du document source ;</li>
+            <li>chaînage avec l’entrée précédente ;</li>
+            <li>identité bornée du composant ;</li>
+            <li>métriques minimales autorisées ;</li>
+            <li>consentement ou revue structurée quand exigé.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Il ne peut pas prouver</h3>
+          <ul>
+            <li>identité humaine ou propriété de la machine ;</li>
+            <li>qualité globale d’un résultat ;</li>
+            <li>exactitude d’une sortie sans vérificateur ;</li>
+            <li>coût exact d’un abonnement CLI ;</li>
+            <li>benchmark physique depuis une fixture ;</li>
+            <li>supériorité scientifique d’un agent.</li>
+          </ul>
+        </article>
+      </div>
+
+      <p>
+        Le Ledger exclut volontairement description brute, prompt, réponse de
+        modèle, code, capture, chemin local, credential et secret de test.
+      </p>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>15. AI Capability Passport et passerelle locale</h2>
+          <p>
+            Le Passport est la sortie portable ; la passerelle est un accès
+            temporaire, local et read-only à cette capacité.
+          </p>
+        </div>
+        <span class="status candidate">BRIDGE NON PUBLIC</span>
+      </div>
+
+      <div class="flow" aria-label="Flux du Passport">
+        <span>Scan</span><b>→</b>
+        <span>Mesures</span><b>→</b>
+        <span>Recommandation</span><b>→</b>
+        <span>Passport signé par hash</span><b>→</b>
+        <span>Bridge 127.0.0.1 · 15 min</span>
+      </div>
+
+      <ul>
+        <li>désactivé par défaut ;</li>
+        <li>consentement explicite ;</li>
+        <li>écoute uniquement sur <code>127.0.0.1</code> ;</li>
+        <li>jeton Bearer aléatoire en mémoire ;</li>
+        <li>GET/OPTIONS uniquement ;</li>
+        <li>arrêt automatique après 15 minutes ou Passport périmé ;</li>
+        <li>aucun modèle, benchmark, chat, fichier, backtest ou trade modifiable.</li>
+      </ul>
+
+      <div class="callout info">
+        <strong>Frontière Strategy Arena</strong>
+        <p>
+          OutilsIA prépare la machine et les modèles. Strategy Arena peut lire
+          un profil borné pour choisir un mode local, mais conserve génération
+          de stratégie, compilation, backtest, CUDA, robustesse et export
+          TradingView. Aucun backtest n’est déplacé dans OutilsIA.
+        </p>
+      </div>
+    </section>
+
+    <section id="chatgpt" class="section">
+      <div class="section-head">
+        <div>
+          <h2>16. L’app ChatGPT OutilsIA</h2>
+          <p>
+            L’app ChatGPT n’est pas le logiciel desktop dans une conversation.
+            C’est une surface read-only qui utilise le moteur OutilsIA à partir
+            de faits explicitement fournis ou d’un rapport déjà partagé.
+          </p>
+        </div>
+        <span class="status review">SOUMISE LE 26/07/2026</span>
+      </div>
+
+      <div class="architecture" aria-label="Architecture app ChatGPT">
+        <div class="node">
+          <strong>Utilisateur</strong>
+          <span>Déclare CPU, RAM, GPU et VRAM ou fournit un rapport OutilsIA.</span>
+        </div>
+        <div class="node">
+          <strong>ChatGPT</strong>
+          <span>Choisit l’outil, explique la décision et affiche le composant.</span>
+        </div>
+        <div class="node">
+          <strong>MCP OutilsIA</strong>
+          <span>Valide, appelle le moteur déterministe et retourne une sortie bornée.</span>
+        </div>
+        <div class="node">
+          <strong>Widget v3</strong>
+          <span>Score, matériel, modèles, preuve mesurée et upgrade utile ou inutile.</span>
+        </div>
+      </div>
+
+      <div class="grid-4">
+        <article class="card">
+          <span class="metric">5</span>
+          <strong>outils MCP</strong>
+          <p>Quatre parcours read-only et un renderer réservé à l’app.</p>
+        </article>
+        <article class="card">
+          <span class="metric">12/12</span>
+          <strong>tests locaux</strong>
+          <p>Contrat, domaine, API, widget, absence de preuve fabriquée.</p>
+        </article>
+        <article class="card">
+          <span class="metric">5 + 3</span>
+          <strong>tests de revue</strong>
+          <p>Cinq positifs et exactement trois négatifs.</p>
+        </article>
+        <article class="card">
+          <span class="metric">5:00</span>
+          <strong>vidéo réelle</strong>
+          <p>H.264, fenêtre Brave isolée, quatre scénarios, aucune donnée privée.</p>
+        </article>
+      </div>
+
+      <div class="callout">
+        <strong>URL MCP publique</strong>
+        <p><code>https://outilsia.fr/mcp</code></p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>17. Les cinq outils ChatGPT</h2>
+          <p>
+            Tous déclarent <code>readOnlyHint=true</code>,
+            <code>openWorldHint=false</code> et
+            <code>destructiveHint=false</code>.
+          </p>
+        </div>
+        <span class="status review">CONTRAT GELÉ PENDANT REVUE</span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Outil</th>
+              <th>Entrée</th>
+              <th>Sortie</th>
+              <th>Interdit</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>check_pc_for_local_ai</code></td>
+              <td>Profil matériel explicite</td>
+              <td>Score, modèles, limites, décision d’achat</td>
+              <td>Ne prétend pas scanner le PC</td>
+            </tr>
+            <tr>
+              <td><code>analyze_shared_report</code></td>
+              <td>URL exacte <code>outilsia.fr/r/…</code></td>
+              <td>Décision issue d’un rapport public</td>
+              <td>Refuse les domaines étrangers</td>
+            </tr>
+            <tr>
+              <td><code>simulate_hardware_upgrade</code></td>
+              <td>Profil + RAM/VRAM cibles</td>
+              <td>Avant/après, gain, modèles débloqués</td>
+              <td>N’achète et ne modifie rien</td>
+            </tr>
+            <tr>
+              <td><code>explain_local_action_boundary</code></td>
+              <td>Demande d’action locale</td>
+              <td>Refus bref et renvoi vers le desktop</td>
+              <td>Aucune commande ou procédure manuelle</td>
+            </tr>
+            <tr>
+              <td><code>render_machine_cockpit</code></td>
+              <td>Décision déjà produite</td>
+              <td>Widget <code>machine-cockpit-v3</code></td>
+              <td>Ne recalcule ni ne sauvegarde</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>18. Frontière entre ChatGPT et le desktop</h2>
+          <p>
+            Cette séparation est le point de sécurité et de compréhension le
+            plus important de l’ensemble.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <article class="card">
+          <span class="status review">APP CHATGPT</span>
+          <h3>Conseille et affiche</h3>
+          <ul>
+            <li>profil déclaré ;</li>
+            <li>rapport public ;</li>
+            <li>compatibilité estimée ;</li>
+            <li>simulation RAM/VRAM ;</li>
+            <li>widget compact ;</li>
+            <li>refus déterministe d’action locale.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <span class="status public">LOCAL COCKPIT</span>
+          <h3>Scanne et exécute localement</h3>
+          <ul>
+            <li>scan CPU/RAM/GPU/VRAM ;</li>
+            <li>détection Windows/WSL/Linux ;</li>
+            <li>installation Ollama et modèles ;</li>
+            <li>benchmark et dialogue ;</li>
+            <li>preuve d’offload ;</li>
+            <li>rapport et Passport.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="callout danger">
+        <strong>Ce que l’app ChatGPT ne peut jamais prétendre</strong>
+        <p>
+          « J’ai scanné votre PC », « j’ai installé Ollama », « le modèle tourne
+          à 80 tok/s » sans rapport mesuré, « j’ai commandé un GPU » ou « j’ai
+          accès à vos fichiers ». Aucun de ces pouvoirs n’existe dans son
+          contrat MCP.
+        </p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>19. Widget ChatGPT v3</h2>
+          <p>
+            Le widget reste compact et ne remplace pas l’explication textuelle.
+            Il affiche la provenance afin que l’utilisateur sache si le résultat
+            vient d’une déclaration, d’un rapport ou d’une simulation.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <article class="card">
+          <h3>Décision</h3>
+          <p>Verdict, score sur 100, label et résumé borné.</p>
+        </article>
+        <article class="card">
+          <h3>Machine</h3>
+          <p>CPU, RAM, GPU, VRAM, mémoire unifiée, stockage et OS.</p>
+        </article>
+        <article class="card">
+          <h3>Modèles</h3>
+          <p>Nom, paramètres, statut, VRAM Q4, commande Ollama et raison.</p>
+        </article>
+        <article class="card">
+          <h3>Preuve</h3>
+          <p>Tokens/s et durée uniquement si une vraie mesure structurée existe.</p>
+        </article>
+        <article class="card">
+          <h3>Achat</h3>
+          <p>Priorité, utilité ou conclusion explicite qu’aucun achat n’est requis.</p>
+        </article>
+        <article class="card">
+          <h3>Limites</h3>
+          <p>Ce qui reste estimé, absent, non mesuré ou réservé au desktop.</p>
+        </article>
+      </div>
+
+      <p>
+        URI actuelle : <code>ui://outilsia/machine-cockpit-v3.html</code>.
+        Domaine UI dédié :
+        <code>https://chatgpt-local-cockpit.outilsia.fr</code>.
+      </p>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>20. Soumission OpenAI : ce qui a été réellement fait</h2>
+          <p>
+            La soumission n’est pas une intention. Le serveur, le domaine, la
+            vidéo, les tests et les assets ont été préparés puis envoyés.
+          </p>
+        </div>
+        <span class="status review">APPROVAL PENDING</span>
+      </div>
+
+      <div class="timeline">
+        <div class="timeline-item">
+          <strong>Serveur MCP public et widget v3</strong>
+          <p>Endpoint production stable, cinq outils et ressource UI versionnée.</p>
+        </div>
+        <div class="timeline-item">
+          <strong>Identité vérifiée</strong>
+          <p>Organisation OutilsIA.fr et développeur individuel validés dans la plateforme.</p>
+        </div>
+        <div class="timeline-item">
+          <strong>Domaine vérifié</strong>
+          <p>Challenge exact servi depuis <code>/.well-known/openai-apps-challenge</code> et conservé pendant la revue.</p>
+        </div>
+        <div class="timeline-item">
+          <strong>Scan Tools</strong>
+          <p>Annotations et justifications relues pour les cinq outils.</p>
+        </div>
+        <div class="timeline-item">
+          <strong>Vidéo H.264 validée</strong>
+          <p>Profil, rapport, upgrade et refus d’installation dans la vraie interface ChatGPT.</p>
+        </div>
+        <div class="timeline-item">
+          <strong>Soumission déposée</strong>
+          <p>Fiche, icônes, pays, 5 tests positifs, 3 négatifs et attestations envoyés le 26 juillet 2026.</p>
+        </div>
+      </div>
+
+      <div class="callout warning">
+        <strong>Statut public à employer</strong>
+        <p>
+          « Soumise pour revue OpenAI » est correct. « Approuvée », « publiée
+          dans l’annuaire » ou « app officielle OpenAI » est faux tant que le
+          portail n’a pas confirmé l’approbation puis la publication.
+        </p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>21. Les quatre scénarios de démonstration</h2>
+          <p>
+            La vidéo finale dure environ cinq minutes et capture uniquement la
+            fenêtre Brave avec Windows Graphics Capture.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <article class="card">
+          <h3>1. Profil haut de gamme</h3>
+          <p>
+            Ryzen 7 7800X3D, 64 Go RAM, RTX 4080 SUPER 16 Go. Score et modèles,
+            sans vitesse fabriquée ni achat forcé.
+          </p>
+        </article>
+        <article class="card">
+          <h3>2. Rapport partagé</h3>
+          <p>
+            Analyse d’une URL OutilsIA exacte, provenance « rapport partagé » et
+            aucune revendication d’accès direct au PC.
+          </p>
+        </article>
+        <article class="card">
+          <h3>3. Simulation d’upgrade</h3>
+          <p>
+            Comparatif d’un vieux Core i7/GTX 1080 Ti avant et après RAM/VRAM,
+            avec gain théorique et limites.
+          </p>
+        </article>
+        <article class="card">
+          <h3>4. Demande d’installation</h3>
+          <p>
+            Appel de l’outil de frontière : refus read-only, aucun PowerShell,
+            aucune commande Ollama et renvoi vers Local Cockpit.
+          </p>
+        </article>
+      </div>
+
+      <p>
+        Vidéo publique :
+        <a href="https://outilsia.fr/static/media/demo-outilsia-chatgpt-local-cockpit.mp4">
+          https://outilsia.fr/static/media/demo-outilsia-chatgpt-local-cockpit.mp4
+        </a>
+      </p>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>22. Confidentialité et sécurité de l’app ChatGPT</h2>
+          <p>
+            La V1 anonyme évite volontairement l’authentification et demande le
+            minimum de données utile à la décision.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <article class="card">
+          <h3>Données acceptées</h3>
+          <ul>
+            <li>CPU, cœurs, RAM, GPU, VRAM ;</li>
+            <li>mémoire unifiée, stockage et OS optionnels ;</li>
+            <li>usage demandé ;</li>
+            <li>URL publique exacte d’un rapport OutilsIA.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Données absentes</h3>
+          <ul>
+            <li>fichiers personnels ;</li>
+            <li>liste locale Ollama ;</li>
+            <li>terminal ou commandes ;</li>
+            <li>mot de passe, token ou clé API ;</li>
+            <li>carte bancaire ou achat ;</li>
+            <li>historique complet de conversation.</li>
+          </ul>
+        </article>
+      </div>
+
+      <p>
+        Les rapports ne sont acceptés que sur l’origine OutilsIA autorisée.
+        Les sorties sont bornées et n’incluent pas d’identifiant interne inutile.
+      </p>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>23. Site, SEO et GEO</h2>
+          <p>
+            Chaque capacité technique importante doit être expliquée publiquement
+            sans présenter une source candidate comme déjà distribuée.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <article class="card">
+          <h3>Hub scanner</h3>
+          <p><code>/scanner-ia-local</code></p>
+          <p>Positionnement « quel modèle IA local pour mon PC ».</p>
+        </article>
+        <article class="card">
+          <h3>Téléchargement</h3>
+          <p><code>/telecharger-scanner-ia-local</code></p>
+          <p>Artefacts, version, SHA-256 et sécurité lisibles sans JavaScript.</p>
+        </article>
+        <article class="card">
+          <h3>App ChatGPT</h3>
+          <p><code>/chatgpt-ia-locale</code></p>
+          <p>Promesse read-only, outils, confidentialité et mode développeur.</p>
+        </article>
+      </div>
+
+      <ul>
+        <li><code>llms.txt</code> décrit la frontière produit aux moteurs IA ;</li>
+        <li>les guides matériels alimentent le catalogue et les décisions ;</li>
+        <li>les pages money doivent partir du diagnostic avant l’affiliation ;</li>
+        <li>le rapport partagé peut devenir un pont vers un upgrade réellement utile ;</li>
+        <li>les fonctions candidates ne doivent être annoncées qu’après build, SHA et recette.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>24. Ce qui est différenciant</h2>
+          <p>
+            La différenciation ne vient pas d’une liste de modèles. Elle vient
+            de la combinaison diagnostic, décision, preuve et interopérabilité.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <article class="card">
+          <h3>Vérité matérielle</h3>
+          <p>Une valeur inconnue reste inconnue et une API signalée ne devient pas une preuve GPU.</p>
+        </article>
+        <article class="card">
+          <h3>Runtime exact</h3>
+          <p>Windows, WSL et Linux font partie de l’identité réelle du modèle.</p>
+        </article>
+        <article class="card">
+          <h3>Mesure locale</h3>
+          <p>Tokens/s, latence et offload proviennent d’un run, pas d’un tableau générique.</p>
+        </article>
+        <article class="card">
+          <h3>Décision d’achat honnête</h3>
+          <p>Le moteur peut recommander de ne rien acheter tant que la machine suffit.</p>
+        </article>
+        <article class="card">
+          <h3>Passport et Ledger</h3>
+          <p>Les capacités et preuves deviennent portables sans exporter les contenus sensibles.</p>
+        </article>
+        <article class="card">
+          <h3>Surface ChatGPT</h3>
+          <p>Le moteur de décision devient accessible dans la conversation sans donner un faux accès au PC.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>25. Risques et dettes actuels</h2>
+          <p>
+            Une analyse utile doit porter autant sur les frontières que sur les
+            fonctionnalités.
+          </p>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Risque</th>
+              <th>Impact</th>
+              <th>État</th>
+              <th>Réponse</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Décalage sources / binaire public</td>
+              <td>Promesse trompeuse</td>
+              <td>Candidat 0.1.2 plus avancé</td>
+              <td>Release candidate, exact-byte promotion et rollback</td>
+            </tr>
+            <tr>
+              <td>Terrain 0/5</td>
+              <td>Validation physique insuffisante</td>
+              <td>Bloquant pour revendication large</td>
+              <td>Tests de demain sur plusieurs machines</td>
+            </tr>
+            <tr>
+              <td>Installateurs Windows non signés</td>
+              <td>Friction SmartScreen et confiance</td>
+              <td>À traiter</td>
+              <td>Signature de code avant diffusion large</td>
+            </tr>
+            <tr>
+              <td>Interface encore dense</td>
+              <td>Découverte difficile</td>
+              <td>Navigation corrigée dans les sources</td>
+              <td>Recette manuelle et publication du candidat</td>
+            </tr>
+            <tr>
+              <td>ForgeBench non scientifique</td>
+              <td>Risque de faux classement</td>
+              <td>Claims bloqués dans les contrats</td>
+              <td>Vault durci, pairs, énergie, protocole privé</td>
+            </tr>
+            <tr>
+              <td>App ChatGPT en revue</td>
+              <td>Pas encore découvrable publiquement</td>
+              <td>Soumise</td>
+              <td>Geler le contrat et répondre au reviewer</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="roadmap" class="section">
+      <div class="section-head">
+        <div>
+          <h2>26. Roadmap recommandée</h2>
+          <p>
+            L’ordre privilégie la preuve, la publication cohérente et la
+            simplicité avant l’élargissement agentique.
+          </p>
+        </div>
+      </div>
+
+      <div class="timeline">
+        <div class="timeline-item">
+          <strong>Palier 1 · Revue OpenAI et gel MCP</strong>
+          <p>
+            Surveiller la soumission, conserver challenge et vidéo, corriger
+            seulement les demandes du reviewer sans élargir silencieusement le contrat.
+          </p>
+        </div>
+        <div class="timeline-item">
+          <strong>Palier 2 · Tests physiques</strong>
+          <p>
+            Exécuter le cockpit sur les deux Core i7 puis compléter 1080 Ti,
+            CPU-only, RTX 3060 et RTX 4080/4090 avec rapports réels.
+          </p>
+        </div>
+        <div class="timeline-item">
+          <strong>Palier 3 · Publier le candidat 0.1.2</strong>
+          <p>
+            Recette navigation, drivers, stockage, WSL, benchmark et rapports,
+            puis build cross-platform, SHA et mise à jour du site.
+          </p>
+        </div>
+        <div class="timeline-item">
+          <strong>Palier 4 · Tests privés et Bridge</strong>
+          <p>
+            Publier uniquement après validation physique, avec confidentialité
+            des prompts et contrat read-only vérifiés.
+          </p>
+        </div>
+        <div class="timeline-item">
+          <strong>Palier 5 · Workstack Arena limitée</strong>
+          <p>
+            Garder Signal Maze comme banc de preuve, ajouter un pair seulement
+            après permissions, budget, isolation et revue indépendants.
+          </p>
+        </div>
+        <div class="timeline-item">
+          <strong>Palier 6 · App ScoreLook puis Strategy Arena Evidence</strong>
+          <p>
+            Réutiliser le playbook de soumission OutilsIA sans fusionner les
+            produits ni leurs MCP.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>27. Indicateurs à suivre</h2>
+          <p>
+            Les métriques doivent distinguer acquisition, activation, preuve et
+            achat utile.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid-4">
+        <article class="card">
+          <span class="metric">Activation</span>
+          <p>Scan terminé → modèle installé → premier benchmark réussi.</p>
+        </article>
+        <article class="card">
+          <span class="metric">Décision</span>
+          <p>Modèle recommandé testé, gardé ou remplacé.</p>
+        </article>
+        <article class="card">
+          <span class="metric">Preuve</span>
+          <p>Rapport, PDF, Passport ou fiche terrain générés.</p>
+        </article>
+        <article class="card">
+          <span class="metric">Conversion</span>
+          <p>Download app, rapport partagé, achat après diagnostic.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>28. Questions précises pour Grok</h2>
+          <p>
+            Le but n’est pas de demander des compliments, mais une critique
+            exploitable et hiérarchisée.
+          </p>
+        </div>
+      </div>
+
+      <ol>
+        <li>Le positionnement « couche de décision de l’IA locale » est-il plus fort qu’un simple scanner ou gestionnaire Ollama ?</li>
+        <li>Quelles trois fonctions créent le plus de valeur pour un utilisateur non technique ?</li>
+        <li>Quelles fonctions avancées risquent encore de brouiller le premier parcours ?</li>
+        <li>La séparation Accueil / Machine / Modèles / Tests / Assistant / Atelier IA / Compte est-elle cohérente ?</li>
+        <li>Quel message de 15 mots devrait porter la page d’accueil ?</li>
+        <li>Comment mieux transformer diagnostic → modèle testé → achat utile sans dégrader la confiance ?</li>
+        <li>Le AI Capability Passport peut-il devenir un standard interopérable ? Quel schéma minimal faut-il figer ?</li>
+        <li>Quels signaux matériels manquent encore au Hardware Doctor sans exiger de privilèges élevés ?</li>
+        <li>Quelle stratégie produit adopter pour AMD/Strix Halo et Intel Arc face à l’évolution rapide des runtimes ?</li>
+        <li>Comment rendre Workstacks compréhensible sans exposer toute la complexité de ForgeBench et du Ledger ?</li>
+        <li>Quelles conditions minimales permettraient de présenter ForgeBench comme benchmark scientifique ?</li>
+        <li>L’app ChatGPT read-only est-elle suffisamment utile seule ? Quel workflow supplémentaire resterait compatible avec sa frontière ?</li>
+        <li>Quels risques de revue ou de confiance vois-tu dans les textes actuels ?</li>
+        <li>Quel ordre de roadmap maximiserait adoption, SEO/GEO et qualité sur six mois ?</li>
+        <li>Quelles fonctions ne faut-il surtout pas construire, même si elles semblent séduisantes ?</li>
+      </ol>
+    </section>
+
+    <section id="mission-grok" class="section">
+      <div class="section-head">
+        <div>
+          <h2>29. Prompt prêt à donner à Grok</h2>
+          <p>
+            Cette consigne accompagne le présent HTML. Elle demande une analyse
+            critique fondée sur les statuts réels.
+          </p>
+        </div>
+      </div>
+
+      <div class="prompt-box">
+        <strong>Consigne</strong>
+        <pre>Lis intégralement ce dossier OutilsIA avant de répondre.
+
+Tu dois distinguer strictement :
+1. le build desktop public 0.1.1 ;
+2. les fonctions présentes uniquement dans les sources candidates 0.1.2 ;
+3. l'app ChatGPT 0.3.0 soumise pour revue mais pas encore approuvée.
+
+Ne transforme pas une fixture en preuve terrain, une estimation en benchmark,
+un hash en identité, une API GPU détectée en preuve d'offload, ni une soumission
+OpenAI en publication.
+
+Produis :
+A. un verdict produit en 10 lignes ;
+B. les 10 forces les plus défendables ;
+C. les 10 risques ou incohérences les plus importants, classés P0/P1/P2 ;
+D. les 5 simplifications UX prioritaires ;
+E. une roadmap 30 jours, 90 jours et 6 mois ;
+F. trois propositions de positionnement et une recommandation ;
+G. un plan SEO/GEO relié aux fonctions réellement publiées ;
+H. un avis sur Hardware Doctor, Capability Passport, Workstacks, ForgeBench et
+   Evidence Ledger ;
+I. un avis séparé sur l'app ChatGPT et une idée de workflow read-only
+   supplémentaire qui n'accède jamais directement au PC ;
+J. les trois fonctionnalités à ne pas construire.
+
+Pour chaque recommandation, indique :
+- valeur utilisateur ;
+- complexité ;
+- risque ;
+- dépendances ;
+- preuve nécessaire avant communication publique.
+
+Sois critique. Ne félicite pas par défaut. Si une affirmation du dossier manque
+de preuve, signale-la explicitement.</pre>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>30. Sources internes de vérité</h2>
+          <p>
+            Grok peut utiliser ce document comme synthèse. Une future session
+            de développement doit cependant revenir aux fichiers ci-dessous.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <article class="card">
+          <h3>Desktop</h3>
+          <ul>
+            <li><code>local-cockpit-app/README.md</code></li>
+            <li><code>local-cockpit-app/ROADMAP.md</code></li>
+            <li><code>local-cockpit-app/NOTICE-UTILISATION-WORKSTACK.md</code></li>
+            <li><code>local-cockpit-app/src/</code></li>
+            <li><code>local-cockpit-app/src-tauri/src/</code></li>
+            <li><code>server-work/static/downloads/local-cockpit/release.json</code></li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>App ChatGPT</h3>
+          <ul>
+            <li><code>outilsia-chatgpt-app/README.md</code></li>
+            <li><code>outilsia-chatgpt-app/server.js</code></li>
+            <li><code>outilsia-chatgpt-app/public/machine-cockpit-v3.html</code></li>
+            <li><code>outilsia-chatgpt-app/chatgpt-app-submission.json</code></li>
+            <li><code>outilsia-chatgpt-app/submission/CHECKLIST.md</code></li>
+            <li><code>handoffs/PLAYBOOK-CHATGPT-PLUGIN-MCP-APP-REUTILISABLE-20260726.md</code></li>
+          </ul>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>
+      OutilsIA · Dossier de contexte pour Grok · 26 juillet 2026.
+      Ce document ne contient ni secret, ni token, ni adresse d’origine du VPS.
+      Il ne remplace pas les manifests de release ou les contrats source.
+    </p>
+  </footer>
+</body>
+</html>

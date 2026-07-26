@@ -11,7 +11,7 @@
 - Fichier d'import officiel `chatgpt-app-submission.json`
 - Trois prompts de démarrage
 - Page produit, support, confidentialité et conditions dédiées
-- Challenge de domaine implémenté, désactivé tant que le portail n'a pas fourni le token
+- Challenge de domaine implémenté, configuré et vérifié pour la soumission
 - Logo 512 x 512 et trois captures 706 x 860
 - Script de démonstration reviewer-ready dans `DEMO-RECORDING.md`
 
@@ -21,7 +21,8 @@
 - Production : prête (`npm run smoke:production`)
 - Connexion en mode développeur : testée
 - Identité OpenAI : vérifiée pour l'organisation `OutilsIA.fr`
-- Challenge de domaine : en attente du token fourni par le portail
+- Challenge de domaine : configuré et vérifié lors de la soumission ; le
+  conserver actif pendant toute la revue
 - Vidéo : validée et publique à
   `https://outilsia.fr/static/media/demo-outilsia-chatgpt-local-cockpit.mp4`
   (H.264, 300,8 s, SHA256
@@ -75,4 +76,6 @@ npm run verify
 npm run smoke:production
 ```
 
-Le challenge doit retourner `404` avant configuration. Pendant la vérification OpenAI, il doit retourner `200 text/plain` avec le token exact et rien d'autre.
+Sur un nouveau projet, le challenge doit retourner `404` avant configuration.
+Dès sa vérification dans le portail et pendant toute la revue, il doit retourner
+`200 text/plain` avec le token exact et rien d'autre.
