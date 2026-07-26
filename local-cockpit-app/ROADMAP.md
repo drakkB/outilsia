@@ -65,11 +65,15 @@ physiques et la décision de promotion ne sont pas terminés.
 - [x] Vérifier séparément la vérité des sources, du manifeste public et des pages scanner/téléchargement.
 - [x] Générer dans le kit privé un guide de campagne ordonné : Core i7 + GTX 1080 Ti, second Core i7, CPU-only, RTX 3060 12 Go, RTX 4080/4090.
 - [x] Conserver deux seuils honnêtes : smoke RC à deux machines uniques et terrain complet à cinq profils.
-- [ ] Produire la RC privée Windows/Linux depuis CI et confirmer son statut Authenticode natif.
+- [x] Produire la RC privée Windows/Linux depuis CI et confirmer son statut Authenticode natif : `0.1.2-rc.1`, build `302038485811`, `not_signed`, sans déploiement.
+- [x] Préparer un build Authenticode optionnel par empreinte du magasin Windows, SHA-256, timestamp RFC 3161, vérification SignTool et reçu lié aux artefacts.
+- [x] Refuser une release dite stable si la signature est valide mais non horodatée ; conserver le mode RC non signé explicite.
 - [ ] Tester les deux Core i7 et importer leurs rapports réseau réels.
 - [ ] Compléter CPU-only, RTX 3060 12 Go et RTX 4080/4090.
 - [ ] Approuver puis promouvoir les mêmes octets uniquement après lecture des preuves.
-- [ ] Étudier l'achat et la conservation sécurisée d'un certificat de signature ; aucun secret de signature ne doit entrer dans Git.
+- [ ] Choisir et acheter le certificat ou service de signature, puis valider le nom d'éditeur Windows.
+- [ ] Choisir la conservation sécurisée de la clé : poste/token protégé ou signature distante ; aucun secret de signature ne doit entrer dans Git.
+- [ ] Produire une première RC signée et horodatée, puis vérifier ses EXE/MSI téléchargés sur une machine Windows distincte.
 
 ## Livré dans les sources - Navigation par espaces
 

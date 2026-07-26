@@ -69,6 +69,11 @@ try {
     "--replace",
   ]);
   run("verify-release-candidate.mjs", ["--input", windows, "--require-platform", "windows-x64", "--require-freshness"]);
+  expectFailure(
+    "verify-release-candidate.mjs",
+    ["--input", windows, "--require-windows-signature"],
+    "valid timestamped Windows signature",
+  );
   run("verify-release-candidate.mjs", ["--input", linux, "--require-platform", "linux", "--require-freshness"]);
   const windowsCandidate = JSON.parse(readFileSync(join(windows, "release-candidate.json"), "utf8"));
   if (windowsCandidate.code_signing?.schema !== "outilsia.windows_authenticode.v1") {

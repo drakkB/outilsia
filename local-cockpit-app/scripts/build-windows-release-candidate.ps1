@@ -5,7 +5,10 @@ param(
   [string]$CandidateDir = "",
   [string]$KitDir = "",
   [switch]$SkipInstall,
-  [switch]$AllowDirty
+  [switch]$AllowDirty,
+  [string]$SigningCertificateThumbprint = $env:OUTILSIA_WINDOWS_CERTIFICATE_THUMBPRINT,
+  [string]$SigningTimestampUrl = $env:OUTILSIA_WINDOWS_TIMESTAMP_URL,
+  [switch]$RequireSignedArtifacts
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,6 +31,14 @@ if (!$BuildId) { $BuildId = [DateTimeOffset]::UtcNow.ToString("yyyyMMddHHmmss") 
 if ($BuildId -notmatch "^[0-9A-Za-z._-]{6,32}$") { throw "Invalid BuildId: $BuildId" }
 if (!$CandidateDir) { $CandidateDir = Join-Path $appRoot ".artifacts\release-candidate-windows" }
 if (!$KitDir) { $KitDir = Join-Path $desktop "_OutilsIA\OutilsIA-Local-Cockpit-$version-rc.$RcNumber-Test" }
+$signingThumbprintProvided = -not [string]::IsNullOrWhiteSpace($SigningCertificateThumbprint)
+$signingTimestampProvided = -not [string]::IsNullOrWhiteSpace($SigningTimestampUrl)
+if ($signingThumbprintProvided -ne $signingTimestampProvided) {
+  throw "SigningCertificateThumbprint and SigningTimestampUrl must be provided together."
+}
+if ($RequireSignedArtifacts -and -not $signingThumbprintProvided) {
+  throw "Signed artifacts are required, but no certificate thumbprint was provided."
+}
 
 $trackedDirty = (& git -C $repoRoot status --porcelain --untracked-files=no)
 if ($trackedDirty -and !$AllowDirty) {
@@ -50,6 +61,13 @@ $buildArgs = @(
   "-DesktopFolder", $ArtifactFolder
 )
 if ($SkipInstall) { $buildArgs += "-SkipInstall" }
+if ($signingThumbprintProvided) {
+  $buildArgs += @(
+    "-SigningCertificateThumbprint", $SigningCertificateThumbprint,
+    "-SigningTimestampUrl", $SigningTimestampUrl
+  )
+}
+if ($RequireSignedArtifacts) { $buildArgs += "-RequireSignedArtifacts" }
 Invoke-Checked "powershell.exe" $buildArgs
 $postBuildTrackedDirty = (& git -C $repoRoot status --porcelain --untracked-files=no)
 if ($postBuildTrackedDirty) {
@@ -86,6 +104,9 @@ $verifyArgs = @(
   "--require-freshness"
 )
 if (!$AllowDirty) { $verifyArgs += "--require-clean-source" }
+if ($signingThumbprintProvided -or $RequireSignedArtifacts) {
+  $verifyArgs += "--require-windows-signature"
+}
 Invoke-Checked "node.exe" $verifyArgs
 
 Invoke-Checked "node.exe" @(

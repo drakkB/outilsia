@@ -44,6 +44,8 @@ $overall = if ($files.Count -eq 0) {
 } else {
   "mixed_or_invalid"
 }
+$allValid = ($overall -eq "valid")
+$allTimestamped = ($allValid -and @($files | Where-Object { -not $_.timestamp_present }).Count -eq 0)
 
 $report = [ordered]@{
   schema = "outilsia.windows_authenticode.v1"
@@ -51,9 +53,10 @@ $report = [ordered]@{
   inspector = "Get-AuthenticodeSignature"
   verified_on_windows = $true
   status = $overall
-  all_valid = ($overall -eq "valid")
-  identity_claim_allowed = ($overall -eq "valid")
-  stable_release_ready = ($overall -eq "valid")
+  all_valid = $allValid
+  all_timestamped = $allTimestamped
+  identity_claim_allowed = $allValid
+  stable_release_ready = ($allValid -and $allTimestamped)
   files = $files
 }
 

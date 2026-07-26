@@ -1,6 +1,9 @@
 param(
   [string]$DesktopFolder = "OutilsIA-Local-Cockpit-Beta-Windows",
-  [switch]$SkipInstall
+  [switch]$SkipInstall,
+  [string]$SigningCertificateThumbprint = $env:OUTILSIA_WINDOWS_CERTIFICATE_THUMBPRINT,
+  [string]$SigningTimestampUrl = $env:OUTILSIA_WINDOWS_TIMESTAMP_URL,
+  [switch]$RequireSignedArtifacts
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,6 +43,13 @@ $version = $tauriConfig.version
 if (-not $version) {
   throw "Version missing in src-tauri\tauri.conf.json"
 }
+$signingEnabled = -not [string]::IsNullOrWhiteSpace($SigningCertificateThumbprint)
+if ($RequireSignedArtifacts -and -not $signingEnabled) {
+  throw "Signed artifacts are required, but no certificate thumbprint was provided."
+}
+if ($signingEnabled -ne (-not [string]::IsNullOrWhiteSpace($SigningTimestampUrl))) {
+  throw "SigningCertificateThumbprint and SigningTimestampUrl must be provided together."
+}
 
 Write-Step "Checking Windows build tools"
 $node = Require-Command "node" "Install Node.js or add a portable Node directory to PATH."
@@ -66,7 +76,41 @@ Remove-Item (Join-Path $releaseRoot "bundle\nsis\OutilsIA Local Cockpit_*_arm64-
 Remove-Item (Join-Path $releaseRoot "bundle\msi\OutilsIA Local Cockpit_*_x64_en-US.msi") -Force -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $releaseRoot "bundle\msi\OutilsIA Local Cockpit_*_x86_en-US.msi") -Force -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $releaseRoot "bundle\msi\OutilsIA Local Cockpit_*_arm64_en-US.msi") -Force -ErrorAction SilentlyContinue
-Invoke-Checked $npm @("exec", "tauri", "build", "--", "--bundles", "nsis")
+$tauriArgs = @("exec", "tauri", "build", "--", "--bundles", "nsis")
+$signingConfigPath = ""
+if ($signingEnabled) {
+  Write-Step "Checking Authenticode signer"
+  $readiness = & (Join-Path $PSScriptRoot "test-windows-signing-readiness.ps1") `
+    -CertificateThumbprint $SigningCertificateThumbprint `
+    -TimestampUrl $SigningTimestampUrl
+  Write-Host $readiness
+
+  $normalizedThumbprint = ($SigningCertificateThumbprint -replace "[^0-9A-Fa-f]", "").ToUpperInvariant()
+  $signingConfigPath = Join-Path ([System.IO.Path]::GetTempPath()) "outilsia-tauri-signing-$PID-$([guid]::NewGuid().ToString('N')).json"
+  $signingConfig = [ordered]@{
+    bundle = [ordered]@{
+      windows = [ordered]@{
+        certificateThumbprint = $normalizedThumbprint
+        digestAlgorithm = "sha256"
+        timestampUrl = $SigningTimestampUrl
+      }
+    }
+  } | ConvertTo-Json -Depth 6
+  [System.IO.File]::WriteAllText(
+    $signingConfigPath,
+    $signingConfig,
+    (New-Object System.Text.UTF8Encoding($false))
+  )
+  $tauriArgs += @("--config", $signingConfigPath)
+}
+
+try {
+  Invoke-Checked $npm $tauriArgs
+} finally {
+  if ($signingConfigPath -and (Test-Path -LiteralPath $signingConfigPath)) {
+    Remove-Item -LiteralPath $signingConfigPath -Force
+  }
+}
 
 $directExe = Join-Path $releaseRoot "outilsia-local-cockpit.exe"
 $setupExe = Join-Path $releaseRoot "bundle\nsis\OutilsIA Local Cockpit_${version}_x64-setup.exe"
@@ -85,10 +129,29 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 Remove-Item (Join-Path $outDir "outilsia-local-cockpit.exe") -Force -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $outDir "OutilsIA Local Cockpit_*_x64-setup.exe") -Force -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $outDir "OutilsIA Local Cockpit_*_x64_en-US.msi") -Force -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $outDir "WINDOWS-SIGNING-RECEIPT.json") -Force -ErrorAction SilentlyContinue
 Copy-Item $directExe $outDir -Force
 Copy-Item $setupExe $outDir -Force
 if (Test-Path $msi) {
   Copy-Item $msi $outDir -Force
+}
+
+if ($signingEnabled) {
+  Write-Step "Verifying signed Windows artifacts"
+  $signedArtifacts = @(
+    Get-ChildItem -LiteralPath $outDir -File |
+      Where-Object { $_.Extension.ToLowerInvariant() -in @(".exe", ".msi") } |
+      Select-Object -ExpandProperty FullName
+  )
+  $receipt = & (Join-Path $PSScriptRoot "verify-windows-signed-artifacts.ps1") `
+    -ArtifactPath $signedArtifacts `
+    -ExpectedCertificateThumbprint $SigningCertificateThumbprint
+  [System.IO.File]::WriteAllText(
+    (Join-Path $outDir "WINDOWS-SIGNING-RECEIPT.json"),
+    "$receipt`n",
+    (New-Object System.Text.UTF8Encoding($false))
+  )
+  Write-Host "windows_authenticode_verified files=$($signedArtifacts.Count)" -ForegroundColor Green
 }
 
 Write-Step "Artifacts"

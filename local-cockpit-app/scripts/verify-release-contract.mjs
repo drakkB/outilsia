@@ -266,9 +266,14 @@ try {
       fail(`release.code_signing aggregate status mismatch: ${signing.status} != ${expectedSigningStatus}`);
     }
     const allValid = signing.status === "valid";
+    const allTimestamped = allValid && signatureFiles.every((file) => file.timestamp_present === true);
+    const declaredAllTimestamped = signing.all_timestamped === undefined
+      ? false
+      : signing.all_timestamped;
     if (signing.all_valid !== allValid
+      || declaredAllTimestamped !== allTimestamped
       || signing.identity_claim_allowed !== allValid
-      || signing.stable_release_ready !== allValid) {
+      || signing.stable_release_ready !== (allValid && allTimestamped)) {
       fail("release.code_signing claims do not match its status");
     }
     if (allValid && signatureFiles.some((file) => (

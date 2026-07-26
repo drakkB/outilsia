@@ -105,6 +105,7 @@ function main() {
     verified_on_windows: false,
     status: "not_applicable",
     all_valid: false,
+    all_timestamped: false,
     identity_claim_allowed: false,
     stable_release_ready: false,
     files: [],

@@ -172,6 +172,7 @@ function unverifiedAuthenticode(files, status = "unverified") {
     verified_on_windows: false,
     status: applicable ? status : "not_applicable",
     all_valid: false,
+    all_timestamped: false,
     identity_claim_allowed: false,
     stable_release_ready: false,
     files: windowsFiles.map((file) => ({
@@ -239,6 +240,7 @@ function inspectWindowsAuthenticode(files, outputDir) {
       ? "not_signed"
       : "mixed_or_invalid";
   const allValid = status === "valid";
+  const allTimestamped = allValid && inspectedFiles.every((file) => file.timestamp_present === true);
   return {
     schema: "outilsia.windows_authenticode.v1",
     inspected_at: inspectedAt.sort().at(-1) || new Date().toISOString(),
@@ -246,8 +248,9 @@ function inspectWindowsAuthenticode(files, outputDir) {
     verified_on_windows: true,
     status,
     all_valid: allValid,
+    all_timestamped: allTimestamped,
     identity_claim_allowed: allValid,
-    stable_release_ready: allValid,
+    stable_release_ready: allValid && allTimestamped,
     files: inspectedFiles,
   };
 }

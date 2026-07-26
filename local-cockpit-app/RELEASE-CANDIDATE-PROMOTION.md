@@ -11,8 +11,11 @@ Etat de reference au 26 juillet 2026 :
 
 - sources : `0.1.2`, candidat prive uniquement ;
 - public : `0.1.1`, build `291439601671` ;
+- derniere RC privee : `0.1.2-rc.1`, build `302038485811`, CI Windows/Linux
+  verte, aucun deploiement ;
 - terrain `0.1.2` : `0/5`, aucune fixture ne compte comme machine ;
 - Authenticode public Windows : `NotSigned` ;
+- Authenticode RC `302038485811` : `not_signed` ;
 - app ChatGPT : contrat gele pendant son examen.
 
 ## Frontiere de preuve
@@ -128,6 +131,33 @@ resultat au SHA256 exact. Les statuts acceptes sont :
 Seul `valid` autorise une revendication d'identite signee. `NotSigned` n'empeche
 pas une beta privee ou publique explicitement non signee, mais interdit toute
 mention contraire. Aucun certificat, PFX ou mot de passe n'entre dans le depot.
+
+### Construire avec la signature optionnelle
+
+Le pipeline de signature est pret, mais aucun certificat n'est provisionne.
+La procedure complete est dans `WINDOWS-CODE-SIGNING.md`.
+
+Le certificat reste dans `Cert:\CurrentUser\My`. Le build recoit uniquement son
+empreinte et l'URL RFC 3161 du fournisseur :
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\build-windows-release-candidate.ps1 `
+  -RcNumber 2 `
+  -SigningCertificateThumbprint $thumbprint `
+  -SigningTimestampUrl $timestampUrl `
+  -RequireSignedArtifacts
+```
+
+Tauri signe l'executable avant de construire les bundles. Le build exige ensuite
+`Get-AuthenticodeSignature=Valid`, le signataire attendu, un timestamp et
+SignTool `/pa /all /tw`. Le packager relit encore la signature sur les octets
+renommes de la RC. `stable_release_ready=true` exige a la fois signature valide
+et horodatage sur tous les artefacts Windows.
+
+Sans certificat, le meme script conserve le comportement RC non signe et le
+declare honnetement. `-RequireSignedArtifacts` interdit de retomber
+silencieusement dans ce mode.
 
 ## 2. Tester une machine Windows
 
@@ -308,6 +338,7 @@ npm run verify:product-truth
 npm run test:release-candidate
 npm run test:release-candidate:promotion
 npm run verify:release-candidate:workflow
+npm run verify:windows-signing
 npm run verify:release-promotion:workflow
 npm run verify:ci-source
 ```

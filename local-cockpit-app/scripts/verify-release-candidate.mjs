@@ -15,7 +15,8 @@ const platformExts = {
 function usage() {
   console.log(`Usage:
   node scripts/verify-release-candidate.mjs [--input <dir>]
-    [--require-platform <platform>]... [--require-freshness] [--require-clean-source]`);
+    [--require-platform <platform>]... [--require-freshness] [--require-clean-source]
+    [--require-windows-signature]`);
 }
 
 function fail(message) {
@@ -23,7 +24,13 @@ function fail(message) {
 }
 
 function parseArgs(argv) {
-  const opts = { input: defaultInput, platforms: [], freshness: false, clean: false };
+  const opts = {
+    input: defaultInput,
+    platforms: [],
+    freshness: false,
+    clean: false,
+    windowsSignature: false,
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") {
@@ -44,6 +51,10 @@ function parseArgs(argv) {
     }
     if (arg === "--require-clean-source") {
       opts.clean = true;
+      continue;
+    }
+    if (arg === "--require-windows-signature") {
+      opts.windowsSignature = true;
       continue;
     }
     fail(`Unknown argument: ${arg}`);
@@ -116,9 +127,14 @@ function validateAuthenticode(candidate, input) {
     fail(`RC code signing aggregate status mismatch: ${report.status} != ${expectedStatus}`);
   }
   const allValid = report.status === "valid";
+  const allTimestamped = allValid && signatureFiles.every((file) => file.timestamp_present === true);
+  const declaredAllTimestamped = report.all_timestamped === undefined
+    ? false
+    : report.all_timestamped;
   if (report.all_valid !== allValid
+    || declaredAllTimestamped !== allTimestamped
     || report.identity_claim_allowed !== allValid
-    || report.stable_release_ready !== allValid) {
+    || report.stable_release_ready !== (allValid && allTimestamped)) {
     fail("RC code signing claims do not match the verified status");
   }
   if (allValid) {
@@ -205,6 +221,10 @@ function main() {
     fail("RC provenance artifact_set_sha256 mismatch");
   }
   const signingStatus = validateAuthenticode(candidate, opts.input);
+  if (opts.windowsSignature
+    && (signingStatus !== "valid" || candidate.code_signing?.stable_release_ready !== true)) {
+    fail("RC requires a valid timestamped Windows signature");
+  }
   const actualPlatforms = [...new Set(candidate.files.map((file) => file.platform))].sort();
   const provenancePlatforms = [...(candidate.build_provenance?.artifact_platforms || [])].sort();
   if (JSON.stringify(actualPlatforms) !== JSON.stringify(provenancePlatforms)) {
