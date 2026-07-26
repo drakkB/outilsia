@@ -1,12 +1,52 @@
 # OutilsIA Local Cockpit - Roadmap produit
 
-Mise à jour : 2026-07-24
+Mise à jour : 2026-07-26
 
 ## Cap produit
 
 OutilsIA doit devenir la couche de décision de l'IA locale : savoir ce qu'une machine peut réellement exécuter, dans quelles conditions, pour quel usage et avec quel niveau de confiance.
 
 L'application reste centrée sur le diagnostic, l'installation consentie, la mesure, la comparaison, la recommandation et la preuve. Elle ne devient pas un chat généraliste et ne réalise pas les backtests de Strategy Arena.
+
+## Décisions de pilotage - audit externe du 26 juillet 2026
+
+L'audit externe est utilisé comme regard produit, pas comme source de vérité. Le code, le manifeste public, les artefacts téléchargés et les preuves terrain restent les seules autorités.
+
+### Risques confirmés
+
+- Les sources sont en `0.1.2` tandis que le manifeste public distribue `0.1.1`. Ce décalage est volontaire, mais toute page publique doit attribuer chaque fonction au build exact qui la contient.
+- La campagne physique reste à `0/5` avec `network_verified=false`. Les replays et fixtures empêchent des régressions ; ils ne remplacent pas les essais sur de vraies machines.
+- Les installateurs Windows EXE et MSI publics sont `NotSigned` selon Authenticode. Les SHA-256 prouvent l'intégrité du fichier téléchargé, pas l'identité de l'éditeur et ne suppriment pas la friction SmartScreen.
+
+### Critiques déjà traitées ou à corriger
+
+- Le premier écran ouvre déjà sur **Analyser ce PC**, le matériel détecté, un Bilan machine et une action contextuelle unique.
+- Le mode Essentiel masque déjà les panneaux avancés. Workstacks et ForgeBench restent dans **Atelier IA** et ne sont pas le parcours par défaut.
+- L'action contextuelle sait déjà enchaîner les étapes utiles, notamment **Installer + tester**, sans obliger l'utilisateur à comprendre le runtime ou le catalogue.
+- Estimation, mesure locale et preuve exportable sont déjà des états distincts dans l'interface et les contrats. Leur lisibilité doit encore être validée sur les machines terrain.
+- AI Capability Passport v1 est déjà livré dans le build public `291439601671`. Ce qui reste futur est son adoption comme contrat interopérable externe, pas son existence.
+- Le parcours ChatGPT « rapport partagé → explication → simulation d'upgrade → retour vers le desktop » existe déjà avec les outils read-only soumis. Aucun nouvel outil MCP n'est ajouté pendant l'examen initial.
+
+### Idées retenues
+
+1. **Vérité de release obligatoire** : aucune fonction candidate n'est attribuée au téléchargement public avant vérification du manifeste, des octets servis et de la recette native.
+2. **Preuve physique prioritaire** : tester d'abord les deux Core i7 disponibles, dont la tour GTX 1080 Ti, puis compléter CPU-only, RTX 3060 12 Go et RTX 4080/4090 avec rapports réseau cohérents.
+3. **Signature Windows** : documenter coût, fournisseur, conservation de clé et pipeline de signature ; ne jamais afficher « signé » avant un `Get-AuthenticodeSignature` valide sur EXE et MSI téléchargés.
+4. **Funnel mesurable sans contenu privé** : suivre seulement `scan_success`, `recommended_model_install_success` et `first_benchmark_success`, localement par défaut et en agrégé uniquement avec consentement. Aucun prompt, réponse, nom de fichier ou modèle personnel n'entre dans ces métriques.
+5. **Divulgation progressive** : conserver Workstacks, ForgeBench, Ledger et Router en mode avancé. Évaluer après les tests physiques s'ils doivent rester masqués jusqu'au premier benchmark réussi ; ne pas introduire ce verrou avant d'avoir observé de vrais utilisateurs.
+6. **Résultat décisionnel compact** : viser une synthèse immédiatement visible en quatre faits maximum : potentiel machine, modèle conseillé ou testé, preuve mesurée, prochaine action ou absence d'achat utile.
+7. **Positionnement stable** : « OutilsIA est la couche de décision de l'IA locale. On dit ce que le PC peut réellement faire, on le prouve et on indique s'il faut upgrader ou non. »
+8. **Gel de la soumission ChatGPT** : pendant l'examen OpenAI, ne modifier le contrat MCP, les annotations, le widget ou les textes de frontière qu'en réponse à un défaut de production ou à une demande du reviewer.
+
+### Ordre d'exécution
+
+1. Recette physique et collecte des preuves sur les machines disponibles.
+2. Correction des défauts reproductibles et ajout de tests de non-régression.
+3. Recette native complète du candidat `0.1.2`, puis publication Windows/Linux cohérente.
+4. Étude et mise en place de la signature Windows.
+5. Mesure du funnel réel avant toute extension grand public des Workstacks.
+
+Ne pas lancer maintenant un orchestrateur multi-agents généraliste, un leaderboard présenté comme scientifique ou une installation distante depuis ChatGPT. Ces pistes restent subordonnées à la fluidité et à la preuve du parcours diagnostic → modèle recommandé → benchmark → rapport.
 
 ## Livré dans les sources - Navigation par espaces
 

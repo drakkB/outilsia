@@ -320,10 +320,40 @@ for (const [label, path] of Object.entries(pages)) {
   requireCondition(!/<iframe\b/i.test(html), `${label} page must not embed an iframe.`);
 }
 
+const websiteHtml = readFileSync(pages.website, "utf8");
+requireCondition(
+  websiteHtml.includes("soumission initiale a été envoyée")
+    && websiteHtml.includes("en cours d'examen"),
+  "Website must expose the current submitted-under-review status.",
+);
+requireCondition(
+  !websiteHtml.includes("dossier de publication publique est prêt avant examen"),
+  "Website still exposes the obsolete pre-submission status.",
+);
+
+const scannerHtml = readFileSync(
+  join(repoRoot, "server-work", "static", "pages", "scanner-ia-local.html"),
+  "utf8",
+);
+requireCondition(
+  scannerHtml.includes("soumission initiale envoyée à OpenAI")
+    && scannerHtml.includes("examen en cours"),
+  "Scanner hub must expose the current submitted-under-review status.",
+);
+requireCondition(
+  !scannerHtml.includes("soumission à l'annuaire non finalisée"),
+  "Scanner hub still exposes the obsolete pre-submission status.",
+);
+
 const llms = readFileSync(join(repoRoot, "server-work", "static", "llms.txt"), "utf8");
 for (const url of [ui.websiteURL, ui.privacyPolicyURL, ui.supportURL]) {
   requireCondition(llms.includes(url), `llms.txt missing ${url}`);
 }
+requireCondition(
+  llms.includes("initial submission sent to OpenAI")
+    && llms.includes("currently under review"),
+  "llms.txt must expose the current submitted-under-review status.",
+);
 
 console.log(
   `outilsia_chatgpt_submission_ok prompts=${ui.defaultPrompt.length} positive=${tests.positive.length} negative=${tests.negative.length} tools=${TOOL_NAMES.length}`,

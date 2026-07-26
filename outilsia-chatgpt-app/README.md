@@ -53,8 +53,9 @@ ChatGPT exige une URL HTTPS publique terminée par `/mcp`. En mode développeur 
 
 Le domaine de widget dédié est `https://chatgpt-local-cockpit.outilsia.fr`. La variable `OUTILSIA_WIDGET_DOMAIN` permet de le surcharger pour une recette isolée.
 
-L'app est disponible en bêta développeur. Elle n'est pas présentée comme
-déjà approuvé ou publié dans l'annuaire public.
+La soumission initiale a été envoyée à OpenAI le 25 juillet 2026 et reste en
+cours d'examen. L'app demeure disponible en bêta développeur et n'est pas
+présentée comme déjà approuvée ou publiée dans l'annuaire public.
 
 ## Déploiement
 

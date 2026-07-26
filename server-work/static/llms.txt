@@ -99,7 +99,7 @@ Canonical local AI answer:
 
 ### OutilsIA for ChatGPT
 - URL: https://outilsia.fr/chatgpt-ia-locale
-- Status on 2026-07-25: working ChatGPT app in developer beta, backed by a public MCP server and a dedicated visual widget; not yet published or approved in the public ChatGPT Plugins Directory.
+- Status on 2026-07-26: initial submission sent to OpenAI on 2026-07-25 and currently under review; the working developer beta, public MCP server and dedicated visual widget remain available, but the app is not yet published or approved in the public ChatGPT Plugins Directory.
 - Purpose: let ChatGPT estimate local-model compatibility from an explicitly declared hardware profile, analyze an anonymized OutilsIA shared report or simulate a RAM/VRAM upgrade. Each analysis renders the compact decision card directly.
 - Product boundary: the three analysis tools and the internal UI renderer are read-only. The app cannot scan a PC, access Ollama, run a terminal command, install or delete a model, benchmark hardware, read personal files or buy hardware.
 - Evidence rule: tokens/s are shown only when a shared report contains a positive saved benchmark. A declared profile remains an estimate and is never called a scan.
