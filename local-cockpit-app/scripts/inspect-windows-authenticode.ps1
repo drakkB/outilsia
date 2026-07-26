@@ -4,6 +4,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+Import-Module Microsoft.PowerShell.Security -ErrorAction Stop
 
 function Signature-Status([string]$Status) {
   switch ($Status) {

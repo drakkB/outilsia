@@ -33,6 +33,9 @@ if (!packager.includes("Inspect one artifact per process")
   || !packager.includes("for (const file of windowsFiles)")) {
   fail("RC packager must inspect Windows artifacts individually before aggregation");
 }
+if (!packager.includes('key.toLowerCase() !== "psmodulepath"')) {
+  fail("RC packager must not pass a PowerShell 7 module path into Windows PowerShell");
+}
 
 const forbidden = [
   [/\bscp\b/i, "scp"],

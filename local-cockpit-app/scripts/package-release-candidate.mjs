@@ -193,6 +193,9 @@ function inspectWindowsAuthenticode(files, outputDir) {
   if (!windowsFiles.length) return unverifiedAuthenticode(files);
   if (process.platform !== "win32") return unverifiedAuthenticode(files);
   const script = join(appRoot, "scripts", "inspect-windows-authenticode.ps1");
+  const powershellEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => key.toLowerCase() !== "psmodulepath")
+  );
   const inspectedFiles = [];
   const inspectedAt = [];
   for (const file of windowsFiles) {
@@ -203,7 +206,7 @@ function inspectWindowsAuthenticode(files, outputDir) {
       "-ExecutionPolicy", "Bypass",
       "-File", script,
       "-ArtifactPath", join(outputDir, file.name),
-    ], { cwd: appRoot, encoding: "utf8" });
+    ], { cwd: appRoot, encoding: "utf8", env: powershellEnv });
     if (result.status !== 0) {
       fail(`Authenticode inspection failed for ${file.name}: ${result.stderr || result.stdout}`);
     }
