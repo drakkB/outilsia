@@ -53,9 +53,50 @@ ChatGPT exige une URL HTTPS publique terminée par `/mcp`. En mode développeur 
 
 Le domaine de widget dédié est `https://chatgpt-local-cockpit.outilsia.fr`. La variable `OUTILSIA_WIDGET_DOMAIN` permet de le surcharger pour une recette isolée.
 
-La soumission initiale a été envoyée à OpenAI le 25 juillet 2026 et reste en
+La soumission initiale a été envoyée à OpenAI le 26 juillet 2026 et reste en
 cours d'examen. L'app demeure disponible en bêta développeur et n'est pas
 présentée comme déjà approuvée ou publiée dans l'annuaire public.
+
+## Statut de publication
+
+Le fichier `submission/publication-status.json` est l'unique source de vérité
+pour les mentions publiques de la revue OpenAI. Il distingue quatre états :
+
+- `review` : soumission en cours d'examen ;
+- `approved_unpublished` : fiche approuvée, mais pas encore publiée ;
+- `published` : fiche publiée avec son URL officielle `chatgpt.com` ;
+- `changes_requested` : corrections demandées avant une nouvelle soumission.
+
+La page produit, le hub scanner, les conditions et `llms.txt` sont générés à
+partir de cet état. La CI refuse toute dérive. Une modification manuelle des
+phrases publiques ne suffit donc pas à annoncer une approbation.
+
+Après avoir vérifié le portail OpenAI, utiliser une commande explicite. Exemples :
+
+```bash
+# Fiche approuvée, publication pas encore déclenchée
+npm run set:publication-status -- \
+  --state approved_unpublished \
+  --checked-on 2026-07-28 \
+  --approved-on 2026-07-28 \
+  --status-label Approved \
+  --confirm-openai-portal
+
+# Fiche effectivement publiée dans le répertoire
+npm run set:publication-status -- \
+  --state published \
+  --checked-on 2026-07-29 \
+  --approved-on 2026-07-28 \
+  --published-on 2026-07-29 \
+  --directory-url https://chatgpt.com/plugins/URL-OFFICIELLE \
+  --status-label Published \
+  --confirm-openai-portal
+```
+
+Le second état est refusé sans date d'approbation, date de publication et URL
+HTTPS officielle `chatgpt.com`. Après la synchronisation, déployer les pages,
+puis lancer `npm run smoke:production`. L'approbation et la publication restent
+deux actions distinctes.
 
 ## Déploiement
 

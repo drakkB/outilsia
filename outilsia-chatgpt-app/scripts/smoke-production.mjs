@@ -8,6 +8,16 @@ import {
   RESOURCE_URI,
   TOOL_NAMES,
 } from "../server.js";
+import { publicationStatusCopy, validatePublicationStatus } from "../lib/publication-status.js";
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const publicationStatus = validatePublicationStatus(
+  JSON.parse(readFileSync(join(root, "submission", "publication-status.json"), "utf8")),
+);
+const publicationCopy = publicationStatusCopy(publicationStatus);
 
 const baseUrl = String(process.env.OUTILSIA_PUBLIC_BASE_URL || "https://outilsia.fr").replace(/\/+$/, "");
 const pages = [
@@ -17,6 +27,7 @@ const pages = [
   "/support-plugin-outilsia",
 ];
 const widgetHealthUrl = `${DEFAULT_WIDGET_DOMAIN}/healthz`;
+const pageBodies = new Map();
 
 for (const path of pages) {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -24,10 +35,23 @@ for (const path of pages) {
   });
   if (response.status !== 200) throw new Error(`${path} returned ${response.status}`);
   const body = await response.text();
+  pageBodies.set(path, body);
   if (!body.includes("OutilsIA")) throw new Error(`${path} returned an unexpected document`);
   if (path === "/chatgpt-ia-locale" && !body.includes("machine-cockpit-v3")) {
     throw new Error("Public ChatGPT app page still advertises a stale widget.");
   }
+}
+if (
+  !pageBodies.get("/chatgpt-ia-locale")?.includes(publicationCopy.heroEyebrow)
+  || !pageBodies.get("/chatgpt-ia-locale")?.includes(publicationCopy.directoryAnswer)
+) {
+  throw new Error(`Production website does not expose publication state ${publicationStatus.state}.`);
+}
+if (
+  !pageBodies.get("/conditions-plugin-outilsia")?.includes(publicationCopy.termsStatus)
+  || !pageBodies.get("/conditions-plugin-outilsia")?.includes(publicationCopy.termsAccess)
+) {
+  throw new Error(`Production terms do not expose publication state ${publicationStatus.state}.`);
 }
 const widgetHealth = await fetch(widgetHealthUrl, {
   headers: { "user-agent": "OutilsIA-ChatGPT-App-Smoke/0.2.1" },

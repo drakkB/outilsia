@@ -7,10 +7,18 @@ on:
       - main
     paths:
       - "outilsia-chatgpt-app/**"
+      - "server-work/static/llms.txt"
+      - "server-work/static/pages/chatgpt-ia-locale.html"
+      - "server-work/static/pages/conditions-plugin-outilsia.html"
+      - "server-work/static/pages/scanner-ia-local.html"
       - ".github/workflows/outilsia-chatgpt-app.yml"
   pull_request:
     paths:
       - "outilsia-chatgpt-app/**"
+      - "server-work/static/llms.txt"
+      - "server-work/static/pages/chatgpt-ia-locale.html"
+      - "server-work/static/pages/conditions-plugin-outilsia.html"
+      - "server-work/static/pages/scanner-ia-local.html"
       - ".github/workflows/outilsia-chatgpt-app.yml"
 
 permissions:

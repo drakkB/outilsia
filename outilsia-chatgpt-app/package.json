@@ -10,9 +10,12 @@
     "test": "node --test",
     "generate:submission": "node scripts/generate-chatgpt-app-submission.mjs",
     "capture:submission": "node scripts/capture-submission-screenshots.mjs",
+    "sync:publication-status": "node scripts/sync-publication-status.mjs --write",
+    "verify:publication-status": "node scripts/sync-publication-status.mjs",
+    "set:publication-status": "node scripts/set-publication-status.mjs",
     "verify:submission": "node scripts/verify-submission.mjs",
     "smoke:production": "node scripts/smoke-production.mjs",
-    "verify": "node scripts/verify-contract.mjs && npm run verify:submission && npm test"
+    "verify": "node scripts/verify-contract.mjs && npm run verify:publication-status && npm run verify:submission && npm test"
   },
   "engines": {
     "node": ">=20"

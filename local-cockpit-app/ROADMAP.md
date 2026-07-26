@@ -37,6 +37,7 @@ L'audit externe est utilisé comme regard produit, pas comme source de vérité.
 6. **Résultat décisionnel compact** : viser une synthèse immédiatement visible en quatre faits maximum : potentiel machine, modèle conseillé ou testé, preuve mesurée, prochaine action ou absence d'achat utile.
 7. **Positionnement stable** : « OutilsIA est la couche de décision de l'IA locale. On dit ce que le PC peut réellement faire, on le prouve et on indique s'il faut upgrader ou non. »
 8. **Gel de la soumission ChatGPT** : pendant l'examen OpenAI, ne modifier le contrat MCP, les annotations, le widget ou les textes de frontière qu'en réponse à un défaut de production ou à une demande du reviewer.
+9. **Bascule de publication vérifiable** : le statut ChatGPT public provient d'un contrat unique qui distingue revue, approbation non publiée, publication et corrections demandées. La CI exige une confirmation explicite de lecture du portail, des dates cohérentes et une URL officielle `chatgpt.com`; le contrat MCP soumis reste inchangé.
 
 ### Ordre d'exécution
 

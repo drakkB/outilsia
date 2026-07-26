@@ -29,6 +29,8 @@
   `c83ca491dd120cd8d26009cf660eaa81c08954edcfd6b5283116adcf36cb4557`)
 - Soumission : déposée pour revue OpenAI le 26 juillet 2026
 - Publication dans le répertoire : en attente d'approbation, non lancée
+- État public canonique : `submission/publication-status.json`
+- Dernière vérification portail : `Review`, version `1.0.0`, le 26 juillet 2026
 
 ## Actions humaines restantes dans le portail
 
@@ -39,6 +41,8 @@ pendant la revue, puis :
 2. Répondre aux demandes sans modifier silencieusement le périmètre des outils.
 3. Après approbation, relire la fiche approuvée avant de choisir la date de
    publication dans le répertoire.
+4. Ne modifier l'état public qu'avec `npm run set:publication-status` et
+   `--confirm-openai-portal`, puis déployer et lancer le smoke de production.
 
 ## Recette de resoumission
 

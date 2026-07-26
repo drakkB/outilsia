@@ -7,6 +7,7 @@ import {
   RESOURCE_URI,
   TOOL_NAMES,
 } from "../server.js";
+import { publicationStatusCopy, validatePublicationStatus } from "../lib/publication-status.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(root, "..");
@@ -21,6 +22,10 @@ const windowRecorderManifestPath = join(root, "submission", "window-recorder", "
 const windowRecorderSourcePath = join(root, "submission", "window-recorder", "src", "main.rs");
 const demoVideoUrl = "https://outilsia.fr/static/media/demo-outilsia-chatgpt-local-cockpit.mp4";
 const demoVideoSha256 = "c83ca491dd120cd8d26009cf660eaa81c08954edcfd6b5283116adcf36cb4557";
+const publicationStatus = validatePublicationStatus(
+  JSON.parse(readFileSync(join(root, "submission", "publication-status.json"), "utf8")),
+);
+const publicationCopy = publicationStatusCopy(publicationStatus);
 const pages = {
   website: join(repoRoot, "server-work", "static", "pages", "chatgpt-ia-locale.html"),
   privacy: join(repoRoot, "server-work", "static", "pages", "confidentialite-plugin-outilsia.html"),
@@ -322,13 +327,10 @@ for (const [label, path] of Object.entries(pages)) {
 
 const websiteHtml = readFileSync(pages.website, "utf8");
 requireCondition(
-  websiteHtml.includes("soumission initiale a été envoyée")
-    && websiteHtml.includes("en cours d'examen"),
-  "Website must expose the current submitted-under-review status.",
-);
-requireCondition(
-  !websiteHtml.includes("dossier de publication publique est prêt avant examen"),
-  "Website still exposes the obsolete pre-submission status.",
+  websiteHtml.includes(publicationCopy.heroEyebrow)
+    && websiteHtml.includes(publicationCopy.directoryAnswer)
+    && websiteHtml.includes(publicationCopy.footer),
+  `Website must expose publication state ${publicationStatus.state}.`,
 );
 
 const scannerHtml = readFileSync(
@@ -336,13 +338,9 @@ const scannerHtml = readFileSync(
   "utf8",
 );
 requireCondition(
-  scannerHtml.includes("soumission initiale envoyée à OpenAI")
-    && scannerHtml.includes("examen en cours"),
-  "Scanner hub must expose the current submitted-under-review status.",
-);
-requireCondition(
-  !scannerHtml.includes("soumission à l'annuaire non finalisée"),
-  "Scanner hub still exposes the obsolete pre-submission status.",
+  scannerHtml.includes(publicationCopy.scannerPill)
+    && scannerHtml.includes(publicationCopy.scannerStatus),
+  `Scanner hub must expose publication state ${publicationStatus.state}.`,
 );
 
 const llms = readFileSync(join(repoRoot, "server-work", "static", "llms.txt"), "utf8");
@@ -350,9 +348,15 @@ for (const url of [ui.websiteURL, ui.privacyPolicyURL, ui.supportURL]) {
   requireCondition(llms.includes(url), `llms.txt missing ${url}`);
 }
 requireCondition(
-  llms.includes("initial submission sent to OpenAI")
-    && llms.includes("currently under review"),
-  "llms.txt must expose the current submitted-under-review status.",
+  llms.includes(publicationCopy.llmsStatus),
+  `llms.txt must expose publication state ${publicationStatus.state}.`,
+);
+
+const termsHtml = readFileSync(pages.terms, "utf8");
+requireCondition(
+  termsHtml.includes(publicationCopy.termsStatus)
+    && termsHtml.includes(publicationCopy.termsAccess),
+  `Terms must expose publication state ${publicationStatus.state}.`,
 );
 
 console.log(

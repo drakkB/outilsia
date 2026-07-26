@@ -1,0 +1,17 @@
+{
+  "schema_version": "outilsia.chatgpt.publication-status.v1",
+  "app_name": "OutilsIA Local Cockpit",
+  "submission_version": "1.0.0",
+  "mcp_version": "0.3.0",
+  "state": "review",
+  "submitted_on": "2026-07-26",
+  "last_checked_on": "2026-07-26",
+  "evidence": {
+    "kind": "openai_platform_dashboard",
+    "label": "OpenAI Platform > Plugins",
+    "status_label": "Review"
+  },
+  "approved_on": null,
+  "published_on": null,
+  "directory_url": null
+}
