@@ -76,7 +76,7 @@ Remove-Item (Join-Path $releaseRoot "bundle\nsis\OutilsIA Local Cockpit_*_arm64-
 Remove-Item (Join-Path $releaseRoot "bundle\msi\OutilsIA Local Cockpit_*_x64_en-US.msi") -Force -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $releaseRoot "bundle\msi\OutilsIA Local Cockpit_*_x86_en-US.msi") -Force -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $releaseRoot "bundle\msi\OutilsIA Local Cockpit_*_arm64_en-US.msi") -Force -ErrorAction SilentlyContinue
-$tauriArgs = @("exec", "tauri", "build", "--", "--bundles", "nsis")
+$tauriArgs = @("exec", "tauri", "build", "--", "--bundles", "nsis,msi")
 $signingConfigPath = ""
 if ($signingEnabled) {
   Write-Step "Checking Authenticode signer"
@@ -116,7 +116,7 @@ $directExe = Join-Path $releaseRoot "outilsia-local-cockpit.exe"
 $setupExe = Join-Path $releaseRoot "bundle\nsis\OutilsIA Local Cockpit_${version}_x64-setup.exe"
 $msi = Join-Path $releaseRoot "bundle\msi\OutilsIA Local Cockpit_${version}_x64_en-US.msi"
 
-foreach ($path in @($directExe, $setupExe)) {
+foreach ($path in @($directExe, $setupExe, $msi)) {
   if (-not (Test-Path $path)) {
     throw "Expected build artifact not found: $path"
   }
@@ -132,9 +132,7 @@ Remove-Item (Join-Path $outDir "OutilsIA Local Cockpit_*_x64_en-US.msi") -Force 
 Remove-Item (Join-Path $outDir "WINDOWS-SIGNING-RECEIPT.json") -Force -ErrorAction SilentlyContinue
 Copy-Item $directExe $outDir -Force
 Copy-Item $setupExe $outDir -Force
-if (Test-Path $msi) {
-  Copy-Item $msi $outDir -Force
-}
+Copy-Item $msi $outDir -Force
 
 if ($signingEnabled) {
   Write-Step "Verifying signed Windows artifacts"

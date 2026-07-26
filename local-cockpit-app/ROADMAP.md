@@ -68,6 +68,7 @@ physiques et la décision de promotion ne sont pas terminés.
 - [x] Produire la RC privée Windows/Linux depuis CI et confirmer son statut Authenticode natif : `0.1.2-rc.1`, build `302038485811`, `not_signed`, sans déploiement.
 - [x] Préparer un build Authenticode optionnel par empreinte du magasin Windows, SHA-256, timestamp RFC 3161, vérification SignTool et reçu lié aux artefacts.
 - [x] Refuser une release dite stable si la signature est valide mais non horodatée ; conserver le mode RC non signé explicite.
+- [x] Réaligner la RC Windows sur la distribution publique : portable de recette, setup NSIS et MSI obligatoire.
 - [ ] Tester les deux Core i7 et importer leurs rapports réseau réels.
 - [ ] Compléter CPU-only, RTX 3060 12 Go et RTX 4080/4090.
 - [ ] Approuver puis promouvoir les mêmes octets uniquement après lecture des preuves.

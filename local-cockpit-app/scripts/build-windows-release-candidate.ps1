@@ -79,7 +79,7 @@ $artifactDir = Join-Path $desktop $ArtifactFolder
 $direct = Join-Path $artifactDir "outilsia-local-cockpit.exe"
 $setup = Join-Path $artifactDir "OutilsIA Local Cockpit_${version}_x64-setup.exe"
 $msi = Join-Path $artifactDir "OutilsIA Local Cockpit_${version}_x64_en-US.msi"
-foreach ($path in @($direct, $setup)) {
+foreach ($path in @($direct, $setup, $msi)) {
   if (!(Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing RC artifact: $path" }
 }
 
@@ -87,14 +87,12 @@ $packageArgs = @(
   (Join-Path $PSScriptRoot "package-release-candidate.mjs"),
   "--artifact", $direct,
   "--artifact", $setup,
+  "--artifact", $msi,
   "--output-dir", $CandidateDir,
   "--rc", [string]$RcNumber,
   "--build-id", $BuildId,
   "--replace"
 )
-if (Test-Path -LiteralPath $msi -PathType Leaf) {
-  $packageArgs += @("--artifact", $msi)
-}
 Invoke-Checked "node.exe" $packageArgs
 
 $verifyArgs = @(

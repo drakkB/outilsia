@@ -28,6 +28,7 @@ const verifyPath = join(scriptsRoot, "verify-windows-signed-artifacts.ps1");
 const buildPath = join(scriptsRoot, "build-windows-beta.ps1");
 const rcBuildPath = join(scriptsRoot, "build-windows-release-candidate.ps1");
 const inspectorPath = join(scriptsRoot, "inspect-windows-authenticode.ps1");
+const windowsArtifactVerifierPath = join(scriptsRoot, "verify-windows-artifacts.ps1");
 const candidateVerifierPath = join(scriptsRoot, "verify-release-candidate.mjs");
 const configPath = join(appRoot, "src-tauri", "tauri.conf.json");
 const guidePath = join(appRoot, "WINDOWS-CODE-SIGNING.md");
@@ -39,6 +40,7 @@ const verifier = read(verifyPath);
 const build = read(buildPath);
 const rcBuild = read(rcBuildPath);
 const inspector = read(inspectorPath);
+const windowsArtifactVerifier = read(windowsArtifactVerifierPath);
 const candidateVerifier = read(candidateVerifierPath);
 const config = read(configPath);
 const guide = read(guidePath);
@@ -73,6 +75,7 @@ requireMarkers("Windows build", build, [
   "test-windows-signing-readiness.ps1",
   "verify-windows-signed-artifacts.ps1",
   'digestAlgorithm = "sha256"',
+  '"--bundles", "nsis,msi"',
   '"--config", $signingConfigPath',
   "Remove-Item -LiteralPath $signingConfigPath -Force",
   "WINDOWS-SIGNING-RECEIPT.json",
@@ -82,6 +85,8 @@ requireMarkers("RC Windows build", rcBuild, [
   "SigningTimestampUrl",
   "RequireSignedArtifacts",
   "--require-windows-signature",
+  "@($direct, $setup, $msi)",
+  '"--artifact", $msi',
 ]);
 requireMarkers("Authenticode inspector", inspector, [
   "all_timestamped",
@@ -91,6 +96,10 @@ requireMarkers("candidate signature gate", candidateVerifier, [
   "--require-windows-signature",
   "valid timestamped Windows signature",
   "all_timestamped",
+]);
+requireMarkers("Windows bundle verifier", windowsArtifactVerifier, [
+  'Require-File (Join-Path $BuildRoot "bundle\\msi\\$msiFileName")',
+  "MSI is missing from release.files",
 ]);
 requireMarkers("Windows signing guide", guide, [
   "aucune cle privee, aucun PFX et aucun mot de passe dans Git",
@@ -127,7 +136,15 @@ for (const pattern of ["*.pfx", "*.p12"]) {
 }
 
 if (process.platform === "win32") {
-  for (const path of [commonPath, readinessPath, verifyPath, buildPath, rcBuildPath, inspectorPath]) {
+  for (const path of [
+    commonPath,
+    readinessPath,
+    verifyPath,
+    buildPath,
+    rcBuildPath,
+    inspectorPath,
+    windowsArtifactVerifierPath,
+  ]) {
     const syntax = spawnSync("powershell.exe", [
       "-NoProfile",
       "-Command",

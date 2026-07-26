@@ -57,8 +57,7 @@ $directExe = Require-File (Join-Path $BuildRoot "outilsia-local-cockpit.exe")
 $setupFileName = "OutilsIA Local Cockpit_${version}_x64-setup.exe"
 $msiFileName = "OutilsIA Local Cockpit_${version}_x64_en-US.msi"
 $setupExe = Require-File (Join-Path $BuildRoot "bundle\nsis\$setupFileName")
-$msiPath = Join-Path $BuildRoot "bundle\msi\$msiFileName"
-$msi = if (Test-Path $msiPath -PathType Leaf) { (Resolve-Path $msiPath).Path } else { "" }
+$msi = Require-File (Join-Path $BuildRoot "bundle\msi\$msiFileName")
 $releasePath = Require-File $ReleaseJson
 
 $release = Get-Content -Raw $releasePath | ConvertFrom-Json
@@ -77,7 +76,7 @@ if ([int64]$release.freshness.oldest_artifact_mtime_ms -lt [int64]$release.fresh
 }
 
 $setupHash = Hash-Lower $setupExe
-$msiHash = if ($msi) { Hash-Lower $msi } else { "" }
+$msiHash = Hash-Lower $msi
 $directHash = Hash-Lower $directExe
 
 $setupItem = $release.files | Where-Object { $_.original_name -eq $setupFileName } | Select-Object -First 1
@@ -86,12 +85,9 @@ if (-not $setupItem) { throw "Setup .exe is missing from release.files" }
 
 Assert-Equal "setup size" ([int64]$setupItem.size_bytes) (Get-Item $setupExe).Length
 Assert-Equal "setup sha256" $setupItem.sha256 $setupHash
-if ($msiItem -or $msi) {
-  if (-not $msiItem) { throw "Local MSI exists but is missing from release.files" }
-  if (-not $msi) { throw "MSI is present in release.files but missing locally" }
-  Assert-Equal "msi size" ([int64]$msiItem.size_bytes) (Get-Item $msi).Length
-  Assert-Equal "msi sha256" $msiItem.sha256 $msiHash
-}
+if (-not $msiItem) { throw "MSI is missing from release.files" }
+Assert-Equal "msi size" ([int64]$msiItem.size_bytes) (Get-Item $msi).Length
+Assert-Equal "msi sha256" $msiItem.sha256 $msiHash
 Assert-Equal "primary download" $setupItem.name $release.primary_download.name
 Assert-Equal "primary sha256" $setupItem.sha256 $release.primary_download.sha256
 
@@ -114,10 +110,6 @@ if ($LaunchSmoke) {
 Write-Host "windows_artifacts_ok"
 Write-Host "direct_exe $((Get-Item $directExe).Length) $directHash"
 Write-Host "setup_exe $((Get-Item $setupExe).Length) $setupHash"
-if ($msi) {
-  Write-Host "msi $((Get-Item $msi).Length) $msiHash"
-} else {
-  Write-Host "msi optional_absent"
-}
+Write-Host "msi $((Get-Item $msi).Length) $msiHash"
 Write-Host "release_primary $($release.primary_download.name) $($release.primary_download.sha256)"
 Write-Host "release_freshness_ok source=$($release.freshness.newest_source) artifact=$($release.freshness.oldest_artifact)"

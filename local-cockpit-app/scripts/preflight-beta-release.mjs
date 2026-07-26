@@ -168,9 +168,10 @@ function checkLocalFiles() {
     "windows_beta_build_ok",
     "Require-Npm",
     "npm.cmd",
-    "Invoke-Checked $npm @(\"exec\", \"tauri\", \"build\", \"--\", \"--bundles\", \"nsis\")",
+    '"--bundles", "nsis,msi"',
     "Get-FileHash",
     "OutilsIA Local Cockpit_${version}_x64-setup.exe",
+    "OutilsIA Local Cockpit_${version}_x64_en-US.msi",
   ], "windows beta build script");
 
   assertText(join(appRoot, "scripts", "release-windows-beta.ps1"), [
@@ -259,7 +260,7 @@ function checkLocalFiles() {
     "release.freshness is missing",
     "release.freshness.stale must be false",
     "release_freshness_ok",
-    "optional_absent",
+    "MSI is missing from release.files",
   ], "windows artifact verifier");
 
   assertText(join(appRoot, "scripts", "make-windows-test-kit.ps1"), [

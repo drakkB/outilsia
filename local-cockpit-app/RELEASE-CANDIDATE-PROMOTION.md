@@ -155,6 +155,11 @@ SignTool `/pa /all /tw`. Le packager relit encore la signature sur les octets
 renommes de la RC. `stable_release_ready=true` exige a la fois signature valide
 et horodatage sur tous les artefacts Windows.
 
+La surface Windows candidate contient trois artefacts : portable EXE pour la
+recette, setup NSIS EXE et MSI. Le MSI n'est plus optionnel dans une nouvelle
+RC ; cela conserve les deux formats d'installation deja proposes par la release
+publique.
+
 Sans certificat, le meme script conserve le comportement RC non signe et le
 declare honnetement. `-RequireSignedArtifacts` interdit de retomber
 silencieusement dans ce mode.
