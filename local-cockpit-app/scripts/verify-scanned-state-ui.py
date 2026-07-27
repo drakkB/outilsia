@@ -166,6 +166,24 @@ def check_scanned_view(browser, width: int, height: int, label: str):
     page.goto(HTML.as_uri(), wait_until="load")
     result = page.evaluate("""() => window.__OUTILSIA_TEST__.applyDemoState()""")
     page.wait_for_timeout(250)
+    upgrade_guard = page.evaluate(
+        """() => ({
+          sameVram: window.__OUTILSIA_TEST__.compatibilityUpgradesForCurrentDecision({
+            upgrades: [{ name: "Même palier", effects: { vram_gb: 24 } }]
+          }).length,
+          lowerRam: window.__OUTILSIA_TEST__.compatibilityUpgradesForCurrentDecision({
+            upgrades: [{ name: "RAM inférieure", effects: { ram_gb: 32 } }]
+          }).length,
+          higherVram: window.__OUTILSIA_TEST__.compatibilityUpgradesForCurrentDecision({
+            upgrades: [{ name: "Palier supérieur", effects: { vram_gb: 48 } }]
+          }).length,
+          unstructured: window.__OUTILSIA_TEST__.compatibilityUpgradesForCurrentDecision({
+            upgrades: ["Conseil manuel à vérifier"]
+          }).length
+        })"""
+    )
+    if upgrade_guard != {"sameVram": 0, "lowerRam": 0, "higherVram": 1, "unstructured": 1}:
+        raise AssertionError(f"{label}: measured-capacity upgrade guard failed {upgrade_guard}")
 
     assert_no_horizontal_overflow(page, label)
     assert_button_text_fits(page, label)
@@ -195,7 +213,8 @@ def check_scanned_view(browser, width: int, height: int, label: str):
     assert_text(page, ".quick-decision-strip", "MODÈLE CONSEILLÉ", f"{label} recommended model label")
     assert_text(page, "#quickModelDetail", "benchmarké", f"{label} quick model")
     assert_text(page, "#quickProofText", "qwen3:0.6b", f"{label} quick proof")
-    assert_text(page, "#quickUpgradeText", "Gros LLM", f"{label} quick upgrade")
+    assert_text(page, "#quickUpgradeText", "Aucun achat urgent", f"{label} quick upgrade")
+    assert_no_text(page, "#readinessBox", "Gros LLM 24 Go", f"{label} stale upgrade")
 
     page.locator("#workspaceSectionSelect").select_option(".readiness-panel")
     assert_readiness_visual_state(page, width, label)

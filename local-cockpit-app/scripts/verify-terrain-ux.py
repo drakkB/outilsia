@@ -109,7 +109,7 @@ def assert_scanned_contract(page, label: str):
             raise AssertionError(f"{label}: scanned machine summary missing {needle!r}: {machine}")
 
     readiness = text(page, "#readinessBox")
-    for needle in ["Machine prête pour l'IA locale", "Hermes 3 8B", "37.5 tok/s", "Gros LLM"]:
+    for needle in ["Machine prête pour l'IA locale", "Hermes 3 8B", "37.5 tok/s", "Aucun achat urgent"]:
         if needle not in readiness:
             raise AssertionError(f"{label}: scanned Bilan missing {needle!r}: {readiness}")
 
@@ -126,7 +126,7 @@ def assert_scanned_contract(page, label: str):
         "hermes3:8b",
         "benchmarké",
         "qwen3:0.6b",
-        "Gros LLM",
+        "Aucun achat urgent",
     ]
     missing = [needle for needle in required if needle not in quick]
     if missing:

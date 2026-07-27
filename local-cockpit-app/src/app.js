@@ -2882,7 +2882,7 @@ function renderQuickDecision(action = primaryActionState()) {
   const flow = prepareFlowState();
   const compatibility = state.compatibility?.compatibility || state.compatibility || {};
   const score = normalizeScore(compatibility.score ?? compatibility.compatibility_score ?? null);
-  const upgrades = compatibility.upgrades || compatibility.recommended_upgrades || compatibility.shopping_list || [];
+  const upgrades = compatibilityUpgradesForCurrentDecision(compatibility);
   const upgrade = upgrades.find((item) => item && typeof item === "object") || null;
   const benchmark = successfulBenchmarkFor(flow.testModel);
   const runtime = runtimeReadinessState(flow.testModel);
@@ -4430,8 +4430,6 @@ function renderCompatibility(payload) {
     || fallbackVerdict(state.scan);
   els.verdictBox.innerHTML = renderVerdict(score, verdict, compatibility, state.scan);
 
-  const upgrades = compatibility.upgrades || compatibility.recommended_upgrades || compatibility.shopping_list || [];
-
   const models = extractModels(compatibility);
   const rankedModels = sortRecommendedModels(models.filter((model) => actionableOllamaRef(model)));
   const visibleModels = [
@@ -4445,8 +4443,8 @@ function renderCompatibility(payload) {
     : "Aucun modèle renvoyé par l'API pour cette machine.";
 
   const blocked = compatibility.blocked_next || compatibility.blocked || [];
-  renderUpgradeImpact(compatibility, blocked, upgrades);
   const effectiveUpgrades = compatibilityUpgradesForCurrentDecision(compatibility);
+  renderUpgradeImpact(compatibility, blocked, effectiveUpgrades);
   renderUpgrades(effectiveUpgrades);
   renderBuyingGuide(compatibility, effectiveUpgrades);
   const machineMemory = Math.max(Number(state.scan?.vram_gb || 0), effectiveModelMemoryGb(state.scan));
@@ -4682,6 +4680,25 @@ function upgradeEffectValue(item, key) {
   const effects = item?.effects && typeof item.effects === "object" ? item.effects : {};
   const value = Number(effects[key] ?? 0);
   return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function compatibilityUpgradeItems(compatibility = {}) {
+  const upgrades = compatibility.upgrades || compatibility.recommended_upgrades || compatibility.shopping_list || [];
+  return Array.isArray(upgrades) ? upgrades : [];
+}
+
+function upgradeImprovesMeasuredCapacity(item, scan = state.scan) {
+  if (!item || typeof item !== "object" || !scan) return true;
+  const comparisons = [
+    ["vram_gb", Number(scan.vram_gb)],
+    ["ram_gb", Number(scan.ram_gb)],
+    ["storage_free_gb", Number(scan.storage_free_gb)]
+  ].map(([key, current]) => ({
+    target: upgradeEffectValue(item, key),
+    current
+  })).filter(({ target }) => target > 0);
+  if (!comparisons.length) return true;
+  return comparisons.some(({ target, current }) => !Number.isFinite(current) || current <= 0 || target > current);
 }
 
 function upgradeEffectPills(item) {
@@ -5335,7 +5352,8 @@ function digitalTwinSuppressesPurchases() {
 
 function compatibilityUpgradesForCurrentDecision(compatibility = state.compatibility?.compatibility || state.compatibility || {}) {
   if (digitalTwinSuppressesPurchases()) return [];
-  return compatibility.upgrades || compatibility.recommended_upgrades || compatibility.shopping_list || [];
+  return compatibilityUpgradeItems(compatibility)
+    .filter((upgrade) => upgradeImprovesMeasuredCapacity(upgrade));
 }
 
 function digitalTwinExportDocument() {
@@ -5456,10 +5474,11 @@ function setUpgradeSimTarget(key) {
   state.upgradeDigitalTwinRun = buildUpgradeDigitalTwin();
   invalidateCapabilityPassport();
   const compatibility = state.compatibility?.compatibility || state.compatibility || {};
+  const effectiveUpgrades = compatibilityUpgradesForCurrentDecision(compatibility);
   renderUpgradeImpact(
     compatibility,
     compatibility.blocked_next || compatibility.blocked || [],
-    compatibility.upgrades || compatibility.recommended_upgrades || compatibility.shopping_list || []
+    effectiveUpgrades
   );
   renderCapabilityPassportPanel();
   renderReadinessPanel();
@@ -5546,7 +5565,7 @@ function currentUpgradeImpact() {
   return buildUpgradeImpact(
     compatibility,
     compatibility.blocked_next || compatibility.blocked || [],
-    compatibility.upgrades || compatibility.recommended_upgrades || compatibility.shopping_list || [],
+    compatibilityUpgradesForCurrentDecision(compatibility),
     readUpgradeSimTargetKey()
   );
 }
@@ -15650,7 +15669,7 @@ function currentDecisionPack() {
     compatibility,
     extractModels(compatibility),
     compatibility.blocked_next || compatibility.blocked || [],
-    compatibility.upgrades || compatibility.recommended_upgrades || compatibility.shopping_list || [],
+    compatibilityUpgradesForCurrentDecision(compatibility),
     compatibility.new || compatibility.new_models || [],
     []
   );
@@ -19250,28 +19269,48 @@ function demoCompatibility() {
         { name: "Qwen3 test léger", params: "0.6B", kind: "text", use_case: "test rapide Ollama", reason: "Premier test fiable", ollama: "qwen3:0.6b" },
         { name: "Hermes 3", params: "8B", kind: "text", use_case: "MemoryForge, Obsidian, décisions", reason: "Très bon modèle assistant", ollama: "hermes3:8b" },
         { name: "Qwen 3", params: "14B", kind: "text", use_case: "qualité et raisonnement", reason: "Bon palier qualité", ollama: "qwen3:14b" },
+        { name: "Qwen 3", params: "32B", kind: "text", use_case: "raisonnement et code avancés", reason: "Compatible en Q4 avec 24 Go de VRAM", ollama: "qwen3:32b" },
         { name: "Flux Schnell", params: "Image", kind: "image", use_case: "image locale, runtime dédié", reason: "Compatible matériel, non piloté comme chat", ollama: "" },
         { name: "Whisper Large v3", params: "Audio", kind: "audio", use_case: "transcription, non piloté comme chat", reason: "Compatible matériel, pas une commande Ollama chat", ollama: "" }
       ],
       blocked_next: [
-        { name: "Qwen 3", params: "32B", kind: "text", vram_q4: 20, reason: "Demande un palier 24 Go pour garder de la marge" },
         { name: "Llama 4 Maverick", params: "109B MoE", kind: "text", vram_q4: 65, reason: "Trop lourd sans grosse VRAM" }
       ],
-      upgrades: [
-        {
-          name: "RTX 3090 24 Go",
-          label: "Gros LLM 24 Go",
-          component: "gpu",
-          reason: "24 Go VRAM ouvrent les 32B quantifiés et plus de marge pour Hermes/Mixtral.",
-          price_range_eur: "650-950 occasion selon état",
-          avoid: "Occasion sans test température/ventilation/alimentation.",
-          effects: { vram_gb: 24 },
-          cost_eur: { min: 650, max: 950 },
-          requirements: { system_power_w: 750, gpu_power_w: 350, pcie_generation: 4, reference_case_clearance_mm: 313, reference_slots: 3 }
-        }
-      ]
+      upgrades: []
     }
   };
+}
+
+function demoCompatibilityForLegacyGpu() {
+  const payload = demoCompatibility();
+  payload.compatibility.score = 54;
+  payload.compatibility.summary = "Machine encore utile pour les modèles 7B-14B quantifiés, avec limites de vitesse et de mémoire.";
+  payload.compatibility.blocked_next = [
+    { name: "Qwen 3", params: "32B", kind: "text", vram_q4: 20, reason: "Demande plus de VRAM ou un offload RAM important" },
+    ...payload.compatibility.blocked_next
+  ];
+  payload.compatibility.upgrades = [
+    {
+      name: "RTX 3090 24 Go",
+      label: "Gros LLM 24 Go",
+      component: "gpu",
+      reason: "24 Go VRAM ouvrent les 32B quantifiés et plus de marge pour Hermes/Mixtral.",
+      price_range_eur: "650-950 occasion selon état",
+      avoid: "Occasion sans test température/ventilation/alimentation.",
+      effects: { vram_gb: 24 },
+      url: "https://www.amazon.fr/s?k=RTX+3090+24GB",
+      cost_eur: { min: 650, max: 950 },
+      requirements: { system_power_w: 750, gpu_power_w: 350, pcie_generation: 4, reference_case_clearance_mm: 313, reference_slots: 3 }
+    },
+    {
+      name: "32 Go RAM",
+      label: "RAM minimum confortable",
+      component: "ram",
+      reason: "Évite le swap pendant l'offload CPU, le RAG et le multitâche.",
+      effects: { ram_gb: 32 }
+    }
+  ];
+  return payload;
 }
 
 function machineReplayScan(overrides = {}) {
@@ -19403,6 +19442,7 @@ function installTestHarness() {
   window.__OUTILSIA_TEST__ = {
     demoScan,
     demoCompatibility,
+    compatibilityUpgradesForCurrentDecision,
     demoBenchmark,
     evaluateArenaObjective,
     evaluateRecommendationProof,
@@ -20739,8 +20779,7 @@ function installTestHarness() {
         source: "demo"
       };
       renderScan(scan);
-      const compatibility = demoCompatibility();
-      compatibility.compatibility.score = 54;
+      const compatibility = demoCompatibilityForLegacyGpu();
       renderCompatibility(compatibility);
 
       writeBenchmarkHistory([]);
