@@ -224,6 +224,10 @@ def start_bridge_from_ui(page: Page, timeout_ms: int) -> dict[str, Any]:
 
     copy_button = page.locator("#copyLocalCapabilityBridgeBtn")
     assert not copy_button.is_disabled(), "MCP pairing copy remains disabled"
+    advanced = page.locator(".local-bridge-advanced")
+    if not advanced.evaluate("(element) => element.open"):
+        advanced.locator("summary").click()
+    copy_button.wait_for(state="visible")
     copy_button.click()
     page.wait_for_function(
         "() => document.getElementById('statusText')?.textContent?.includes('Connexion MCP copiée')",
