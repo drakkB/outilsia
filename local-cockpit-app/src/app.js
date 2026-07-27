@@ -2387,22 +2387,31 @@ function renderModelActions(model, options = {}) {
   const installed = isOllamaModelInstalled(ref);
   const installing = isOllamaModelInstalling(ref);
   const installLocked = hasActiveInstall() && !installing;
-  const buttons = [];
+  const primaryButtons = [];
+  const secondaryButtons = [];
   if (ollamaMissing) {
-    buttons.push(`<button type="button" data-install-ollama="true">Installer Ollama</button>`);
+    primaryButtons.push(`<button type="button" data-install-ollama="true">Installer Ollama</button>`);
   } else if (installed) {
-    buttons.push(`<button type="button" data-benchmark-model="${escapeHtml(ref)}">${escapeHtml(benchmarkButtonLabel(ref))}</button>`);
-    buttons.push(`<button type="button" data-chat-model="${escapeHtml(ref)}">Dialogue</button>`);
+    primaryButtons.push(`<button type="button" data-benchmark-model="${escapeHtml(ref)}">${escapeHtml(benchmarkButtonLabel(ref))}</button>`);
+    primaryButtons.push(`<button type="button" data-chat-model="${escapeHtml(ref)}">Dialogue</button>`);
   } else {
-    buttons.push(`<button type="button" data-install-model="${escapeHtml(ref)}" ${(installing || installLocked) ? "disabled" : ""}>${installing ? "Télécharge..." : installLocked ? "Attends" : options.primaryLabel || "Installer"}</button>`);
-    buttons.push(`<button type="button" data-benchmark-model="${escapeHtml(ref)}">${escapeHtml(benchmarkButtonLabel(ref))}</button>`);
+    primaryButtons.push(`<button type="button" data-install-model="${escapeHtml(ref)}" ${(installing || installLocked) ? "disabled" : ""}>${installing ? "Télécharge..." : installLocked ? "Attends" : options.primaryLabel || "Installer"}</button>`);
+    primaryButtons.push(`<button type="button" data-benchmark-model="${escapeHtml(ref)}">${escapeHtml(benchmarkButtonLabel(ref))}</button>`);
   }
-  buttons.push(`<button type="button" data-model-info="${escapeHtml(ref)}">Fiche</button>`);
-  buttons.push(`<button type="button" data-copy-command="${escapeHtml(`${ollamaRuntimeCommandLabel(ref)} run ${ref}`)}">Copier</button>`);
+  secondaryButtons.push(`<button type="button" data-model-info="${escapeHtml(ref)}">Fiche</button>`);
+  secondaryButtons.push(`<button type="button" data-copy-command="${escapeHtml(`${ollamaRuntimeCommandLabel(ref)} run ${ref}`)}">Copier</button>`);
   if (installed) {
-    buttons.push(`<button type="button" data-delete-model="${escapeHtml(ref)}">Supprimer</button>`);
+    secondaryButtons.push(`<button type="button" data-delete-model="${escapeHtml(ref)}">Supprimer</button>`);
   }
-  return `<div class="model-actions">${buttons.join("")}</div>`;
+  return `
+    <div class="model-actions">
+      ${primaryButtons.join("")}
+      <details class="model-secondary-actions">
+        <summary>Autres actions</summary>
+        <div>${secondaryButtons.join("")}</div>
+      </details>
+    </div>
+  `;
 }
 
 function benchmarkButtonLabel(ref, installedLabel = "Préparer le test", missingLabel = "Préparer install + test") {
@@ -17238,12 +17247,15 @@ function renderChatHistory() {
   els.chatHistoryState.textContent = `${items.length} échange${items.length > 1 ? "s" : ""}`;
   els.chatHistoryBox.className = items.length ? "chat-history-box" : "chat-history-box empty";
   els.chatHistoryBox.innerHTML = items.length
-    ? items.slice(0, 3).map((item) => `
-      <div class="chat-history-item">
-        <strong>${escapeHtml(item.model || "modèle local")} · ${escapeHtml(item.estimated_tokens_per_second || 0)} tok/s</strong>
-        <span>${escapeHtml(item.prompt || "")}</span>
-        <span>${escapeHtml(item.output_preview || "")}</span>
-      </div>
+    ? items.slice(0, 3).map((item, index) => `
+      <details class="chat-history-item" ${index === 0 ? "open" : ""}>
+        <summary>
+          <strong>${escapeHtml(item.model || "modèle local")} · ${escapeHtml(item.estimated_tokens_per_second || 0)} tok/s</strong>
+          <span>${escapeHtml(item.prompt || "")}</span>
+        </summary>
+        <span class="chat-history-answer">${escapeHtml(localChatOutput(item))}</span>
+        ${localChatIsIncomplete(item) ? `<span class="chat-history-incomplete">Réponse incomplète · ${escapeHtml(item.done_reason || "limite de sortie")}</span>` : ""}
+      </details>
     `).join("")
     : "Les échanges locaux apparaîtront ici après une réponse du modèle.";
   if (els.copyChatHistoryBtn) els.copyChatHistoryBtn.disabled = !items.length;
@@ -17273,8 +17285,11 @@ function renderChatPresets() {
   els.chatPresetBox.className = presets.length ? "chat-preset-box" : "chat-preset-box empty";
   els.chatPresetBox.innerHTML = presets.length
     ? presets.map((preset) => {
-        const bench = preset.benchmark
-          ? `${preset.benchmark.estimated_tokens_per_second ?? "--"} tok/s`
+        const historicalBenchmark = Boolean(preset.benchmark && !preset.installed);
+        const bench = historicalBenchmark
+          ? `Mesure historique · ${preset.benchmark.estimated_tokens_per_second ?? "--"} tok/s · modèle absent`
+          : preset.benchmark
+            ? `${preset.benchmark.estimated_tokens_per_second ?? "--"} tok/s`
           : preset.installed ? "installé" : "à installer";
         return `
           <button type="button" data-chat-preset="${escapeHtml(preset.key)}" ${preset.installed ? "" : "disabled"}>

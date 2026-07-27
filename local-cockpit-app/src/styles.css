@@ -5061,6 +5061,30 @@ dd {
   color: #ffb4ae;
 }
 
+.model-secondary-actions {
+  flex: 1 0 100%;
+}
+
+.model-secondary-actions > summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 850;
+  min-height: 30px;
+  padding: 7px 2px 5px;
+}
+
+.model-secondary-actions[open] > summary {
+  color: var(--cyan);
+}
+
+.model-secondary-actions > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 2px;
+}
+
 .model-card-details {
   border-top: 1px solid rgba(139, 163, 174, 0.16);
   margin-top: 9px;
@@ -6445,6 +6469,31 @@ dd {
   padding: 9px;
 }
 
+.chat-history-item > summary {
+  cursor: pointer;
+  list-style: none;
+  padding-right: 76px;
+  position: relative;
+}
+
+.chat-history-item > summary::-webkit-details-marker {
+  display: none;
+}
+
+.chat-history-item > summary::after {
+  color: var(--cyan);
+  content: "Afficher";
+  font-size: 10px;
+  font-weight: 850;
+  position: absolute;
+  right: 0;
+  top: 1px;
+}
+
+.chat-history-item[open] > summary::after {
+  content: "Masquer";
+}
+
 .chat-history-item strong,
 .chat-history-item span {
   display: block;
@@ -6460,6 +6509,17 @@ dd {
   line-height: 1.34;
   margin-top: 4px;
   overflow-wrap: anywhere;
+}
+
+.chat-history-item .chat-history-answer {
+  color: var(--text);
+  padding-top: 7px;
+  white-space: pre-wrap;
+}
+
+.chat-history-item .chat-history-incomplete {
+  color: var(--yellow);
+  font-weight: 800;
 }
 
 .feedback-panel textarea {
@@ -6495,6 +6555,37 @@ dd {
     justify-self: center;
     min-width: 0;
     width: min(440px, 100%);
+  }
+
+  .workspace-nav {
+    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr);
+    position: static;
+  }
+
+  .workspace-tabs {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+
+  .workspace-tabs button {
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .workspace-section-picker {
+    align-items: center;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .machine-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .machine-summary-grid strong {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
   }
 
   .machine-panel,
