@@ -18,10 +18,6 @@ from typing import Any
 from urllib.parse import quote, urlencode
 from urllib.request import urlopen
 
-from google.auth.transport.requests import AuthorizedSession
-from google.oauth2 import service_account
-
-
 DEFAULT_ENV_FILES = (
     Path("/etc/scorezenith/master.env"),
     Path("/var/www/outilsia/.env"),
@@ -90,6 +86,9 @@ def recovery_status(percent: float) -> tuple[str, str]:
 
 class GscClient:
     def __init__(self, key_file: Path, site_url: str):
+        from google.auth.transport.requests import AuthorizedSession
+        from google.oauth2 import service_account
+
         credentials = service_account.Credentials.from_service_account_file(
             str(key_file),
             scopes=[GSC_SCOPE],
