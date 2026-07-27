@@ -902,6 +902,14 @@ summary:focus-visible,
   white-space: nowrap;
 }
 
+.machine-summary-grid > div:first-child strong {
+  min-height: 2.44em;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 .quick-decision-strip > div {
   background:
     radial-gradient(circle at 0% 0%, rgba(134, 239, 172, 0.16), transparent 36%),
@@ -5752,6 +5760,38 @@ dd {
   gap: 14px;
 }
 
+.readiness-report-confirmation {
+  align-items: center;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(134, 239, 172, 0.16), transparent 42%),
+    rgba(8, 25, 23, 0.82);
+  border: 1px solid rgba(134, 239, 172, 0.42);
+  border-left: 4px solid var(--green);
+  border-radius: 8px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(260px, 1.1fr);
+  padding: 13px 15px;
+}
+
+.readiness-report-confirmation strong,
+.readiness-report-confirmation p {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.readiness-report-confirmation strong {
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.readiness-report-confirmation p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 0;
+}
+
 .readiness-prescan-box {
   min-height: 128px;
 }
@@ -6118,6 +6158,20 @@ dd {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.promptforge-method {
+  background: rgba(103, 232, 249, 0.055);
+  border-left: 3px solid rgba(103, 232, 249, 0.42);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 0;
+  padding: 8px 10px;
+}
+
+.promptforge-method strong {
+  color: var(--text);
+}
+
 .promptforge-score div,
 .promptforge-analysis {
   background: rgba(4, 9, 12, 0.48);
@@ -6330,6 +6384,23 @@ dd {
 
 #chatPromptInput {
   min-height: 82px;
+}
+
+.chat-answer {
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.chat-incomplete {
+  background: rgba(252, 211, 77, 0.08);
+  border-left: 3px solid rgba(252, 211, 77, 0.58);
+  color: var(--muted);
+  line-height: 1.45;
+  padding: 8px 10px;
+}
+
+.chat-incomplete strong {
+  color: var(--yellow);
 }
 
 .chat-card span:last-child {
@@ -6949,6 +7020,7 @@ dd {
   }
 
   .readiness-hero,
+  .readiness-report-confirmation,
   .readiness-section-head,
   .readiness-action-grid,
   .readiness-prescan,

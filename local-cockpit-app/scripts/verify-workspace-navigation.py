@@ -326,8 +326,8 @@ def check(browser, width: int, height: int, label: str):
     if installed_model_card.locator("[data-run-model]").count():
         raise AssertionError(f"{label}: installed model exposes duplicate Tester/Bench actions")
     installed_test_actions = installed_model_card.locator("[data-benchmark-model]")
-    if installed_test_actions.count() != 1 or installed_test_actions.first.inner_text().strip() != "Tester":
-        raise AssertionError(f"{label}: installed model must expose one clear Tester action")
+    if installed_test_actions.count() != 1 or installed_test_actions.first.inner_text().strip() != "Préparer le test":
+        raise AssertionError(f"{label}: installed model must expose one clear two-click benchmark entry")
     page.locator("#modelList [data-chat-model]").first.click()
     routed_chat = page.locator("#appShell").get_attribute("data-workspace-tab")
     routed_chat_section = page.locator("#workspaceSectionSelect").input_value()

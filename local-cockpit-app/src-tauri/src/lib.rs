@@ -334,6 +334,12 @@ pub struct BenchmarkResult {
     success: bool,
     timed_out: bool,
     output_preview: String,
+    #[serde(default)]
+    output_text: String,
+    #[serde(default)]
+    output_truncated: bool,
+    #[serde(default)]
+    done_reason: String,
     error: Option<String>,
     #[serde(default)]
     execution_mode: String,
@@ -1485,6 +1491,16 @@ fn benchmark_result_from_ollama_api(
         .trim()
         .to_string();
     let output_chars = output.chars().count();
+    let done_reason = payload
+        .get("done_reason")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    let output_text = output.chars().take(12_000).collect::<String>();
+    let output_truncated = output_chars > 12_000
+        || matches!(done_reason.as_str(), "length" | "max_tokens")
+        || !payload.get("done").and_then(Value::as_bool).unwrap_or(true);
     let eval_count = payload
         .get("eval_count")
         .and_then(Value::as_u64)
@@ -1551,6 +1567,9 @@ fn benchmark_result_from_ollama_api(
         success: payload.get("done").and_then(Value::as_bool).unwrap_or(true),
         timed_out: false,
         output_preview: output.chars().take(700).collect(),
+        output_text,
+        output_truncated,
+        done_reason,
         error: None,
         execution_mode: execution_mode.to_string(),
         runtime_model_size_bytes: 0,
@@ -1816,6 +1835,8 @@ fn run_ollama_prompt(
     let stdout = clean_benchmark_output(&stdout_raw);
     let stderr = clean_benchmark_output(&stderr_raw);
     let output_chars = stdout.chars().count();
+    let output_text = stdout.chars().take(12_000).collect::<String>();
+    let output_truncated = output_chars > 12_000 || timed_out;
     let estimated_tokens = ((output_chars as f64) / 4.0).round().max(0.0) as u32;
     let seconds = (elapsed_ms as f64 / 1000.0).max(0.001);
     let estimated_tokens_per_second = ((estimated_tokens as f64 / seconds) * 10.0).round() / 10.0;
@@ -1841,6 +1862,13 @@ fn run_ollama_prompt(
         success: status.success() && !timed_out,
         timed_out,
         output_preview: stdout.chars().take(700).collect(),
+        output_text,
+        output_truncated,
+        done_reason: if timed_out {
+            "timeout".to_string()
+        } else {
+            String::new()
+        },
         error: if status.success() && !timed_out {
             None
         } else if timed_out {
@@ -5776,6 +5804,33 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603|2026-06-15|PCI\\VEN_10DE|
         assert_eq!(result.load_duration_ms, 500);
         assert_eq!(result.eval_duration_ms, 2000);
         assert_eq!(result.output_preview, "CPU OK");
+        assert_eq!(result.output_text, "CPU OK");
+        assert!(!result.output_truncated);
+        assert_eq!(result.done_reason, "");
+    }
+
+    #[test]
+    fn dialogue_keeps_full_text_and_reports_ollama_length_stop() {
+        let long_output = format!("{}FIN", "réponse complète ".repeat(70));
+        assert!(long_output.chars().count() > 700);
+        let result = benchmark_result_from_ollama_api(
+            "hermes3:8b".to_string(),
+            "question longue".to_string(),
+            json!({
+                "message": { "role": "assistant", "content": long_output },
+                "done": true,
+                "done_reason": "length",
+                "eval_count": 200,
+                "eval_duration": 2_000_000_000_u64
+            }),
+            Duration::from_secs(2),
+            "auto",
+        )
+        .unwrap();
+        assert_eq!(result.output_preview.chars().count(), 700);
+        assert!(result.output_text.ends_with("FIN"));
+        assert!(result.output_truncated);
+        assert_eq!(result.done_reason, "length");
     }
 
     #[test]

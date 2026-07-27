@@ -48,6 +48,7 @@ const state = {
   benchmark: null,
   chatResult: null,
   markdown: "",
+  reportGeneratedAt: 0,
   desktopManifest: null,
   contentSignals: null,
   release: null,
@@ -2404,9 +2405,9 @@ function renderModelActions(model, options = {}) {
   return `<div class="model-actions">${buttons.join("")}</div>`;
 }
 
-function benchmarkButtonLabel(ref, installedLabel = "Tester", missingLabel = "Installer + tester") {
+function benchmarkButtonLabel(ref, installedLabel = "Préparer le test", missingLabel = "Préparer install + test") {
   if (!ref) return installedLabel;
-  if (isOllamaModelInstalled(ref)) return benchmarkTimeoutSeconds(ref) > 45 ? "Bench long" : installedLabel;
+  if (isOllamaModelInstalled(ref)) return benchmarkTimeoutSeconds(ref) > 45 ? "Préparer bench long" : installedLabel;
   if (isOllamaModelInstalling(ref)) return "Téléchargement...";
   return missingLabel;
 }
@@ -2652,7 +2653,7 @@ function renderModelOfMomentCard() {
   const action = moment.installed
     ? moment.benchmarked
       ? `<button type="button" data-post-install-chat="${escapeHtml(moment.ref)}">Dialoguer</button>`
-      : `<button type="button" data-benchmark-model="${escapeHtml(moment.ref)}">${escapeHtml(benchmarkButtonLabel(moment.ref, "Tester maintenant", "Installer + tester"))}</button>`
+      : `<button type="button" data-benchmark-model="${escapeHtml(moment.ref)}">${escapeHtml(benchmarkButtonLabel(moment.ref, "Préparer le test", "Préparer install + test"))}</button>`
     : `<button type="button" data-install-model="${escapeHtml(moment.ref)}">Installer</button>`;
   return `
     <div class="moment-model-card">
@@ -2744,9 +2745,9 @@ function primaryActionState() {
     }
     return {
       key: "benchmark-test",
-      label: "Lancer le benchmark recommandé",
+      label: "Préparer le benchmark",
       detail: flow.testModel,
-      status: "Première preuve locale : temps de réponse, tokens/s et résultat lisible.",
+      status: "Ouvre le préflight. Le benchmark ne démarre qu'après un second clic explicite.",
       command: "benchmark-test"
     };
   }
@@ -2775,9 +2776,9 @@ function primaryActionState() {
   if (recommended.ref && recommended.installed && !recommended.benchmarked) {
     return {
       key: "benchmark-recommended",
-      label: "Comparer le modèle recommandé",
+      label: "Préparer la comparaison",
       detail: recommended.ref,
-      status: "Le modèle conseillé est installé : mesure-le sur cette machine.",
+      status: "Le modèle conseillé est installé : vérifie son préflight, puis lance la mesure avec un second clic.",
       command: "benchmark-recommended",
       model: recommended.ref
     };
@@ -4365,6 +4366,7 @@ function renderScan(scan) {
   invalidateCapabilityPassport();
   clearCapabilityRouter(true);
   state.analysisError = "";
+  state.reportGeneratedAt = 0;
   state.modelAutopilotRun = null;
   state.upgradeDigitalTwinRun = null;
   state.scan = scan;
@@ -6754,7 +6756,7 @@ function firstTestReportText() {
     `VRAM: ${formatGb(scan.vram_gb)}`,
     `Runtime IA: ${ollamaReady ? ollamaRuntimeLabel(scan) : "non détecté"}`,
     `Modèle test: ${modelReady ? `${model} installé` : `${model} non installé`}`,
-    benchmark ? `Benchmark: ${benchmark.success ? "réussi" : "erreur"} - ${benchmark.estimated_tokens_per_second ?? "--"} tok/s - ${benchmark.elapsed_ms ?? "--"} ms` : "Benchmark: non lancé",
+    benchmark ? `Benchmark${modelReady ? "" : " historique"}: ${benchmark.success ? "réussi" : "erreur"} - ${benchmark.estimated_tokens_per_second ?? "--"} tok/s - ${benchmark.elapsed_ms ?? "--"} ms` : "Benchmark: non lancé",
     benchmark?.output_preview ? `Réponse: ${benchmark.output_preview}` : "",
     "",
     "Prochaine étape: relancer le scan, sauvegarder ce PC ou tester un modèle plus ambitieux selon le diagnostic."
@@ -6774,7 +6776,7 @@ function prepareFlowState() {
   const chatReady = Boolean(state.chatResult?.success);
   const promptReady = Boolean(currentPromptForgeResult()?.optimized);
   const arenaReady = Boolean(readLastArenaRun()?.results?.length);
-  const reportReady = Boolean(state.markdown && String(state.markdown).trim());
+  const reportReady = Boolean(state.reportGeneratedAt && state.markdown && String(state.markdown).trim());
   const steps = [
     { key: "scan", label: "Scan PC", ok: scanned, text: scanned ? "machine détectée" : "à lancer" },
     { key: "ollama", label: "Runtime IA", ok: ollamaReady, text: ollamaReady ? ollamaRuntimeLabel(state.scan) : scanned ? "à installer" : "après scan" },
@@ -6990,6 +6992,9 @@ function readinessReport() {
     || compatibility.score?.label
     || (state.scan ? fallbackVerdict(state.scan) : "");
   const benchmark = successfulBenchmarkFor(flow.testModel);
+  const benchmarkStatus = benchmark
+    ? isOllamaModelInstalled(benchmark.model) ? "current" : "historical_model_absent"
+    : "missing";
   const runtimeReadiness = runtimeReadinessState(flow.testModel);
   const promptForge = currentPromptForgeResult();
   const arenaRun = readLastArenaRun();
@@ -7105,8 +7110,10 @@ function readinessReport() {
       limit: flow.recommended.info?.limit || ""
     } : null,
     benchmark,
+    benchmark_status: benchmarkStatus,
     promptForge: promptForge ? {
       model: promptForge.model,
+      score_method: "heuristique_locale_v1",
       before_score: promptForge.before.score,
       after_score: promptForge.after.score,
       optimized: promptForge.optimized
@@ -7211,7 +7218,7 @@ function readinessMarkdown(report = readinessReport()) {
     "## Preuve locale",
     "",
     report.benchmark
-      ? `- Benchmark: ${report.benchmark.model} - ${report.benchmark.estimated_tokens_per_second} tok/s - ${report.benchmark.elapsed_ms} ms - ${benchmarkMeasurementLabel(report.benchmark)} - ${benchmarkExecutionLabel(report.benchmark)} - succès ${report.benchmark.success ? "oui" : "non"}`
+      ? `- Benchmark${report.benchmark_status === "historical_model_absent" ? " historique, modèle absent du scan actuel" : ""}: ${report.benchmark.model} - ${report.benchmark.estimated_tokens_per_second} tok/s - ${report.benchmark.elapsed_ms} ms - ${benchmarkMeasurementLabel(report.benchmark)} - ${benchmarkExecutionLabel(report.benchmark)} - succès ${report.benchmark.success ? "oui" : "non"}`
       : "- Aucun benchmark lancé.",
     report.benchmark && benchmarkPlacementVerdict(report.benchmark) ? `- ${benchmarkPlacementVerdict(report.benchmark)}` : "",
     report.model_autopilot?.active
@@ -7226,7 +7233,7 @@ function readinessMarkdown(report = readinessReport()) {
     ...(report.flight_recorder?.comparison?.possible_causes || []).map((item) => `- Cause possible Flight Recorder: ${item}`),
     report.benchmark?.output_preview ? `- Réponse: ${report.benchmark.output_preview}` : "",
     `- Dialogue local: ${report.chat_ready ? "réponse reçue" : "non validé"}`,
-    report.promptForge ? `- PromptForge: ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100 (${report.promptForge.model})` : "- PromptForge: non utilisé.",
+    report.promptForge ? `- PromptForge, grille heuristique locale: ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100 (${report.promptForge.model})` : "- PromptForge: non utilisé.",
     report.arena?.compromise ? `- Arena locale: ${report.arena.objective ? "protocole objectif v1" : "ancien protocole estimatif"}, compromis ${report.arena.compromise} (${report.arena.compromise_score}/100), plus rapide ${report.arena.fastest || "n/a"}, assistant ${report.arena.assistant || "n/a"}, code ${report.arena.code || "n/a"}, mémoire ${report.arena.memory || "n/a"}, français ${report.arena.french || "n/a"}, portable ${report.arena.light_laptop || "n/a"}, rappel de contexte ${report.arena.long_context || "n/a"}, qualité ${report.arena.quality || "n/a"}` : "- Arena locale: non lancée.",
     ...(report.arena?.proof_results || []).map((item) => `- Preuve Arena ${item.model}: ${item.checks || "ancien protocole"}${item.score !== null ? `, ${item.score}/100` : ""}`),
     report.recommendation_engine
@@ -7303,7 +7310,7 @@ function readinessSummaryText(report = readinessReport()) {
     ? `${report.upgrades[0].title}${report.upgrades[0].reason ? ` (${report.upgrades[0].reason})` : ""}`
     : "aucun achat prioritaire";
   const prompt = report.promptForge
-    ? `PromptForge ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100`
+    ? `PromptForge, grille heuristique ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100`
     : "PromptForge non lancé";
   const lines = [
     "Résumé OutilsIA Local Cockpit",
@@ -7390,7 +7397,7 @@ function premiumReportHtml(report = readinessReport()) {
     : "À déterminer";
   const scoreText = report.score === null ? "--" : `${report.score}/100`;
   const speedText = benchmark
-    ? `${benchmark.estimated_tokens_per_second ?? "--"} tok/s · ${benchmark.elapsed_ms ?? "--"} ms`
+    ? `${benchmark.estimated_tokens_per_second ?? "--"} tok/s · ${benchmark.elapsed_ms ?? "--"} ms${report.benchmark_status === "historical_model_absent" ? " · historique" : ""}`
     : "Benchmark local à lancer";
   const upgradeTitle = upgradeImpact.primary?.name || upgradeImpact.primary?.label || upgrade.title || "Pas d'achat urgent";
   const upgradeReason = upgradeImpact.primary?.reason || upgrade.reason || "Mesurer davantage avant d'acheter.";
@@ -7416,11 +7423,11 @@ function premiumReportHtml(report = readinessReport()) {
   const hardwareDoctor = report.hardware_doctor || hardwareDoctorSnapshot();
   const flightRecorder = report.flight_recorder || null;
   const proofLabel = benchmark
-    ? `${benchmark.model} · ${benchmark.estimated_tokens_per_second ?? "--"} tok/s`
+    ? `${benchmark.model} · ${benchmark.estimated_tokens_per_second ?? "--"} tok/s${report.benchmark_status === "historical_model_absent" ? " · historique" : ""}`
     : "Benchmark à lancer";
   const proofItems = [
-    benchmark ? `Benchmark réel : ${benchmark.model} à ${benchmark.estimated_tokens_per_second ?? "--"} tok/s` : "Benchmark court à lancer",
-    report.promptForge ? `PromptForge : ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100` : "PromptForge non utilisé",
+    benchmark ? `Benchmark ${report.benchmark_status === "historical_model_absent" ? "historique, modèle absent" : "réel"} : ${benchmark.model} à ${benchmark.estimated_tokens_per_second ?? "--"} tok/s` : "Benchmark court à lancer",
+    report.promptForge ? `PromptForge, grille heuristique : ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100` : "PromptForge non utilisé",
     report.arena?.compromise ? `Arena : ${readinessArenaLabel(report)}` : "Arena locale à comparer",
     recommendation?.winner ? `Recommendation Engine : ${recommendation.verdict} (${recommendation.winner.score}/100)` : "Recommendation Engine v2 à lancer",
     privateWorkload?.winner ? `Tests privés : ${privateWorkload.winner.model} (${privateWorkload.winner.score}/100 · ${privateWorkload.pack})` : "Tests privés à lancer dans l'espace Tests",
@@ -7636,7 +7643,7 @@ function premiumReportHtml(report = readinessReport()) {
         </div>
         <div class="pdf-card">
           <span>PromptForge</span>
-          <strong>${escapeHtml(report.promptForge ? `${report.promptForge.before_score}/100 → ${report.promptForge.after_score}/100` : "Non utilisé")}</strong>
+          <strong>${escapeHtml(report.promptForge ? `Grille ${report.promptForge.before_score}/100 → ${report.promptForge.after_score}/100` : "Non utilisé")}</strong>
           <p>${escapeHtml(pdfExcerpt(report.promptForge?.optimized || "Optimise un prompt avant benchmark/dialogue pour mesurer le modèle dans de meilleures conditions.", 340))}</p>
         </div>
         <div class="pdf-card">
@@ -7936,7 +7943,7 @@ function memoryDecisionCard(report = readinessReport()) {
     `- Recommandation mesurée: ${report.recommendation_engine?.verdict || "non lancée"}`,
     report.recommendation_engine?.winner ? `- Modèle à garder: ${report.recommendation_engine.winner.model} (${report.recommendation_engine.winner.score}/100, confiance ${report.recommendation_engine.confidence})` : "",
     report.upgrade_digital_twin ? `- Digital Twin: ${report.upgrade_digital_twin.decision.label} · ${report.upgrade_digital_twin.compatibility.status}` : "- Digital Twin: non calculé",
-    `- PromptForge: ${report.promptForge ? `${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100` : "non lancé"}`,
+    `- PromptForge, grille heuristique: ${report.promptForge ? `${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100` : "non lancé"}`,
     `- Rapport partagé: ${lastShareReportUrl || "non partagé"}`,
     "",
     "## Actions à faire",
@@ -8051,7 +8058,7 @@ function hermesAgentMemory(report = readinessReport()) {
     "",
     `- Machine: ${report.machine.gpu} · ${report.machine.vram} VRAM`,
     `- Meilleur modèle mémoire: ${report.arena?.memory || report.recommended_model?.ref || "à tester"}`,
-    `- PromptForge: ${report.promptForge ? `${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100` : "non lancé"}`
+    `- PromptForge, grille heuristique: ${report.promptForge ? `${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100` : "non lancé"}`
   ].join("\n");
 }
 
@@ -8114,7 +8121,7 @@ function cockpitMemoryMarkdown() {
   if (prompt) {
     sections.push(promptForgeMarkdown(prompt));
   }
-  if (state.chatResult?.output_preview) {
+  if (localChatOutput(state.chatResult)) {
     sections.push(localChatMemoryMarkdown(state.chatResult));
   }
   const chatHistory = readChatHistory();
@@ -8169,6 +8176,9 @@ function renderReadinessPanel() {
     return;
   }
   const report = readinessReport();
+  const reportGeneratedLabel = state.reportGeneratedAt
+    ? new Date(state.reportGeneratedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+    : "";
   const recommendation = report.recommendation_engine;
   const recommendationWinner = recommendation?.winner;
   const benchmark = report.benchmark;
@@ -8187,7 +8197,9 @@ function renderReadinessPanel() {
   const twinLabel = report.upgrade_digital_twin?.decision?.label || "Tester un upgrade avant achat";
   const scoreLabel = report.score === null ? "--" : String(report.score);
   const proofLabel = benchmark ? `${benchmark.estimated_tokens_per_second} tok/s` : "À mesurer";
-  const proofDetail = benchmark ? `${benchmark.model} · ${benchmark.elapsed_ms} ms` : "Lance un benchmark court";
+  const proofDetail = benchmark
+    ? `${benchmark.model} · ${benchmark.elapsed_ms} ms${report.benchmark_status === "historical_model_absent" ? " · mesure historique, modèle absent du scan actuel" : ""}`
+    : "Lance un benchmark court";
   const recommendedLabel = recommended?.title || recommended?.ref || report.test_model || "À déterminer";
   const recommendedDetail = recommended
     ? `${recommended.ref} · ${recommended.installed ? recommended.benchmarked ? "installé et mesuré" : "installé" : "à installer"}`
@@ -8269,6 +8281,15 @@ function renderReadinessPanel() {
   els.readinessState.textContent = report.status;
   els.readinessBox.className = report.ready ? "readiness-box" : "readiness-box empty";
   els.readinessBox.innerHTML = `
+    ${state.reportGeneratedAt ? `
+      <div id="readinessReportConfirmation" class="readiness-report-confirmation" role="status">
+        <div>
+          <span class="label">Rapport final prêt · ${escapeHtml(reportGeneratedLabel)}</span>
+          <strong>Le bilan affiché ci-dessous est le rapport de cette machine.</strong>
+        </div>
+        <p>Les exports PDF, MemoryForge, Copier et Partager de cette section utilisent maintenant ce rapport.</p>
+      </div>
+    ` : ""}
     <div class="readiness-hero">
       <div>
         <span class="label">${escapeHtml(heroScope)}</span>
@@ -8375,6 +8396,7 @@ function saveReadinessToMemory() {
   const note = cockpitMemoryMarkdown();
   els.memoryText.value = note;
   state.markdown = els.memoryText.value;
+  state.reportGeneratedAt = Date.now();
   els.copyBtn.disabled = false;
   els.downloadBtn.disabled = false;
   els.vaultBtn.disabled = false;
@@ -8601,10 +8623,11 @@ function generateFinalCockpitReport() {
   }
   els.memoryText.value = cockpitMemoryMarkdown();
   state.markdown = els.memoryText.value;
+  state.reportGeneratedAt = Date.now();
   els.copyBtn.disabled = false;
   els.downloadBtn.disabled = false;
   els.vaultBtn.disabled = false;
-  setStatus("Journal MemoryForge cockpit généré", "ok");
+  setStatus("Rapport final généré : il est affiché dans Bilan machine et prêt pour les exports", "ok");
   renderPreparePanel();
   renderReadinessPanel();
   renderPrimaryAction();
@@ -8618,12 +8641,13 @@ function renderFirstTestPanel() {
   const benchmark = successfulBenchmarkFor(model);
   const benchmarkReady = Boolean(benchmark);
   const benchmarkMatches = Boolean(state.benchmark?.success && normalizeOllamaRef(state.benchmark?.model || "") === normalizeOllamaRef(model));
-  const modelReady = isOllamaModelInstalled(model) || (benchmarkReady && benchmarkMatches);
+  const modelReady = isOllamaModelInstalled(model);
+  const historicalBenchmark = Boolean(benchmarkReady && !modelReady);
 
   const steps = [
     { label: "Runtime IA", ok: ollamaReady, text: ollamaReady ? ollamaRuntimeLabel(state.scan) : scanned ? "À installer" : "Scan requis" },
     { label: "Modèle test", ok: modelReady, text: modelReady ? `${model} installé` : ollamaReady ? "À télécharger" : "En attente d'Ollama" },
-    { label: "Benchmark", ok: benchmarkReady, text: benchmarkReady ? `${benchmark.estimated_tokens_per_second ?? "--"} tok/s` : modelReady ? "Prêt à lancer" : "En attente du modèle" }
+    { label: "Benchmark", ok: benchmarkReady, text: benchmarkReady ? `${historicalBenchmark ? "Historique · " : ""}${benchmark.estimated_tokens_per_second ?? "--"} tok/s` : modelReady ? "Prêt à lancer" : "En attente du modèle" }
   ];
   const stepHtml = steps.map((step) => `
     <div class="first-test-step ${step.ok ? "ok-step" : ""}">
@@ -8657,12 +8681,12 @@ function renderFirstTestPanel() {
     cta = `<button class="first-test-primary" type="button" data-install-model="${model}">Installer le modèle de test</button>`;
   } else if (modelReady && !benchmarkReady) {
     stateLabel = "benchmark à lancer";
-    cta = `<button class="first-test-primary" type="button" data-benchmark-model="${model}">${escapeHtml(benchmarkButtonLabel(model, "Lancer le benchmark recommandé", "Installer + benchmarker"))}</button>`;
+    cta = `<button class="first-test-primary" type="button" data-benchmark-model="${model}">${escapeHtml(benchmarkButtonLabel(model, "Préparer le benchmark", "Préparer install + bench"))}</button>`;
   } else if (benchmarkReady) {
     stateLabel = "test réussi";
     cta = `
       ${recommendedRef && !recommendedInstalled ? `<button class="first-test-primary" type="button" data-install-model="${escapeHtml(recommendedRef)}">Installer le modèle recommandé</button>` : ""}
-      ${recommendedRef && recommendedInstalled ? `<button class="first-test-primary" type="button" data-benchmark-model="${escapeHtml(recommendedRef)}">Comparer le modèle recommandé</button>` : ""}
+      ${recommendedRef && recommendedInstalled ? `<button class="first-test-primary" type="button" data-benchmark-model="${escapeHtml(recommendedRef)}">Préparer la comparaison</button>` : ""}
       <button type="button" data-copy-test-report="true">Copier le rapport</button>
       <button type="button" data-focus-feedback="true">Signaler un résultat</button>
     `;
@@ -8673,7 +8697,7 @@ function renderFirstTestPanel() {
     <div class="first-test-steps">${stepHtml}</div>
     ${benchmarkReady ? `
       <div class="benchmark-card">
-        <strong>Test réussi - ${escapeHtml(benchmark.model)}</strong>
+        <strong>${historicalBenchmark ? "Mesure historique" : "Test réussi"} - ${escapeHtml(benchmark.model)}</strong>
         <span>Temps de réponse : ${escapeHtml(benchmark.elapsed_ms ?? "--")} ms</span>
         <span>${escapeHtml(benchmarkSpeedLabel(benchmark))} : ${escapeHtml(benchmark.estimated_tokens_per_second ?? "--")} tok/s · ${escapeHtml(benchmarkMeasurementLabel(benchmark))}</span>
         <span>${escapeHtml(benchmark.output_preview || "Réponse vide")}</span>
@@ -8683,7 +8707,11 @@ function renderFirstTestPanel() {
     `}
     ${recommendedHtml}
     <div class="row-actions">${cta}</div>
-    ${benchmarkReady && !benchmarkMatches ? `<p class="fine-note">Dernier benchmark affiché depuis l'historique : ${escapeHtml(benchmark.model)}.</p>` : ""}
+    ${historicalBenchmark
+      ? `<p class="fine-note history-warning">Cette mesure reste dans l'historique, mais le scan actuel ne détecte plus ${escapeHtml(model)} comme installé. Réinstalle le modèle avant de le retester.</p>`
+      : benchmarkReady && !benchmarkMatches
+        ? `<p class="fine-note">Dernier benchmark affiché depuis l'historique : ${escapeHtml(benchmark.model)}.</p>`
+        : ""}
   `;
   renderPrimaryAction();
 }
@@ -8751,7 +8779,13 @@ function promptForgeAnalyze(prompt) {
   if (!/\b(contraintes?|évite|sans|maximum|minimum|court|détaillé)\b/i.test(text)) issues.push("Contraintes faibles ou absentes.");
   else strengths.push("Contraintes présentes.");
   if (!/[?]/.test(text) && !/\b(réponds|explique|résume|compare|écris|transforme|analyse)\b/i.test(text)) issues.push("Action demandée peu claire.");
-  return { score: scorePromptText(text), issues, strengths };
+  return {
+    score: scorePromptText(text),
+    method: "heuristique_locale_v1",
+    method_label: "Grille locale indicative",
+    issues,
+    strengths
+  };
 }
 
 function promptForgeOptimize(prompt) {
@@ -8803,14 +8837,15 @@ function renderPromptForge(result) {
     els.promptForgeSaveMemoryBtn.disabled = true;
     return;
   }
-  els.promptForgeState.textContent = `${result.after.score}/100`;
+  els.promptForgeState.textContent = `Grille ${result.after.score}/100`;
   els.promptForgeResult.className = "promptforge-result";
   els.promptForgeResult.innerHTML = `
     <div class="promptforge-score">
-      <div><strong>Avant</strong><span>${escapeHtml(result.before.score)}/100</span></div>
-      <div><strong>Après</strong><span>${escapeHtml(result.after.score)}/100</span></div>
+      <div><strong>Avant · grille</strong><span>${escapeHtml(result.before.score)}/100</span></div>
+      <div><strong>Après · grille</strong><span>${escapeHtml(result.after.score)}/100</span></div>
       <div><strong>Modèle</strong><span>${escapeHtml(result.model)}</span></div>
     </div>
+    <p class="promptforge-method"><strong>Score heuristique local.</strong> Il vérifie le contexte, l'action, le format et les contraintes du prompt. Ce n'est ni un benchmark du modèle ni une note scientifique.</p>
     <div class="promptforge-analysis">
       <strong>Corrections</strong>
       ${(result.before.issues.length ? result.before.issues : ["Prompt déjà exploitable."]).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
@@ -8843,8 +8878,9 @@ function promptForgeMarkdown(result = currentPromptForgeResult()) {
     "",
     `- Date: ${new Date(Number(result.created_at_ms || Date.now())).toISOString()}`,
     `- Modèle cible: ${result.model}`,
-    `- Score avant: ${result.before.score}/100`,
-    `- Score après: ${result.after.score}/100`,
+    "- Méthode: grille heuristique locale v1 (contexte, action, format, contraintes)",
+    `- Score heuristique avant: ${result.before.score}/100`,
+    `- Score heuristique après: ${result.after.score}/100`,
     "",
     "## Prompt original",
     "",
@@ -15021,7 +15057,7 @@ function fieldTestMachineEntry() {
     benchmark_prompt_tokens_per_second: Number(benchmark?.prompt_tokens_per_second || 0),
     benchmark_eval_duration_ms: Number(benchmark?.eval_duration_ms || 0),
     promptforge_ok: Boolean(promptForge?.optimized),
-    dialogue_ok: Boolean(state.chatResult?.success && state.chatResult?.output_preview),
+    dialogue_ok: Boolean(state.chatResult?.success && localChatOutput(state.chatResult)),
     arena_ok: Boolean(successfulArena),
     arena_protocol: arena?.protocol || "legacy_estimate",
     arena_objective: arena?.protocol === ARENA_OBJECTIVE_PROTOCOL,
@@ -17077,6 +17113,20 @@ function chatPresetPrompt(key, model) {
   return "Pourquoi la VRAM est importante pour un LLM local ?";
 }
 
+function localChatOutput(result = state.chatResult) {
+  return String(result?.output_text || result?.output_preview || "").trim();
+}
+
+function localChatIsIncomplete(result = state.chatResult) {
+  const reason = String(result?.done_reason || "").toLowerCase();
+  return Boolean(
+    result?.output_truncated
+    || result?.timed_out
+    || reason === "length"
+    || reason === "max_tokens"
+  );
+}
+
 function readChatHistory() {
   try {
     const raw = window.localStorage?.getItem(CHAT_HISTORY_KEY);
@@ -17127,14 +17177,18 @@ function buildLocalChatPrompt(model, userPrompt) {
 }
 
 function saveChatHistoryEntry(result, userPrompt, systemPrompt) {
-  if (!result?.output_preview) return;
+  const output = localChatOutput(result);
+  if (!output) return;
   const entry = {
     id: `chat-${Date.now()}`,
     created_at_ms: Date.now(),
     model: result.model || "",
     prompt: userPrompt || result.prompt || "",
     system_prompt: systemPrompt || "",
-    output_preview: result.output_preview || "",
+    output_preview: output.slice(0, 700),
+    output_text: output,
+    output_truncated: localChatIsIncomplete(result),
+    done_reason: result.done_reason || "",
     elapsed_ms: Number(result.elapsed_ms || 0),
     estimated_tokens_per_second: Number(result.estimated_tokens_per_second || 0),
     success: Boolean(result.success)
@@ -17172,7 +17226,7 @@ function chatHistoryMarkdown(items = readChatHistory()) {
       "### Réponse",
       "",
       "```text",
-      item.output_preview || "",
+      localChatOutput(item),
       "```"
     ].join("\n"))
   ].join("\n");
@@ -17302,8 +17356,8 @@ async function runLocalChat() {
     setStatus(friendlyOllamaError(error), "bad");
   } finally {
     els.chatSendBtn.disabled = false;
-    els.chatCopyBtn.disabled = !state.chatResult?.output_preview;
-    els.chatMemoryBtn.disabled = !state.chatResult?.output_preview;
+    els.chatCopyBtn.disabled = !localChatOutput(state.chatResult);
+    els.chatMemoryBtn.disabled = !localChatOutput(state.chatResult);
   }
 }
 
@@ -17400,6 +17454,30 @@ async function prepareLocalAiFlow() {
   }
 }
 
+function prepareBenchmarkForConsent(model) {
+  const clean = ollamaActionRef(model);
+  if (!clean) {
+    setStatus("Modèle Ollama requis pour préparer le benchmark", "bad");
+    return false;
+  }
+  els.benchmarkModelInput.value = clean;
+  els.chatModelInput.value = clean;
+  renderBenchmarkPreflight();
+  revealWorkspacePanel("tests", els.benchmarkPanel, "start");
+  setStatus(
+    `${clean} prêt dans Mesurer un modèle. Vérifie le runtime et la durée, puis clique sur le bouton de test pour lancer le benchmark.`,
+    "ok"
+  );
+  window.requestAnimationFrame(() => {
+    els.benchmarkPanel?.classList.add("feature-focus-pulse");
+    window.setTimeout(() => {
+      els.benchmarkBtn?.focus({ preventScroll: true });
+      els.benchmarkPanel?.classList.remove("feature-focus-pulse");
+    }, 280);
+  });
+  return true;
+}
+
 async function runPrimaryCommand(command, model = "") {
   const flow = prepareFlowState();
   const recommendedRef = actionableOllamaRef(flow.recommended);
@@ -17419,11 +17497,7 @@ async function runPrimaryCommand(command, model = "") {
       await installRecommendedModel(flow.testModel);
       break;
     case "benchmark-test":
-      els.benchmarkModelInput.value = flow.testModel;
-      els.chatModelInput.value = flow.testModel;
-      revealWorkspacePanel("tests", els.benchmarkPanel, "start");
-      setStatus(`Benchmark du modèle test ${flow.testModel}...`);
-      await runBenchmark({ source: "primary-action" });
+      prepareBenchmarkForConsent(flow.testModel);
       break;
     case "benchmark-test-cpu":
       els.benchmarkModelInput.value = flow.testModel;
@@ -17447,11 +17521,7 @@ async function runPrimaryCommand(command, model = "") {
       break;
     case "benchmark-recommended":
       if (!nextModel) throw new Error("Aucun modèle recommandé à benchmarker");
-      els.benchmarkModelInput.value = nextModel;
-      els.chatModelInput.value = nextModel;
-      revealWorkspacePanel("tests", els.benchmarkPanel, "start");
-      setStatus(`Benchmark du modèle recommandé ${nextModel}...`);
-      await runBenchmark({ source: "primary-action" });
+      prepareBenchmarkForConsent(nextModel);
       break;
     case "arena":
       revealWorkspacePanel("tests", document.querySelector(".arena-panel"), "start");
@@ -17502,19 +17572,23 @@ function renderLocalChat(result) {
   const memoryHint = result.success
     ? localChatMemorySummary(result)
     : "";
+  const output = localChatOutput(result);
+  const incomplete = localChatIsIncomplete(result);
   els.chatResult.innerHTML = `
     <div class="benchmark-card chat-card">
       <strong>${escapeHtml(result.success ? "Réponse locale" : "Réponse avec erreur")} - ${escapeHtml(result.model)}</strong>
       <span>Temps : ${escapeHtml(result.elapsed_ms ?? 0)} ms${result.timed_out ? " - interrompu" : ""}</span>
       <span>${escapeHtml(benchmarkSpeedLabel(result))} : ${escapeHtml(result.estimated_tokens_per_second ?? 0)} tok/s · ${escapeHtml(benchmarkMeasurementLabel(result))}</span>
-      <span>${escapeHtml(result.error || result.output_preview || "Réponse vide")}</span>
+      <span class="chat-answer">${escapeHtml(result.error || output || "Réponse vide")}</span>
+      ${incomplete ? `<span class="chat-incomplete"><strong>Réponse incomplète.</strong> Ollama a arrêté la génération (${escapeHtml(result.done_reason || (result.timed_out ? "délai atteint" : "limite de sortie"))}). Relance avec une demande plus courte ou un délai plus long.</span>` : ""}
       ${memoryHint ? `<span class="memory-candidate">${escapeHtml(memoryHint)}</span>` : ""}
     </div>
   `;
 }
 
 async function copyLocalChatAnswer() {
-  if (!state.chatResult?.output_preview) {
+  const output = localChatOutput(state.chatResult);
+  if (!output) {
     setStatus("Aucune réponse locale à copier", "warn");
     return;
   }
@@ -17524,7 +17598,7 @@ async function copyLocalChatAnswer() {
     `${benchmarkSpeedLabel(state.chatResult)}: ${state.chatResult.estimated_tokens_per_second} tok/s`,
     `Methode: ${benchmarkMeasurementLabel(state.chatResult)}`,
     "",
-    state.chatResult.output_preview
+    output
   ].join("\n");
   await navigator.clipboard.writeText(text);
   setStatus("Réponse locale copiée", "ok");
@@ -17532,7 +17606,8 @@ async function copyLocalChatAnswer() {
 
 function localChatMemoryMarkdown(result = state.chatResult) {
   const scan = state.scan || {};
-  if (!result?.output_preview) return "";
+  const output = localChatOutput(result);
+  if (!output) return "";
   const info = modelInfo(result.model || "");
   const benchmark = successfulBenchmarkFor(result.model) || result;
   const createdAt = new Date(Number(result.created_at_ms || Date.now())).toISOString();
@@ -17590,7 +17665,7 @@ function localChatMemoryMarkdown(result = state.chatResult) {
     "## Réponse conservée",
     "",
     "```text",
-    result.output_preview || "",
+    output,
     "```",
     "",
     "## Décision OutilsIA",
@@ -17614,7 +17689,7 @@ function localChatMemorySummary(result = state.chatResult) {
 }
 
 async function saveLocalChatToMemory() {
-  if (!state.chatResult?.output_preview) {
+  if (!localChatOutput(state.chatResult)) {
     setStatus("Aucune réponse locale à sauvegarder", "warn");
     return;
   }
@@ -19410,6 +19485,7 @@ function demoBenchmark(model) {
 }
 
 function demoChat(model, prompt) {
+  const output = "Ton PC peut faire tourner des modèles légers à moyens avec Ollama ; commence par qwen3:0.6b pour valider l'installation, puis monte vers un modèle plus lourd selon la RAM et la VRAM détectées.";
   return {
     model,
     prompt,
@@ -19427,7 +19503,10 @@ function demoChat(model, prompt) {
     eval_duration_ms: 980,
     success: true,
     timed_out: false,
-    output_preview: "Ton PC peut faire tourner des modèles légers à moyens avec Ollama ; commence par qwen3:0.6b pour valider l'installation, puis monte vers un modèle plus lourd selon la RAM et la VRAM détectées.",
+    output_preview: output,
+    output_text: output,
+    output_truncated: false,
+    done_reason: "stop",
     error: null,
     created_at_ms: Date.now()
   };
@@ -19475,6 +19554,13 @@ function installTestHarness() {
     runtimeDriverIntelligence,
     runtimeDriverAccelerationExpected,
     primaryActionState,
+    prepareBenchmarkForConsent,
+    generateFinalCockpitReport,
+    localChatOutput,
+    localChatIsIncomplete,
+    renderLocalChat,
+    promptForgeOptimize,
+    renderPromptForge,
     buildCapabilityPassport,
     verifyCapabilityPassportIntegrity,
     capabilityPassportSummary,
@@ -21491,6 +21577,38 @@ function installTestHarness() {
         readinessVisible: Boolean(els.readinessPanel?.offsetParent)
       };
     },
+    applyComputerUseRegressionState() {
+      const scan = demoScan();
+      scan.cpu_name = "AMD Ryzen 7 7800X3D 8-Core Processor";
+      scan.gpu_name = "NVIDIA GeForce RTX 4080 SUPER";
+      scan.vram_gb = 16;
+      scan.ram_gb = 64;
+      scan.installed_models = (scan.installed_models || [])
+        .filter((model) => !sameOllamaModel(modelLabel(model), "qwen3:0.6b"));
+      renderScan(scan);
+      renderCompatibility(demoCompatibility());
+      const historicalQwen = {
+        ...demoBenchmark("qwen3:0.6b"),
+        estimated_tokens_per_second: 394.2,
+        elapsed_ms: 820,
+        created_at_ms: Date.now() - 86_400_000
+      };
+      state.benchmark = historicalQwen;
+      writeBenchmarkHistory([historicalQwen]);
+      state.markdown = "";
+      state.reportGeneratedAt = 0;
+      renderBenchmark(historicalQwen);
+      renderFirstTestPanel();
+      renderPreparePanel();
+      renderReadinessPanel();
+      renderPrimaryAction();
+      return {
+        modelInstalled: isOllamaModelInstalled("qwen3:0.6b"),
+        firstTest: els.firstTestBox?.textContent || "",
+        action: primaryActionState(),
+        reportReady: prepareFlowState().reportReady
+      };
+    },
     applyDualRuntimeWslModelState() {
       const scan = demoScan();
       scan.runtimes = {
@@ -22442,11 +22560,7 @@ document.addEventListener("click", async (event) => {
   const benchmarkModel = benchmarkButton?.getAttribute?.("data-benchmark-model");
   if (benchmarkModel) {
     const model = ollamaActionRef(benchmarkModel);
-    els.benchmarkModelInput.value = model;
-    els.chatModelInput.value = model;
-    revealWorkspacePanel("tests", els.benchmarkPanel);
-    setStatus(`Test court ${model}...`);
-    await runBenchmark({ source: "arena" });
+    prepareBenchmarkForConsent(model);
     return;
   }
 });
