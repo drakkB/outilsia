@@ -182,18 +182,23 @@
 
     <section class="px-4 py-10" id="passerelle-locale-capacites-ia">
       <div class="max-w-6xl mx-auto card p-5 md:p-7" style="border-color:rgba(91,241,205,.38);background:linear-gradient(135deg,rgba(91,241,205,.10),rgba(15,23,42,.94),rgba(103,232,249,.06));">
-        <span class="pill">Local Capability Bridge v1 · candidat</span>
-        <h2 class="text-3xl md:text-4xl font-black mt-4">Partager les capacités locales du PC sans donner le contrôle de la machine</h2>
-        <p class="muted mt-3 text-lg">Après génération du Passport, OutilsIA peut ouvrir sur <code>127.0.0.1</code> un instantané en lecture seule pendant 15 minutes. Un jeton Bearer aléatoire protège les routes de données et n'est jamais enregistré sur disque.</p>
+        <span class="pill">Local MCP v0.1 + Capability Bridge · candidat</span>
+        <h2 class="text-3xl md:text-4xl font-black mt-4">Codex ou Claude peuvent déjà lire les capacités du PC sans en prendre le contrôle.</h2>
+        <p class="muted mt-3 text-lg">Après génération du Passport, OutilsIA peut ouvrir pendant 15 minutes un serveur MCP Streamable HTTP sur <code>127.0.0.1</code> et les routes historiques du Capability Bridge. Un jeton Bearer 256 bits aléatoire protège l'instantané figé et n'est jamais enregistré sur disque.</p>
         <div class="grid md:grid-cols-4 gap-3 mt-6">
           <article class="card p-4"><strong class="cyan">Loopback uniquement</strong><p class="mini mt-2">Le serveur écoute sur cette machine, pas sur le réseau local ni Internet.</p></article>
-          <article class="card p-4"><strong class="cyan">Expiration automatique</strong><p class="mini mt-2">15 minutes par défaut, 30 minutes maximum, puis la session devient inutilisable.</p></article>
-          <article class="card p-4"><strong class="cyan">Lecture seule</strong><p class="mini mt-2">Capacités, Passport, modèles et handoff Strategy Arena : aucune commande Ollama ou système.</p></article>
-          <article class="card p-4"><strong class="cyan">Secrets exclus</strong><p class="mini mt-2">Aucun prompt, résultat brut, fichier personnel, jeton de compte, backtest ou ordre de trading.</p></article>
+          <article class="card p-4"><strong class="cyan">8 outils + 4 ressources</strong><p class="mini mt-2">Machine, Doctor, modèles, recommandation, benchmarks, Passport et handoff borné.</p></article>
+          <article class="card p-4"><strong class="cyan">Clients candidats testés</strong><p class="mini mt-2">Recettes natives avec client HTTP, Codex CLI et Claude Code, sans conserver le jeton.</p></article>
+          <article class="card p-4"><strong class="cyan">Lecture seule</strong><p class="mini mt-2">Aucun scan, téléchargement, benchmark, chat, fichier, backtest ou ordre de trading.</p></article>
+        </div>
+        <div class="card p-4 mt-5" style="border-color:rgba(251,191,36,.28);background:rgba(251,191,36,.07);">
+          <strong>Prochain contrat : l'IA propose, l'utilisateur autorise dans l'app.</strong>
+          <p class="mini mt-2">La future Local Action Lane restera séparée du MCP de lecture. Elle figera un plan exact, affichera modèle, runtime, taille, durée et effets, puis exigera un clic humain natif avant d'émettre une capacité à usage unique. Un champ <code>confirm:true</code> envoyé par le modèle ne sera jamais un consentement.</p>
         </div>
         <p class="mini mt-5">Cette fonction reste candidate tant que le nouveau build Windows/Linux n'est pas publié. Elle ne constitue pas une preuve terrain physique et ne transforme pas Strategy Arena en gestionnaire Ollama.</p>
         <div class="flex flex-wrap gap-3 mt-6">
-          <a class="btn btn-primary" href="/telecharger-scanner-ia-local">Voir la bêta Windows/Linux</a>
+          <a class="btn btn-primary" href="https://github.com/drakkB/outilsia/blob/main/local-cockpit-app/LOCAL-MCP.md" rel="noopener">Lire le contrat MCP</a>
+          <a class="btn btn-secondary" href="/telecharger-scanner-ia-local">Voir la bêta Windows/Linux</a>
           <a class="btn btn-secondary" href="/securite-confidentialite-scanner">Comprendre les garde-fous</a>
         </div>
       </div>

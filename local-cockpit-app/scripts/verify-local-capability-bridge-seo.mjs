@@ -11,11 +11,15 @@ const files = {
 
 const contracts = {
   hub: [
-    "Local Capability Bridge v1 · candidat",
+    "Local MCP v0.1 + Capability Bridge · candidat",
     "127.0.0.1",
     "15 minutes",
+    "8 outils + 4 ressources",
+    "Codex CLI et Claude Code",
     "Lecture seule",
-    "Aucun prompt, résultat brut, fichier personnel, jeton de compte, backtest ou ordre de trading",
+    "Aucun scan, téléchargement, benchmark, chat, fichier, backtest ou ordre de trading",
+    "confirm:true",
+    "ne sera jamais un consentement",
     "ne constitue pas une preuve terrain physique"
   ],
   download: [
@@ -30,7 +34,10 @@ const contracts = {
     "random 256-bit Bearer token kept only in memory",
     "read-only",
     "no model installation/deletion",
-    "does not count as physical field-validation evidence"
+    "does not count as physical field-validation evidence",
+    "Local MCP v0.1 (source candidate, not in the current public build)",
+    "eight read-only tools and four resources",
+    "A model-provided field such as `confirm:true` is not human consent"
   ]
 };
 

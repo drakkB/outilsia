@@ -49,6 +49,96 @@ L'audit externe est utilisé comme regard produit, pas comme source de vérité.
 
 Ne pas lancer maintenant un orchestrateur multi-agents généraliste, un leaderboard présenté comme scientifique ou une installation distante depuis ChatGPT. Ces pistes restent subordonnées à la fluidité et à la preuve du parcours diagnostic → modèle recommandé → benchmark → rapport.
 
+## Cap stratégique - cockpit pilotable par les IA
+
+Le MCP local read-only n'est plus une idée : le candidat expose déjà huit outils
+et quatre ressources issus d'un Passport figé, sur loopback, avec token
+éphémère. Les recettes natives valident le protocole et les refus ; des recettes
+séparées font lire des preuves bornées par Codex CLI et Claude Code. Cette
+capacité reste candidate tant qu'elle n'appartient pas à un manifeste public.
+
+Le palier suivant ne consiste pas à ouvrir les commandes Tauri derrière une API
+HTTP générique. OutilsIA conserve un seul noyau métier Rust et deux contrats
+strictement séparés :
+
+1. **Evidence Plane** : MCP read-only actuel, sans effet de bord.
+2. **Local Action Lane** : l'IA propose un plan ; l'application native seule
+   recueille le consentement et émet une capacité temporaire à usage unique.
+
+### Local Action Lane v0
+
+- [x] Servir un snapshot MCP read-only sur `127.0.0.1`, port aléatoire, quinze
+  minutes, token 256 bits en mémoire.
+- [x] Vérifier les outils et ressources par client HTTP, Codex CLI et Claude
+  Code sans conserver le jeton ou les transcriptions.
+- [ ] Formaliser un schéma versionné de demande avec action, modèle, runtime,
+  taille, durée, effets, risques, provenance client et hash canonique.
+- [ ] Ajouter une file native `proposed / awaiting_human / approved / executing
+  / completed / failed / rejected / expired / cancelled`.
+- [ ] Afficher dans Tauri une confirmation non contournable. Un paramètre
+  `confirm:true` fourni par le modèle ne vaut jamais consentement humain.
+- [ ] Émettre après ce clic une capacité liée au plan, au client et à la session,
+  valable deux minutes et consommable une seule fois.
+- [ ] Commencer par trois opérations allowlistées : installer une référence
+  Ollama validée, benchmarker un modèle déjà installé, exporter un rapport vers
+  une destination choisie dans l'app.
+- [ ] Réutiliser Install Safety Preflight, les runtimes par modèle, les délais
+  adaptatifs, l'anti-réentrance et l'annulation existants ; ne dupliquer aucune
+  logique dans le serveur MCP.
+- [ ] Écrire un reçu Evidence Ledger minimal séparant demande, consentement,
+  exécution et résultat, sans prompt, réponse brute, chemin personnel ou token.
+- [ ] Rejeter replay, expiration, altération du plan, consommation par un autre
+  client, arrêt serveur, redémarrage app et changement de Passport.
+- [ ] Garder hors périmètre : shell, chemin/URL arbitraire, pilote graphique,
+  élévation lancée par l'IA, suppression de modèle, contrôle distant, backtest et
+  trading.
+
+La spécification détaillée vit dans `LOCAL-MCP.md`. La voie d'action ne sera
+jamais ajoutée silencieusement aux huit outils read-only.
+
+### Benchmark Commons v1 - preuve communautaire opt-in
+
+Le réseau communautaire doit construire un jeu de données utile, pas un
+leaderboard décoratif.
+
+- [ ] Proposer après un benchmark réussi un partage séparé, désactivé par défaut.
+- [ ] Envoyer uniquement matériel normalisé, runtime, version Ollama, modèle
+  exact, protocole versionné, tok/s, latences, offload, date, build et hash de
+  preuve ; exclure prompt, réponse, fichiers, hostname, compte et token.
+- [ ] Utiliser un identifiant pseudonyme rotatif et une déduplication serveur ;
+  ne jamais annoncer un nombre de machines à partir de simples lignes JSON.
+- [ ] Vérifier cohérence, plafonds, modèle/runtime, version de protocole et
+  signatures de reçu avant d'accepter une observation.
+- [ ] Afficher médiane, dispersion et taille d'échantillon ; aucun classement
+  public sous trois machines distinctes pour une même cohorte.
+- [ ] Publier des pages GPU/modèle uniquement à partir de cohortes vérifiées et
+  datées, avec lien vers la méthode et les limites.
+- [ ] Permettre retrait local et révocation des données soumises.
+
+### Monétisation produit, pas péage sur la preuve
+
+Le scan, la première recommandation, le benchmark de base, la sécurité, le
+rapport minimal et le MCP read-only restent gratuits. Ils constituent la preuve
+que le produit fonctionne et ne doivent pas devenir un appât payant.
+
+Une offre payante pourra viser l'historique long, la comparaison multi-machines,
+les politiques d'équipe, les campagnes planifiées Flight Recorder, les exports
+professionnels et les contrôles administratifs de Local Action Lane. Elle ne
+doit pas vendre une promesse de performance ni masquer les limites.
+
+Gate avant Stripe :
+
+- campagne physique complète à cinq profils ;
+- release publique Windows/Linux cohérente et recette native verte ;
+- au moins 500 téléchargements vérifiés ou 100 utilisateurs mensuels
+  récurrents ;
+- demandes utilisateurs observées pour au moins deux fonctions payantes ;
+- prix, résiliation, données et frontière gratuit/payant documentés.
+
+Avant ce gate, OutilsIA mesure l'usage et améliore le produit ; il n'ajoute ni
+paywall éditorial, ni abonnement artificiel, ni pression commerciale dans le
+diagnostic.
+
 ## Candidat 0.1.2 - promotion honnête et campagne physique
 
 État au 26 juillet 2026 : la chaîne candidate conserve maintenant l'identité
@@ -316,7 +406,8 @@ Premier jalon candidat v1 terminé le 12 juillet 2026 dans le build Windows/Linu
 - [x] Ajouter un serveur MCP Streamable HTTP v0.1 sur la même liaison loopback : huit outils et quatre ressources strictement read-only, snapshot figé, aucune action locale.
 - [x] Publier dans le handshake MCP les instructions de frontière et annoter chaque outil `readOnlyHint=true`, `destructiveHint=false`, `openWorldHint=false`.
 - [ ] Ajouter le consommateur côté Strategy Arena dans une session séparée, sans déplacer la gestion Ollama.
-- [ ] Recetter la connexion réelle avec Codex, Claude Code et MCP Inspector sur Windows et Linux avant toute promotion publique.
+- [x] Recetter les lectures bornées avec Codex CLI et Claude Code sur le candidat Windows, sans persister le jeton ni les transcriptions.
+- [ ] Ajouter MCP Inspector à la matrice Windows/Linux avant toute promotion publique du serveur local.
 - [ ] Étudier séparément une v0.2 `prepare -> confirmer dans l'app -> exécuter`, sans modifier le contrat read-only v0.1.
 
 ## Phase 7 - Workstack Composer

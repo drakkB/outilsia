@@ -147,3 +147,79 @@ Une future action locale devra utiliser un autre contrat :
 5. écrire un reçu minimal dans Evidence Ledger.
 
 La v0.1 read-only ne sera pas élargie silencieusement à ces actions.
+
+## Local Action Lane - contrat de conception
+
+La voie d'action sera un service séparé du MCP read-only. Elle réutilisera les
+commandes Rust existantes, mais n'exposera ni shell, ni chemin arbitraire, ni
+commande Ollama libre. Un champ fourni par le modèle, y compris
+`confirm: true`, ne constitue jamais un consentement humain.
+
+### Cycle de vie
+
+1. Le client IA appelle un outil de préparation borné.
+2. OutilsIA valide les paramètres et produit un plan immuable sans l'exécuter.
+3. La demande apparaît dans une file native avec le client, le modèle, le
+   runtime, la taille, le délai, les effets et les risques.
+4. L'utilisateur accepte ou refuse dans la fenêtre Local Cockpit.
+5. Une acceptation crée une capacité liée au hash exact du plan, au client et à
+   la session, valable deux minutes et utilisable une seule fois.
+6. Le noyau Rust exécute uniquement l'opération allowlistée.
+7. Evidence Ledger conserve le résultat minimal, les durées, les empreintes et
+   la décision humaine, sans prompt ni sortie brute.
+
+États autorisés :
+
+```text
+proposed -> awaiting_human -> approved -> executing -> completed
+                         \-> rejected
+approved                 \-> expired
+proposed/awaiting_human   \-> cancelled
+executing                 \-> failed
+```
+
+Un redémarrage de l'app, l'arrêt du serveur, une modification du plan ou un
+nouveau scan invalident toutes les capacités encore ouvertes.
+
+### Outils envisagés
+
+Les outils de préparation ne réalisent aucune action :
+
+| Outil | Plan préparé |
+|---|---|
+| `outilsia_prepare_model_install` | Référence Ollama exacte, runtime, taille haute, volume et délai |
+| `outilsia_prepare_benchmark` | Modèle déjà installé, runtime, protocole, délai et charge probable |
+| `outilsia_prepare_model_comparison` | Deux ou trois modèles installés, ordre, budget global et zéro téléchargement |
+| `outilsia_prepare_report_export` | Format borné et destination choisie dans l'app |
+| `outilsia_get_action_request` | État et résumé expurgé d'une demande |
+| `outilsia_cancel_action_request` | Annulation d'une demande non exécutée |
+
+`outilsia_get_model_recommendation` reste une lecture et n'a besoin d'aucune
+confirmation. L'installation, la suppression, l'exécution d'un benchmark, la
+modification d'un profil et l'écriture d'un export restent des actions.
+
+La première version ne proposera pas :
+
+- suppression de modèle ;
+- installation de pilote ;
+- téléchargement ou exécution de binaire arbitraire ;
+- accès à un fichier fourni par le client ;
+- contrôle distant ou écoute hors loopback ;
+- action groupée qui masquerait plusieurs consentements ;
+- élévation administrateur lancée par l'IA.
+
+### Propriétés de sécurité à tester
+
+- une instruction dans un prompt ne peut pas approuver sa propre demande ;
+- un token rejoué, expiré ou lié à un plan modifié est refusé ;
+- le runtime et la référence de modèle exécutés correspondent octet pour octet
+  au plan affiché ;
+- deux clients ne peuvent pas consommer la même capacité ;
+- aucun appel MCP ne contourne le préflight stockage ou les limites de temps ;
+- l'arrêt d'urgence révoque la session et annule les demandes non exécutées ;
+- le reçu distingue demande, consentement, exécution et résultat ;
+- les tests négatifs recherchent shell, chemins, URL, variables
+  d'environnement, credentials et sorties brutes.
+
+Cette voie ne sera exposée aux clients réels qu'après validation de la recette
+physique et revue séparée de son modèle de menace.
