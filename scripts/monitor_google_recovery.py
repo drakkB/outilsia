@@ -284,8 +284,14 @@ def build_report(
         "bing_control": bing,
         "intervention": {
             "deployed_at": "2026-07-27T00:02:00+00:00",
-            "summary": "Article schema normalized and sitemap lastmod made semantic.",
-            "expectation": "GSC changes are delayed; no same-day recovery should be inferred.",
+            "summary": (
+                "Article schemas and sitemap dates normalized; seven priority "
+                "pages consolidated from observed GSC losses."
+            ),
+            "expectation": (
+                "GSC changes are delayed; only final data dated after "
+                "2026-07-27 can measure this intervention."
+            ),
         },
     }
 
