@@ -1,0 +1,49 @@
+name: SEO integrity
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/seo-integrity.yml"
+      - "scripts/article_date_overrides.json"
+      - "scripts/audit_article_schema.py"
+      - "scripts/monitor_google_recovery.py"
+      - "scripts/normalize_article_schema.py"
+      - "scripts/test_monitor_google_recovery.py"
+      - "scripts/test_normalize_article_schema.py"
+  push:
+    paths:
+      - ".github/workflows/seo-integrity.yml"
+      - "scripts/article_date_overrides.json"
+      - "scripts/audit_article_schema.py"
+      - "scripts/monitor_google_recovery.py"
+      - "scripts/normalize_article_schema.py"
+      - "scripts/test_monitor_google_recovery.py"
+      - "scripts/test_normalize_article_schema.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile recovery scripts
+        run: |
+          python -m py_compile \
+            scripts/audit_article_schema.py \
+            scripts/monitor_google_recovery.py \
+            scripts/normalize_article_schema.py
+
+      - name: Test schema normalization
+        run: python scripts/test_normalize_article_schema.py
+
+      - name: Test recovery calculations
+        run: python scripts/test_monitor_google_recovery.py

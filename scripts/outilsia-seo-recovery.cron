@@ -1,0 +1,2 @@
+# Daily private Google recovery report. Server time is UTC.
+15 7 * * * root cd /var/www/outilsia && /usr/bin/python3 scripts/monitor_google_recovery.py >> /var/www/outilsia/logs/google_recovery.log 2>&1
