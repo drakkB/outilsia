@@ -48,11 +48,16 @@ def main():
     assert passport["capabilities"]["runtime_driver_intelligence_v1"] is True
     assert passport["capabilities"]["private_workload_packs_v1"] is True
     assert passport["capabilities"]["local_capability_bridge_v1"] is True
+    assert passport["capabilities"]["local_mcp_read_only_v0_1"] is True
     assert passport["capabilities"]["install_safety_preflight_v1"] is True
     assert passport["interoperability"]["local_capability_bridge"]["enabled_by_default"] is False
     assert passport["interoperability"]["local_capability_bridge"]["bind"] == "127.0.0.1"
     assert passport["interoperability"]["local_capability_bridge"]["read_only"] is True
     assert passport["interoperability"]["local_capability_bridge"]["token_persisted"] is False
+    assert passport["interoperability"]["local_capability_bridge"]["mcp"]["transport"] == "streamable_http"
+    assert passport["interoperability"]["local_capability_bridge"]["mcp"]["protocol_version"] == "2025-11-25"
+    assert passport["interoperability"]["local_capability_bridge"]["mcp"]["actions_exposed"] is False
+    assert len(passport["interoperability"]["local_capability_bridge"]["mcp"]["tools"]) == 8
     evidence = passport["runtime_readiness"]["evidence"]
     assert evidence["status"] == "gpu-proven", evidence
     assert evidence["source"] == "ollama_api_ps", evidence

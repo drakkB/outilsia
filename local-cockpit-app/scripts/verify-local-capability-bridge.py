@@ -38,7 +38,7 @@ def main():
     token = pairing["authorization"]["token"]
 
     assert payload["schema"] == "outilsia.local_capability_bridge.v1"
-    assert payload["contract_version"] == "2026-07-12"
+    assert payload["contract_version"] == "2026-07-27"
     assert payload["read_only"] is True
     assert payload["permissions"]["read_capabilities"] is True
     for key in [
@@ -60,6 +60,29 @@ def main():
         "account_tokens_included": False,
         "token_persisted": False,
     }
+    assert payload["mcp"] == {
+        "read_only": True,
+        "actions_exposed": False,
+        "transport": "streamable_http",
+        "protocol_version": "2025-11-25",
+        "server_version": "0.1.0",
+        "tools": [
+            "outilsia_get_cockpit_status",
+            "outilsia_get_machine_profile",
+            "outilsia_get_hardware_doctor",
+            "outilsia_list_installed_models",
+            "outilsia_get_model_recommendation",
+            "outilsia_get_benchmark_proofs",
+            "outilsia_get_capability_passport",
+            "outilsia_get_strategy_arena_handoff",
+        ],
+        "resources": [
+            "outilsia://passport/current",
+            "outilsia://models/installed",
+            "outilsia://recommendation/current",
+            "outilsia://strategy-arena/handoff",
+        ],
+    }
     assert payload["passport"]["integrity"]["digest"] == passport["integrity"]["digest"]
     assert payload["strategy_arena"]["read_only"] is True
     assert payload["strategy_arena"]["boundary"]["forbidden_in_outilsia"] == [
@@ -75,12 +98,22 @@ def main():
     assert pairing["base_url"] == "http://127.0.0.1:43127"
     assert pairing["authorization"]["scheme"] == "Bearer"
     assert token in pairing["authorization"]["header"]
+    assert pairing["mcp"]["url"] == "http://127.0.0.1:43127/mcp"
+    assert pairing["mcp"]["transport"] == "streamable_http"
+    assert pairing["mcp"]["protocol_version"] == "2025-11-25"
+    assert pairing["mcp"]["server_version"] == "0.1.0"
+    assert len(pairing["mcp"]["tools"]) == 8
+    assert pairing["mcp"]["headers"]["Authorization"].endswith(token)
     assert pairing["permissions"]["read_only"] is True
     assert pairing["permissions"]["model_management"] is False
     assert pairing["permissions"]["backtests"] is False
 
     assert summary["running"] is True
     assert summary["bind"] == "127.0.0.1"
+    assert summary["mcp_url"] == "http://127.0.0.1:43127/mcp"
+    assert summary["mcp_protocol_version"] == "2025-11-25"
+    assert summary["mcp_server_version"] == "0.1.0"
+    assert len(summary["mcp_tools"]) == 8
     assert summary["token_persisted"] is False
     assert summary["token_exposed_in_summary"] is False
     assert "token" not in summary
@@ -95,6 +128,7 @@ def main():
 
     assert passport["passport_version"] == "1.3.0"
     assert passport["capabilities"]["local_capability_bridge_v1"] is True
+    assert passport["capabilities"]["local_mcp_read_only_v0_1"] is True
     interop = passport["interoperability"]["local_capability_bridge"]
     assert interop["enabled_by_default"] is False
     assert interop["bind"] == "127.0.0.1"

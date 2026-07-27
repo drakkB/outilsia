@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -10,13 +10,26 @@ use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const BRIDGE_SCHEMA: &str = "outilsia.local_capability_bridge.v1";
-const BRIDGE_CONTRACT_VERSION: &str = "2026-07-12";
+const BRIDGE_CONTRACT_VERSION: &str = "2026-07-27";
+const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
+const MCP_SERVER_VERSION: &str = "0.1.0";
+const MCP_PATH: &str = "/mcp";
 const DEFAULT_TTL_SECONDS: u64 = 15 * 60;
 const MIN_TTL_SECONDS: u64 = 60;
 const MAX_TTL_SECONDS: u64 = 30 * 60;
 const MAX_PAYLOAD_BYTES: usize = 1024 * 1024;
-const MAX_REQUEST_BYTES: usize = 16 * 1024;
+const MAX_REQUEST_BYTES: usize = 64 * 1024;
 const MAX_REQUESTS_PER_SESSION: usize = 240;
+const MCP_TOOL_NAMES: [&str; 8] = [
+    "outilsia_get_cockpit_status",
+    "outilsia_get_machine_profile",
+    "outilsia_get_hardware_doctor",
+    "outilsia_list_installed_models",
+    "outilsia_get_model_recommendation",
+    "outilsia_get_benchmark_proofs",
+    "outilsia_get_capability_passport",
+    "outilsia_get_strategy_arena_handoff",
+];
 
 static LOCAL_BRIDGE: OnceLock<Mutex<Option<BridgeRuntime>>> = OnceLock::new();
 
@@ -34,6 +47,10 @@ pub(crate) struct LocalCapabilityBridgeStart {
     contract_version: String,
     running: bool,
     base_url: String,
+    mcp_url: String,
+    mcp_protocol_version: String,
+    mcp_server_version: String,
+    mcp_tools: Vec<String>,
     token: String,
     expires_at_ms: u128,
     ttl_seconds: u64,
@@ -51,6 +68,10 @@ pub(crate) struct LocalCapabilityBridgeStatus {
     contract_version: String,
     running: bool,
     base_url: String,
+    mcp_url: String,
+    mcp_protocol_version: String,
+    mcp_server_version: String,
+    mcp_tools: Vec<String>,
     expires_at_ms: u128,
     bind: String,
     read_only: bool,
@@ -70,6 +91,7 @@ struct BridgeBodies {
     passport: Arc<Vec<u8>>,
     models: Arc<Vec<u8>>,
     strategy_arena: Arc<Vec<u8>>,
+    snapshot: Arc<Value>,
 }
 
 #[derive(Debug)]
@@ -77,6 +99,7 @@ struct HttpRequest {
     method: String,
     path: String,
     headers: HashMap<String, String>,
+    body: Vec<u8>,
 }
 
 fn bridge_state() -> &'static Mutex<Option<BridgeRuntime>> {
@@ -212,6 +235,31 @@ fn validate_payload(payload: &Value) -> Result<Vec<u8>, String> {
     required_bool(payload, "/privacy/raw_prompts_included", false)?;
     required_bool(payload, "/privacy/raw_model_outputs_included", false)?;
     required_bool(payload, "/privacy/account_tokens_included", false)?;
+    required_bool(payload, "/mcp/read_only", true)?;
+    required_bool(payload, "/mcp/actions_exposed", false)?;
+    if payload.pointer("/mcp/transport").and_then(Value::as_str) != Some("streamable_http") {
+        return Err("Transport MCP local invalide.".to_string());
+    }
+    if payload
+        .pointer("/mcp/protocol_version")
+        .and_then(Value::as_str)
+        != Some(MCP_PROTOCOL_VERSION)
+    {
+        return Err("Version de protocole MCP locale invalide.".to_string());
+    }
+    let advertised_tools = payload
+        .pointer("/mcp/tools")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "Liste des outils MCP locale invalide.".to_string())?;
+    if advertised_tools.len() != MCP_TOOL_NAMES.len()
+        || MCP_TOOL_NAMES.iter().any(|expected| {
+            !advertised_tools
+                .iter()
+                .any(|value| value.as_str() == Some(expected))
+        })
+    {
+        return Err("Catalogue des outils MCP local incomplet.".to_string());
+    }
 
     if payload.pointer("/passport/schema").and_then(Value::as_str)
         != Some("outilsia.ai_capability_passport.v1")
@@ -253,6 +301,7 @@ fn bridge_bodies(payload: &Value, serialized: Vec<u8>) -> Result<BridgeBodies, S
         passport: Arc::new(passport),
         models: Arc::new(models),
         strategy_arena: Arc::new(strategy_arena),
+        snapshot: Arc::new(payload.clone()),
     })
 }
 
@@ -298,7 +347,18 @@ fn bridge_status_snapshot() -> Result<LocalCapabilityBridgeStatus, String> {
         schema: BRIDGE_SCHEMA.to_string(),
         contract_version: BRIDGE_CONTRACT_VERSION.to_string(),
         running,
+        mcp_url: if base_url.is_empty() {
+            String::new()
+        } else {
+            format!("{base_url}{MCP_PATH}")
+        },
         base_url,
+        mcp_protocol_version: MCP_PROTOCOL_VERSION.to_string(),
+        mcp_server_version: MCP_SERVER_VERSION.to_string(),
+        mcp_tools: MCP_TOOL_NAMES
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect(),
         expires_at_ms,
         bind: "127.0.0.1".to_string(),
         read_only: true,
@@ -326,6 +386,7 @@ pub(crate) fn start_local_capability_bridge(
         .map_err(|err| format!("Adresse de passerelle locale indisponible: {err}"))?
         .port();
     let base_url = format!("http://127.0.0.1:{port}");
+    let mcp_url = format!("{base_url}{MCP_PATH}");
     let token = generate_token()?;
     let expires_at_ms = unix_ms() + u128::from(ttl_seconds) * 1000;
     let shutdown = Arc::new(AtomicBool::new(false));
@@ -362,6 +423,13 @@ pub(crate) fn start_local_capability_bridge(
         contract_version: BRIDGE_CONTRACT_VERSION.to_string(),
         running: true,
         base_url,
+        mcp_url,
+        mcp_protocol_version: MCP_PROTOCOL_VERSION.to_string(),
+        mcp_server_version: MCP_SERVER_VERSION.to_string(),
+        mcp_tools: MCP_TOOL_NAMES
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect(),
         token,
         expires_at_ms,
         ttl_seconds,
@@ -369,6 +437,7 @@ pub(crate) fn start_local_capability_bridge(
         read_only: true,
         token_persisted: false,
         endpoints: vec![
+            MCP_PATH.to_string(),
             "/v1/health".to_string(),
             "/v1/capabilities".to_string(),
             "/v1/passport".to_string(),
@@ -483,10 +552,32 @@ fn read_request(stream: &TcpStream) -> Result<HttpRequest, String> {
         };
         headers.insert(name.trim().to_ascii_lowercase(), value.trim().to_string());
     }
+    if headers.contains_key("transfer-encoding") {
+        return Err("transfer_encoding_not_supported".to_string());
+    }
+    let content_length = headers
+        .get("content-length")
+        .map(|value| {
+            value
+                .parse::<usize>()
+                .map_err(|_| "content_length_invalid".to_string())
+        })
+        .transpose()?
+        .unwrap_or(0);
+    if total.saturating_add(content_length) > MAX_REQUEST_BYTES {
+        return Err("request_too_large".to_string());
+    }
+    let mut body = vec![0_u8; content_length];
+    if content_length > 0 {
+        reader
+            .read_exact(&mut body)
+            .map_err(|_| "request_body_unreadable".to_string())?;
+    }
     Ok(HttpRequest {
         method: parts[0].to_string(),
         path: parts[1].to_string(),
         headers,
+        body,
     })
 }
 
@@ -580,6 +671,40 @@ fn response_for_request(
     if request.method == "OPTIONS" {
         return json_response(204, "No Content", &Value::Null, origin, false);
     }
+    if request.path == MCP_PATH {
+        if request.method != "POST" {
+            return json_response(
+                405,
+                "Method Not Allowed",
+                &json!({"error": "streamable_http_post_required"}),
+                origin,
+                false,
+            );
+        }
+        if !authorized(request, token) {
+            return json_response(
+                401,
+                "Unauthorized",
+                &json!({"error": "bearer_token_required"}),
+                origin,
+                true,
+            );
+        }
+        if !request
+            .headers
+            .get("content-type")
+            .is_some_and(|value| value.to_ascii_lowercase().starts_with("application/json"))
+        {
+            return json_response(
+                415,
+                "Unsupported Media Type",
+                &json!({"error": "application_json_required"}),
+                origin,
+                false,
+            );
+        }
+        return mcp_response_for_request(request, bodies, expires_at_ms, origin);
+    }
     if request.method != "GET" {
         return json_response(
             405,
@@ -632,6 +757,371 @@ fn response_for_request(
     }
 }
 
+fn mcp_response_for_request(
+    request: &HttpRequest,
+    bodies: &BridgeBodies,
+    expires_at_ms: u128,
+    origin: Option<&str>,
+) -> Vec<u8> {
+    let message = match serde_json::from_slice::<Value>(&request.body) {
+        Ok(value) => value,
+        Err(_) => {
+            return json_response(
+                200,
+                "OK",
+                &mcp_rpc_error(Value::Null, -32700, "JSON-RPC parse error"),
+                origin,
+                false,
+            )
+        }
+    };
+    let Some(object) = message.as_object() else {
+        return json_response(
+            200,
+            "OK",
+            &mcp_rpc_error(Value::Null, -32600, "Invalid JSON-RPC request"),
+            origin,
+            false,
+        );
+    };
+    if object.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
+        return json_response(
+            200,
+            "OK",
+            &mcp_rpc_error(
+                object.get("id").cloned().unwrap_or(Value::Null),
+                -32600,
+                "JSON-RPC 2.0 required",
+            ),
+            origin,
+            false,
+        );
+    }
+    let Some(method) = object.get("method").and_then(Value::as_str) else {
+        return json_response(
+            200,
+            "OK",
+            &mcp_rpc_error(
+                object.get("id").cloned().unwrap_or(Value::Null),
+                -32600,
+                "JSON-RPC method required",
+            ),
+            origin,
+            false,
+        );
+    };
+    let Some(id) = object.get("id").cloned() else {
+        return raw_json_response(202, "Accepted", &[], origin, false);
+    };
+    let params = object.get("params");
+    let response = match mcp_dispatch(method, params, bodies, expires_at_ms) {
+        Ok(result) => mcp_rpc_result(id, result),
+        Err((code, message)) => mcp_rpc_error(id, code, &message),
+    };
+    json_response(200, "OK", &response, origin, false)
+}
+
+fn mcp_rpc_result(id: Value, result: Value) -> Value {
+    json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "result": result
+    })
+}
+
+fn mcp_rpc_error(id: Value, code: i64, message: &str) -> Value {
+    json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "error": {
+            "code": code,
+            "message": message
+        }
+    })
+}
+
+fn mcp_dispatch(
+    method: &str,
+    params: Option<&Value>,
+    bodies: &BridgeBodies,
+    expires_at_ms: u128,
+) -> Result<Value, (i64, String)> {
+    match method {
+        "initialize" => Ok(mcp_initialize_result(params)),
+        "ping" => Ok(json!({})),
+        "tools/list" => Ok(json!({"tools": mcp_tool_definitions()})),
+        "tools/call" => mcp_call_tool(params, bodies, expires_at_ms),
+        "resources/list" => Ok(json!({"resources": mcp_resource_definitions()})),
+        "resources/read" => mcp_read_resource(params, bodies, expires_at_ms),
+        "resources/templates/list" => Ok(json!({"resourceTemplates": []})),
+        "prompts/list" => Ok(json!({"prompts": []})),
+        _ => Err((-32601, format!("MCP method not found: {method}"))),
+    }
+}
+
+fn mcp_initialize_result(params: Option<&Value>) -> Value {
+    const SUPPORTED_PROTOCOLS: [&str; 3] = ["2025-11-25", "2025-06-18", "2025-03-26"];
+    let requested = params
+        .and_then(|value| value.get("protocolVersion"))
+        .and_then(Value::as_str);
+    let protocol_version = requested
+        .filter(|value| SUPPORTED_PROTOCOLS.contains(value))
+        .unwrap_or(MCP_PROTOCOL_VERSION);
+    json!({
+        "protocolVersion": protocol_version,
+        "capabilities": {
+            "tools": {"listChanged": false},
+            "resources": {"subscribe": false, "listChanged": false}
+        },
+        "serverInfo": {
+            "name": "OutilsIA Local Cockpit",
+            "version": MCP_SERVER_VERSION
+        },
+        "instructions": "Serveur MCP local OutilsIA strictement en lecture seule. Utilise ses outils pour consulter l'instantané courant du matériel, du Hardware Doctor, des modèles installés, des benchmarks, de la recommandation et du Capability Passport. Il ne déclenche aucun scan, modèle, benchmark, téléchargement, fichier, backtest ou ordre de trading. Toute action locale reste dans l'application desktop avec consentement humain."
+    })
+}
+
+fn mcp_tool_definition(name: &str, title: &str, description: &str) -> Value {
+    json!({
+        "name": name,
+        "title": title,
+        "description": description,
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+        },
+        "annotations": {
+            "title": title,
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": false
+        }
+    })
+}
+
+fn mcp_tool_definitions() -> Vec<Value> {
+    vec![
+        mcp_tool_definition(
+            MCP_TOOL_NAMES[0],
+            "État du cockpit",
+            "Retourne l'identité du snapshot OutilsIA actif, son expiration et sa frontière de permissions. Ne scanne pas la machine.",
+        ),
+        mcp_tool_definition(
+            MCP_TOOL_NAMES[1],
+            "Profil matériel",
+            "Lit le profil matériel déjà capturé dans l'AI Capability Passport actif. Ne déclenche aucune sonde système.",
+        ),
+        mcp_tool_definition(
+            MCP_TOOL_NAMES[2],
+            "Hardware Doctor",
+            "Lit le dernier diagnostic Hardware Doctor et l'état des runtimes présents dans le snapshot.",
+        ),
+        mcp_tool_definition(
+            MCP_TOOL_NAMES[3],
+            "Modèles installés",
+            "Liste les modèles Ollama observés lors du snapshot avec leur runtime déclaré. N'installe et ne supprime rien.",
+        ),
+        mcp_tool_definition(
+            MCP_TOOL_NAMES[4],
+            "Recommandation locale",
+            "Lit la recommandation de modèle déjà calculée par OutilsIA et sa provenance. Ne recalcule pas la compatibilité.",
+        ),
+        mcp_tool_definition(
+            MCP_TOOL_NAMES[5],
+            "Preuves de benchmark",
+            "Retourne uniquement les preuves de benchmark incluses dans le Passport actif, sans prompt ni sortie brute.",
+        ),
+        mcp_tool_definition(
+            MCP_TOOL_NAMES[6],
+            "Capability Passport",
+            "Lit l'AI Capability Passport complet et son empreinte d'intégrité. Le document reste local.",
+        ),
+        mcp_tool_definition(
+            MCP_TOOL_NAMES[7],
+            "Handoff Strategy Arena",
+            "Lit le handoff borné destiné à Strategy Arena. Aucun backtest, stratégie ou ordre de trading n'est exécuté.",
+        ),
+    ]
+}
+
+fn mcp_call_tool(
+    params: Option<&Value>,
+    bodies: &BridgeBodies,
+    expires_at_ms: u128,
+) -> Result<Value, (i64, String)> {
+    let params = params
+        .and_then(Value::as_object)
+        .ok_or_else(|| (-32602, "tools/call params object required".to_string()))?;
+    let name = params
+        .get("name")
+        .and_then(Value::as_str)
+        .ok_or_else(|| (-32602, "tools/call name required".to_string()))?;
+    if params
+        .get("arguments")
+        .is_some_and(|value| !value.as_object().is_some_and(serde_json::Map::is_empty))
+    {
+        return Err((-32602, format!("{name} accepts no arguments")));
+    }
+    let payload = mcp_tool_payload(name, bodies, expires_at_ms)
+        .ok_or_else(|| (-32602, format!("Unknown read-only tool: {name}")))?;
+    let text = serde_json::to_string_pretty(&payload)
+        .map_err(|_| (-32603, "Tool result serialization failed".to_string()))?;
+    Ok(json!({
+        "content": [{"type": "text", "text": text}],
+        "structuredContent": payload,
+        "isError": false
+    }))
+}
+
+fn mcp_tool_payload(name: &str, bodies: &BridgeBodies, expires_at_ms: u128) -> Option<Value> {
+    let snapshot = bodies.snapshot.as_ref();
+    let passport = snapshot.get("passport").cloned().unwrap_or(Value::Null);
+    let generated_at = snapshot.get("generated_at").cloned().unwrap_or(Value::Null);
+    match name {
+        "outilsia_get_cockpit_status" => Some(json!({
+            "schema": "outilsia.local_mcp_status.v1",
+            "server": {
+                "name": "OutilsIA Local Cockpit",
+                "version": MCP_SERVER_VERSION,
+                "protocol_version": MCP_PROTOCOL_VERSION,
+                "transport": "streamable_http"
+            },
+            "snapshot": {
+                "generated_at": generated_at,
+                "expires_at_ms": expires_at_ms,
+                "passport_sha256": passport.pointer("/integrity/digest").cloned().unwrap_or(Value::Null)
+            },
+            "read_only": true,
+            "permissions": snapshot.get("permissions").cloned().unwrap_or(Value::Null),
+            "privacy": snapshot.get("privacy").cloned().unwrap_or(Value::Null),
+            "tools": MCP_TOOL_NAMES
+        })),
+        "outilsia_get_machine_profile" => Some(json!({
+            "schema": "outilsia.local_mcp_machine_profile.v1",
+            "snapshot_generated_at": generated_at,
+            "machine": passport.get("machine").cloned().unwrap_or(Value::Null),
+            "provenance": passport.get("machine_provenance").cloned().unwrap_or(Value::Null),
+            "binding": {
+                "app_version": passport.pointer("/binding/app_version").cloned().unwrap_or(Value::Null),
+                "build_id": passport.pointer("/binding/build_id").cloned().unwrap_or(Value::Null),
+                "os": passport.pointer("/binding/os").cloned().unwrap_or(Value::Null)
+            }
+        })),
+        "outilsia_get_hardware_doctor" => Some(json!({
+            "schema": "outilsia.local_mcp_hardware_doctor.v1",
+            "snapshot_generated_at": generated_at,
+            "hardware_doctor": passport.get("hardware_doctor").cloned().unwrap_or(Value::Null),
+            "runtime_readiness": passport.get("runtime_readiness").cloned().unwrap_or(Value::Null)
+        })),
+        "outilsia_list_installed_models" => {
+            let models = snapshot
+                .get("installed_models")
+                .cloned()
+                .unwrap_or_else(|| json!([]));
+            Some(json!({
+                "schema": "outilsia.local_mcp_installed_models.v1",
+                "snapshot_generated_at": generated_at,
+                "count": models.as_array().map(Vec::len).unwrap_or(0),
+                "installed_models": models
+            }))
+        }
+        "outilsia_get_model_recommendation" => Some(json!({
+            "schema": "outilsia.local_mcp_recommendation.v1",
+            "snapshot_generated_at": generated_at,
+            "recommendation": snapshot.get("recommendation").cloned().unwrap_or(Value::Null),
+            "model_autopilot": passport.get("model_autopilot").cloned().unwrap_or(Value::Null)
+        })),
+        "outilsia_get_benchmark_proofs" => {
+            let proofs = snapshot
+                .get("benchmark_proofs")
+                .cloned()
+                .unwrap_or_else(|| json!([]));
+            Some(json!({
+                "schema": "outilsia.local_mcp_benchmark_proofs.v1",
+                "snapshot_generated_at": generated_at,
+                "count": proofs.as_array().map(Vec::len).unwrap_or(0),
+                "benchmark_proofs": proofs,
+                "raw_prompts_included": false,
+                "raw_model_outputs_included": false
+            }))
+        }
+        "outilsia_get_capability_passport" => Some(passport),
+        "outilsia_get_strategy_arena_handoff" => Some(json!({
+            "schema": "outilsia.local_mcp_strategy_arena_handoff.v1",
+            "snapshot_generated_at": generated_at,
+            "handoff": snapshot.get("strategy_arena").cloned().unwrap_or(Value::Null)
+        })),
+        _ => None,
+    }
+}
+
+fn mcp_resource_definitions() -> Vec<Value> {
+    vec![
+        json!({
+            "uri": "outilsia://passport/current",
+            "name": "AI Capability Passport actif",
+            "description": "Snapshot local signé des capacités IA de la machine.",
+            "mimeType": "application/json"
+        }),
+        json!({
+            "uri": "outilsia://models/installed",
+            "name": "Modèles installés",
+            "description": "Modèles observés lors de la génération du snapshot.",
+            "mimeType": "application/json"
+        }),
+        json!({
+            "uri": "outilsia://recommendation/current",
+            "name": "Recommandation courante",
+            "description": "Dernière recommandation calculée par OutilsIA.",
+            "mimeType": "application/json"
+        }),
+        json!({
+            "uri": "outilsia://strategy-arena/handoff",
+            "name": "Handoff Strategy Arena",
+            "description": "Profil borné en lecture seule pour Strategy Arena.",
+            "mimeType": "application/json"
+        }),
+    ]
+}
+
+fn mcp_read_resource(
+    params: Option<&Value>,
+    bodies: &BridgeBodies,
+    expires_at_ms: u128,
+) -> Result<Value, (i64, String)> {
+    let uri = params
+        .and_then(|value| value.get("uri"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| (-32602, "resources/read uri required".to_string()))?;
+    let payload = match uri {
+        "outilsia://passport/current" => {
+            mcp_tool_payload("outilsia_get_capability_passport", bodies, expires_at_ms)
+        }
+        "outilsia://models/installed" => {
+            mcp_tool_payload("outilsia_list_installed_models", bodies, expires_at_ms)
+        }
+        "outilsia://recommendation/current" => {
+            mcp_tool_payload("outilsia_get_model_recommendation", bodies, expires_at_ms)
+        }
+        "outilsia://strategy-arena/handoff" => {
+            mcp_tool_payload("outilsia_get_strategy_arena_handoff", bodies, expires_at_ms)
+        }
+        _ => None,
+    }
+    .ok_or_else(|| (-32602, format!("Unknown OutilsIA resource: {uri}")))?;
+    let text = serde_json::to_string_pretty(&payload)
+        .map_err(|_| (-32603, "Resource serialization failed".to_string()))?;
+    Ok(json!({
+        "contents": [{
+            "uri": uri,
+            "mimeType": "application/json",
+            "text": text
+        }]
+    }))
+}
+
 fn json_response(
     status: u16,
     label: &str,
@@ -664,9 +1154,11 @@ fn raw_json_response(
         "X-Content-Type-Options: nosniff".to_string(),
         "Content-Security-Policy: default-src 'none'; frame-ancestors 'none'".to_string(),
         "Referrer-Policy: no-referrer".to_string(),
-        "Access-Control-Allow-Methods: GET, OPTIONS".to_string(),
-        "Access-Control-Allow-Headers: Authorization".to_string(),
+        "Access-Control-Allow-Methods: GET, POST, OPTIONS".to_string(),
+        "Access-Control-Allow-Headers: Authorization, Content-Type, Accept, MCP-Protocol-Version, MCP-Session-Id".to_string(),
+        "Access-Control-Expose-Headers: MCP-Protocol-Version".to_string(),
         "Access-Control-Max-Age: 60".to_string(),
+        format!("MCP-Protocol-Version: {MCP_PROTOCOL_VERSION}"),
         "Vary: Origin".to_string(),
     ];
     if let Some(value) = origin.filter(|value| allowed_origin(value)) {
@@ -726,6 +1218,19 @@ mod tests {
                 "raw_model_outputs_included": false,
                 "account_tokens_included": false
             },
+            "mcp": {
+                "read_only": true,
+                "actions_exposed": false,
+                "transport": "streamable_http",
+                "protocol_version": MCP_PROTOCOL_VERSION,
+                "tools": MCP_TOOL_NAMES,
+                "resources": [
+                    "outilsia://passport/current",
+                    "outilsia://models/installed",
+                    "outilsia://recommendation/current",
+                    "outilsia://strategy-arena/handoff"
+                ]
+            },
             "passport": passport,
             "installed_models": [{"ref": "qwen3:8b"}],
             "recommendation": {"recommended_model": "qwen3:8b"},
@@ -746,7 +1251,21 @@ mod tests {
             method: method.to_string(),
             path: path.to_string(),
             headers,
+            body: Vec::new(),
         }
+    }
+
+    fn mcp_request(body: Value, token: Option<&str>) -> HttpRequest {
+        let mut request = request("POST", MCP_PATH, token, None);
+        request
+            .headers
+            .insert("content-type".to_string(), "application/json".to_string());
+        request.headers.insert(
+            "accept".to_string(),
+            "application/json, text/event-stream".to_string(),
+        );
+        request.body = serde_json::to_vec(&body).expect("json request");
+        request
     }
 
     fn response_status(response: &[u8]) -> &str {
@@ -757,6 +1276,15 @@ mod tests {
             .unwrap_or_default()
     }
 
+    fn response_json(response: &[u8]) -> Value {
+        let offset = response
+            .windows(4)
+            .position(|window| window == b"\r\n\r\n")
+            .map(|index| index + 4)
+            .expect("http body");
+        serde_json::from_slice(&response[offset..]).expect("json response")
+    }
+
     #[test]
     fn payload_contract_rejects_mutation_and_bad_digest() {
         let mut payload = valid_payload();
@@ -764,6 +1292,9 @@ mod tests {
         payload["permissions"]["install_models"] = Value::Bool(true);
         assert!(validate_payload(&payload).is_err());
         payload["permissions"]["install_models"] = Value::Bool(false);
+        payload["mcp"]["actions_exposed"] = Value::Bool(true);
+        assert!(validate_payload(&payload).is_err());
+        payload["mcp"]["actions_exposed"] = Value::Bool(false);
         payload["passport"]["integrity"]["digest"] = Value::String("bad".to_string());
         assert!(validate_payload(&payload).is_err());
         let mut tampered = valid_payload();
@@ -870,6 +1401,11 @@ mod tests {
         .expect("bridge start");
         assert!(started.running);
         assert!(started.base_url.starts_with("http://127.0.0.1:"));
+        assert_eq!(started.mcp_url, format!("{}/mcp", started.base_url));
+        assert_eq!(started.mcp_protocol_version, MCP_PROTOCOL_VERSION);
+        assert_eq!(started.mcp_server_version, MCP_SERVER_VERSION);
+        assert_eq!(started.mcp_tools.len(), MCP_TOOL_NAMES.len());
+        assert!(started.endpoints.contains(&MCP_PATH.to_string()));
         assert_eq!(started.token.len(), 64);
         assert!(!started.token_persisted);
 
@@ -892,5 +1428,192 @@ mod tests {
         let stopped = stop_local_capability_bridge().expect("bridge stop");
         assert!(!stopped.running);
         assert!(!stopped.token_exposed);
+    }
+
+    #[test]
+    fn mcp_streamable_http_works_over_the_loopback_socket() {
+        let _guard = TEST_LOCK.lock().expect("test lock");
+        let started = start_local_capability_bridge(LocalCapabilityBridgeRequest {
+            payload: valid_payload(),
+            ttl_seconds: Some(60),
+        })
+        .expect("bridge start");
+        let port = started
+            .base_url
+            .rsplit(':')
+            .next()
+            .and_then(|value| value.parse::<u16>().ok())
+            .expect("bridge port");
+        let body = serde_json::to_vec(&json!({
+            "jsonrpc": "2.0",
+            "id": "network-tools",
+            "method": "tools/list",
+            "params": {}
+        }))
+        .expect("request body");
+        let headers = format!(
+            "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {}\r\nContent-Type: application/json\r\nAccept: application/json, text/event-stream\r\nContent-Length: {}\r\n\r\n",
+            started.token,
+            body.len()
+        );
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("loopback connect");
+        stream
+            .write_all(headers.as_bytes())
+            .expect("request headers");
+        stream.write_all(&body).expect("request body");
+        let mut response = Vec::new();
+        stream.read_to_end(&mut response).expect("mcp response");
+        assert!(response_status(&response).contains("200 OK"));
+        let response_text = String::from_utf8_lossy(&response);
+        assert!(response_text.contains("MCP-Protocol-Version: 2025-11-25"));
+        let response_body = response_json(&response);
+        assert_eq!(
+            response_body.pointer("/id").and_then(Value::as_str),
+            Some("network-tools")
+        );
+        assert_eq!(
+            response_body
+                .pointer("/result/tools")
+                .and_then(Value::as_array)
+                .map(Vec::len),
+            Some(MCP_TOOL_NAMES.len())
+        );
+        assert!(!response_text.contains(&started.token));
+        stop_local_capability_bridge().expect("bridge stop");
+    }
+
+    #[test]
+    fn mcp_contract_lists_and_calls_only_read_only_snapshot_tools() {
+        let payload = valid_payload();
+        let serialized = validate_payload(&payload).expect("valid payload");
+        let bodies = bridge_bodies(&payload, serialized).expect("valid bodies");
+        let token = "c".repeat(64);
+        let expires = unix_ms() + 60_000;
+
+        let initialize = response_for_request(
+            &mcp_request(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": MCP_PROTOCOL_VERSION,
+                        "capabilities": {},
+                        "clientInfo": {"name": "bridge-test", "version": "1.0"}
+                    }
+                }),
+                Some(&token),
+            ),
+            &token,
+            &bodies,
+            expires,
+        );
+        assert!(response_status(&initialize).contains("200 OK"));
+        let initialized = response_json(&initialize);
+        assert_eq!(
+            initialized
+                .pointer("/result/protocolVersion")
+                .and_then(Value::as_str),
+            Some(MCP_PROTOCOL_VERSION)
+        );
+        assert_eq!(
+            initialized
+                .pointer("/result/serverInfo/version")
+                .and_then(Value::as_str),
+            Some(MCP_SERVER_VERSION)
+        );
+
+        let listed = response_for_request(
+            &mcp_request(
+                json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}),
+                Some(&token),
+            ),
+            &token,
+            &bodies,
+            expires,
+        );
+        let listed_json = response_json(&listed);
+        let tools = listed_json
+            .pointer("/result/tools")
+            .and_then(Value::as_array)
+            .expect("tools array");
+        assert_eq!(tools.len(), MCP_TOOL_NAMES.len());
+        for tool in tools {
+            assert_eq!(
+                tool.pointer("/annotations/readOnlyHint")
+                    .and_then(Value::as_bool),
+                Some(true)
+            );
+            assert_eq!(
+                tool.pointer("/annotations/destructiveHint")
+                    .and_then(Value::as_bool),
+                Some(false)
+            );
+            assert_eq!(
+                tool.pointer("/annotations/openWorldHint")
+                    .and_then(Value::as_bool),
+                Some(false)
+            );
+        }
+
+        let called = response_for_request(
+            &mcp_request(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "outilsia_get_machine_profile",
+                        "arguments": {}
+                    }
+                }),
+                Some(&token),
+            ),
+            &token,
+            &bodies,
+            expires,
+        );
+        let called_text = String::from_utf8_lossy(&called);
+        assert!(called_text.contains("RTX test"));
+        assert!(!called_text.contains(&token));
+        let called_json = response_json(&called);
+        assert_eq!(
+            called_json
+                .pointer("/result/structuredContent/schema")
+                .and_then(Value::as_str),
+            Some("outilsia.local_mcp_machine_profile.v1")
+        );
+
+        let forbidden = response_for_request(
+            &mcp_request(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": 4,
+                    "method": "tools/call",
+                    "params": {"name": "install_ollama_model", "arguments": {}}
+                }),
+                Some(&token),
+            ),
+            &token,
+            &bodies,
+            expires,
+        );
+        assert_eq!(
+            response_json(&forbidden)
+                .pointer("/error/code")
+                .and_then(Value::as_i64),
+            Some(-32602)
+        );
+
+        let unauthorized = response_for_request(
+            &mcp_request(
+                json!({"jsonrpc": "2.0", "id": 5, "method": "tools/list", "params": {}}),
+                None,
+            ),
+            &token,
+            &bodies,
+            expires,
+        );
+        assert!(response_status(&unauthorized).contains("401 Unauthorized"));
     }
 }

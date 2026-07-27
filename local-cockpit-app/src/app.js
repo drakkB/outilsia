@@ -113,8 +113,26 @@ const MAX_CHAT_HISTORY = 60;
 const MAX_PRIVATE_WORKLOAD_RUNS = 12;
 const PRIVATE_WORKLOAD_PROTOCOL = "outilsia.private_workload_pack.v1";
 const LOCAL_CAPABILITY_BRIDGE_SCHEMA = "outilsia.local_capability_bridge.v1";
-const LOCAL_CAPABILITY_BRIDGE_CONTRACT_VERSION = "2026-07-12";
+const LOCAL_CAPABILITY_BRIDGE_CONTRACT_VERSION = "2026-07-27";
 const LOCAL_CAPABILITY_BRIDGE_TTL_SECONDS = 15 * 60;
+const LOCAL_MCP_PROTOCOL_VERSION = "2025-11-25";
+const LOCAL_MCP_SERVER_VERSION = "0.1.0";
+const LOCAL_MCP_TOOL_NAMES = Object.freeze([
+  "outilsia_get_cockpit_status",
+  "outilsia_get_machine_profile",
+  "outilsia_get_hardware_doctor",
+  "outilsia_list_installed_models",
+  "outilsia_get_model_recommendation",
+  "outilsia_get_benchmark_proofs",
+  "outilsia_get_capability_passport",
+  "outilsia_get_strategy_arena_handoff"
+]);
+const LOCAL_MCP_RESOURCE_URIS = Object.freeze([
+  "outilsia://passport/current",
+  "outilsia://models/installed",
+  "outilsia://recommendation/current",
+  "outilsia://strategy-arena/handoff"
+]);
 const BOARD_OBSERVER_REQUEST_SCHEMA = "outilsia.board_observer_request.v1";
 const BOARD_OBSERVER_RESULT_SCHEMA = "outilsia.board_observer_result.v1";
 const WORKSTACK_COMPILE_REQUEST_SCHEMA = "outilsia.workstack_compile_request.v1";
@@ -827,7 +845,7 @@ const WORKSPACE_SECTIONS = {
     ["Lancer le pilote Codex", ".workstack-arena-panel"],
     ["Vérifier les preuves", ".evidence-ledger-panel"],
     ["Créer le passeport IA", ".capability-passport-panel"],
-    ["Partager localement", ".local-capability-bridge-panel"],
+    ["Connecter une IA", ".local-capability-bridge-panel"],
     ["Préparer Strategy Arena", ".strategy-bridge-panel"]
   ],
   account: [
@@ -906,7 +924,7 @@ const WORKSPACE_FEATURES = Object.freeze({
     panel: ".local-capability-bridge-panel",
     target: ".local-capability-bridge-panel",
     focus: "#startLocalCapabilityBridgeBtn",
-    label: "Passerelle locale"
+    label: "Serveur MCP local"
   },
   board: {
     tab: "workflows",
@@ -11311,6 +11329,7 @@ function capabilityPassportDocument() {
       upgrade_digital_twin_v1: Boolean(report.upgrade_digital_twin),
       private_workload_packs_v1: true,
       local_capability_bridge_v1: true,
+      local_mcp_read_only_v0_1: true,
       install_safety_preflight_v1: true,
       local_arena: Boolean(report.arena),
       strategy_arena_profile_export: true
@@ -11378,7 +11397,7 @@ function capabilityPassportDocument() {
       "Upgrade Digital Twin simule des scénarios ; alimentation, connecteurs, dimensions, slots et QVL doivent être vérifiés physiquement avant achat.",
       "Tests privés compare des sorties avec des critères déterministes bornés ; les prompts et réponses bruts ne sont pas inclus dans le Passport.",
       "Install Safety Preflight estime le budget du modèle et mesure l'espace du volume Ollama sans exporter son chemin ; il ne prédit pas la vitesse ni l'offload GPU.",
-      "La passerelle locale est désactivée par défaut, liée à 127.0.0.1, bornée dans le temps et strictement en lecture seule ; son jeton éphémère n'est pas inclus dans ce Passport.",
+      "Le serveur MCP local est désactivé par défaut, lié à 127.0.0.1, borné dans le temps et strictement en lecture seule ; son jeton éphémère n'est pas inclus dans ce Passport.",
       "L'empreinte SHA-256 détecte une modification du document ; elle ne prouve ni l'identité du PC ni celle du propriétaire.",
       "Ce passeport ne constitue pas une validation de stratégie financière ni un résultat de backtest."
     ]
@@ -11528,6 +11547,16 @@ function localCapabilityBridgePolicy() {
     ttl_seconds: LOCAL_CAPABILITY_BRIDGE_TTL_SECONDS,
     max_ttl_seconds: 30 * 60,
     token_persisted: false,
+    mcp: {
+      server_version: LOCAL_MCP_SERVER_VERSION,
+      protocol_version: LOCAL_MCP_PROTOCOL_VERSION,
+      transport: "streamable_http",
+      path: "/mcp",
+      read_only: true,
+      actions_exposed: false,
+      tools: [...LOCAL_MCP_TOOL_NAMES],
+      resources: [...LOCAL_MCP_RESOURCE_URIS]
+    },
     allowed_origins: [
       "https://strategyarena.io",
       "https://www.strategyarena.io",
@@ -11535,6 +11564,7 @@ function localCapabilityBridgePolicy() {
       "http://127.0.0.1:<port>"
     ],
     endpoints: [
+      "/mcp",
       "/v1/health",
       "/v1/capabilities",
       "/v1/passport",
@@ -11559,6 +11589,10 @@ function localCapabilityBridgeSummary(runtime = state.localCapabilityBridge) {
     running,
     bind: policy.bind,
     base_url: running ? runtime.base_url || "" : "",
+    mcp_url: running ? runtime.mcp_url || `${runtime.base_url || ""}/mcp` : "",
+    mcp_protocol_version: runtime?.mcp_protocol_version || policy.mcp.protocol_version,
+    mcp_server_version: runtime?.mcp_server_version || policy.mcp.server_version,
+    mcp_tools: runtime?.mcp_tools || policy.mcp.tools,
     expires_at_ms: running ? Number(runtime.expires_at_ms || 0) : 0,
     read_only: true,
     token_persisted: false,
@@ -11571,10 +11605,13 @@ function localCapabilityBridgeSummary(runtime = state.localCapabilityBridge) {
 function localCapabilityBridgeMarkdown(runtime = state.localCapabilityBridge) {
   const summary = localCapabilityBridgeSummary(runtime);
   return [
-    "## Passerelle locale OutilsIA",
+    "## Serveur MCP local OutilsIA",
     "",
     `- Schéma: ${summary.schema}`,
     `- État: ${summary.running ? "active" : "désactivée"}`,
+    `- Transport: Streamable HTTP ${summary.mcp_protocol_version}`,
+    `- Endpoint: ${summary.running ? summary.mcp_url : "non ouvert"}`,
+    `- Outils: ${summary.mcp_tools.length} outils de consultation`,
     "- Liaison: 127.0.0.1 uniquement",
     "- Accès: lecture seule avec jeton Bearer éphémère",
     "- Durée: 15 minutes par défaut, 30 minutes maximum",
@@ -11624,6 +11661,15 @@ function localCapabilityBridgePayload() {
       account_tokens_included: false,
       token_persisted: false
     },
+    mcp: {
+      read_only: true,
+      actions_exposed: false,
+      transport: "streamable_http",
+      protocol_version: LOCAL_MCP_PROTOCOL_VERSION,
+      server_version: LOCAL_MCP_SERVER_VERSION,
+      tools: [...LOCAL_MCP_TOOL_NAMES],
+      resources: [...LOCAL_MCP_RESOURCE_URIS]
+    },
     passport,
     installed_models: passport.installed_models || [],
     benchmark_proofs: passport.benchmark_proofs || [],
@@ -11661,6 +11707,17 @@ function localCapabilityBridgePairingDocument() {
       token: runtime.token,
       header: `Authorization: Bearer ${runtime.token}`
     },
+    mcp: {
+      transport: "streamable_http",
+      url: runtime.mcp_url || `${runtime.base_url}/mcp`,
+      protocol_version: runtime.mcp_protocol_version || LOCAL_MCP_PROTOCOL_VERSION,
+      server_version: runtime.mcp_server_version || LOCAL_MCP_SERVER_VERSION,
+      headers: {
+        Authorization: `Bearer ${runtime.token}`
+      },
+      tools: runtime.mcp_tools || [...LOCAL_MCP_TOOL_NAMES],
+      resources: [...LOCAL_MCP_RESOURCE_URIS]
+    },
     endpoints: runtime.endpoints || localCapabilityBridgePolicy().endpoints,
     permissions: {
       read_only: true,
@@ -11670,7 +11727,7 @@ function localCapabilityBridgePairingDocument() {
       backtests: false,
       trading_execution: false
     },
-    warning: "Secret éphémère : ne pas publier. La passerelle s'arrête automatiquement à expiration."
+    warning: "Secret éphémère : ne pas publier. Le serveur MCP s'arrête automatiquement à expiration."
   };
 }
 
@@ -11699,7 +11756,7 @@ function renderLocalCapabilityBridgePanel() {
   if (!invoke && !runtime?.test_mode) {
     els.localCapabilityBridgeState.textContent = "app native requise";
     els.localCapabilityBridgeBox.className = "local-capability-bridge-box empty";
-    els.localCapabilityBridgeBox.textContent = "La passerelle loopback est disponible uniquement dans l'application Windows/Linux, jamais dans la page web.";
+    els.localCapabilityBridgeBox.textContent = "Le serveur MCP loopback est disponible uniquement dans l'application Windows/Linux, jamais depuis le site ou l'app ChatGPT publique.";
     return;
   }
   if (!state.scan) {
@@ -11711,7 +11768,7 @@ function renderLocalCapabilityBridgePanel() {
   if (!passportCurrent && !running) {
     els.localCapabilityBridgeState.textContent = "Passport requis";
     els.localCapabilityBridgeBox.className = "local-capability-bridge-box empty";
-    els.localCapabilityBridgeBox.textContent = "Génère un Passport à jour. Aucun serveur local ne démarre automatiquement.";
+    els.localCapabilityBridgeBox.textContent = "Génère un Passport à jour. Aucun serveur MCP local ne démarre automatiquement.";
     return;
   }
   if (!running) {
@@ -11719,7 +11776,7 @@ function renderLocalCapabilityBridgePanel() {
     els.localCapabilityBridgeBox.className = "local-capability-bridge-box empty";
     els.localCapabilityBridgeBox.innerHTML = `
       <strong>Prête, mais arrêtée par défaut.</strong>
-      <span>Un clic ouvre une API sur 127.0.0.1 pendant 15 minutes. Lecture seule, jeton éphémère, zéro persistance et aucune commande Ollama.</span>
+      <span>Un clic ouvre un serveur MCP Streamable HTTP sur 127.0.0.1 pendant 15 minutes. Huit outils lisent uniquement le dernier Passport.</span>
     `;
     return;
   }
@@ -11729,14 +11786,14 @@ function renderLocalCapabilityBridgePanel() {
   els.localCapabilityBridgeBox.className = "local-capability-bridge-box";
   els.localCapabilityBridgeBox.innerHTML = `
     <div class="local-bridge-summary">
-      <strong>${escapeHtml(runtime.base_url || "127.0.0.1")}</strong>
-      <span>Lecture seule · expiration automatique dans ${escapeHtml(remainingMinutes)} min</span>
+      <strong>${escapeHtml(runtime.mcp_url || `${runtime.base_url || "http://127.0.0.1"}/mcp`)}</strong>
+      <span>Lecture seule · MCP ${escapeHtml(runtime.mcp_protocol_version || LOCAL_MCP_PROTOCOL_VERSION)} · ${escapeHtml((runtime.mcp_tools || LOCAL_MCP_TOOL_NAMES).length)} outils · expiration dans ${escapeHtml(remainingMinutes)} min</span>
       <span>Passport SHA-256 ${escapeHtml(digest ? `${digest.slice(0, 16)}…${digest.slice(-8)}` : "non affiché")}</span>
     </div>
     <div class="local-bridge-rules">
       <span>Jeton conservé uniquement en mémoire.</span>
       <span>Aucun prompt, résultat brut, fichier personnel ou jeton de compte exposé.</span>
-      <span>Aucune installation, suppression, exécution de benchmark ou backtest disponible.</span>
+      <span>Aucune installation, suppression, analyse, benchmark, conversation ou backtest déclenchable.</span>
     </div>
   `;
 }
@@ -11751,7 +11808,7 @@ async function startLocalCapabilityBridge() {
     return null;
   }
   const confirmed = window.confirm(
-    "Ouvrir pendant 15 minutes une API locale en lecture seule sur 127.0.0.1 ? Aucun modèle, fichier ou réglage ne pourra être modifié."
+    "Ouvrir pendant 15 minutes le serveur MCP local en lecture seule sur 127.0.0.1 ? Il exposera uniquement le Passport courant et ne pourra déclencher aucune action."
   );
   if (!confirmed) return null;
   try {
@@ -11770,12 +11827,12 @@ async function startLocalCapabilityBridge() {
     renderLocalCapabilityBridgePanel();
     renderStrategyBridgePanel();
     renderReadinessPanel();
-    setStatus("Passerelle locale active pour 15 minutes", "ok");
+    setStatus("Serveur MCP local actif pour 15 minutes", "ok");
     return state.localCapabilityBridge;
   } catch (error) {
     state.localCapabilityBridge = null;
     renderLocalCapabilityBridgePanel();
-    setStatus(`Passerelle locale impossible : ${error}`, "error");
+    setStatus(`Serveur MCP local impossible : ${error}`, "error");
     return null;
   }
 }
@@ -11791,7 +11848,7 @@ async function stopLocalCapabilityBridge(silent = false) {
     renderStrategyBridgePanel();
     renderReadinessPanel();
   }
-  if (!silent) setStatus("Passerelle locale arrêtée", "ok");
+  if (!silent) setStatus("Serveur MCP local arrêté", "ok");
 }
 
 async function refreshLocalCapabilityBridgeStatus(silent = false) {
@@ -11806,7 +11863,7 @@ async function refreshLocalCapabilityBridgeStatus(silent = false) {
       state.localCapabilityBridge = { ...status, token: "", passport_digest: "" };
     }
     renderLocalCapabilityBridgePanel();
-    if (!silent) setStatus(status?.running ? "Passerelle locale vérifiée" : "Passerelle locale arrêtée", "ok");
+    if (!silent) setStatus(status?.running ? "Serveur MCP local vérifié" : "Serveur MCP local arrêté", "ok");
     return status;
   } catch (error) {
     if (!silent) setStatus(`Vérification locale impossible : ${error}`, "error");
@@ -11818,7 +11875,7 @@ async function copyLocalCapabilityBridgeConnection() {
   try {
     const pairing = localCapabilityBridgePairingDocument();
     await navigator.clipboard.writeText(`${JSON.stringify(pairing, null, 2)}\n`);
-    setStatus("Connexion locale copiée · secret éphémère", "ok");
+    setStatus("Connexion MCP copiée · secret éphémère", "ok");
   } catch (error) {
     setStatus(String(error), "warn");
   }
@@ -20100,6 +20157,10 @@ function installTestHarness() {
         contract_version: LOCAL_CAPABILITY_BRIDGE_CONTRACT_VERSION,
         running: true,
         base_url: "http://127.0.0.1:43127",
+        mcp_url: "http://127.0.0.1:43127/mcp",
+        mcp_protocol_version: LOCAL_MCP_PROTOCOL_VERSION,
+        mcp_server_version: LOCAL_MCP_SERVER_VERSION,
+        mcp_tools: [...LOCAL_MCP_TOOL_NAMES],
         token: `bridge-test-${"a".repeat(52)}`,
         expires_at_ms: Date.now() + (LOCAL_CAPABILITY_BRIDGE_TTL_SECONDS * 1000),
         ttl_seconds: LOCAL_CAPABILITY_BRIDGE_TTL_SECONDS,

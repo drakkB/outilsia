@@ -41,7 +41,7 @@ WORKSPACE_FIRST_SECTIONS = {
 
 HUMAN_PANEL_TITLES = {
     ".capability-passport-panel": ("Passeport IA", "AI Capability Passport"),
-    ".local-capability-bridge-panel": ("Partage local", "Local Capability Bridge"),
+    ".local-capability-bridge-panel": ("Serveur MCP local", "lecture seule v0.1"),
     ".board-observer-panel": ("Lire un board", "Board Observer"),
     ".workstack-composer-panel": ("Composer le plan", "Workstack Composer"),
     ".capability-router-panel": ("Affecter les rôles", "Capability Router"),

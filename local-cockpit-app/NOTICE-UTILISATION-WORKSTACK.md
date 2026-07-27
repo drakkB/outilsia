@@ -1,6 +1,6 @@
 # Notice d'utilisation - Workstacks et preuves OutilsIA
 
-Version de la notice : 2026-07-24
+Version de la notice : 2026-07-27
 Périmètre : OutilsIA Local Cockpit, espace **Atelier IA**
 
 ## Navigation du cockpit
@@ -27,11 +27,23 @@ Les actions transversales ouvrent automatiquement l'espace correspondant. Par ex
 | Workstack Composer | Transformer une carte prête en plan borné avec rôles, budget, permissions et gate humaine. | Aucune exécution, création de worktree, fusion ou publication. |
 | Capability Router | Détecter les CLI et modèles locaux disponibles, puis proposer un planificateur, un exécutant et un vérificateur distinct. | Ne lit pas les jetons, ne vérifie pas les quotas et ne transmet pas la mission aux agents. |
 | Agent Adapter Policy | Afficher le contrat signé propre à Codex CLI, Claude Code, Hermes Agent et Kimi Code : état d'exécution, consentements, budget et interdits. | Le registre n'autorise et ne lance aucun run. Codex reste borné à Signal Maze public ; Claude Code, Hermes et Kimi restent en détection seule. |
+| Serveur MCP local | Donner à un client local huit vues typées sur le dernier Passport : cockpit, machine, Doctor, modèles, recommandation, benchmarks et handoff Strategy Arena. | Aucun scan, installation, suppression, benchmark, dialogue, fichier, backtest ou trading. Le serveur est arrêté par défaut et expire après 15 minutes. |
 | Evidence Ledger | Conserver une trace locale chaînée des étapes validées et de leurs empreintes. | Ne stocke ni description brute, prompt, réponse de modèle, credential ou fichier projet. Il ne prouve pas à lui seul la qualité du résultat. |
 | ForgeBench | Préparer un protocole équitable `Signal Maze v1`, publier un contrat de gameplay observable, vérifier une référence clavier/souris/tactile, sceller localement des seeds privés, tester bubblewrap puis Chromium sans réseau, exécuter un pilote technique, puis appeler facultativement un modèle Ollama local sur le seul contrat public. | Le préflight Chromium n'installe rien : il teste une page minimale et propose au besoin une commande Playwright à copier. Après consentement, le code candidat est gelé, contrôlé publiquement puis soumis à un second Chromium holdout sans réseau. Cette preuve locale ne vaut encore ni score scientifique ni vainqueur : familles de checks publiques, vault non chiffré, pairs et énergie restent des blocages. ForgeBench ne lance pas seul un agent CLI. |
 | Workstack Arena | Dans le candidat source, lancer **Codex CLI uniquement sur Signal Maze public** dans un workspace jetable, avec un seul essai borné, puis enregistrer une décision humaine structurée sur le reçu signé. | Aucun projet utilisateur, board, test caché, fusion ou publication. La revue n'inspecte ni capture ni code et n'autorise ni livraison ni gagnant. Claude Code, Hermes, Kimi et l'exécution d'une carte arbitraire restent indisponibles. Le build public actuel ne contient pas encore ce pilote. |
 | MemoryForge / Obsidian | Conserver les décisions, bilans et connaissances durables du projet. | Ne reçoit pas tous les logs, prompts ou sorties brutes du Ledger. |
 | Strategy Arena | Exploiter les capacités IA locales préparées par OutilsIA pour les workflows quant, puis compiler et backtester. | OutilsIA ne génère pas de stratégie financière et ne lance pas de backtest. |
+
+## Connexion MCP locale
+
+1. Scanner la machine et générer un **AI Capability Passport** à jour.
+2. Dans Atelier IA, ouvrir **Serveur MCP local** puis cliquer sur **Démarrer MCP 15 min**.
+3. Copier la connexion MCP. Ce document contient un secret temporaire : ne pas le publier ou l'ajouter à un dépôt.
+4. Configurer le client avec le transport Streamable HTTP, l'URL locale `/mcp` et l'en-tête Bearer fourni.
+5. Vérifier que le client voit exactement huit outils, tous annotés en lecture seule.
+6. Arrêter le serveur depuis OutilsIA après la consultation. Toute nouvelle preuve ou expiration arrête aussi la connexion.
+
+Le POST JSON-RPC utilisé par MCP ne constitue pas une autorisation d'écriture sur la machine. Les outils ne prennent aucun argument d'action et ne lisent que l'instantané figé au démarrage.
 
 ## Parcours disponible aujourd'hui
 

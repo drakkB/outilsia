@@ -5,6 +5,7 @@ export const PUBLIC_RELEASE_FEATURES = Object.freeze([
   "runtime_driver_intelligence_v1",
   "private_workload_packs_v1",
   "local_capability_bridge_v1",
+  "local_mcp_read_only_v0_1",
   "install_safety_preflight_v1",
   "ai_capability_passport_v1",
   "model_autopilot_v1",
@@ -12,6 +13,7 @@ export const PUBLIC_RELEASE_FEATURES = Object.freeze([
 ]);
 
 export const PUBLIC_RELEASE_NOTES = Object.freeze([
+  "MCP local v0.1 : huit outils et quatre ressources permettent à Codex, Claude Code ou un autre client MCP local de consulter le Passport, Hardware Doctor, les modèles, preuves, recommandations et handoff Strategy Arena. Le serveur reste désactivé par défaut, temporaire, lié à 127.0.0.1 et incapable de déclencher un scan ou une action.",
   "Install Safety Preflight v1 : avant tout ollama pull, l'app vérifie le runtime ciblé et l'espace du volume de modèles natif ou WSL, ajoute une réserve prudente, bloque seulement une insuffisance mesurée et n'exporte jamais le chemin du dossier Ollama.",
   "Local Capability Bridge v1 : API éphémère strictement en lecture seule sur 127.0.0.1, désactivée par défaut, ouverte 15 minutes après consentement avec jeton Bearer aléatoire non persisté ; aucun modèle, benchmark, fichier, réglage, backtest ou ordre de trading ne peut être exécuté.",
   "Private Workload Packs v1 : comparer 2 à 3 modèles déjà installés sur Code, Français, résumé, mémoire/Obsidian ou tâche métier ; zéro téléchargement, zéro cloud et aucun prompt ou résultat brut conservé dans le rapport, MemoryForge ou le Passport.",

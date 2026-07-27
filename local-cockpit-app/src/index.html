@@ -355,16 +355,16 @@
 
         <article class="panel local-capability-bridge-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
-            <h2>Partage local <small>Local Capability Bridge</small></h2>
+            <h2>Serveur MCP local <small>lecture seule v0.1</small></h2>
             <span id="localCapabilityBridgeState">désactivée</span>
           </div>
           <div id="localCapabilityBridgeBox" class="local-capability-bridge-box empty">
-            Génère d'abord l'AI Capability Passport. Tu pourras ensuite ouvrir pendant 15 minutes une API strictement en lecture seule sur 127.0.0.1.
+            Génère d'abord l'AI Capability Passport. Tu pourras ensuite connecter Codex, Claude Code ou un autre client MCP pendant 15 minutes, sans lui donner le droit d'agir sur le PC.
           </div>
           <div class="row-actions">
             <button class="path-action" type="button" data-open-feature="passport">Préparer le Passport</button>
-            <button id="startLocalCapabilityBridgeBtn" type="button" disabled>Démarrer 15 min</button>
-            <button id="copyLocalCapabilityBridgeBtn" type="button" disabled>Copier connexion</button>
+            <button id="startLocalCapabilityBridgeBtn" type="button" disabled>Démarrer MCP 15 min</button>
+            <button id="copyLocalCapabilityBridgeBtn" type="button" disabled>Copier connexion MCP</button>
             <button id="refreshLocalCapabilityBridgeBtn" type="button" disabled>Vérifier</button>
             <button id="stopLocalCapabilityBridgeBtn" type="button" disabled>Arrêter</button>
           </div>

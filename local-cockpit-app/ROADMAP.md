@@ -313,8 +313,11 @@ Premier jalon candidat v1 terminé le 12 juillet 2026 dans le build Windows/Linu
 - [x] Arrêter automatiquement la passerelle si le Passport devient périmé.
 - [x] Ajouter tests Rust réseau et recette Playwright desktop/mobile avec contrôle anti-fuite du jeton.
 - [x] Construire un candidat Windows/Linux et vérifier les cinq artefacts, le manifeste et les SHA-256 avant toute communication publique.
+- [x] Ajouter un serveur MCP Streamable HTTP v0.1 sur la même liaison loopback : huit outils et quatre ressources strictement read-only, snapshot figé, aucune action locale.
+- [x] Publier dans le handshake MCP les instructions de frontière et annoter chaque outil `readOnlyHint=true`, `destructiveHint=false`, `openWorldHint=false`.
 - [ ] Ajouter le consommateur côté Strategy Arena dans une session séparée, sans déplacer la gestion Ollama.
-- [ ] Étudier MCP local seulement après stabilisation de ce contrat HTTP minimal.
+- [ ] Recetter la connexion réelle avec Codex, Claude Code et MCP Inspector sur Windows et Linux avant toute promotion publique.
+- [ ] Étudier séparément une v0.2 `prepare -> confirmer dans l'app -> exécuter`, sans modifier le contrat read-only v0.1.
 
 ## Phase 7 - Workstack Composer
 

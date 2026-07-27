@@ -112,9 +112,18 @@ npm run verify:private-workload-seo
 
 La source canonique est `server-work/static/data/private-workload-packs.json`. Le fichier `src/private-workload-packs.js` est généré par `npm run sync:private-workload-packs`. Une campagne compare une seule tâche sur deux ou trois modèles Ollama déjà installés, avec 60 secondes maximum par modèle et zéro téléchargement. Seuls scores, checks, métriques et SHA-256 sont persistés ; les consignes personnalisées et réponses brutes sont exclues du stockage, du rapport, du PDF, de MemoryForge et du Capability Passport 1.3.0.
 
-## Local Capability Bridge v1
+## Local MCP v0.1 et Capability Bridge
 
-La passerelle locale est désactivée par défaut et disponible uniquement dans l'espace Atelier IA après génération d'un Passport à jour. Un consentement explicite ouvre un serveur HTTP sur `127.0.0.1` pendant 15 minutes. Les routes de données exigent un jeton Bearer aléatoire conservé uniquement en mémoire. Le contrat est GET-only : aucun téléchargement ou retrait de modèle, benchmark, chat, accès aux fichiers personnels, changement de configuration, backtest ou ordre de trading n'est exposé.
+Le serveur est désactivé par défaut et disponible uniquement dans l'espace Atelier IA après génération d'un Passport à jour. Un consentement explicite ouvre pendant 15 minutes :
+
+- un serveur MCP Streamable HTTP sur `http://127.0.0.1:<port>/mcp` ;
+- les anciennes routes GET du Capability Bridge pour les consommateurs locaux existants.
+
+Toutes les données viennent d'un instantané figé. Les huit outils MCP consultent l'état du cockpit, le matériel, Hardware Doctor, les modèles installés, la recommandation, les preuves de benchmark, le Passport et le handoff Strategy Arena. Les quatre ressources couvrent Passport, modèles, recommandation et handoff.
+
+Le jeton Bearer aléatoire reste uniquement en mémoire. Aucun outil MCP ne déclenche de scan, téléchargement ou retrait de modèle, benchmark, chat, accès aux fichiers personnels, changement de configuration, backtest ou ordre de trading. La connexion complète est copiée depuis l'interface et expire avec le serveur.
+
+Voir [LOCAL-MCP.md](LOCAL-MCP.md) pour le contrat et la recette de connexion.
 
 ## Workstacks, preuves et benchmarks
 
