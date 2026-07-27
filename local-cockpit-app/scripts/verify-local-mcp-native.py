@@ -59,10 +59,17 @@ def clipboard_text() -> str:
 
 def clear_clipboard() -> None:
     subprocess.run(
-        ["powershell.exe", "-NoProfile", "-Command", "Set-Clipboard -Value ''"],
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-Command",
+            "[Console]::OutputEncoding=[Text.UTF8Encoding]::new(); Set-Clipboard -Value ''",
+        ],
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
 
 

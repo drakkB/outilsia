@@ -22,6 +22,8 @@ def main():
         panel = page.locator(".local-capability-bridge-panel")
         panel.screenshot(path=str(ARTIFACTS / "local-capability-bridge-desktop.png"))
         copy_enabled = not page.locator("#copyLocalCapabilityBridgeBtn").is_disabled()
+        client_config_enabled = not page.locator("#copyLocalCapabilityClientConfigBtn").is_disabled()
+        token_copy_enabled = not page.locator("#copyLocalCapabilityTokenBtn").is_disabled()
         state_text = page.locator("#localCapabilityBridgeState").inner_text()
         page.set_viewport_size({"width": 390, "height": 844})
         panel.screenshot(path=str(ARTIFACTS / "local-capability-bridge-mobile.png"))
@@ -35,6 +37,8 @@ def main():
     report = result["report"]
     strategy = result["bridge"]
     panel_text = result["panel"]
+    codex_config = result["codexConfig"]
+    claude_config = result["claudeConfig"]
     token = pairing["authorization"]["token"]
 
     assert payload["schema"] == "outilsia.local_capability_bridge.v1"
@@ -121,10 +125,19 @@ def main():
     assert token not in json.dumps(payload, ensure_ascii=False)
     assert token not in json.dumps(report, ensure_ascii=False)
     assert token not in json.dumps(passport, ensure_ascii=False)
+    assert token not in codex_config
+    assert token not in claude_config
+    assert "[mcp_servers.outilsia_local]" in codex_config
+    assert 'bearer_token_env_var = "OUTILSIA_LOCAL_MCP_TOKEN"' in codex_config
+    assert '"type": "http"' in claude_config
+    assert "Bearer ${OUTILSIA_LOCAL_MCP_TOKEN}" in claude_config
     assert "Lecture seule" in panel_text
     assert "Aucune installation" in panel_text
+    assert "Choisis Codex ou Claude Code" in panel_text
     assert state_text.startswith("active")
     assert copy_enabled is True
+    assert client_config_enabled is True
+    assert token_copy_enabled is True
 
     assert passport["passport_version"] == "1.3.0"
     assert passport["capabilities"]["local_capability_bridge_v1"] is True

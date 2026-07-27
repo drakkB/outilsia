@@ -492,6 +492,9 @@ const els = {
   localCapabilityBridgeState: $("localCapabilityBridgeState"),
   localCapabilityBridgeBox: $("localCapabilityBridgeBox"),
   startLocalCapabilityBridgeBtn: $("startLocalCapabilityBridgeBtn"),
+  localCapabilityClientSelect: $("localCapabilityClientSelect"),
+  copyLocalCapabilityClientConfigBtn: $("copyLocalCapabilityClientConfigBtn"),
+  copyLocalCapabilityTokenBtn: $("copyLocalCapabilityTokenBtn"),
   copyLocalCapabilityBridgeBtn: $("copyLocalCapabilityBridgeBtn"),
   refreshLocalCapabilityBridgeBtn: $("refreshLocalCapabilityBridgeBtn"),
   stopLocalCapabilityBridgeBtn: $("stopLocalCapabilityBridgeBtn"),
@@ -11731,6 +11734,35 @@ function localCapabilityBridgePairingDocument() {
   };
 }
 
+function localCapabilityBridgeClientConfig(client = els.localCapabilityClientSelect?.value || "codex") {
+  const runtime = state.localCapabilityBridge;
+  if (!localCapabilityBridgeIsRunning(runtime) || !runtime?.mcp_url) {
+    throw new Error("Démarre d'abord le serveur MCP local");
+  }
+  if (client === "claude") {
+    return `${JSON.stringify({
+      mcpServers: {
+        outilsia_local: {
+          type: "http",
+          url: runtime.mcp_url,
+          headers: {
+            Authorization: "Bearer ${OUTILSIA_LOCAL_MCP_TOKEN}"
+          }
+        }
+      }
+    }, null, 2)}\n`;
+  }
+  return [
+    "[mcp_servers.outilsia_local]",
+    `url = "${runtime.mcp_url}"`,
+    'bearer_token_env_var = "OUTILSIA_LOCAL_MCP_TOKEN"',
+    "enabled = true",
+    "required = false",
+    'default_tools_approval_mode = "writes"',
+    ""
+  ].join("\n");
+}
+
 let localCapabilityBridgeStopPending = false;
 
 function renderLocalCapabilityBridgePanel() {
@@ -11739,6 +11771,8 @@ function renderLocalCapabilityBridgePanel() {
   const running = localCapabilityBridgeIsRunning(runtime);
   const passportCurrent = capabilityPassportIsCurrent();
   els.startLocalCapabilityBridgeBtn.disabled = !invoke || !passportCurrent || running;
+  els.copyLocalCapabilityClientConfigBtn.disabled = !running || !runtime?.mcp_url;
+  els.copyLocalCapabilityTokenBtn.disabled = !running || !runtime?.token;
   els.copyLocalCapabilityBridgeBtn.disabled = !running || !runtime?.token;
   els.refreshLocalCapabilityBridgeBtn.disabled = !invoke;
   els.stopLocalCapabilityBridgeBtn.disabled = !invoke || !running;
@@ -11794,6 +11828,11 @@ function renderLocalCapabilityBridgePanel() {
       <span>Jeton conservé uniquement en mémoire.</span>
       <span>Aucun prompt, résultat brut, fichier personnel ou jeton de compte exposé.</span>
       <span>Aucune installation, suppression, analyse, benchmark, conversation ou backtest déclenchable.</span>
+    </div>
+    <div class="local-bridge-client-steps">
+      <span><strong>1.</strong> Choisis Codex ou Claude Code.</span>
+      <span><strong>2.</strong> Copie sa configuration sans secret.</span>
+      <span><strong>3.</strong> Copie le jeton temporaire puis lance le client avant l'expiration.</span>
     </div>
   `;
 }
@@ -11876,6 +11915,34 @@ async function copyLocalCapabilityBridgeConnection() {
     const pairing = localCapabilityBridgePairingDocument();
     await navigator.clipboard.writeText(`${JSON.stringify(pairing, null, 2)}\n`);
     setStatus("Connexion MCP copiée · secret éphémère", "ok");
+  } catch (error) {
+    setStatus(String(error), "warn");
+  }
+}
+
+async function copyLocalCapabilityBridgeClientConfig() {
+  try {
+    const client = els.localCapabilityClientSelect?.value || "codex";
+    await navigator.clipboard.writeText(localCapabilityBridgeClientConfig(client));
+    setStatus(
+      client === "claude"
+        ? "Configuration Claude Code copiée · aucun secret inclus"
+        : "Configuration Codex copiée · aucun secret inclus",
+      "ok"
+    );
+  } catch (error) {
+    setStatus(String(error), "warn");
+  }
+}
+
+async function copyLocalCapabilityBridgeToken() {
+  try {
+    const runtime = state.localCapabilityBridge;
+    if (!localCapabilityBridgeIsRunning(runtime) || !runtime?.token) {
+      throw new Error("Démarre d'abord le serveur MCP local");
+    }
+    await navigator.clipboard.writeText(runtime.token);
+    setStatus("Jeton MCP copié · secret temporaire valable 15 minutes maximum", "warn");
   } catch (error) {
     setStatus(String(error), "warn");
   }
@@ -20177,6 +20244,8 @@ function installTestHarness() {
       return {
         payload: localCapabilityBridgePayload(),
         pairing: localCapabilityBridgePairingDocument(),
+        codexConfig: localCapabilityBridgeClientConfig("codex"),
+        claudeConfig: localCapabilityBridgeClientConfig("claude"),
         summary: localCapabilityBridgeSummary(),
         passport: passportState.passport,
         report: readinessReport(),
@@ -22182,6 +22251,8 @@ els.generateCapabilityPassportBtn?.addEventListener("click", generateCapabilityP
 els.copyCapabilityPassportBtn?.addEventListener("click", copyCapabilityPassport);
 els.downloadCapabilityPassportBtn?.addEventListener("click", downloadCapabilityPassport);
 els.startLocalCapabilityBridgeBtn?.addEventListener("click", startLocalCapabilityBridge);
+els.copyLocalCapabilityClientConfigBtn?.addEventListener("click", copyLocalCapabilityBridgeClientConfig);
+els.copyLocalCapabilityTokenBtn?.addEventListener("click", copyLocalCapabilityBridgeToken);
 els.copyLocalCapabilityBridgeBtn?.addEventListener("click", copyLocalCapabilityBridgeConnection);
 els.refreshLocalCapabilityBridgeBtn?.addEventListener("click", () => refreshLocalCapabilityBridgeStatus(false));
 els.stopLocalCapabilityBridgeBtn?.addEventListener("click", () => stopLocalCapabilityBridge(false));

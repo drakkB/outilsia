@@ -111,6 +111,31 @@ Le rapport est écrit dans
 `.artifacts/native-local-mcp/native-local-mcp-e2e.json`. Il ne contient ni
 jeton, ni prompt, ni sortie brute de modèle.
 
+## Recette clients réels
+
+La recette suivante démarre le serveur depuis les boutons natifs, puis fait
+réellement appeler trois outils de lecture par Codex CLI et Claude Code sous
+Windows :
+
+```powershell
+python .\scripts\verify-local-mcp-clients.py --cdp-url http://127.0.0.1:9444
+```
+
+Codex et Claude utilisent leurs connexions existantes. Le jeton MCP est fourni
+uniquement par variable d'environnement. Les configurations et transcriptions
+restent dans un dossier temporaire supprimé à la fin. Le rapport expurgé
+`.artifacts/native-local-mcp-clients/native-local-mcp-clients.json` conserve
+seulement les outils appelés, les valeurs vérifiées et le résultat du nettoyage.
+
+Cette recette doit confirmer :
+
+- lecture du profil CPU/GPU/VRAM ;
+- lecture du nombre de modèles installés ;
+- lecture du nombre de preuves benchmark ;
+- absence d'outil d'installation, de benchmark ou de dialogue ;
+- arrêt du serveur, effacement du presse-papiers et suppression des fichiers
+  temporaires.
+
 ## Évolutions exclues de v0.1
 
 Une future action locale devra utiliser un autre contrat :

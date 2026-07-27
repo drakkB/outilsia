@@ -3104,6 +3104,56 @@ dd {
   border-radius: 8px;
 }
 
+.local-bridge-client-controls {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(190px, 1fr) auto auto;
+  margin: 10px 0;
+}
+
+.local-bridge-client-controls label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.local-bridge-client-controls select {
+  margin: 0;
+}
+
+.local-bridge-client-steps {
+  border-top: 1px solid rgba(91, 241, 205, 0.16);
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.local-bridge-client-steps span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.local-bridge-client-steps strong {
+  color: var(--cyan);
+}
+
+.local-bridge-advanced {
+  margin-top: 9px;
+}
+
+.local-bridge-advanced summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.local-bridge-advanced .row-actions {
+  margin-top: 8px;
+}
+
 .board-observer-intro,
 .board-observer-box {
   background:
@@ -6690,6 +6740,10 @@ dd {
 
   .secondary-actions {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .local-bridge-client-controls {
+    grid-template-columns: 1fr;
   }
 
   .verdict-summary {
