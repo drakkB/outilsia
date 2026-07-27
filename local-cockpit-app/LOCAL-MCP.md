@@ -94,6 +94,23 @@ La recette minimale doit réussir `initialize`, `tools/list`,
 `outilsia_get_machine_profile`, `resources/list` et
 `resources/read` sur `outilsia://passport/current`.
 
+## Recette native automatisée
+
+Le build Windows peut être testé en boîte noire avec WebView2 ouvert en mode
+CDP. La recette pilote les boutons réels, récupère la connexion via le
+presse-papiers, appelle les huit outils et les quatre ressources depuis un
+client HTTP séparé, vérifie les refus, arrête le serveur puis efface le jeton :
+
+```powershell
+$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9333"
+Start-Process .\src-tauri\target\release\outilsia-local-cockpit.exe
+python .\scripts\verify-local-mcp-native.py
+```
+
+Le rapport est écrit dans
+`.artifacts/native-local-mcp/native-local-mcp-e2e.json`. Il ne contient ni
+jeton, ni prompt, ni sortie brute de modèle.
+
 ## Évolutions exclues de v0.1
 
 Une future action locale devra utiliser un autre contrat :

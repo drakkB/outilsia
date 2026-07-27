@@ -2,12 +2,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::io::{Cursor, Read};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tiny_http::{Header, Request as TinyRequest, Response as TinyResponse, Server, StatusCode};
 
 const BRIDGE_SCHEMA: &str = "outilsia.local_capability_bridge.v1";
 const BRIDGE_CONTRACT_VERSION: &str = "2026-07-27";
@@ -376,21 +376,19 @@ pub(crate) fn start_local_capability_bridge(
         .ttl_seconds
         .unwrap_or(DEFAULT_TTL_SECONDS)
         .clamp(MIN_TTL_SECONDS, MAX_TTL_SECONDS);
-    let listener = TcpListener::bind(("127.0.0.1", 0))
+    let server = Server::http(("127.0.0.1", 0))
         .map_err(|err| format!("Ouverture de la passerelle locale impossible: {err}"))?;
-    listener
-        .set_nonblocking(true)
-        .map_err(|err| format!("Configuration de la passerelle locale impossible: {err}"))?;
-    let port = listener
-        .local_addr()
-        .map_err(|err| format!("Adresse de passerelle locale indisponible: {err}"))?
+    let port = server
+        .server_addr()
+        .to_ip()
+        .ok_or_else(|| "Adresse TCP de passerelle locale indisponible.".to_string())?
         .port();
     let base_url = format!("http://127.0.0.1:{port}");
     let mcp_url = format!("{base_url}{MCP_PATH}");
     let token = generate_token()?;
     let expires_at_ms = unix_ms() + u128::from(ttl_seconds) * 1000;
     let shutdown = Arc::new(AtomicBool::new(false));
-    let alive = Arc::new(AtomicBool::new(true));
+    let alive = Arc::new(AtomicBool::new(false));
 
     stop_current_bridge()?;
     {
@@ -406,9 +404,12 @@ pub(crate) fn start_local_capability_bridge(
     }
 
     let server_token = token.clone();
+    let (ready_sender, ready_receiver) = mpsc::sync_channel(1);
     thread::spawn(move || {
+        alive.store(true, Ordering::SeqCst);
+        let _ = ready_sender.send(());
         serve_bridge(
-            listener,
+            server,
             server_token,
             bodies,
             expires_at_ms,
@@ -417,6 +418,10 @@ pub(crate) fn start_local_capability_bridge(
         );
         alive.store(false, Ordering::SeqCst);
     });
+    if ready_receiver.recv_timeout(Duration::from_secs(1)).is_err() {
+        stop_current_bridge()?;
+        return Err("Demarrage du serveur MCP local non confirme.".to_string());
+    }
 
     Ok(LocalCapabilityBridgeStart {
         schema: BRIDGE_SCHEMA.to_string(),
@@ -465,7 +470,7 @@ pub(crate) fn get_local_capability_bridge_status() -> Result<LocalCapabilityBrid
 }
 
 fn serve_bridge(
-    listener: TcpListener,
+    server: Server,
     token: String,
     bodies: BridgeBodies,
     expires_at_ms: u128,
@@ -474,10 +479,13 @@ fn serve_bridge(
 ) {
     let mut request_count = 0_usize;
     while !shutdown.load(Ordering::SeqCst) && unix_ms() < expires_at_ms {
-        match listener.accept() {
-            Ok((mut stream, peer)) => {
+        match server.recv_timeout(Duration::from_millis(50)) {
+            Ok(Some(mut request)) => {
                 request_count += 1;
-                let response = if !peer.ip().is_loopback() {
+                let response = if !request
+                    .remote_addr()
+                    .is_some_and(|peer| peer.ip().is_loopback())
+                {
                     json_response(
                         403,
                         "Forbidden",
@@ -494,7 +502,7 @@ fn serve_bridge(
                         false,
                     )
                 } else {
-                    match read_request(&stream) {
+                    match read_request(&mut request) {
                         Ok(request) => {
                             response_for_request(&request, &token, &bodies, expires_at_ms)
                         }
@@ -503,82 +511,88 @@ fn serve_bridge(
                         }
                     }
                 };
-                let _ = stream.write_all(&response);
-                let _ = stream.flush();
+                let _ = request.respond(tiny_response(response));
             }
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                thread::sleep(Duration::from_millis(25));
-            }
-            Err(_) => thread::sleep(Duration::from_millis(50)),
+            Ok(None) => {}
+            Err(_) => thread::sleep(Duration::from_millis(25)),
         }
     }
     alive.store(false, Ordering::SeqCst);
 }
 
-fn read_request(stream: &TcpStream) -> Result<HttpRequest, String> {
-    stream
-        .set_read_timeout(Some(Duration::from_secs(2)))
-        .map_err(|_| "read_timeout_unavailable".to_string())?;
-    let clone = stream
-        .try_clone()
-        .map_err(|_| "request_stream_unavailable".to_string())?;
-    let mut reader = BufReader::new(clone);
-    let mut first = String::new();
-    let mut total = reader
-        .read_line(&mut first)
-        .map_err(|_| "request_line_unreadable".to_string())?;
-    if first.len() > 4096 || total == 0 {
-        return Err("request_line_invalid".to_string());
-    }
-    let parts = first.split_whitespace().collect::<Vec<_>>();
-    if parts.len() != 3 || !parts[2].starts_with("HTTP/1.") {
-        return Err("request_line_invalid".to_string());
-    }
-    let mut headers = HashMap::new();
-    loop {
-        let mut line = String::new();
-        let read = reader
-            .read_line(&mut line)
-            .map_err(|_| "request_headers_unreadable".to_string())?;
-        total += read;
-        if total > MAX_REQUEST_BYTES {
-            return Err("request_too_large".to_string());
-        }
-        if read == 0 || line == "\r\n" || line == "\n" {
-            break;
-        }
-        let Some((name, value)) = line.split_once(':') else {
-            return Err("request_header_invalid".to_string());
-        };
-        headers.insert(name.trim().to_ascii_lowercase(), value.trim().to_string());
-    }
+fn read_request(request: &mut TinyRequest) -> Result<HttpRequest, String> {
+    let header_bytes = request.headers().iter().fold(
+        request.method().as_str().len() + request.url().len(),
+        |total, header| {
+            total
+                .saturating_add(header.field.as_str().len())
+                .saturating_add(header.value.as_str().len())
+                .saturating_add(4)
+        },
+    );
+    let headers = request
+        .headers()
+        .iter()
+        .map(|header| {
+            (
+                header.field.as_str().to_ascii_lowercase().to_string(),
+                header.value.as_str().to_string(),
+            )
+        })
+        .collect::<HashMap<_, _>>();
     if headers.contains_key("transfer-encoding") {
         return Err("transfer_encoding_not_supported".to_string());
     }
-    let content_length = headers
-        .get("content-length")
-        .map(|value| {
-            value
-                .parse::<usize>()
-                .map_err(|_| "content_length_invalid".to_string())
-        })
-        .transpose()?
-        .unwrap_or(0);
-    if total.saturating_add(content_length) > MAX_REQUEST_BYTES {
+    let content_length = request.body_length().unwrap_or(0);
+    if header_bytes.saturating_add(content_length) > MAX_REQUEST_BYTES {
         return Err("request_too_large".to_string());
     }
-    let mut body = vec![0_u8; content_length];
-    if content_length > 0 {
-        reader
-            .read_exact(&mut body)
-            .map_err(|_| "request_body_unreadable".to_string())?;
+    let mut body = Vec::with_capacity(content_length);
+    request
+        .as_reader()
+        .take((MAX_REQUEST_BYTES + 1) as u64)
+        .read_to_end(&mut body)
+        .map_err(|_| "request_body_unreadable".to_string())?;
+    if body.len() > MAX_REQUEST_BYTES {
+        return Err("request_too_large".to_string());
     }
     Ok(HttpRequest {
-        method: parts[0].to_string(),
-        path: parts[1].to_string(),
+        method: request.method().as_str().to_string(),
+        path: request.url().to_string(),
         headers,
         body,
     })
+}
+
+fn tiny_response(raw: Vec<u8>) -> TinyResponse<Cursor<Vec<u8>>> {
+    let split = raw
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .map(|index| index + 4)
+        .unwrap_or(raw.len());
+    let head = String::from_utf8_lossy(&raw[..split.saturating_sub(4)]);
+    let mut lines = head.lines();
+    let status = lines
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .and_then(|value| value.parse::<u16>().ok())
+        .unwrap_or(500);
+    let headers = lines
+        .filter_map(|line| line.split_once(':'))
+        .filter(|(name, _)| {
+            !name.eq_ignore_ascii_case("content-length") && !name.eq_ignore_ascii_case("connection")
+        })
+        .filter_map(|(name, value)| Header::from_bytes(name.trim(), value.trim()).ok())
+        .collect::<Vec<_>>();
+    let body = raw[split..].to_vec();
+    let length = body.len();
+    TinyResponse::new(
+        StatusCode(status),
+        headers,
+        Cursor::new(body),
+        Some(length),
+        None,
+    )
 }
 
 fn local_dev_origin(origin: &str, prefix: &str) -> bool {
@@ -1180,7 +1194,8 @@ fn raw_json_response(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Read;
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
 
     static TEST_LOCK: Mutex<()> = Mutex::new(());
 
@@ -1417,7 +1432,7 @@ mod tests {
             .expect("bridge port");
         let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("loopback connect");
         stream
-            .write_all(b"GET /v1/health HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+            .write_all(b"GET /v1/health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
             .expect("health request");
         let mut response = String::new();
         stream
@@ -1452,7 +1467,7 @@ mod tests {
         }))
         .expect("request body");
         let headers = format!(
-            "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {}\r\nContent-Type: application/json\r\nAccept: application/json, text/event-stream\r\nContent-Length: {}\r\n\r\n",
+            "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {}\r\nContent-Type: application/json\r\nAccept: application/json, text/event-stream\r\nConnection: close\r\nContent-Length: {}\r\n\r\n",
             started.token,
             body.len()
         );
@@ -1479,6 +1494,58 @@ mod tests {
             Some(MCP_TOOL_NAMES.len())
         );
         assert!(!response_text.contains(&started.token));
+        stop_local_capability_bridge().expect("bridge stop");
+    }
+
+    #[test]
+    fn mcp_loopback_handles_a_short_request_burst() {
+        let _guard = TEST_LOCK.lock().expect("test lock");
+        let started = start_local_capability_bridge(LocalCapabilityBridgeRequest {
+            payload: valid_payload(),
+            ttl_seconds: Some(60),
+        })
+        .expect("bridge start");
+        let port = started
+            .base_url
+            .rsplit(':')
+            .next()
+            .and_then(|value| value.parse::<u16>().ok())
+            .expect("bridge port");
+
+        for request_id in 0..64 {
+            let body = serde_json::to_vec(&json!({
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "method": "ping"
+            }))
+            .expect("request body");
+            let headers = format!(
+                "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {}\r\nContent-Type: application/json\r\nAccept: application/json\r\nConnection: close\r\nContent-Length: {}\r\n\r\n",
+                started.token,
+                body.len()
+            );
+            let mut stream =
+                TcpStream::connect(("127.0.0.1", port)).expect("loopback burst connect");
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .expect("read timeout");
+            stream
+                .write_all(headers.as_bytes())
+                .expect("request headers");
+            stream.write_all(&body).expect("request body");
+            let mut response = Vec::new();
+            stream
+                .read_to_end(&mut response)
+                .expect("complete burst response");
+            assert!(response_status(&response).contains("200 OK"));
+            assert_eq!(
+                response_json(&response)
+                    .pointer("/id")
+                    .and_then(Value::as_u64),
+                Some(request_id)
+            );
+        }
+
         stop_local_capability_bridge().expect("bridge stop");
     }
 
