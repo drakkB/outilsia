@@ -593,7 +593,26 @@ if ($hash -eq $expected) { &quot;OutilsIA: SHA256 OK&quot; } else { &quot;Outils
     };
     const shortHash = (hash) => hash ? `${hash.slice(0, 16)}...${hash.slice(-8)}` : "a publier";
     const fmtInt = (value) => new Intl.NumberFormat("fr-FR").format(Number(value || 0));
-    const trackedUrlFor = (file) => file?.url || (file?.name ? `/download/local-cockpit/${encodeURIComponent(file.name)}` : "#");
+    const directDownloadPrefix = "/static/downloads/local-cockpit/";
+    const trackedUrlFor = (file) => file?.name
+      ? `/download/local-cockpit/${encodeURIComponent(file.name)}`
+      : "#";
+    const bindStaticDownloadTracking = (release) => {
+      const releaseNames = new Set((release?.files || []).map((file) => file?.name).filter(Boolean));
+      document.querySelectorAll(`#telechargements-directs a[href^="${directDownloadPrefix}"]`).forEach((link) => {
+        const directUrl = link.getAttribute("href") || "";
+        const encodedName = directUrl.slice(directDownloadPrefix.length);
+        let fileName = "";
+        try{
+          fileName = decodeURIComponent(encodedName);
+        }catch(_err){
+          return;
+        }
+        if(!releaseNames.has(fileName)) return;
+        link.href = trackedUrlFor({name: fileName});
+        link.setAttribute("download", fileName);
+      });
+    };
     const verifyCommandFor = (file) => {
       if(!file?.name || !file?.sha256) return "";
       if(file.platform === "windows-x64"){
@@ -694,6 +713,7 @@ if ($hash -eq $expected) { &quot;OutilsIA: SHA256 OK&quot; } else { &quot;Outils
         const file = chooseRecommendedFile(release);
         if(!file || !file.url) return;
         renderDownloadList(release, file);
+        bindStaticDownloadTracking(release);
         renderFreshness(release);
         downloadBtn.classList.remove("disabled");
         downloadBtn.removeAttribute("aria-disabled");
