@@ -22,6 +22,12 @@ OutilsIA is a French-first toolbox for running AI on your own machine: free in-b
 
 The open desktop client scans CPU, RAM, GPU, VRAM, storage and Ollama runtimes, installs models only after explicit confirmation, benchmarks them with native Ollama metrics and recommends which tested model to keep.
 
+### Dated evidence
+
+[Inspect the first public Local Cockpit benchmark record](https://outilsia.fr/preuves-local-cockpit): Hermes 3 8B measured at 118.5 tokens/s through Ollama Windows with 100% GPU placement on an RTX 4080 SUPER 16 GB machine, on 27 July 2026. The record exposes the exact machine, runtime, app build, source commit, raw screenshot SHA-256 and limits.
+
+This is evidence for one private release candidate on one machine. It is not presented as a stable-release claim, a universal speed estimate or completed multi-machine validation.
+
 - **Hardware Doctor 2.0** separates detected drivers from observed runtime allocation. After a benchmark it uses Ollama `/api/ps` (`size_vram / size`) to report CPU, hybrid CPU/GPU or GPU execution; missing evidence stays unknown.
 - **Runtime & Driver Intelligence v1 (cross-platform candidate `291887472771`, not yet claimed as public)** uses a dated official-source matrix to separate driver presence, CUDA/ROCm/Vulkan signals, Ollama support and measured `/api/ps` execution. Pascal remains capped at CUDA toolkit 12.x, Strix Halo Windows/Linux are evaluated separately, Intel keeps its OEM warning, and shared RAM is never relabeled as dedicated VRAM.
 - **Model Autopilot v1** compares three bounded Ollama execution profiles on one already-installed model, requires explicit consent before testing or applying, and can restore the previous profile or Ollama defaults.

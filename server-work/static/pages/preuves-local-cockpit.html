@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Preuves OutilsIA Local Cockpit : benchmarks IA locale datés</title>
+  <meta name="description" content="Consultez les preuves datées d'OutilsIA Local Cockpit : machine, modèle, runtime, tokens/s, latence, capture brute, SHA-256 et limites de chaque benchmark IA locale.">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://outilsia.fr/preuves-local-cockpit">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="OutilsIA.fr">
+  <meta property="og:locale" content="fr_FR">
+  <meta property="og:url" content="https://outilsia.fr/preuves-local-cockpit">
+  <meta property="og:title" content="Preuves OutilsIA Local Cockpit">
+  <meta property="og:description" content="Des résultats IA locale datés, reliés à une machine, un modèle, un runtime, un build et une capture vérifiable.">
+  <meta property="og:image" content="https://outilsia.fr/static/images/local-cockpit/evidence/hermes3-8b-rtx4080-super-20260727.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://outilsia.fr/static/images/local-cockpit/evidence/hermes3-8b-rtx4080-super-20260727.jpg">
+  <link rel="stylesheet" href="/static/css/tailwind.min.css">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #070b10;
+      --band: #0c131d;
+      --panel: #111a25;
+      --line: #2a3b4d;
+      --text: #f8fafc;
+      --muted: #a8b6c6;
+      --cyan: #67e8f9;
+      --green: #86efac;
+      --amber: #fcd34d;
+      --red: #fca5a5;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      overflow-x: hidden;
+      color: var(--text);
+      background: var(--bg);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+    a { color: inherit; }
+    .wrap { width: min(1120px, calc(100% - 32px)); margin: 0 auto; }
+    .topbar { border-bottom: 1px solid #1f2b39; background: #080d14; }
+    .topbar__inner {
+      min-height: 62px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .brand { color: #fff; font-size: 19px; font-weight: 900; text-decoration: none; }
+    .brand span { color: var(--cyan); }
+    .topnav { display: flex; flex-wrap: wrap; gap: 16px; color: var(--muted); font-size: 13px; }
+    .topnav a:hover { color: #fff; }
+    .hero { padding: 58px 0 30px; background: #080e16; }
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--cyan);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    h1 {
+      max-width: 930px;
+      margin: 0;
+      font-size: clamp(36px, 7vw, 68px);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+    .lead {
+      max-width: 850px;
+      margin: 20px 0 0;
+      color: #c6d1de;
+      font-size: clamp(17px, 2vw, 21px);
+      line-height: 1.65;
+    }
+    .statusline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin-top: 24px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .statusline strong { color: var(--green); }
+    .proof-shot {
+      margin: 30px 0 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: #04070b;
+    }
+    .proof-shot img {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 760px;
+      object-fit: contain;
+    }
+    .caption {
+      margin: 0;
+      padding: 13px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .band { padding: 46px 0; border-top: 1px solid #172230; }
+    .band--alt { background: var(--band); }
+    h2 { margin: 0 0 12px; font-size: clamp(25px, 4vw, 37px); line-height: 1.15; }
+    h3 { margin: 0 0 7px; font-size: 17px; line-height: 1.3; }
+    .section-intro {
+      max-width: 810px;
+      margin: 0 0 24px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.7;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .metric {
+      min-width: 0;
+      min-height: 114px;
+      padding: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .metric__label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .metric__value {
+      display: block;
+      margin-top: 7px;
+      overflow-wrap: anywhere;
+      color: #fff;
+      font-size: 19px;
+      font-weight: 900;
+      line-height: 1.25;
+    }
+    .metric__note { display: block; margin-top: 5px; color: #8fa1b5; font-size: 12px; line-height: 1.4; }
+    .levels {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .level {
+      padding: 17px;
+      border-top: 3px solid #64748b;
+      background: #0d1621;
+    }
+    .level:nth-child(2) { border-color: var(--amber); }
+    .level:nth-child(3) { border-color: var(--green); }
+    .level:nth-child(4) { border-color: var(--cyan); }
+    .level p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .record {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(280px, .7fr);
+      gap: 28px;
+      align-items: start;
+    }
+    .record dl { margin: 0; }
+    .record-row {
+      display: grid;
+      grid-template-columns: minmax(150px, .35fr) minmax(0, 1fr);
+      gap: 14px;
+      padding: 12px 0;
+      border-bottom: 1px solid #223040;
+    }
+    .record dt { color: var(--muted); font-size: 13px; }
+    .record dd { margin: 0; color: #fff; font-size: 14px; font-weight: 750; overflow-wrap: anywhere; }
+    .limit-box {
+      padding: 18px;
+      background: #191711;
+      border: 1px solid #5f5128;
+      border-radius: 8px;
+    }
+    .limit-box h3 { color: var(--amber); }
+    .limit-box ul { margin: 12px 0 0; padding-left: 19px; color: #d1c7a9; }
+    .limit-box li { margin: 9px 0; line-height: 1.5; }
+    code {
+      display: block;
+      padding: 12px;
+      overflow-wrap: anywhere;
+      color: #d7e3ee;
+      background: #05090e;
+      border: 1px solid #263649;
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+    .button {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 15px;
+      color: #e8eef5;
+      background: #142132;
+      border: 1px solid #3a4d63;
+      border-radius: 7px;
+      font-size: 14px;
+      font-weight: 850;
+      text-align: center;
+      text-decoration: none;
+    }
+    .button:hover { border-color: var(--cyan); color: #fff; }
+    .button--primary { color: #06111d; background: var(--cyan); border-color: var(--cyan); }
+    .button--primary:hover { color: #06111d; background: #a5f3fc; }
+    .public-status {
+      padding: 20px;
+      background: #101922;
+      border-left: 4px solid var(--green);
+    }
+    .public-status p { margin: 7px 0 0; color: var(--muted); line-height: 1.65; }
+    footer { padding: 30px 0 42px; color: #7f90a3; font-size: 12px; border-top: 1px solid #172230; }
+    @media (max-width: 820px) {
+      .metrics, .levels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .record { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .topbar__inner { align-items: flex-start; flex-direction: column; padding: 14px 0; }
+      .hero { padding-top: 40px; }
+      .metrics, .levels { grid-template-columns: 1fr; }
+      .record-row { grid-template-columns: 1fr; gap: 4px; }
+      .actions { display: grid; grid-template-columns: 1fr; }
+      .button { width: 100%; }
+    }
+  </style>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Dataset",
+        "@id": "https://outilsia.fr/preuves-local-cockpit#benchmark-20260727-hermes3-8b",
+        "name": "Benchmark local Hermes 3 8B sur RTX 4080 SUPER",
+        "description": "Mesure OutilsIA Local Cockpit datée du 27 juillet 2026 : 118,5 tokens/s, 8 579 ms, Ollama Windows et placement GPU 100 % sur RTX 4080 SUPER 16 Go.",
+        "url": "https://outilsia.fr/preuves-local-cockpit",
+        "dateCreated": "2026-07-27",
+        "dateModified": "2026-07-27",
+        "inLanguage": "fr-FR",
+        "creator": {
+          "@type": "Person",
+          "@id": "https://outilsia.fr/#chris",
+          "name": "Chris Drakkeng",
+          "url": "https://outilsia.fr/about"
+        },
+        "measurementTechnique": "Benchmark local lancé dans OutilsIA Local Cockpit via Ollama Windows, avec métriques de vitesse, latence et placement GPU affichées par l'application.",
+        "variableMeasured": [
+          {"@type": "PropertyValue", "name": "Vitesse de génération", "value": 118.5, "unitText": "tokens/s"},
+          {"@type": "PropertyValue", "name": "Temps observé", "value": 8579, "unitCode": "MS"},
+          {"@type": "PropertyValue", "name": "Placement GPU", "value": 100, "unitText": "%"},
+          {"@type": "PropertyValue", "name": "VRAM du GPU", "value": 16, "unitText": "Go"}
+        ],
+        "distribution": {
+          "@type": "DataDownload",
+          "contentUrl": "https://outilsia.fr/static/images/local-cockpit/evidence/hermes3-8b-rtx4080-super-20260727.jpg",
+          "encodingFormat": "image/jpeg",
+          "sha256": "be744a08ff04454af0deecb30b2583512b831ae8fe41f152240da56e2765c7b4"
+        }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://outilsia.fr/scanner-ia-local#software",
+        "name": "OutilsIA Local Cockpit",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Windows, Linux",
+        "softwareVersion": "0.1.1",
+        "url": "https://outilsia.fr/scanner-ia-local",
+        "downloadUrl": "https://outilsia.fr/telecharger-scanner-ia-local",
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {"@type": "ListItem", "position": 1, "name": "Accueil", "item": "https://outilsia.fr/"},
+          {"@type": "ListItem", "position": 2, "name": "Local Cockpit", "item": "https://outilsia.fr/scanner-ia-local"},
+          {"@type": "ListItem", "position": 3, "name": "Preuves", "item": "https://outilsia.fr/preuves-local-cockpit"}
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar__inner">
+      <a class="brand" href="/">Outils<span>IA</span></a>
+      <nav class="topnav" aria-label="Navigation principale">
+        <a href="/scanner-ia-local">Local Cockpit</a>
+        <a href="/comment-nous-testons">Méthode</a>
+        <a href="/telecharger-scanner-ia-local">Télécharger</a>
+        <a href="https://github.com/drakkB/outilsia" rel="noopener">Code GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">Registre de preuves OutilsIA Local Cockpit</p>
+        <h1>Un benchmark IA locale doit montrer d'où vient son chiffre.</h1>
+        <p class="lead">Machine, modèle, runtime, build, date, capture brute et limites : cette page publie les éléments qui permettent de distinguer une compatibilité estimée d'une performance réellement mesurée.</p>
+        <div class="statusline" aria-label="Résumé de la première preuve">
+          <span><strong>Mesuré</strong> le 27 juillet 2026</span>
+          <span>Hermes 3 8B</span>
+          <span>RTX 4080 SUPER 16 Go</span>
+          <span>Ollama Windows</span>
+        </div>
+        <figure class="proof-shot">
+          <a href="/static/images/local-cockpit/evidence/hermes3-8b-rtx4080-super-20260727.jpg">
+            <img src="/static/images/local-cockpit/evidence/hermes3-8b-rtx4080-super-20260727.jpg" width="1183" height="811" loading="eager" alt="Capture brute OutilsIA Local Cockpit montrant le benchmark Hermes 3 8B à 118,5 tokens par seconde sur RTX 4080 SUPER">
+          </a>
+          <figcaption class="caption">Capture brute du résultat. Aucun chiffre n'a été reconstruit pour cette page. Cliquez pour ouvrir le fichier original publié.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="band band--alt">
+      <div class="wrap">
+        <p class="eyebrow">Résultat n° OIA-LC-BENCH-20260727-HERMES3-8B-RTX4080S</p>
+        <h2>Ce qui a été observé</h2>
+        <p class="section-intro">Il s'agit d'un test ponctuel sur une machine précise. Le résultat prouve que ce parcours a fonctionné dans ces conditions ; il ne prédit pas la vitesse de tous les PC équipés du même GPU.</p>
+        <div class="metrics">
+          <div class="metric"><span class="metric__label">Génération</span><span class="metric__value">118,5 tok/s</span><span class="metric__note">Mesure affichée par le runtime local</span></div>
+          <div class="metric"><span class="metric__label">Temps observé</span><span class="metric__value">8 579 ms</span><span class="metric__note">Durée du test affichée dans l'app</span></div>
+          <div class="metric"><span class="metric__label">Placement</span><span class="metric__value">GPU 100 %</span><span class="metric__note">4,6 / 4,6 Go placés en VRAM</span></div>
+          <div class="metric"><span class="metric__label">Achat conseillé</span><span class="metric__value">Aucun achat urgent</span><span class="metric__note">La machine répond déjà au besoin testé</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap">
+        <p class="eyebrow">Langage de preuve</p>
+        <h2>Quatre mots, quatre niveaux différents</h2>
+        <p class="section-intro">OutilsIA utilise ce vocabulaire dans ses guides et dans Local Cockpit pour éviter de transformer une fiche technique en benchmark.</p>
+        <div class="levels">
+          <article class="level">
+            <h3>Déclaré</h3>
+            <p>Une caractéristique saisie par l'utilisateur. Elle n'a pas été lue sur la machine.</p>
+          </article>
+          <article class="level">
+            <h3>Détecté</h3>
+            <p>Une information lue localement : CPU, RAM, GPU, VRAM, runtime ou modèle installé.</p>
+          </article>
+          <article class="level">
+            <h3>Estimé</h3>
+            <p>Une compatibilité calculée depuis la mémoire disponible, la taille du modèle et le catalogue.</p>
+          </article>
+          <article class="level">
+            <h3>Mesuré</h3>
+            <p>Un benchmark réellement exécuté avec une référence de modèle et un runtime identifiés.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band--alt">
+      <div class="wrap record">
+        <div>
+          <p class="eyebrow">Fiche technique de la preuve</p>
+          <h2>Contexte reproductible</h2>
+          <dl>
+            <div class="record-row"><dt>Date</dt><dd>27 juillet 2026</dd></div>
+            <div class="record-row"><dt>Application testée</dt><dd>OutilsIA Local Cockpit 0.1.2-rc.2, candidate privée</dd></div>
+            <div class="record-row"><dt>Build / commit</dt><dd>20260727124017 / e60b45a6582d0ba2b1ce65fc48f8d17c6759040d</dd></div>
+            <div class="record-row"><dt>CPU</dt><dd>AMD Ryzen 7 7800X3D</dd></div>
+            <div class="record-row"><dt>RAM</dt><dd>63 Go détectés</dd></div>
+            <div class="record-row"><dt>GPU</dt><dd>NVIDIA GeForce RTX 4080 SUPER, 16 Go VRAM</dd></div>
+            <div class="record-row"><dt>OS</dt><dd>Windows 11 (26200)</dd></div>
+            <div class="record-row"><dt>Runtime</dt><dd>Ollama Windows</dd></div>
+            <div class="record-row"><dt>Modèle</dt><dd>hermes3:8b</dd></div>
+            <div class="record-row"><dt>Fenêtre de recette</dt><dd>1183 × 811 pixels, échelle Windows non modifiée</dd></div>
+          </dl>
+        </div>
+        <aside class="limit-box">
+          <h3>Ce que cette preuve ne démontre pas</h3>
+          <ul>
+            <li>Elle ne compare pas Hermes 3 à tous les autres modèles.</li>
+            <li>Elle ne promet pas 118,5 tok/s sur une autre RTX 4080 SUPER.</li>
+            <li>Elle ne remplace pas les tests à venir sur GTX 1080 Ti, RTX 3060, CPU only et portable.</li>
+            <li>Elle ne transforme pas la candidate privée 0.1.2 en version stable publique.</li>
+          </ul>
+        </aside>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap">
+        <p class="eyebrow">Intégrité et audit</p>
+        <h2>Le fichier publié porte une empreinte vérifiable</h2>
+        <p class="section-intro">Le SHA-256 ci-dessous correspond à la capture brute utilisée sur cette page. Le dépôt GitHub expose le code du client desktop et les scripts de release ; le backend et les données privées n'y sont pas publiés.</p>
+        <code>be744a08ff04454af0deecb30b2583512b831ae8fe41f152240da56e2765c7b4  hermes3-8b-rtx4080-super-20260727.jpg</code>
+        <div class="actions">
+          <a class="button" href="/static/images/local-cockpit/evidence/hermes3-8b-rtx4080-super-20260727.jpg">Ouvrir la capture</a>
+          <a class="button" href="https://github.com/drakkB/outilsia" rel="noopener">Consulter le code GitHub</a>
+          <a class="button" href="/comment-nous-testons">Lire la méthode complète</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band--alt">
+      <div class="wrap">
+        <div class="public-status">
+          <h2>Version publique et campagne terrain</h2>
+          <p>La version téléchargeable reste la bêta publique 0.1.1, build 291439601671, distribuée pour Windows et Linux avec SHA-256. Le benchmark ci-dessus provient d'une candidate privée 0.1.2 et sert de preuve de développement, pas d'annonce de version stable. La campagne multi-machines reste en cours.</p>
+        </div>
+        <div class="actions">
+          <a class="button button--primary" href="/telecharger-scanner-ia-local">Télécharger la bêta publique</a>
+          <a class="button" href="/static/downloads/local-cockpit/release.json">Vérifier le manifeste de release</a>
+          <a class="button" href="/scanner-ia-local">Découvrir toutes les fonctions</a>
+          <a class="button" href="/r/c9UaPaUTfcLTzpJyWLNLlkJBkhi6acu_">Voir un rapport de scan public</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">OutilsIA.fr · Benchmarks datés, limites explicites, achat après diagnostic.</div>
+  </footer>
+</body>
+</html>
