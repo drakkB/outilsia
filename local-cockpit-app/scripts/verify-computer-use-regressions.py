@@ -27,7 +27,8 @@ def main():
         stale = page.evaluate(
             "() => window.__OUTILSIA_TEST__.applyComputerUseRegressionState()"
         )
-        assert stale["modelInstalled"] is False, stale
+        assert stale["modelInstalled"] is True, stale
+        assert stale["modelInstalledInScan"] is False, stale
         assert stale["action"]["command"] == "install-test", stale
         assert stale["reportReady"] is False, stale
         require(stale["firstTest"], "Mesure historique", "état historique qwen")

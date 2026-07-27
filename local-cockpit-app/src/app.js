@@ -2565,7 +2565,7 @@ function topRecommendedModel() {
 function recommendedModelState() {
   const model = topRecommendedModel();
   const ref = actionableOllamaRef(model);
-  const installed = ref ? isOllamaModelInstalled(ref) : false;
+  const installed = ref ? isOllamaModelInstalledInScan(ref) : false;
   const benchmarked = ref
     ? hasSuccessfulBenchmarkFor(ref)
     : false;
@@ -6751,7 +6751,7 @@ function firstTestReportText() {
   const scan = state.scan || {};
   const model = "qwen3:0.6b";
   const ollamaReady = hasUsableOllamaRuntime(scan);
-  const modelReady = isOllamaModelInstalled(model);
+  const modelReady = isOllamaModelInstalledInScan(model);
   const benchmark = state.benchmark && normalizeOllamaRef(state.benchmark.model) === normalizeOllamaRef(model)
     ? state.benchmark
     : successfulBenchmarkFor(model);
@@ -6776,7 +6776,7 @@ function prepareFlowState() {
   const testModel = "qwen3:0.6b";
   const scanned = Boolean(state.scan);
   const ollamaReady = hasUsableOllamaRuntime(state.scan);
-  const modelReady = isOllamaModelInstalled(testModel);
+  const modelReady = isOllamaModelInstalledInScan(testModel);
   const benchmarkReady = hasSuccessfulBenchmarkFor(testModel);
   const benchmarkSpeed = benchmarkSpeedFor(testModel);
   const recommended = recommendedModelState();
@@ -8650,7 +8650,7 @@ function renderFirstTestPanel() {
   const benchmark = successfulBenchmarkFor(model);
   const benchmarkReady = Boolean(benchmark);
   const benchmarkMatches = Boolean(state.benchmark?.success && normalizeOllamaRef(state.benchmark?.model || "") === normalizeOllamaRef(model));
-  const modelReady = isOllamaModelInstalled(model);
+  const modelReady = isOllamaModelInstalledInScan(model);
   const historicalBenchmark = Boolean(benchmarkReady && !modelReady);
 
   const steps = [
@@ -8667,7 +8667,7 @@ function renderFirstTestPanel() {
 
   const recommended = topRecommendedModel();
   const recommendedRef = actionableOllamaRef(recommended);
-  const recommendedInstalled = recommendedRef ? isOllamaModelInstalled(recommendedRef) : false;
+  const recommendedInstalled = recommendedRef ? isOllamaModelInstalledInScan(recommendedRef) : false;
   const recommendedInfo = recommendedRef ? modelInfo(recommendedRef) : null;
   const recommendedHtml = recommendedRef ? `
     <div class="first-test-recommended">
@@ -17086,7 +17086,7 @@ function chatModelPresets() {
       label,
       model: clean,
       reason,
-      installed: isOllamaModelInstalled(clean),
+      installed: isOllamaModelInstalledInScan(clean),
       benchmark: successfulBenchmarkFor(clean)
     });
   };
@@ -21600,6 +21600,7 @@ function installTestHarness() {
       scan.ram_gb = 64;
       scan.installed_models = (scan.installed_models || [])
         .filter((model) => !sameOllamaModel(modelLabel(model), "qwen3:0.6b"));
+      state.optimisticInstalledModels = ["qwen3:0.6b"];
       renderScan(scan);
       renderCompatibility(demoCompatibility());
       const historicalQwen = {
@@ -21619,6 +21620,7 @@ function installTestHarness() {
       renderPrimaryAction();
       return {
         modelInstalled: isOllamaModelInstalled("qwen3:0.6b"),
+        modelInstalledInScan: isOllamaModelInstalledInScan("qwen3:0.6b"),
         firstTest: els.firstTestBox?.textContent || "",
         action: primaryActionState(),
         reportReady: prepareFlowState().reportReady
