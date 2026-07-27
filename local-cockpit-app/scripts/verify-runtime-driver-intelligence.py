@@ -110,6 +110,8 @@ def main():
     assert result["pascalDoctor"]["runtime"]["driver_intelligence"]["schema"] == "outilsia.runtime_driver_intelligence.v1"
     assert "Runtime & Driver Intelligence v1" in result["pascalPanel"]
     assert "CUDA toolkit 12.x maximum" in result["pascalPanel"]
+    assert "placement gpu mesuré à 100.0 % GPU via Ollama /api/ps" in result["rtxGpuProvenPanel"]
+    assert "offload non prouvé" not in result["rtxGpuProvenPanel"]
 
     print(
         "runtime_driver_intelligence_ok "

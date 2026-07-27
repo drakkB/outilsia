@@ -605,6 +605,21 @@ async fn fetch_desktop_manifest() -> Result<Value, String> {
 }
 
 #[tauri::command]
+async fn fetch_release_metadata() -> Result<Value, String> {
+    let client = reqwest::Client::new();
+    response_json(
+        client
+            .get(format!(
+                "{OUTILSIA_ENDPOINT}/static/downloads/local-cockpit/release.json"
+            ))
+            .send()
+            .await
+            .map_err(|err| format!("Impossible de charger la release desktop: {err}"))?,
+    )
+    .await
+}
+
+#[tauri::command]
 async fn fetch_content_signals() -> Result<Value, String> {
     let client = reqwest::Client::new();
     response_json(
@@ -5148,6 +5163,7 @@ pub fn run() {
             write_windows_recipe_file,
             check_compatibility,
             fetch_desktop_manifest,
+            fetch_release_metadata,
             get_app_build_info,
             fetch_content_signals,
             save_local_snapshot,

@@ -1853,13 +1853,18 @@ async function loadReleaseMetadata() {
   els.releaseTitle.textContent = "Vérification de la release...";
   els.releaseText.textContent = releaseFeedUrl;
   try {
-    const res = await fetch(releaseFeedUrl, { cache: "no-store" });
-    if (!res.ok) {
-      state.release = null;
-      renderReleaseMetadata(null);
-      return;
+    let release;
+    if (invoke) {
+      release = await invoke("fetch_release_metadata");
+    } else {
+      const res = await fetch(releaseFeedUrl, { cache: "no-store" });
+      if (!res.ok) {
+        state.release = null;
+        renderReleaseMetadata(null);
+        return;
+      }
+      release = await res.json();
     }
-    const release = await res.json();
     state.release = release;
     renderReleaseMetadata(release);
   } catch (error) {
@@ -2385,19 +2390,21 @@ function renderModelActions(model, options = {}) {
   if (ollamaMissing) {
     buttons.push(`<button type="button" data-install-ollama="true">Installer Ollama</button>`);
   } else if (installed) {
-    buttons.push(`<button type="button" data-run-model="${escapeHtml(ref)}">Tester</button>`);
+    buttons.push(`<button type="button" data-benchmark-model="${escapeHtml(ref)}">${escapeHtml(benchmarkButtonLabel(ref))}</button>`);
     buttons.push(`<button type="button" data-chat-model="${escapeHtml(ref)}">Dialogue</button>`);
-    buttons.push(`<button type="button" data-delete-model="${escapeHtml(ref)}">Supprimer</button>`);
   } else {
     buttons.push(`<button type="button" data-install-model="${escapeHtml(ref)}" ${(installing || installLocked) ? "disabled" : ""}>${installing ? "Télécharge..." : installLocked ? "Attends" : options.primaryLabel || "Installer"}</button>`);
+    buttons.push(`<button type="button" data-benchmark-model="${escapeHtml(ref)}">${escapeHtml(benchmarkButtonLabel(ref))}</button>`);
   }
   buttons.push(`<button type="button" data-model-info="${escapeHtml(ref)}">Fiche</button>`);
-  buttons.push(`<button type="button" data-benchmark-model="${escapeHtml(ref)}" ${ollamaMissing ? "disabled" : ""}>${escapeHtml(benchmarkButtonLabel(ref))}</button>`);
   buttons.push(`<button type="button" data-copy-command="${escapeHtml(`${ollamaRuntimeCommandLabel(ref)} run ${ref}`)}">Copier</button>`);
+  if (installed) {
+    buttons.push(`<button type="button" data-delete-model="${escapeHtml(ref)}">Supprimer</button>`);
+  }
   return `<div class="model-actions">${buttons.join("")}</div>`;
 }
 
-function benchmarkButtonLabel(ref, installedLabel = "Bench", missingLabel = "Installer + bench") {
+function benchmarkButtonLabel(ref, installedLabel = "Tester", missingLabel = "Installer + tester") {
   if (!ref) return installedLabel;
   if (isOllamaModelInstalled(ref)) return benchmarkTimeoutSeconds(ref) > 45 ? "Bench long" : installedLabel;
   if (isOllamaModelInstalling(ref)) return "Téléchargement...";
@@ -3826,6 +3833,13 @@ function renderHardwareDoctor(scan) {
   const driverLink = gpuDriverLink(scan, probe);
   const boardAdvice = motherboardRamAdvice(scan);
   const source = analysis.source;
+  const apiSignal = analysis.runtimeDriver.api_signal;
+  const runtimeEvidence = analysis.runtimeEvidence;
+  const runtimeApiLine = apiSignal.status === "reported"
+    ? runtimeEvidence.status.endsWith("-proven")
+      ? `${apiSignal.label || analysis.runtimeDriver.backend.label} ${apiSignal.value} signalé par le pilote · placement ${runtimeEvidence.processor} mesuré à ${runtimeEvidence.gpu_offload_percent.toFixed(1)} % GPU via Ollama /api/ps`
+      : `${apiSignal.label || analysis.runtimeDriver.backend.label} ${apiSignal.value} signalé par le pilote · allocation Ollama non mesurée`
+    : "API GPU non confirmée";
   const rows = [];
   rows.push(["Confiance GPU", gpuConfidenceLabel(probe, scan)]);
   rows.push(["Confiance RAM", memoryConfidenceLabel(memory)]);
@@ -3896,7 +3910,7 @@ function renderHardwareDoctor(scan) {
         <div class="runtime-driver-details">
           <strong>Runtime & Driver Intelligence v1</strong>
           <span>${escapeHtml(analysis.runtimeDriver.vendor_label)}${analysis.runtimeDriver.family ? ` · ${escapeHtml(analysis.runtimeDriver.family.label)}` : ""} · ${escapeHtml(analysis.runtimeDriver.backend.label)} · ${escapeHtml(analysis.runtimeDriver.backend.ollama_support_tier)}</span>
-          <span>${escapeHtml(analysis.runtimeDriver.api_signal.status === "reported" ? `${analysis.runtimeDriver.api_signal.label || analysis.runtimeDriver.backend.label} ${analysis.runtimeDriver.api_signal.value} signalé, offload non prouvé` : "API GPU non confirmée")}</span>
+          <span>${escapeHtml(runtimeApiLine)}</span>
           <span>${escapeHtml(analysis.runtimeDriver.memory.note)}</span>
           <small>Matrice ${escapeHtml(analysis.runtimeDriver.matrix_version)} · revue ${escapeHtml(analysis.runtimeDriver.matrix_updated_at)} · installation pilote automatique désactivée</small>
         </div>
@@ -19876,6 +19890,20 @@ function installTestHarness() {
       results.pascalPrimaryAction = primaryActionState();
       results.pascalDoctor = hardwareDoctorSnapshot(pascalScan);
       results.pascalPanel = els.hardwareDoctorBox?.textContent || "";
+
+      const gpuBenchmark = {
+        ...demoBenchmark("qwen3:0.6b"),
+        runtime_processor: "gpu",
+        runtime_gpu_offload_percent: 100,
+        runtime_vram_bytes: 2_000_000_000,
+        runtime_model_size_bytes: 2_000_000_000,
+        runtime_evidence_source: "ollama_api_ps",
+        execution_mode: "auto"
+      };
+      state.benchmark = gpuBenchmark;
+      writeBenchmarkHistory([gpuBenchmark]);
+      renderScan(rtxScan);
+      results.rtxGpuProvenPanel = els.hardwareDoctorBox?.textContent || "";
       return results;
     },
     async applyModelAutopilotState() {

@@ -320,6 +320,14 @@ def check(browser, width: int, height: int, label: str):
         raise AssertionError(f"{label}: changing workspace destroyed form state")
 
     page.locator("#workspaceModelsBtn").click()
+    installed_model_card = page.locator("#modelList .model-card").filter(
+        has=page.locator("[data-chat-model]")
+    ).first
+    if installed_model_card.locator("[data-run-model]").count():
+        raise AssertionError(f"{label}: installed model exposes duplicate Tester/Bench actions")
+    installed_test_actions = installed_model_card.locator("[data-benchmark-model]")
+    if installed_test_actions.count() != 1 or installed_test_actions.first.inner_text().strip() != "Tester":
+        raise AssertionError(f"{label}: installed model must expose one clear Tester action")
     page.locator("#modelList [data-chat-model]").first.click()
     routed_chat = page.locator("#appShell").get_attribute("data-workspace-tab")
     routed_chat_section = page.locator("#workspaceSectionSelect").input_value()
