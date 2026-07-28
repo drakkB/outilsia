@@ -20,10 +20,12 @@ mod workstack_review;
 
 use agent_adapter_policy::get_agent_adapter_policy_catalog;
 use benchmark_commons::{
-    approve_benchmark_contribution, export_benchmark_contribution_state,
-    get_benchmark_commons_status, prepare_benchmark_contribution,
-    revoke_benchmark_contribution_state, rotate_benchmark_commons_pseudonym, BenchmarkCommonsState,
-    ExportContributionRequest, RevokeContributionRequest,
+    abort_server_operation, approve_benchmark_contribution, begin_server_revocation,
+    begin_server_submission, benchmark_commons_upload_enabled, export_benchmark_contribution_state,
+    get_benchmark_commons_status, prepare_benchmark_contribution, record_server_revocation,
+    record_server_submission, revoke_benchmark_contribution_state,
+    rotate_benchmark_commons_pseudonym, BenchmarkCommonsState, ExportContributionRequest,
+    RevokeContributionNetworkRequest, RevokeContributionRequest, SubmitContributionNetworkRequest,
 };
 use board_observer::observe_planka_board;
 use capability_router::route_workstack_capabilities;
@@ -978,7 +980,7 @@ async fn sync_benchmark_with_token(
     let auth = read_desktop_auth(&app)?
         .ok_or_else(|| "Token desktop absent. Lance le pairing OutilsIA.".to_string())?;
     let client = reqwest::Client::new();
-    response_json(
+    let synced_machine = response_json(
         client
             .post(format!("{OUTILSIA_ENDPOINT}/api/desktop/sync"))
             .bearer_auth(&auth.desktop_token)
@@ -1003,7 +1005,7 @@ async fn sync_benchmark_with_token(
             "elapsed_ms": benchmark.elapsed_ms
         }
     });
-    response_json(
+    let mut result = response_json(
         client
             .post(format!("{OUTILSIA_ENDPOINT}/api/desktop/benchmarks"))
             .bearer_auth(auth.desktop_token)
@@ -1012,7 +1014,17 @@ async fn sync_benchmark_with_token(
             .await
             .map_err(|err| format!("Impossible de synchroniser le benchmark: {err}"))?,
     )
-    .await
+    .await?;
+    if let Some(object) = result.as_object_mut() {
+        object.insert(
+            "machine".to_string(),
+            synced_machine
+                .get("machine")
+                .cloned()
+                .unwrap_or(Value::Null),
+        );
+    }
+    Ok(result)
 }
 
 #[tauri::command]
@@ -5513,6 +5525,145 @@ fn reject_local_action_request(
     }))
 }
 
+fn benchmark_commons_network_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|err| format!("Client HTTPS Benchmark Commons indisponible: {err}"))
+}
+
+#[tauri::command]
+async fn submit_benchmark_contribution_with_token(
+    app: AppHandle,
+    state: State<'_, BenchmarkCommonsState>,
+    request: SubmitContributionNetworkRequest,
+) -> Result<Value, String> {
+    if !benchmark_commons_upload_enabled() {
+        return Err(
+            "Le partage Benchmark Commons est desactive dans ce build candidat.".to_string(),
+        );
+    }
+    let contribution_id = request.contribution_id.trim().to_string();
+    let document_sha256 = request.document_sha256.trim().to_string();
+    let machine_id = request.machine_id;
+    let auth = read_desktop_auth(&app)?
+        .ok_or_else(|| "Token desktop absent. Connecte le compte OutilsIA.".to_string())?;
+    let contribution = begin_server_submission(&app, state.inner(), &request)?;
+    let payload = json!({
+        "schema": "outilsia.benchmark_commons.submit_request.v1",
+        "machine_id": machine_id,
+        "consent": {
+            "native_ui": true,
+            "network_upload": true,
+            "privacy_reviewed": true,
+            "not_field_proof_acknowledged": true
+        },
+        "contribution": contribution
+    });
+    let outcome = async {
+        let client = benchmark_commons_network_client()?;
+        let response = client
+            .post(format!(
+                "{OUTILSIA_ENDPOINT}/api/desktop/benchmark-commons/submit"
+            ))
+            .bearer_auth(auth.desktop_token)
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|err| format!("Soumission Benchmark Commons impossible: {err}"))?;
+        let server = response_json(response).await?;
+        if server.get("accepted").and_then(Value::as_bool) != Some(true) {
+            return Err("Le serveur n'a pas confirme la contribution.".to_string());
+        }
+        let receipt = server
+            .get("receipt")
+            .cloned()
+            .ok_or_else(|| "Recu serveur Benchmark Commons absent.".to_string())?;
+        let local = record_server_submission(
+            &app,
+            state.inner(),
+            &contribution_id,
+            &document_sha256,
+            receipt.clone(),
+        )?;
+        Ok(json!({
+            "schema": "outilsia.benchmark_commons.network_submit_result.v1",
+            "accepted": true,
+            "server_duplicate": server.get("duplicate").cloned().unwrap_or(json!(false)),
+            "contribution_id": contribution_id.clone(),
+            "document_sha256": document_sha256.clone(),
+            "receipt": receipt,
+            "local_registry": local,
+            "field_test_proof": false,
+            "community_verified": false,
+            "leaderboard_eligible": false
+        }))
+    }
+    .await;
+    if outcome.is_err() {
+        let _ = abort_server_operation(state.inner(), &contribution_id);
+    }
+    outcome
+}
+
+#[tauri::command]
+async fn revoke_benchmark_contribution_with_token(
+    app: AppHandle,
+    state: State<'_, BenchmarkCommonsState>,
+    request: RevokeContributionNetworkRequest,
+) -> Result<Value, String> {
+    let contribution_id = request.contribution_id.trim().to_string();
+    let document_sha256 = request.document_sha256.trim().to_string();
+    let auth = read_desktop_auth(&app)?
+        .ok_or_else(|| "Token desktop absent. Connecte le compte OutilsIA.".to_string())?;
+    begin_server_revocation(&app, state.inner(), &request)?;
+    let outcome = async {
+        let client = benchmark_commons_network_client()?;
+        let response = client
+            .post(format!(
+                "{OUTILSIA_ENDPOINT}/api/desktop/benchmark-commons/{contribution_id}/revoke"
+            ))
+            .bearer_auth(auth.desktop_token)
+            .json(&json!({"confirmed_in_native_ui": true}))
+            .send()
+            .await
+            .map_err(|err| format!("Revocation Benchmark Commons impossible: {err}"))?;
+        let server = response_json(response).await?;
+        if server.get("revoked").and_then(Value::as_bool) != Some(true) {
+            return Err("Le serveur n'a pas confirme la revocation.".to_string());
+        }
+        let receipt = server
+            .get("receipt")
+            .cloned()
+            .ok_or_else(|| "Recu de revocation serveur absent.".to_string())?;
+        let local = record_server_revocation(
+            &app,
+            state.inner(),
+            &contribution_id,
+            &document_sha256,
+            receipt.clone(),
+        )?;
+        Ok(json!({
+            "schema": "outilsia.benchmark_commons.network_revoke_result.v1",
+            "revoked": true,
+            "server_duplicate": server.get("duplicate").cloned().unwrap_or(json!(false)),
+            "contribution_id": contribution_id.clone(),
+            "document_sha256": document_sha256.clone(),
+            "receipt": receipt,
+            "local_registry": local,
+            "field_test_proof": false,
+            "community_verified": false,
+            "leaderboard_eligible": false
+        }))
+    }
+    .await;
+    if outcome.is_err() {
+        let _ = abort_server_operation(state.inner(), &contribution_id);
+    }
+    outcome
+}
+
 #[tauri::command]
 fn export_benchmark_contribution(
     app: AppHandle,
@@ -5665,6 +5816,8 @@ pub fn run() {
             prepare_benchmark_contribution,
             approve_benchmark_contribution,
             export_benchmark_contribution,
+            submit_benchmark_contribution_with_token,
+            revoke_benchmark_contribution_with_token,
             revoke_benchmark_contribution,
             rotate_benchmark_commons_pseudonym,
             get_benchmark_commons_status,

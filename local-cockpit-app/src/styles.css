@@ -5442,6 +5442,32 @@ dd {
   margin-top: 2px;
 }
 
+.benchmark-commons-network {
+  border-top: 1px dashed rgba(91, 241, 205, 0.22);
+  display: grid;
+  gap: 9px;
+  padding-top: 11px;
+}
+
+.benchmark-commons-network > div:first-child {
+  align-items: baseline;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.benchmark-commons-network > div:first-child strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+#benchmarkCommonsNetworkState {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
 .model-card-head strong {
   font-size: 14px;
   line-height: 1.25;
@@ -7293,6 +7319,15 @@ dd {
   .benchmark-commons-head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .benchmark-commons-network > div:first-child {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  #benchmarkCommonsNetworkState {
+    text-align: left;
   }
 
   .workstack-stage small,

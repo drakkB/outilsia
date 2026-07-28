@@ -157,9 +157,9 @@ cargo test --lib
 
 Après un benchmark standard réellement mesuré par l'API Ollama, l'espace
 **Tests > Historique benchmarks** peut préparer un document communautaire
-pseudonymisé. Le candidat ne l'envoie nulle part : il montre l'aperçu exact,
-recueille un consentement natif, exige un second clic, puis écrit un JSON local
-sans écraser un fichier existant.
+pseudonymisé. Par défaut, le candidat ne l'envoie nulle part : il montre
+l'aperçu exact, recueille un consentement natif, exige un second clic, puis
+écrit un JSON local sans écraser un fichier existant.
 
 Le document conserve uniquement le matériel normalisé, le runtime et la version
 Ollama, la référence du modèle, le protocole versionné, les métriques exactes,
@@ -174,8 +174,23 @@ Ledger. Ils ne valent ni test terrain, ni validation communautaire, ni
 éligibilité à un classement. L'upload, la vérification serveur, les cohortes et
 les pages publiques restent hors de ce palier. Un contrat serveur privé est
 testé séparément avec authentification desktop, correspondance machine/mesure,
-reçu HMAC, révocation et seuil de trois machines ; il n'est ni relié au client,
-ni déployé, ni annoncé dans le manifeste.
+reçu HMAC, révocation et seuil de trois machines. Le client candidat sait
+désormais soumettre vers l'origine OutilsIA fixe, sans redirection, après export
+local, synchronisation du benchmark et consentement réseau distinct. Cette voie
+reste désactivée à la compilation sans
+`OUTILSIA_BENCHMARK_COMMONS_UPLOAD=1` : elle n'est ni déployée, ni présente dans
+le build public, ni annoncée dans le manifeste. Une soumission active doit être
+révoquée côté serveur avant que son export local puisse être supprimé. Le
+client vérifie la forme, les limites et le rattachement du reçu serveur ; il ne
+possède pas la clé HMAC et ne prétend donc pas authentifier lui-même cette
+signature. Le consentement indique que le serveur rattache la soumission au
+compte et à la machine synchronisée pour vérifier, dédupliquer et révoquer,
+sans renvoyer ces identifiants. Les garanties d'absence d'IP et de User-Agent concernent
+explicitement l'enregistrement Benchmark Commons, pas les journaux techniques
+généraux de l'infrastructure HTTPS.
+Le backend candidat fournit aussi `scripts/purge_benchmark_commons.py`. Son
+installation en tâche quotidienne et son monitoring restent un prérequis
+obligatoire avant d'activer la promesse de rétention maximale de 180 jours.
 
 Contrôle dédié :
 

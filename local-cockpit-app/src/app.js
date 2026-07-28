@@ -187,6 +187,8 @@ const BENCHMARK_COMMONS_APPROVE_SCHEMA = "outilsia.benchmark_commons.approve_req
 const BENCHMARK_COMMONS_EXPORT_SCHEMA = "outilsia.benchmark_commons.export_request.v1";
 const BENCHMARK_COMMONS_REVOKE_SCHEMA = "outilsia.benchmark_commons.revoke_request.v1";
 const BENCHMARK_COMMONS_ROTATE_SCHEMA = "outilsia.benchmark_commons.rotate_request.v1";
+const BENCHMARK_COMMONS_NETWORK_SUBMIT_SCHEMA = "outilsia.benchmark_commons.network_submit_request.v1";
+const BENCHMARK_COMMONS_NETWORK_REVOKE_SCHEMA = "outilsia.benchmark_commons.network_revoke_request.v1";
 const BENCHMARK_COMMONS_STANDARD_QUESTION = "Pourquoi la VRAM est importante pour un LLM local ?";
 const BENCHMARK_COMMONS_STANDARD_PROMPT = `${BENCHMARK_COMMONS_STANDARD_QUESTION}\nRéponse finale uniquement, une phrase courte en français.`;
 const INSTALL_SAFETY_PREFLIGHT_SCHEMA = "outilsia.install_safety_preflight.v1";
@@ -715,10 +717,15 @@ const els = {
   benchmarkCommonsDestination: $("benchmarkCommonsDestination"),
   benchmarkCommonsBox: $("benchmarkCommonsBox"),
   benchmarkCommonsConsent: $("benchmarkCommonsConsent"),
+  benchmarkCommonsNetworkState: $("benchmarkCommonsNetworkState"),
+  benchmarkCommonsNetworkConsent: $("benchmarkCommonsNetworkConsent"),
   prepareBenchmarkCommonsBtn: $("prepareBenchmarkCommonsBtn"),
   prepareBenchmarkCommonsTestBtn: $("prepareBenchmarkCommonsTestBtn"),
   approveBenchmarkCommonsBtn: $("approveBenchmarkCommonsBtn"),
   exportBenchmarkCommonsBtn: $("exportBenchmarkCommonsBtn"),
+  syncBenchmarkCommonsBtn: $("syncBenchmarkCommonsBtn"),
+  submitBenchmarkCommonsBtn: $("submitBenchmarkCommonsBtn"),
+  revokeBenchmarkCommonsRemoteBtn: $("revokeBenchmarkCommonsRemoteBtn"),
   revokeBenchmarkCommonsBtn: $("revokeBenchmarkCommonsBtn"),
   rotateBenchmarkCommonsBtn: $("rotateBenchmarkCommonsBtn"),
   promptForgePanel: document.querySelector(".promptforge-panel"),
@@ -770,6 +777,8 @@ let pendingPairing = null;
 let pendingPairingUrl = "";
 let lastVaultPath = "";
 let lastSyncedMachineId = null;
+let lastSyncedBenchmarkFingerprint = "";
+let desktopAccountConnected = false;
 let lastShareReportUrl = "";
 let pairingPollTimer = null;
 let pairingPollAttempts = 0;
@@ -16491,6 +16500,9 @@ async function scanMachine() {
   try {
     const scan = invoke ? await invoke("scan_machine") : demoScan();
     if (invoke) state.optimisticInstalledModels = [];
+    lastSyncedMachineId = null;
+    lastSyncedBenchmarkFingerprint = "";
+    lastShareReportUrl = "";
     renderScan(scan);
     recordActivationMilestone("scan_success");
     renderFieldTestPanel();
@@ -18771,26 +18783,43 @@ async function copyWslCommand() {
   setStatus("Commande WSL copiée", "ok");
 }
 
-async function syncBenchmark() {
-  if (!state.scan || !state.benchmark) {
+async function syncBenchmarkValue(benchmark, button = els.syncBenchmarkBtn) {
+  if (!state.scan || !benchmark) {
     setStatus("Scan et benchmark requis avant synchronisation", "bad");
     return;
   }
-  els.syncBenchmarkBtn.disabled = true;
+  if (button) button.disabled = true;
   setStatus("Synchronisation benchmark...");
   try {
     const payload = invoke
       ? await invoke("sync_benchmark_with_token", {
           scan: state.scan,
-          benchmark: state.benchmark
+          benchmark
         })
-      : { ok: true, benchmark: { id: 1 } };
+      : { ok: true, benchmark: { id: 1 }, machine: { id: lastSyncedMachineId || 1 } };
+    lastSyncedMachineId = Number(payload.machine?.id || lastSyncedMachineId || 0) || null;
+    lastSyncedBenchmarkFingerprint = benchmarkCommonsBenchmarkFingerprint(benchmark);
+    readinessProof.savedAccount = Boolean(lastSyncedMachineId);
     setStatus(`Benchmark synchronisé #${payload.benchmark?.id || ""}`, "ok");
+    await refreshBenchmarkCommonsStatus(true);
   } catch (error) {
     setStatus(String(error), "bad");
   } finally {
     await refreshAuthState();
   }
+}
+
+async function syncBenchmark() {
+  await syncBenchmarkValue(state.benchmark, els.syncBenchmarkBtn);
+}
+
+async function syncBenchmarkForCommons() {
+  const benchmark = benchmarkCommonsEligibleBenchmark();
+  if (!benchmark) {
+    setStatus("Mesure standard Benchmark Commons introuvable", "warn");
+    return;
+  }
+  await syncBenchmarkValue(benchmark, els.syncBenchmarkCommonsBtn);
 }
 
 function benchmarkQualityVerdict(result) {
@@ -19067,6 +19096,23 @@ function benchmarkCommonsEligibleBenchmark() {
   )) || null;
 }
 
+function benchmarkCommonsBenchmarkFingerprint(benchmark) {
+  if (!benchmark) return "";
+  return [
+    String(state.scan?.machine_key || benchmark.machine_key || ""),
+    normalizeOllamaRef(benchmark.model || ""),
+    String(benchmark.created_at_ms || ""),
+    String(benchmark.estimated_tokens_per_second || ""),
+    String(benchmark.eval_count || ""),
+    String(benchmark.eval_duration_ms || "")
+  ].join("|");
+}
+
+function benchmarkCommonsBenchmarkSynced(benchmark) {
+  const fingerprint = benchmarkCommonsBenchmarkFingerprint(benchmark);
+  return Boolean(fingerprint && fingerprint === lastSyncedBenchmarkFingerprint);
+}
+
 function benchmarkCommonsPreparedRequest(status = state.benchmarkCommons) {
   const requests = Array.isArray(status?.prepared) ? status.prepared : [];
   return requests.find((item) => ["approved", "awaiting_human"].includes(String(item?.state || ""))) || null;
@@ -19121,6 +19167,23 @@ function renderBenchmarkCommonsPanel() {
   const pending = benchmarkCommonsPreparedRequest(status);
   const activeExport = benchmarkCommonsActiveExport(status);
   const pendingState = String(pending?.state || "");
+  const uploadAvailable = status?.upload_available === true;
+  const networkBusy = status?.network_operation_in_progress === true;
+  const serverStatus = String(activeExport?.server?.status || "not_submitted");
+  const serverActive = serverStatus === "accepted";
+  const serverRevoked = serverStatus === "revoked";
+  const benchmarkSynced = benchmarkCommonsBenchmarkSynced(eligible);
+  const accountReady = desktopAccountConnected && Boolean(lastSyncedMachineId);
+  const networkReady = Boolean(
+    native
+    && uploadAvailable
+    && activeExport
+    && accountReady
+    && benchmarkSynced
+    && !serverActive
+    && !serverRevoked
+    && !networkBusy
+  );
 
   els.prepareBenchmarkCommonsBtn.disabled = !native || !eligible || Boolean(pending) || Boolean(activeExport);
   els.prepareBenchmarkCommonsTestBtn.disabled = !state.scan;
@@ -19133,8 +19196,50 @@ function renderBenchmarkCommonsPanel() {
     && els.benchmarkCommonsConsent.checked
   );
   els.exportBenchmarkCommonsBtn.disabled = !(native && pendingState === "approved");
-  els.revokeBenchmarkCommonsBtn.disabled = !(native && activeExport);
+  els.revokeBenchmarkCommonsBtn.disabled = !(native && activeExport && !serverActive && !networkBusy);
   els.rotateBenchmarkCommonsBtn.disabled = !native;
+  els.syncBenchmarkCommonsBtn.disabled = !(
+    native
+    && uploadAvailable
+    && desktopAccountConnected
+    && eligible
+    && !benchmarkSynced
+    && !networkBusy
+  );
+  els.benchmarkCommonsNetworkConsent.disabled = !networkReady;
+  if (!networkReady) els.benchmarkCommonsNetworkConsent.checked = false;
+  els.submitBenchmarkCommonsBtn.disabled = !(
+    networkReady
+    && els.benchmarkCommonsNetworkConsent.checked
+  );
+  els.revokeBenchmarkCommonsRemoteBtn.disabled = !(
+    native
+    && serverActive
+    && desktopAccountConnected
+    && !networkBusy
+  );
+
+  if (!native) {
+    els.benchmarkCommonsNetworkState.textContent = "Application native requise";
+  } else if (serverActive) {
+    els.benchmarkCommonsNetworkState.textContent = "Reçu serveur conservé · retrait disponible";
+  } else if (serverRevoked) {
+    els.benchmarkCommonsNetworkState.textContent = "Contribution retirée du serveur";
+  } else if (!uploadAvailable) {
+    els.benchmarkCommonsNetworkState.textContent = "Désactivé dans ce build candidat";
+  } else if (!activeExport) {
+    els.benchmarkCommonsNetworkState.textContent = "Export local requis";
+  } else if (!desktopAccountConnected) {
+    els.benchmarkCommonsNetworkState.textContent = "Compte OutilsIA requis";
+  } else if (!lastSyncedMachineId) {
+    els.benchmarkCommonsNetworkState.textContent = "Machine à synchroniser";
+  } else if (!benchmarkSynced) {
+    els.benchmarkCommonsNetworkState.textContent = "Mesure à synchroniser";
+  } else if (networkBusy) {
+    els.benchmarkCommonsNetworkState.textContent = "Opération HTTPS en cours";
+  } else {
+    els.benchmarkCommonsNetworkState.textContent = "Prêt · consentement réseau séparé";
+  }
 
   if (!native) {
     els.benchmarkCommonsState.textContent = "app native requise";
@@ -19165,11 +19270,23 @@ function renderBenchmarkCommonsPanel() {
     return;
   }
   if (activeExport) {
-    els.benchmarkCommonsState.textContent = "export local";
+    els.benchmarkCommonsState.textContent = serverActive
+      ? "reçu serveur"
+      : serverRevoked
+        ? "retiré du serveur"
+        : "export local";
+    const receiptDigest = String(activeExport.server?.receipt_hmac_digest || "");
+    const serverLine = serverActive
+      ? `<span>Serveur : reçu associé le ${escapeHtml(new Date(Number(activeExport.server?.submitted_at_ms || Date.now())).toLocaleString("fr-FR"))} · empreinte HMAC déclarée ${escapeHtml(receiptDigest ? `${receiptDigest.slice(0, 12)}…${receiptDigest.slice(-8)}` : "non exposée")}.</span>`
+      : serverRevoked
+        ? `<span>Serveur : contribution retirée le ${escapeHtml(new Date(Number(activeExport.server?.revoked_at_ms || Date.now())).toLocaleString("fr-FR"))}. L'export local peut maintenant être supprimé.</span>`
+        : "<span>Serveur : aucune soumission. Le fichier reste strictement local.</span>";
     els.benchmarkCommonsBox.className = "benchmark-commons-box";
     els.benchmarkCommonsBox.innerHTML = `
       ${benchmarkCommonsContributionMarkup(activeExport.contribution || {}, "Contribution exportée localement")}
-      <span>Fichier : ${escapeHtml(activeExport.filename || "export JSON")} · destination ${escapeHtml(activeExport.destination || "locale")} · réseau : aucun envoi.</span>
+      <span>Fichier : ${escapeHtml(activeExport.filename || "export JSON")} · destination ${escapeHtml(activeExport.destination || "locale")}.</span>
+      ${serverLine}
+      ${serverActive ? "<span>Le client contrôle la forme et le rattachement du reçu ; son HMAC reste vérifiable côté serveur. Ce reçu ne vaut ni preuve terrain, ni validation communautaire, ni classement.</span>" : ""}
     `;
     return;
   }
@@ -19307,6 +19424,89 @@ async function exportBenchmarkCommons() {
         ? `Contribution exportée : ${result.filename}`
         : `Contribution exportée : ${result.filename} · reçu Ledger non écrit`,
       ledgerOk ? "ok" : "warn"
+    );
+  } catch (error) {
+    setStatus(String(error), "bad");
+    await refreshBenchmarkCommonsStatus(true);
+  }
+}
+
+async function submitBenchmarkCommonsNetwork() {
+  const active = benchmarkCommonsActiveExport();
+  const eligible = benchmarkCommonsEligibleBenchmark();
+  if (
+    !invoke
+    || !active
+    || !state.benchmarkCommons?.upload_available
+    || !desktopAccountConnected
+    || !lastSyncedMachineId
+    || !benchmarkCommonsBenchmarkSynced(eligible)
+    || !els.benchmarkCommonsNetworkConsent.checked
+  ) {
+    setStatus("Compte, machine, mesure synchronisée et consentement réseau requis", "warn");
+    return;
+  }
+  const model = active.contribution?.observation?.model?.ollama_ref || "modèle";
+  const speed = active.contribution?.observation?.metrics?.generation_tokens_per_second || 0;
+  const confirmed = window.confirm(
+    `Envoyer cet aperçu exact à OutilsIA Benchmark Commons ?\n\n${model} · ${speed} tok/s\nSHA-256 ${active.document_sha256}\n\nHTTPS authentifié · rattachement au compte et à la machine synchronisée pour vérifier, dédupliquer et permettre le retrait · conservation maximale 180 jours. Ces identifiants ne sont pas renvoyés dans le reçu. Ce reçu ne vaut pas preuve terrain.`
+  );
+  if (!confirmed) return;
+  els.submitBenchmarkCommonsBtn.disabled = true;
+  els.syncBenchmarkCommonsBtn.disabled = true;
+  setStatus("Envoi HTTPS de la contribution…");
+  try {
+    const result = await invoke("submit_benchmark_contribution_with_token", {
+      request: {
+        schema: BENCHMARK_COMMONS_NETWORK_SUBMIT_SCHEMA,
+        machine_id: lastSyncedMachineId,
+        contribution_id: active.contribution_id,
+        document_sha256: active.document_sha256,
+        confirmed_in_native_ui: true,
+        privacy_reviewed: true,
+        not_field_proof_acknowledged: true
+      }
+    });
+    els.benchmarkCommonsNetworkConsent.checked = false;
+    await refreshBenchmarkCommonsStatus(true);
+    setStatus(
+      result?.server_duplicate
+        ? "Contribution déjà reçue; reçu serveur restauré localement"
+        : "Contribution reçue par le serveur; retrait disponible",
+      "ok"
+    );
+  } catch (error) {
+    setStatus(String(error), "bad");
+    await refreshBenchmarkCommonsStatus(true);
+  }
+}
+
+async function revokeBenchmarkCommonsRemote() {
+  const active = benchmarkCommonsActiveExport();
+  if (!invoke || !active || active.server?.status !== "accepted") {
+    setStatus("Aucune contribution serveur active", "warn");
+    return;
+  }
+  if (!window.confirm(
+    `Retirer ${active.contribution_id} du Benchmark Commons ?\n\nLe serveur conservera uniquement le reçu de révocation. L'export JSON local restera présent.`
+  )) return;
+  els.revokeBenchmarkCommonsRemoteBtn.disabled = true;
+  setStatus("Révocation HTTPS en cours…");
+  try {
+    const result = await invoke("revoke_benchmark_contribution_with_token", {
+      request: {
+        schema: BENCHMARK_COMMONS_NETWORK_REVOKE_SCHEMA,
+        contribution_id: active.contribution_id,
+        document_sha256: active.document_sha256,
+        confirmed_in_native_ui: true
+      }
+    });
+    await refreshBenchmarkCommonsStatus(true);
+    setStatus(
+      result?.server_duplicate
+        ? "Révocation serveur déjà enregistrée"
+        : "Contribution retirée du serveur; export local conservé",
+      "ok"
     );
   } catch (error) {
     setStatus(String(error), "bad");
@@ -19525,6 +19725,7 @@ async function deleteSyncedMachine(machineId) {
     if (!payload?.ok) throw new Error(payload?.error || "suppression_impossible");
     if (lastSyncedMachineId === id) {
       lastSyncedMachineId = null;
+      lastSyncedBenchmarkFingerprint = "";
       lastShareReportUrl = "";
       readinessProof.savedAccount = false;
       readinessProof.shared = false;
@@ -19752,6 +19953,7 @@ async function claimPairing(options = {}) {
 
 async function refreshAuthState() {
   const auth = invoke ? await invoke("get_desktop_auth") : { desktop_token: "demo" };
+  desktopAccountConnected = Boolean(auth?.desktop_token);
   if (auth?.desktop_token) {
     els.syncState.textContent = "connecté";
     if (els.topAccountBtn) els.topAccountBtn.textContent = "Connecté";
@@ -19782,6 +19984,7 @@ async function refreshAuthState() {
       els.updatesList.textContent = "Compte connecté. Actualise pour retrouver tes machines.";
     }
   } else {
+    lastSyncedBenchmarkFingerprint = "";
     els.syncState.textContent = pendingPairingUrl ? "en attente" : "non connecté";
     if (els.topAccountBtn) els.topAccountBtn.textContent = pendingPairingUrl ? "En attente" : "Compte";
     els.pairBtn.textContent = pendingPairingUrl ? "Recommencer" : "Connecter";
@@ -19804,6 +20007,7 @@ async function refreshAuthState() {
       els.feedbackResult.textContent = "Connecte le compte pour envoyer un retour lié au scan visible dans l'app.";
     }
   }
+  renderBenchmarkCommonsPanel();
 }
 
 async function handleTopAccountClick() {
@@ -19833,6 +20037,8 @@ async function disconnectDesktop() {
   pendingPairingUrl = "";
   stopPairingPolling();
   lastSyncedMachineId = null;
+  lastSyncedBenchmarkFingerprint = "";
+  desktopAccountConnected = false;
   lastShareReportUrl = "";
   readinessProof.savedAccount = false;
   readinessProof.shared = false;
@@ -19894,6 +20100,7 @@ function restoreLocalSnapshot(snapshotId) {
   state.benchmark = snapshot.benchmark || null;
   state.markdown = "";
   lastSyncedMachineId = null;
+  lastSyncedBenchmarkFingerprint = "";
   lastShareReportUrl = "";
   readinessProof.savedAccount = false;
   readinessProof.shared = false;
@@ -22373,6 +22580,15 @@ function installTestHarness() {
       state.benchmark = benchmark;
       writeBenchmarkHistory([benchmark]);
       renderBenchmark(benchmark);
+      desktopAccountConnected = true;
+      lastSyncedMachineId = 1;
+      lastSyncedBenchmarkFingerprint = [
+        "network_ready",
+        "server_submitted",
+        "server_revoked"
+      ].includes(stage)
+        ? benchmarkCommonsBenchmarkFingerprint(benchmark)
+        : "";
 
       const contribution = {
         schema: "outilsia.benchmark_commons.contribution.v1",
@@ -22468,14 +22684,30 @@ function installTestHarness() {
         exported_at_ms: now,
         revoked_at_ms: stage === "revoked" ? now + 1000 : null,
         file_deleted: stage === "revoked",
+        server: {
+          status: stage === "server_submitted"
+            ? "accepted"
+            : stage === "server_revoked"
+              ? "revoked"
+              : "not_submitted",
+          submitted_at_ms: ["server_submitted", "server_revoked"].includes(stage) ? now + 500 : null,
+          revoked_at_ms: stage === "server_revoked" ? now + 1500 : null,
+          receipt_hmac_digest: ["server_submitted", "server_revoked"].includes(stage) ? "e".repeat(64) : null,
+          network_received: ["server_submitted", "server_revoked"].includes(stage),
+          field_test_proof: false,
+          community_verified: false,
+          leaderboard_eligible: false
+        },
         contribution
       };
+      const networkCandidate = ["network_ready", "server_submitted", "server_revoked"].includes(stage);
       state.benchmarkCommons = {
         schema: "outilsia.benchmark_commons.status.v1",
         contract_version: "2026-07-28",
-        mode: "local_export_only",
-        upload_available: false,
-        network_sent: false,
+        mode: networkCandidate ? "local_export_with_guarded_server_candidate" : "local_export_only",
+        upload_available: networkCandidate,
+        network_sent: ["server_submitted", "server_revoked"].includes(stage),
+        network_operation_in_progress: false,
         field_test_proof: false,
         community_verified: false,
         leaderboard_available: false,
@@ -22486,7 +22718,13 @@ function installTestHarness() {
             expires_at_ms: contribution.contributor.pseudonym_expires_at_ms,
             rotation_days: 30
           },
-          exports: ["exported", "revoked"].includes(stage) ? [exportRecord] : []
+          exports: [
+            "exported",
+            "revoked",
+            "network_ready",
+            "server_submitted",
+            "server_revoked"
+          ].includes(stage) ? [exportRecord] : []
         },
         prepared: ["awaiting_human", "approved"].includes(stage) ? [pending] : []
       };
@@ -22504,8 +22742,22 @@ function installTestHarness() {
           consentDisabled: Boolean(els.benchmarkCommonsConsent?.disabled),
           approveDisabled: Boolean(els.approveBenchmarkCommonsBtn?.disabled),
           exportDisabled: Boolean(els.exportBenchmarkCommonsBtn?.disabled),
-          revokeDisabled: Boolean(els.revokeBenchmarkCommonsBtn?.disabled)
+          revokeDisabled: Boolean(els.revokeBenchmarkCommonsBtn?.disabled),
+          syncNetworkDisabled: Boolean(els.syncBenchmarkCommonsBtn?.disabled),
+          networkConsentDisabled: Boolean(els.benchmarkCommonsNetworkConsent?.disabled),
+          submitNetworkDisabled: Boolean(els.submitBenchmarkCommonsBtn?.disabled),
+          revokeNetworkDisabled: Boolean(els.revokeBenchmarkCommonsRemoteBtn?.disabled)
         }
+      };
+    },
+    setBenchmarkCommonsNetworkConsent(checked = true) {
+      if (els.benchmarkCommonsNetworkConsent) {
+        els.benchmarkCommonsNetworkConsent.checked = Boolean(checked);
+      }
+      renderBenchmarkCommonsPanel();
+      return {
+        consentDisabled: Boolean(els.benchmarkCommonsNetworkConsent?.disabled),
+        submitDisabled: Boolean(els.submitBenchmarkCommonsBtn?.disabled)
       };
     },
     applyFieldTestReadyState() {
@@ -23416,9 +23668,13 @@ els.prepareBenchmarkCommonsBtn?.addEventListener("click", prepareBenchmarkCommon
 els.prepareBenchmarkCommonsTestBtn?.addEventListener("click", prepareBenchmarkCommonsStandardTest);
 els.approveBenchmarkCommonsBtn?.addEventListener("click", approveBenchmarkCommons);
 els.exportBenchmarkCommonsBtn?.addEventListener("click", exportBenchmarkCommons);
+els.syncBenchmarkCommonsBtn?.addEventListener("click", syncBenchmarkForCommons);
+els.submitBenchmarkCommonsBtn?.addEventListener("click", submitBenchmarkCommonsNetwork);
+els.revokeBenchmarkCommonsRemoteBtn?.addEventListener("click", revokeBenchmarkCommonsRemote);
 els.revokeBenchmarkCommonsBtn?.addEventListener("click", revokeBenchmarkCommons);
 els.rotateBenchmarkCommonsBtn?.addEventListener("click", rotateBenchmarkCommonsPseudonym);
 els.benchmarkCommonsConsent?.addEventListener("change", renderBenchmarkCommonsPanel);
+els.benchmarkCommonsNetworkConsent?.addEventListener("change", renderBenchmarkCommonsPanel);
 els.benchmarkCommonsDestination?.addEventListener("change", renderBenchmarkCommonsPanel);
 els.observeBoardBtn?.addEventListener("click", observePlankaBoard);
 els.copyBoardSnapshotBtn?.addEventListener("click", copyBoardObserverSnapshot);

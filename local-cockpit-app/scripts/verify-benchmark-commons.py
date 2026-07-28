@@ -37,6 +37,8 @@ def assert_static_contract() -> None:
         '"community_verified": false',
         '"leaderboard_eligible": false',
         '"network_sent": false',
+        '"ip_stored_in_commons_record"',
+        '"user_agent_stored_in_commons_record"',
         "write_json_no_overwrite",
         "confirmed_in_native_ui",
         "explicitly_approved_in_native_ui",
@@ -64,6 +66,8 @@ def assert_static_contract() -> None:
         "prepare_benchmark_contribution,",
         "approve_benchmark_contribution,",
         "export_benchmark_contribution,",
+        "submit_benchmark_contribution_with_token,",
+        "revoke_benchmark_contribution_with_token,",
         "revoke_benchmark_contribution,",
         "rotate_benchmark_commons_pseudonym,",
         "get_benchmark_commons_status,",
@@ -87,8 +91,13 @@ def assert_static_contract() -> None:
         "prepareBenchmarkCommonsTestBtn",
         "benchmarkCommonsBox",
         "benchmarkCommonsConsent",
+        "benchmarkCommonsNetworkState",
+        "benchmarkCommonsNetworkConsent",
         "approveBenchmarkCommonsBtn",
         "exportBenchmarkCommonsBtn",
+        "syncBenchmarkCommonsBtn",
+        "submitBenchmarkCommonsBtn",
+        "revokeBenchmarkCommonsRemoteBtn",
         "revokeBenchmarkCommonsBtn",
         "rotateBenchmarkCommonsBtn",
     ):
@@ -96,10 +105,16 @@ def assert_static_contract() -> None:
             raise AssertionError(f"missing Benchmark Commons control: {element_id}")
 
     for expected in (
-        "export local uniquement",
-        "Rien n'est envoyé",
+        "local par défaut · partage opt-in",
+        "L'aperçu reste local sans autorisation HTTPS séparée",
         "ni preuve terrain ni classement communautaire",
         "aucun prompt, résultat brut, fichier, compte, jeton ou identifiant stable",
+        "Partage communautaire",
+        "Le serveur le rattache à mon compte et à la machine synchronisée",
+        "sans renvoyer ces identifiants",
+        "Conservation maximale : 180 jours",
+        "Envoyer au Commons",
+        "Retirer du Commons",
     ):
         if expected not in html:
             raise AssertionError(f"missing honest UI boundary: {expected}")
@@ -110,13 +125,28 @@ def assert_static_contract() -> None:
         'invoke("prepare_benchmark_contribution"',
         'invoke("approve_benchmark_contribution"',
         'invoke("export_benchmark_contribution"',
+        'invoke("submit_benchmark_contribution_with_token"',
+        'invoke("revoke_benchmark_contribution_with_token"',
         'invoke("revoke_benchmark_contribution"',
         "Un second clic reste nécessaire",
         "Aucun envoi réseau ne sera effectué",
+        "rattachement au compte et à la machine synchronisée",
+        "son HMAC reste vérifiable côté serveur",
         "applyBenchmarkCommonsState",
     ):
         if expected not in app_js:
             raise AssertionError(f"missing Benchmark Commons UI behavior: {expected}")
+
+    for expected in (
+        'const OUTILSIA_ENDPOINT: &str = "https://outilsia.fr"',
+        "/api/desktop/benchmark-commons/submit",
+        "/api/desktop/benchmark-commons/{contribution_id}/revoke",
+        "benchmark_commons_upload_enabled()",
+        "Policy::none()",
+        "Duration::from_secs(20)",
+    ):
+        if expected not in lib_rs:
+            raise AssertionError(f"missing guarded Benchmark Commons network contract: {expected}")
 
     if re.search(
         r"approve_benchmark_contribution[\s\S]{0,500}"
@@ -212,6 +242,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     page.goto(HTML.as_uri(), wait_until="load")
+    page.wait_for_timeout(500)
     page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('tests')")
     page.evaluate(
         "() => window.__OUTILSIA_TEST__.setWorkspaceSection("
@@ -271,7 +302,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     )
     if exported["controls"]["revokeDisabled"]:
         raise AssertionError(f"{label}: active local export cannot be revoked")
-    if "réseau : aucun envoi" not in exported["ui"]:
+    if "Serveur : aucune soumission" not in exported["ui"]:
         raise AssertionError(f"{label}: local-only export boundary is missing")
 
     revoked = page.evaluate(
@@ -279,6 +310,48 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     )
     if not revoked["controls"]["revokeDisabled"]:
         raise AssertionError(f"{label}: revoked export remains actionable")
+
+    network_ready = page.evaluate(
+        "() => window.__OUTILSIA_TEST__.applyBenchmarkCommonsState('network_ready')"
+    )
+    if network_ready["controls"]["networkConsentDisabled"]:
+        raise AssertionError(f"{label}: eligible network consent remains disabled")
+    if not network_ready["controls"]["submitNetworkDisabled"]:
+        raise AssertionError(f"{label}: network submit unlocked without consent")
+    if not network_ready["controls"]["revokeNetworkDisabled"]:
+        raise AssertionError(f"{label}: remote revoke enabled before submission")
+    consented = page.evaluate(
+        """() => {
+          window.__OUTILSIA_TEST__.applyBenchmarkCommonsState('network_ready');
+          return window.__OUTILSIA_TEST__.setBenchmarkCommonsNetworkConsent(true);
+        }"""
+    )
+    if consented["consentDisabled"] or consented["submitDisabled"]:
+        raise AssertionError(f"{label}: network consent does not unlock submit")
+
+    server_submitted = page.evaluate(
+        "() => window.__OUTILSIA_TEST__.applyBenchmarkCommonsState('server_submitted')"
+    )
+    if server_submitted["controls"]["revokeNetworkDisabled"]:
+        raise AssertionError(f"{label}: accepted server contribution cannot be revoked")
+    if not server_submitted["controls"]["revokeDisabled"]:
+        raise AssertionError(f"{label}: local removal can orphan a server contribution")
+    if "ne vaut ni preuve terrain" not in server_submitted["ui"]:
+        raise AssertionError(f"{label}: server receipt overclaim boundary is missing")
+    if "HMAC reste vérifiable côté serveur" not in server_submitted["ui"]:
+        raise AssertionError(f"{label}: HMAC verification boundary is missing")
+    network_screenshot = OUT / f"benchmark-commons-network-{label}.png"
+    section.screenshot(path=str(network_screenshot))
+
+    server_revoked = page.evaluate(
+        "() => window.__OUTILSIA_TEST__.applyBenchmarkCommonsState('server_revoked')"
+    )
+    if not server_revoked["controls"]["revokeNetworkDisabled"]:
+        raise AssertionError(f"{label}: revoked server contribution remains actionable")
+    if server_revoked["controls"]["revokeDisabled"]:
+        raise AssertionError(f"{label}: local removal remains blocked after server revocation")
+    if "export local peut maintenant être supprimé" not in server_revoked["ui"]:
+        raise AssertionError(f"{label}: post-revocation next action is unclear")
 
     page.evaluate(
         "() => window.__OUTILSIA_TEST__.applyBenchmarkCommonsState('awaiting_human')"
@@ -288,7 +361,7 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     for expected in (
         "Contribution volontaire",
         "Benchmark Commons v1",
-        "export local uniquement",
+        "local par défaut",
         "Aperçu figé, aucun envoi",
         "qwen3:14b",
         "57.5 tok/s",
@@ -348,7 +421,8 @@ def main() -> None:
     print(
         "benchmark_commons_ok "
         f"desktop={desktop} mobile={mobile} "
-        "network=false consent=two_step revoke=local privacy=strict"
+        "network=build_gated consent=local_plus_network "
+        "revoke=server_before_local privacy=strict"
     )
 
 

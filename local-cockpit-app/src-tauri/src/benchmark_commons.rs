@@ -3,7 +3,7 @@ use crate::{get_app_build_info, prepare_benchmark_prompt, validate_ollama_model_
 use crate::{BenchmarkResult, MachineScan};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -12,12 +12,16 @@ use tauri::{AppHandle, Manager, State};
 
 pub(crate) const CONTRIBUTION_SCHEMA: &str = "outilsia.benchmark_commons.contribution.v1";
 pub(crate) const RECEIPT_SCHEMA: &str = "outilsia.benchmark_commons.receipt.v1";
+pub(crate) const SERVER_RECEIPT_SCHEMA: &str = "outilsia.benchmark_commons.server_receipt.v1";
+pub(crate) const SERVER_REVOCATION_SCHEMA: &str = "outilsia.benchmark_commons.server_revocation.v1";
 const PREPARE_REQUEST_SCHEMA: &str = "outilsia.benchmark_commons.prepare_request.v1";
 const PREPARE_RESULT_SCHEMA: &str = "outilsia.benchmark_commons.prepare_result.v1";
 const APPROVE_REQUEST_SCHEMA: &str = "outilsia.benchmark_commons.approve_request.v1";
 const EXPORT_REQUEST_SCHEMA: &str = "outilsia.benchmark_commons.export_request.v1";
 const REVOKE_REQUEST_SCHEMA: &str = "outilsia.benchmark_commons.revoke_request.v1";
 const ROTATE_REQUEST_SCHEMA: &str = "outilsia.benchmark_commons.rotate_request.v1";
+const NETWORK_SUBMIT_REQUEST_SCHEMA: &str = "outilsia.benchmark_commons.network_submit_request.v1";
+const NETWORK_REVOKE_REQUEST_SCHEMA: &str = "outilsia.benchmark_commons.network_revoke_request.v1";
 const STATUS_SCHEMA: &str = "outilsia.benchmark_commons.status.v1";
 const REGISTRY_SCHEMA: &str = "outilsia.benchmark_commons.local_registry.v1";
 const REVOCATION_SCHEMA: &str = "outilsia.benchmark_commons.revocation.v1";
@@ -32,6 +36,13 @@ const MAX_EXPORTS: usize = 200;
 const MAX_REVOCATIONS: usize = 200;
 const MAX_REGISTRY_BYTES: usize = 2 * 1024 * 1024;
 const STANDARD_BENCHMARK_QUESTION: &str = "Pourquoi la VRAM est importante pour un LLM local ?";
+
+pub(crate) fn benchmark_commons_upload_enabled() -> bool {
+    matches!(
+        option_env!("OUTILSIA_BENCHMARK_COMMONS_UPLOAD"),
+        Some("1") | Some("true") | Some("enabled")
+    )
+}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -77,6 +88,27 @@ pub(crate) struct RotatePseudonymRequest {
     confirmed_in_native_ui: bool,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) struct SubmitContributionNetworkRequest {
+    pub(crate) schema: String,
+    pub(crate) machine_id: u64,
+    pub(crate) contribution_id: String,
+    pub(crate) document_sha256: String,
+    pub(crate) confirmed_in_native_ui: bool,
+    pub(crate) privacy_reviewed: bool,
+    pub(crate) not_field_proof_acknowledged: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) struct RevokeContributionNetworkRequest {
+    pub(crate) schema: String,
+    pub(crate) contribution_id: String,
+    pub(crate) document_sha256: String,
+    pub(crate) confirmed_in_native_ui: bool,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PreparedState {
     AwaitingHuman,
@@ -113,6 +145,7 @@ struct PreparedContribution {
 #[derive(Default)]
 struct Runtime {
     prepared: HashMap<String, PreparedContribution>,
+    network_in_flight: HashSet<String>,
 }
 
 #[derive(Default)]
@@ -362,6 +395,247 @@ pub(crate) fn validate_receipt(receipt: &Value) -> Result<String, String> {
     Ok(digest)
 }
 
+fn has_exact_keys(value: &Value, expected: &[&str]) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    object.len() == expected.len() && expected.iter().all(|key| object.contains_key(*key))
+}
+
+fn validate_server_integrity_envelope(document: &Value) -> Result<String, String> {
+    let integrity = document
+        .get("server_integrity")
+        .ok_or_else(|| "Signature serveur Benchmark Commons absente.".to_string())?;
+    if !has_exact_keys(
+        integrity,
+        &["algorithm", "canonicalization", "scope", "key_id", "digest"],
+    ) || integrity.get("algorithm").and_then(Value::as_str) != Some("HMAC-SHA256")
+        || integrity.get("canonicalization").and_then(Value::as_str)
+            != Some("recursive-key-sort-json-v1")
+        || integrity.get("scope").and_then(Value::as_str)
+            != Some("canonical_document_without_server_integrity")
+        || integrity.get("key_id").and_then(Value::as_str) != Some("benchmark-commons-server-v1")
+    {
+        return Err("Enveloppe de signature serveur non conforme.".to_string());
+    }
+    integrity
+        .get("digest")
+        .and_then(Value::as_str)
+        .filter(|value| is_sha256(value))
+        .map(str::to_string)
+        .ok_or_else(|| "Empreinte du recu serveur invalide.".to_string())
+}
+
+pub(crate) fn validate_server_submission_receipt(
+    receipt: &Value,
+    contribution_id: &str,
+    observation_sha256: &str,
+    document_sha256: &str,
+) -> Result<String, String> {
+    if !has_exact_keys(
+        receipt,
+        &[
+            "schema",
+            "contract_version",
+            "status",
+            "contribution_id",
+            "observation_sha256",
+            "document_sha256",
+            "accepted_at_ms",
+            "verification",
+            "network",
+            "proof",
+            "privacy",
+            "revocation",
+            "retention",
+            "server_integrity",
+        ],
+    ) || receipt.get("schema").and_then(Value::as_str) != Some(SERVER_RECEIPT_SCHEMA)
+        || receipt.get("contract_version").and_then(Value::as_str) != Some(CONTRACT_VERSION)
+        || receipt.get("status").and_then(Value::as_str) != Some("accepted")
+        || receipt.get("contribution_id").and_then(Value::as_str) != Some(contribution_id)
+        || receipt.get("observation_sha256").and_then(Value::as_str) != Some(observation_sha256)
+        || receipt.get("document_sha256").and_then(Value::as_str) != Some(document_sha256)
+        || receipt
+            .get("accepted_at_ms")
+            .and_then(Value::as_u64)
+            .is_none()
+    {
+        return Err("Recu de soumission serveur detache de la contribution.".to_string());
+    }
+    let verification = receipt
+        .get("verification")
+        .ok_or_else(|| "Verification serveur absente.".to_string())?;
+    if !has_exact_keys(
+        verification,
+        &[
+            "document_integrity",
+            "machine_account_match",
+            "benchmark_account_match",
+            "server_deduplicated",
+            "cohort_key",
+        ],
+    ) || verification
+        .get("document_integrity")
+        .and_then(Value::as_bool)
+        != Some(true)
+        || verification
+            .get("machine_account_match")
+            .and_then(Value::as_bool)
+            != Some(true)
+        || verification
+            .get("benchmark_account_match")
+            .and_then(Value::as_bool)
+            != Some(true)
+        || verification
+            .get("server_deduplicated")
+            .and_then(Value::as_bool)
+            != Some(true)
+        || verification
+            .get("cohort_key")
+            .and_then(Value::as_str)
+            .is_none_or(|value| !is_sha256(value))
+    {
+        return Err("Verification du recu serveur incomplete.".to_string());
+    }
+    let network = receipt
+        .get("network")
+        .ok_or_else(|| "Trace reseau serveur absente.".to_string())?;
+    if !has_exact_keys(network, &["received", "transport"])
+        || network.get("received").and_then(Value::as_bool) != Some(true)
+        || network.get("transport").and_then(Value::as_str) != Some("authenticated_https_candidate")
+    {
+        return Err("Trace reseau serveur invalide.".to_string());
+    }
+    let proof = receipt
+        .get("proof")
+        .ok_or_else(|| "Limites de preuve serveur absentes.".to_string())?;
+    if !has_exact_keys(
+        proof,
+        &[
+            "field_test_proof",
+            "community_verified",
+            "leaderboard_eligible",
+        ],
+    ) || proof.get("field_test_proof").and_then(Value::as_bool) != Some(false)
+        || proof.get("community_verified").and_then(Value::as_bool) != Some(false)
+        || proof.get("leaderboard_eligible").and_then(Value::as_bool) != Some(false)
+    {
+        return Err("Le recu serveur surestime la preuve.".to_string());
+    }
+    let privacy = receipt
+        .get("privacy")
+        .ok_or_else(|| "Garanties de confidentialite serveur absentes.".to_string())?;
+    if !has_exact_keys(
+        privacy,
+        &[
+            "account_identifier_returned",
+            "machine_identifier_returned",
+            "subject_key_returned",
+            "ip_stored_in_commons_record",
+            "user_agent_stored_in_commons_record",
+            "raw_prompt_stored",
+            "model_output_stored",
+        ],
+    ) || privacy
+        .as_object()
+        .is_none_or(|object| object.values().any(|value| value.as_bool() != Some(false)))
+    {
+        return Err("Garanties de confidentialite serveur invalides.".to_string());
+    }
+    let revocation = receipt
+        .get("revocation")
+        .ok_or_else(|| "Contrat de revocation serveur absent.".to_string())?;
+    let retention = receipt
+        .get("retention")
+        .ok_or_else(|| "Contrat de retention serveur absent.".to_string())?;
+    if !has_exact_keys(revocation, &["available_to_authenticated_owner"])
+        || revocation
+            .get("available_to_authenticated_owner")
+            .and_then(Value::as_bool)
+            != Some(true)
+        || !has_exact_keys(retention, &["maximum_days", "revocation_supported"])
+        || retention.get("maximum_days").and_then(Value::as_u64) != Some(180)
+        || retention
+            .get("revocation_supported")
+            .and_then(Value::as_bool)
+            != Some(true)
+    {
+        return Err("Retention ou revocation serveur non conforme.".to_string());
+    }
+    validate_server_integrity_envelope(receipt)
+}
+
+pub(crate) fn validate_server_revocation_receipt(
+    receipt: &Value,
+    contribution_id: &str,
+    observation_sha256: &str,
+    document_sha256: &str,
+) -> Result<String, String> {
+    if !has_exact_keys(
+        receipt,
+        &[
+            "schema",
+            "contract_version",
+            "status",
+            "contribution_id",
+            "observation_sha256",
+            "document_sha256",
+            "revoked_at_ms",
+            "reason",
+            "proof",
+            "privacy",
+            "server_integrity",
+        ],
+    ) || receipt.get("schema").and_then(Value::as_str) != Some(SERVER_REVOCATION_SCHEMA)
+        || receipt.get("contract_version").and_then(Value::as_str) != Some(CONTRACT_VERSION)
+        || receipt.get("status").and_then(Value::as_str) != Some("revoked")
+        || receipt.get("contribution_id").and_then(Value::as_str) != Some(contribution_id)
+        || receipt.get("observation_sha256").and_then(Value::as_str) != Some(observation_sha256)
+        || receipt.get("document_sha256").and_then(Value::as_str) != Some(document_sha256)
+        || receipt
+            .get("revoked_at_ms")
+            .and_then(Value::as_u64)
+            .is_none()
+        || receipt.get("reason").and_then(Value::as_str) != Some("authenticated_owner_request")
+    {
+        return Err("Recu de revocation serveur detache de la contribution.".to_string());
+    }
+    let proof = receipt
+        .get("proof")
+        .ok_or_else(|| "Limites de revocation serveur absentes.".to_string())?;
+    if !has_exact_keys(
+        proof,
+        &[
+            "field_test_proof",
+            "community_verified",
+            "leaderboard_eligible",
+        ],
+    ) || proof
+        .as_object()
+        .is_none_or(|object| object.values().any(|value| value.as_bool() != Some(false)))
+    {
+        return Err("La revocation serveur surestime la preuve.".to_string());
+    }
+    let privacy = receipt
+        .get("privacy")
+        .ok_or_else(|| "Confidentialite de revocation serveur absente.".to_string())?;
+    if !has_exact_keys(
+        privacy,
+        &[
+            "account_identifier_returned",
+            "machine_identifier_returned",
+            "subject_key_returned",
+        ],
+    ) || privacy
+        .as_object()
+        .is_none_or(|object| object.values().any(|value| value.as_bool() != Some(false)))
+    {
+        return Err("Confidentialite de revocation serveur invalide.".to_string());
+    }
+    validate_server_integrity_envelope(receipt)
+}
+
 fn registry_directory(app: &AppHandle) -> Result<PathBuf, String> {
     let directory = app
         .path()
@@ -519,10 +793,63 @@ fn verify_export_record(record: &Value) -> Result<(), String> {
         filename,
     )?;
 
+    let server_submission = record
+        .get("server_submission_receipt")
+        .filter(|value| !value.is_null());
+    let server_revocation = record
+        .get("server_revocation_receipt")
+        .filter(|value| !value.is_null());
+    if let Some(receipt) = server_submission {
+        validate_server_submission_receipt(
+            receipt,
+            contribution_id,
+            observation_sha256,
+            document_sha256,
+        )?;
+        if record.get("server_submitted_at_ms").and_then(Value::as_u64)
+            != receipt.get("accepted_at_ms").and_then(Value::as_u64)
+        {
+            return Err("Date de soumission serveur incoherente.".to_string());
+        }
+        if let Some(revocation) = server_revocation {
+            validate_server_revocation_receipt(
+                revocation,
+                contribution_id,
+                observation_sha256,
+                document_sha256,
+            )?;
+            if record.get("server_revoked_at_ms").and_then(Value::as_u64)
+                != revocation.get("revoked_at_ms").and_then(Value::as_u64)
+            {
+                return Err("Date de revocation serveur incoherente.".to_string());
+            }
+        } else if record
+            .get("server_revoked_at_ms")
+            .is_some_and(|value| !value.is_null())
+        {
+            return Err("Revocation serveur sans recu.".to_string());
+        }
+    } else if server_revocation.is_some()
+        || record
+            .get("server_submitted_at_ms")
+            .is_some_and(|value| !value.is_null())
+        || record
+            .get("server_revoked_at_ms")
+            .is_some_and(|value| !value.is_null())
+    {
+        return Err("Etat serveur Benchmark Commons incomplet.".to_string());
+    }
+
     let revoked = record
         .get("revoked_at_ms")
         .is_some_and(|value| !value.is_null());
     if revoked {
+        if server_submission.is_some() && server_revocation.is_none() {
+            return Err(
+                "Un export soumis au serveur doit etre revoque a distance avant retrait local."
+                    .to_string(),
+            );
+        }
         let expected_revocation_filename =
             format!("outilsia-benchmark-revocation-{contribution_id}.json");
         if record
@@ -717,6 +1044,256 @@ fn active_export_for_observation<'a>(
             record.get("observation_sha256").and_then(Value::as_str) == Some(observation_sha256)
                 && record.get("revoked_at_ms").is_none_or(Value::is_null)
         })
+}
+
+fn export_record_mut<'a>(
+    registry: &'a mut Value,
+    contribution_id: &str,
+    document_sha256: &str,
+) -> Result<&'a mut Value, String> {
+    registry
+        .get_mut("exports")
+        .and_then(Value::as_array_mut)
+        .and_then(|exports| {
+            exports.iter_mut().rev().find(|record| {
+                record.get("contribution_id").and_then(Value::as_str) == Some(contribution_id)
+                    && record.get("document_sha256").and_then(Value::as_str)
+                        == Some(document_sha256)
+            })
+        })
+        .ok_or_else(|| "Contribution locale Benchmark Commons introuvable.".to_string())
+}
+
+fn validate_network_identity(contribution_id: &str, document_sha256: &str) -> Result<(), String> {
+    if !exact_prefixed_hex(contribution_id, "bc-", 24) || !is_sha256(document_sha256) {
+        return Err("Identite de contribution reseau invalide.".to_string());
+    }
+    Ok(())
+}
+
+pub(crate) fn begin_server_submission(
+    app: &AppHandle,
+    state: &BenchmarkCommonsState,
+    request: &SubmitContributionNetworkRequest,
+) -> Result<Value, String> {
+    if request.schema != NETWORK_SUBMIT_REQUEST_SCHEMA
+        || request.machine_id == 0
+        || !request.confirmed_in_native_ui
+        || !request.privacy_reviewed
+        || !request.not_field_proof_acknowledged
+    {
+        return Err("Consentement reseau Benchmark Commons incomplet.".to_string());
+    }
+    let contribution_id = request.contribution_id.trim();
+    let document_sha256 = request.document_sha256.trim();
+    validate_network_identity(contribution_id, document_sha256)?;
+    let mut runtime = state
+        .0
+        .lock()
+        .map_err(|_| "Verrou Benchmark Commons indisponible.".to_string())?;
+    if runtime.network_in_flight.contains(contribution_id) {
+        return Err("Une operation reseau Benchmark Commons est deja en cours.".to_string());
+    }
+    let mut registry = read_registry(app, unix_ms())?;
+    let record = export_record_mut(&mut registry, contribution_id, document_sha256)?;
+    verify_export_record(record)?;
+    if record
+        .get("revoked_at_ms")
+        .is_some_and(|value| !value.is_null())
+    {
+        return Err("Une contribution retiree localement ne peut pas etre envoyee.".to_string());
+    }
+    if record
+        .get("server_submission_receipt")
+        .is_some_and(|value| !value.is_null())
+    {
+        return Err("Cette contribution possede deja un recu serveur.".to_string());
+    }
+    let contribution = record
+        .get("contribution")
+        .cloned()
+        .ok_or_else(|| "Contribution locale absente.".to_string())?;
+    validate_contribution(&contribution)?;
+    runtime
+        .network_in_flight
+        .insert(contribution_id.to_string());
+    Ok(contribution)
+}
+
+pub(crate) fn begin_server_revocation(
+    app: &AppHandle,
+    state: &BenchmarkCommonsState,
+    request: &RevokeContributionNetworkRequest,
+) -> Result<(), String> {
+    if request.schema != NETWORK_REVOKE_REQUEST_SCHEMA || !request.confirmed_in_native_ui {
+        return Err("Confirmation de revocation reseau requise.".to_string());
+    }
+    let contribution_id = request.contribution_id.trim();
+    let document_sha256 = request.document_sha256.trim();
+    validate_network_identity(contribution_id, document_sha256)?;
+    let mut runtime = state
+        .0
+        .lock()
+        .map_err(|_| "Verrou Benchmark Commons indisponible.".to_string())?;
+    if runtime.network_in_flight.contains(contribution_id) {
+        return Err("Une operation reseau Benchmark Commons est deja en cours.".to_string());
+    }
+    let mut registry = read_registry(app, unix_ms())?;
+    let record = export_record_mut(&mut registry, contribution_id, document_sha256)?;
+    verify_export_record(record)?;
+    if record
+        .get("server_submission_receipt")
+        .is_none_or(Value::is_null)
+    {
+        return Err("Aucune soumission serveur active pour cette contribution.".to_string());
+    }
+    if record
+        .get("server_revocation_receipt")
+        .is_some_and(|value| !value.is_null())
+    {
+        return Err("Cette contribution possede deja un recu de revocation serveur.".to_string());
+    }
+    runtime
+        .network_in_flight
+        .insert(contribution_id.to_string());
+    Ok(())
+}
+
+pub(crate) fn abort_server_operation(
+    state: &BenchmarkCommonsState,
+    contribution_id: &str,
+) -> Result<(), String> {
+    state
+        .0
+        .lock()
+        .map_err(|_| "Verrou Benchmark Commons indisponible.".to_string())?
+        .network_in_flight
+        .remove(contribution_id.trim());
+    Ok(())
+}
+
+pub(crate) fn record_server_submission(
+    app: &AppHandle,
+    state: &BenchmarkCommonsState,
+    contribution_id: &str,
+    document_sha256: &str,
+    receipt: Value,
+) -> Result<Value, String> {
+    validate_network_identity(contribution_id, document_sha256)?;
+    let mut runtime = state
+        .0
+        .lock()
+        .map_err(|_| "Verrou Benchmark Commons indisponible.".to_string())?;
+    let result = (|| {
+        if !runtime.network_in_flight.contains(contribution_id) {
+            return Err("Soumission serveur non initiee par l'interface native.".to_string());
+        }
+        let now = unix_ms();
+        let mut registry = read_registry(app, now)?;
+        let record = export_record_mut(&mut registry, contribution_id, document_sha256)?;
+        let observation_sha256 = record
+            .get("observation_sha256")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "Empreinte d'observation absente.".to_string())?
+            .to_string();
+        let receipt_digest = validate_server_submission_receipt(
+            &receipt,
+            contribution_id,
+            &observation_sha256,
+            document_sha256,
+        )?;
+        if let Some(existing) = record
+            .get("server_submission_receipt")
+            .filter(|value| !value.is_null())
+        {
+            if existing != &receipt {
+                return Err("Le recu serveur existant est en conflit.".to_string());
+            }
+            return Ok(json!({
+                "recorded": true,
+                "duplicate": true,
+                "server_receipt_digest": receipt_digest
+            }));
+        }
+        record["server_submitted_at_ms"] = receipt
+            .get("accepted_at_ms")
+            .cloned()
+            .unwrap_or(Value::Null);
+        record["server_submission_receipt"] = receipt;
+        record["server_revoked_at_ms"] = Value::Null;
+        record["server_revocation_receipt"] = Value::Null;
+        write_registry_path(&registry_path(app)?, &mut registry)?;
+        Ok(json!({
+            "recorded": true,
+            "duplicate": false,
+            "server_receipt_digest": receipt_digest
+        }))
+    })();
+    runtime.network_in_flight.remove(contribution_id);
+    result
+}
+
+pub(crate) fn record_server_revocation(
+    app: &AppHandle,
+    state: &BenchmarkCommonsState,
+    contribution_id: &str,
+    document_sha256: &str,
+    receipt: Value,
+) -> Result<Value, String> {
+    validate_network_identity(contribution_id, document_sha256)?;
+    let mut runtime = state
+        .0
+        .lock()
+        .map_err(|_| "Verrou Benchmark Commons indisponible.".to_string())?;
+    let result = (|| {
+        if !runtime.network_in_flight.contains(contribution_id) {
+            return Err("Revocation serveur non initiee par l'interface native.".to_string());
+        }
+        let now = unix_ms();
+        let mut registry = read_registry(app, now)?;
+        let record = export_record_mut(&mut registry, contribution_id, document_sha256)?;
+        let observation_sha256 = record
+            .get("observation_sha256")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "Empreinte d'observation absente.".to_string())?
+            .to_string();
+        let receipt_digest = validate_server_revocation_receipt(
+            &receipt,
+            contribution_id,
+            &observation_sha256,
+            document_sha256,
+        )?;
+        if let Some(existing) = record
+            .get("server_revocation_receipt")
+            .filter(|value| !value.is_null())
+        {
+            if existing != &receipt {
+                return Err("Le recu de revocation serveur existant est en conflit.".to_string());
+            }
+            return Ok(json!({
+                "recorded": true,
+                "duplicate": true,
+                "server_receipt_digest": receipt_digest
+            }));
+        }
+        if record
+            .get("server_submission_receipt")
+            .is_none_or(Value::is_null)
+        {
+            return Err("Recu de soumission serveur absent du registre.".to_string());
+        }
+        record["server_revoked_at_ms"] =
+            receipt.get("revoked_at_ms").cloned().unwrap_or(Value::Null);
+        record["server_revocation_receipt"] = receipt;
+        write_registry_path(&registry_path(app)?, &mut registry)?;
+        Ok(json!({
+            "recorded": true,
+            "duplicate": false,
+            "server_receipt_digest": receipt_digest
+        }))
+    })();
+    runtime.network_in_flight.remove(contribution_id);
+    result
 }
 
 fn prepared_expired(prepared: &PreparedContribution, now: u128) -> bool {
@@ -1218,6 +1795,10 @@ pub(crate) fn export_benchmark_contribution_state(
         "exported_at_ms": now,
         "revoked_at_ms": Value::Null,
         "file_deleted": false,
+        "server_submitted_at_ms": Value::Null,
+        "server_revoked_at_ms": Value::Null,
+        "server_submission_receipt": Value::Null,
+        "server_revocation_receipt": Value::Null,
         "contribution": prepared.contribution,
         "export_receipt": receipt
     });
@@ -1290,6 +1871,12 @@ pub(crate) fn revoke_benchmark_contribution_state(
         .0
         .lock()
         .map_err(|_| "Verrou Benchmark Commons indisponible.".to_string())?;
+    if _runtime
+        .network_in_flight
+        .contains(request.contribution_id.trim())
+    {
+        return Err("Une operation reseau Benchmark Commons est en cours.".to_string());
+    }
     let now = unix_ms();
     let mut registry = read_registry(app, now)?;
     let exports = registry
@@ -1315,6 +1902,18 @@ pub(crate) fn revoke_benchmark_contribution_state(
             "network_sent": false,
             "receipt": record.get("revocation_receipt").cloned().unwrap_or(Value::Null)
         }));
+    }
+    if record
+        .get("server_submission_receipt")
+        .is_some_and(|value| !value.is_null())
+        && record
+            .get("server_revocation_receipt")
+            .is_none_or(Value::is_null)
+    {
+        return Err(
+            "Retire d'abord cette contribution du Commons avant de supprimer l'export local."
+                .to_string(),
+        );
     }
     let destination = record
         .get("destination")
@@ -1449,6 +2048,25 @@ fn public_registry_view(registry: &Value) -> Value {
                 .rev()
                 .take(20)
                 .map(|record| {
+                    let submitted_at_ms = record
+                        .get("server_submitted_at_ms")
+                        .cloned()
+                        .unwrap_or(Value::Null);
+                    let revoked_at_ms = record
+                        .get("server_revoked_at_ms")
+                        .cloned()
+                        .unwrap_or(Value::Null);
+                    let server_status = if !revoked_at_ms.is_null() {
+                        "revoked"
+                    } else if !submitted_at_ms.is_null() {
+                        "accepted"
+                    } else {
+                        "not_submitted"
+                    };
+                    let receipt_digest = record
+                        .pointer("/server_submission_receipt/server_integrity/digest")
+                        .cloned()
+                        .unwrap_or(Value::Null);
                     json!({
                         "contribution_id": record.get("contribution_id").cloned().unwrap_or(Value::Null),
                         "observation_sha256": record.get("observation_sha256").cloned().unwrap_or(Value::Null),
@@ -1458,7 +2076,17 @@ fn public_registry_view(registry: &Value) -> Value {
                         "exported_at_ms": record.get("exported_at_ms").cloned().unwrap_or(Value::Null),
                         "revoked_at_ms": record.get("revoked_at_ms").cloned().unwrap_or(Value::Null),
                         "file_deleted": record.get("file_deleted").cloned().unwrap_or(json!(false)),
-                        "contribution": record.get("contribution").cloned().unwrap_or(Value::Null)
+                        "contribution": record.get("contribution").cloned().unwrap_or(Value::Null),
+                        "server": {
+                            "status": server_status,
+                            "submitted_at_ms": submitted_at_ms,
+                            "revoked_at_ms": revoked_at_ms,
+                            "receipt_hmac_digest": receipt_digest,
+                            "network_received": server_status != "not_submitted",
+                            "field_test_proof": false,
+                            "community_verified": false,
+                            "leaderboard_eligible": false
+                        }
                     })
                 })
                 .collect::<Vec<_>>()
@@ -1493,12 +2121,28 @@ pub(crate) fn get_benchmark_commons_status(
             .unwrap_or_default()
     });
     prepared.reverse();
+    let upload_available = benchmark_commons_upload_enabled();
+    let network_sent = registry
+        .get("exports")
+        .and_then(Value::as_array)
+        .is_some_and(|exports| {
+            exports.iter().any(|record| {
+                record
+                    .get("server_submission_receipt")
+                    .is_some_and(|value| !value.is_null())
+            })
+        });
     Ok(json!({
         "schema": STATUS_SCHEMA,
         "contract_version": CONTRACT_VERSION,
-        "mode": "local_export_only",
-        "upload_available": false,
-        "network_sent": false,
+        "mode": if upload_available {
+            "local_export_with_guarded_server_candidate"
+        } else {
+            "local_export_only"
+        },
+        "upload_available": upload_available,
+        "network_sent": network_sent,
+        "network_operation_in_progress": !runtime.network_in_flight.is_empty(),
         "field_test_proof": false,
         "community_verified": false,
         "leaderboard_available": false,
@@ -1822,6 +2466,147 @@ mod tests {
             ["generation_tokens_per_second"] = json!(9999);
         sign_document(&mut registry).expect("rehashed forged registry");
         assert!(verify_registry(&registry).is_err());
+    }
+
+    fn server_submission_receipt(
+        contribution_id: &str,
+        observation_sha256: &str,
+        document_sha256: &str,
+        now: u128,
+    ) -> Value {
+        json!({
+            "schema": SERVER_RECEIPT_SCHEMA,
+            "contract_version": CONTRACT_VERSION,
+            "status": "accepted",
+            "contribution_id": contribution_id,
+            "observation_sha256": observation_sha256,
+            "document_sha256": document_sha256,
+            "accepted_at_ms": now,
+            "verification": {
+                "document_integrity": true,
+                "machine_account_match": true,
+                "benchmark_account_match": true,
+                "server_deduplicated": true,
+                "cohort_key": "c".repeat(64)
+            },
+            "network": {
+                "received": true,
+                "transport": "authenticated_https_candidate"
+            },
+            "proof": {
+                "field_test_proof": false,
+                "community_verified": false,
+                "leaderboard_eligible": false
+            },
+            "privacy": {
+                "account_identifier_returned": false,
+                "machine_identifier_returned": false,
+                "subject_key_returned": false,
+                "ip_stored_in_commons_record": false,
+                "user_agent_stored_in_commons_record": false,
+                "raw_prompt_stored": false,
+                "model_output_stored": false
+            },
+            "revocation": {
+                "available_to_authenticated_owner": true
+            },
+            "retention": {
+                "maximum_days": 180,
+                "revocation_supported": true
+            },
+            "server_integrity": {
+                "algorithm": "HMAC-SHA256",
+                "canonicalization": "recursive-key-sort-json-v1",
+                "scope": "canonical_document_without_server_integrity",
+                "key_id": "benchmark-commons-server-v1",
+                "digest": "d".repeat(64)
+            }
+        })
+    }
+
+    fn server_revocation_receipt(
+        contribution_id: &str,
+        observation_sha256: &str,
+        document_sha256: &str,
+        now: u128,
+    ) -> Value {
+        json!({
+            "schema": SERVER_REVOCATION_SCHEMA,
+            "contract_version": CONTRACT_VERSION,
+            "status": "revoked",
+            "contribution_id": contribution_id,
+            "observation_sha256": observation_sha256,
+            "document_sha256": document_sha256,
+            "revoked_at_ms": now,
+            "reason": "authenticated_owner_request",
+            "proof": {
+                "field_test_proof": false,
+                "community_verified": false,
+                "leaderboard_eligible": false
+            },
+            "privacy": {
+                "account_identifier_returned": false,
+                "machine_identifier_returned": false,
+                "subject_key_returned": false
+            },
+            "server_integrity": {
+                "algorithm": "HMAC-SHA256",
+                "canonicalization": "recursive-key-sort-json-v1",
+                "scope": "canonical_document_without_server_integrity",
+                "key_id": "benchmark-commons-server-v1",
+                "digest": "e".repeat(64)
+            }
+        })
+    }
+
+    #[test]
+    fn validates_bounded_server_receipts_and_rejects_overclaims() {
+        let now = unix_ms();
+        let contribution_id = "bc-1234567890abcdef12345678";
+        let observation_sha256 = "a".repeat(64);
+        let document_sha256 = "b".repeat(64);
+        let mut submission =
+            server_submission_receipt(contribution_id, &observation_sha256, &document_sha256, now);
+        assert_eq!(
+            validate_server_submission_receipt(
+                &submission,
+                contribution_id,
+                &observation_sha256,
+                &document_sha256
+            )
+            .expect("valid submission receipt"),
+            "d".repeat(64)
+        );
+        submission["proof"]["community_verified"] = json!(true);
+        assert!(validate_server_submission_receipt(
+            &submission,
+            contribution_id,
+            &observation_sha256,
+            &document_sha256
+        )
+        .is_err());
+
+        let mut revocation = server_revocation_receipt(
+            contribution_id,
+            &observation_sha256,
+            &document_sha256,
+            now + 1,
+        );
+        validate_server_revocation_receipt(
+            &revocation,
+            contribution_id,
+            &observation_sha256,
+            &document_sha256,
+        )
+        .expect("valid revocation receipt");
+        revocation["privacy"]["subject_key_returned"] = json!(true);
+        assert!(validate_server_revocation_receipt(
+            &revocation,
+            contribution_id,
+            &observation_sha256,
+            &document_sha256
+        )
+        .is_err());
     }
 
     #[test]

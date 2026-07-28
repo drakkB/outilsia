@@ -1166,12 +1166,12 @@
             <div class="benchmark-commons-head">
               <div>
                 <strong id="benchmarkCommonsTitle">Contribution volontaire</strong>
-                <span>Benchmark Commons v1 · export local uniquement</span>
+                <span>Benchmark Commons v1 · local par défaut · partage opt-in</span>
               </div>
               <span id="benchmarkCommonsState">désactivé</span>
             </div>
             <p class="benchmark-commons-intro">
-              Prépare un fichier pseudonymisé à partir d'un benchmark standard mesuré. Rien n'est envoyé et ce fichier ne vaut ni preuve terrain ni classement communautaire.
+              Prépare un fichier pseudonymisé à partir d'un benchmark standard mesuré. L'aperçu reste local sans autorisation HTTPS séparée et ne vaut ni preuve terrain ni classement communautaire.
             </p>
             <div class="benchmark-commons-controls">
               <label>
@@ -1196,6 +1196,21 @@
               <button id="exportBenchmarkCommonsBtn" type="button" disabled>Exporter le JSON</button>
               <button id="revokeBenchmarkCommonsBtn" type="button" disabled>Retirer l'export</button>
               <button id="rotateBenchmarkCommonsBtn" class="ghost-btn" type="button" disabled>Changer de pseudonyme</button>
+            </div>
+            <div class="benchmark-commons-network">
+              <div>
+                <strong>Partage communautaire</strong>
+                <span id="benchmarkCommonsNetworkState">Désactivé dans ce build</span>
+              </div>
+              <label class="benchmark-commons-consent">
+                <input id="benchmarkCommonsNetworkConsent" type="checkbox" disabled />
+                <span>J'autorise l'envoi HTTPS authentifié de cet aperçu exact. Le serveur le rattache à mon compte et à la machine synchronisée pour vérifier, dédupliquer et permettre le retrait, sans renvoyer ces identifiants. Conservation maximale : 180 jours. Ce reçu ne vaut ni preuve terrain ni validation communautaire.</span>
+              </label>
+              <div class="row-actions">
+                <button id="syncBenchmarkCommonsBtn" type="button" disabled>Synchroniser la mesure</button>
+                <button id="submitBenchmarkCommonsBtn" type="button" disabled>Envoyer au Commons</button>
+                <button id="revokeBenchmarkCommonsRemoteBtn" type="button" disabled>Retirer du Commons</button>
+              </div>
             </div>
           </section>
         </article>

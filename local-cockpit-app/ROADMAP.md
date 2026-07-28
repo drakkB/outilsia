@@ -134,26 +134,35 @@ leaderboard décoratif.
   stricte du document, cohérence avec la machine et le benchmark déjà
   synchronisés, déduplication par sujet serveur, reçu HMAC, révocation et
   rétention maximale de 180 jours.
-- [ ] Relier l'application à cet endpoint seulement après revue du contrat,
-  configuration de la clé serveur, consentement réseau natif séparé et recette
-  de révocation bout en bout. Le candidat desktop actuel n'envoie aucune donnée.
+- [x] Relier le client candidat derrière un drapeau de compilation : origine
+  OutilsIA fixe, redirections refusées, compte desktop, machine et benchmark
+  synchronisés, consentement réseau natif distinct, reçu serveur conservé dans
+  le registre local et révocation distante obligatoire avant retrait local.
+- [ ] Configurer la clé serveur, déployer l'endpoint privé, installer et
+  monitorer la purge quotidienne garantissant la rétention maximale de 180
+  jours, produire une build terrain portant
+  `OUTILSIA_BENCHMARK_COMMONS_UPLOAD=1` et exécuter la recette réelle soumission
+  puis révocation. Les builds actuels gardent le partage désactivé.
 - [ ] Afficher médiane, dispersion et taille d'échantillon ; aucun classement
   public sous trois machines distinctes pour une même cohorte.
 - [ ] Publier des pages GPU/modèle uniquement à partir de cohortes vérifiées et
   datées, avec lien vers la méthode et les limites.
-- [ ] Étendre la révocation au serveur si une collecte opt-in est un jour
-  déployée.
+- [x] Conserver la révocation distante utilisable même si un build futur
+  désactive les nouvelles soumissions, afin de ne jamais piéger un export déjà
+  reçu par le serveur.
 
-État au 28 juillet 2026 : le palier local est implémenté dans les sources
-candidates et ne possède volontairement aucun code réseau. Un fichier exporté
-reste sous le contrôle de son propriétaire. Il porte explicitement
+État au 28 juillet 2026 : le palier local est implémenté et reste le seul actif
+dans les builds actuels. Un fichier exporté reste sous le contrôle de son
+propriétaire. Il porte explicitement
 `field_test_proof=false`, `community_verified=false` et
 `leaderboard_eligible=false`. Il ne sera pas présenté sur le site comme une
 preuve communautaire avant mise en place et audit du palier serveur. Le contrat
 serveur privé candidat refuse toute contribution sans compte desktop, machine
 native et benchmark synchronisés cohérents. Il ne retourne aucune ligne brute
-et masque toute cohorte sous trois machines distinctes ; il n'est ni déployé ni
-annoncé dans le manifeste de l'application.
+et masque toute cohorte sous trois machines distinctes. Le client réseau existe
+uniquement derrière un drapeau de compilation désactivé ; ni l'endpoint, ni sa
+clé HMAC, ni une build activée ne sont déployés ou annoncés dans le manifeste
+de l'application.
 
 ### Monétisation produit, pas péage sur la preuve
 
