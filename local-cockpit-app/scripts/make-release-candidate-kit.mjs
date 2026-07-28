@@ -14,6 +14,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(appRoot, "..");
 const defaultCandidate = join(appRoot, ".artifacts", "release-candidate");
 const defaultKitRoot = join(appRoot, ".artifacts", "release-candidate-kit");
 
@@ -99,6 +100,27 @@ function main() {
   copyFileSync(join(opts.candidate, "release-candidate.json"), join(output, "release-candidate.json"));
   copyFileSync(join(opts.candidate, "SHA256SUMS.txt"), join(output, "SHA256SUMS.txt"));
   copyFileSync(join(opts.candidate, "AUTHENTICODE.json"), join(output, "AUTHENTICODE.json"));
+  const actionLaneProbeName = "Probe-Local-Action-Lane.py";
+  const actionLaneProbeSource = join(appRoot, "scripts", "probe-local-action-lane.py");
+  const actionLaneProbeTarget = join(output, actionLaneProbeName);
+  const actionLaneProbeRepoPath = "local-cockpit-app/scripts/probe-local-action-lane.py";
+  const sourceCommit = String(candidate.source?.commit || "");
+  if (!sourceCommit) fail("Candidate source commit is missing");
+  const committedProbe = spawnSync(
+    "git",
+    ["-C", repoRoot, "show", `${sourceCommit}:${actionLaneProbeRepoPath}`],
+    { encoding: null }
+  );
+  if (committedProbe.status !== 0) {
+    fail("Action Lane probe is absent from the candidate source commit");
+  }
+  if (!readFileSync(actionLaneProbeSource).equals(committedProbe.stdout)) {
+    fail("Action Lane probe differs from the candidate source commit");
+  }
+  copyFileSync(actionLaneProbeSource, actionLaneProbeTarget);
+  const actionLaneProbeSha = createHash("sha256")
+    .update(readFileSync(actionLaneProbeTarget))
+    .digest("hex");
 
   const portable = windowsFiles.find((file) => file.kind === "portable") || null;
   const setup = windowsFiles.find((file) => file.kind === "setup") || windowsFiles[0];
@@ -393,6 +415,75 @@ echo.
 pause
 `, "ascii");
 
+  write(join(output, "04-SONDER-ACTION-LANE.cmd"), `@echo off
+setlocal
+cd /d "%~dp0"
+where py >nul 2>&1
+if errorlevel 1 goto :python
+py -3 "%~dp0${actionLaneProbeName}"
+set "PROBE_EXIT=%ERRORLEVEL%"
+goto :result
+:python
+where python >nul 2>&1
+if errorlevel 1 (
+  echo Python 3 est requis uniquement pour cette sonde avancee optionnelle.
+  pause
+  exit /b 2
+)
+python "%~dp0${actionLaneProbeName}"
+set "PROBE_EXIT=%ERRORLEVEL%"
+:result
+if not "%PROBE_EXIT%"=="0" (
+  echo.
+  echo Sonde Action Lane echouee. Aucune action locale n'a ete executee.
+  pause
+  exit /b %PROBE_EXIT%
+)
+echo.
+echo Sonde Action Lane terminee sans execution locale.
+pause
+`, "ascii");
+
+  write(join(output, "ACTION-LANE-PROBE.md"), `# Sonde externe Local Action Lane
+
+Cette recette avancée est séparée du test express. Elle prouve qu'un vrai client
+HTTP MCP peut préparer deux demandes identiques, les voir comme deux plans
+distincts en attente humaine, tenter sans succès un outil d'exécution interdit,
+puis annuler les deux demandes.
+
+Elle ne peut pas :
+
+- approuver une demande ;
+- exécuter un benchmark ;
+- installer ou supprimer un modèle ;
+- écrire le rapport ;
+- conserver le jeton.
+
+## Préconditions
+
+1. Terminer le scan.
+2. Générer le rapport final et l'AI Capability Passport.
+3. Ouvrir **Atelier IA > Local Action Lane**.
+4. Choisir **Client MCP local**, puis démarrer la lane.
+
+## Recette
+
+1. Double-cliquer \`04-SONDER-ACTION-LANE.cmd\`.
+2. Quand la sonde le demande, cliquer **Copier la configuration** dans OutilsIA,
+   puis revenir au terminal et appuyer sur Entrée.
+3. Quand elle le demande, cliquer **Copier le jeton temporaire**, revenir au
+   terminal et appuyer sur Entrée. Le presse-papiers est effacé immédiatement.
+4. À l'état \`ACTION_LANE_EXTERNAL_PROBE_AWAITING\`, actualiser la file OutilsIA :
+   deux cartes distinctes doivent être **En attente de votre décision** et aucun
+   bouton **Exécuter maintenant** ne doit apparaître.
+5. Revenir au terminal et appuyer sur Entrée. La sonde annule les deux demandes.
+6. Actualiser la file : les deux cartes doivent afficher **Annulé par le client**.
+7. Vérifier la ligne \`ACTION_LANE_EXTERNAL_PROBE_OK\`, puis arrêter la lane.
+
+La sonde ne produit aucun fichier de preuve et n'affiche ni URL, ni jeton, ni
+contenu du rapport. Son SHA-256 est inscrit dans \`RC-KIT-MANIFEST.json\`.
+`);
+
   const steps = [
     ["1", "Vérifier et lancer", "Double-cliquez 01-LANCER-LE-RC.cmd. Les SHA256 sont contrôlés avant l'ouverture."],
     ["2", "Analyser ce PC", "Dans l'app, cliquez Analyser ce PC. Vérifiez CPU, RAM, GPU, VRAM et runtime."],
@@ -432,7 +523,7 @@ pause
     <div class="steps">
       ${steps.map(([number, title, text]) => `<section class="step"><span class="num">${number}</span><div><h2>${html(title)}</h2><p>${html(text)}</p></div></section>`).join("\n")}
     </div>
-    <div class="rule"><strong>Frontière de preuve.</strong> Un résultat <code>RC_SMOKE_VALID</code> valide ce candidat sur une machine. Il ne remplace pas les cinq fiches terrain complètes, qui gardent PromptForge, Dialogue, Arena, deuxième modèle et contrôles anti-fraude.</div>
+    <div class="rule"><strong>Frontière de preuve.</strong> Un résultat <code>RC_SMOKE_VALID</code> valide ce candidat sur une machine. Il ne remplace pas les cinq fiches terrain complètes, qui gardent PromptForge, Dialogue, Arena, deuxième modèle et contrôles anti-fraude. La sonde MCP avancée <code>04-SONDER-ACTION-LANE.cmd</code> est optionnelle et n'exécute aucune action locale.</div>
   </main>
 </body>
 </html>`);
@@ -456,6 +547,10 @@ Le test express exige :
 5. rapport OutilsIA partagé et joignable.
 
 PromptForge, Dialogue, Arena et le deuxième modèle restent optionnels pour ce smoke RC, mais obligatoires dans la validation terrain finale.
+
+Audit Action Lane optionnel : lire \`ACTION-LANE-PROBE.md\`, puis lancer
+\`04-SONDER-ACTION-LANE.cmd\`. Cette sonde prépare et annule deux demandes via
+un client MCP externe ; elle ne peut ni les approuver ni les exécuter.
 `);
   write(join(output, "CAMPAGNE-5-MACHINES.md"), `# Campagne terrain OutilsIA Local Cockpit ${candidate.label}
 
@@ -500,6 +595,16 @@ Toutes les machines doivent utiliser ce même candidat :
     public_deploy_allowed: false,
     code_signing: candidate.code_signing,
     windows_files: windowsFiles.map((file) => ({ name: file.name, sha256: file.sha256, kind: file.kind })),
+    action_lane_probe: {
+      script: actionLaneProbeName,
+      launcher: "04-SONDER-ACTION-LANE.cmd",
+      guide: "ACTION-LANE-PROBE.md",
+      sha256: actionLaneProbeSha,
+      external_http_client: true,
+      approval_available: false,
+      execution_available: false,
+      token_persisted: false,
+    },
     smoke_validator: "02-VALIDER-LE-TEST.cmd",
     smoke_export_directory: "Downloads",
     smoke_import_command: "npm run import:rc-smoke -- --candidate-dir <candidat-fusionne> --input <zip>",

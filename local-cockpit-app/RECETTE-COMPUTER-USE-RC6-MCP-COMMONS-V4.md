@@ -150,19 +150,9 @@ ne doit jamais être lancée, modifiée ou testée dans cette recette.
 
 ### 4.2 Produits interdits
 
-Ne pas ouvrir, modifier ou tester :
+Ne pas ouvrir, modifier ou tester un autre produit, dépôt, site ou jeu.
 
-- GardenArena ;
-- Garden ;
-- Fable Joint Sentinel ;
-- ScoreLook ;
-- ScoreCredit ;
-- Vigi-Sky ;
-- Dragon Labyrinth ;
-- Pac-Man ;
-- un autre dépôt ou site.
-
-Toute logique GardenArena dans OutilsIA est une contamination P0.
+Toute logique étrangère au Local Cockpit dans OutilsIA est une contamination P0.
 
 ### 4.3 Fichiers étrangers à ignorer
 

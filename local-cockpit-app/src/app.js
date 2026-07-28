@@ -6773,6 +6773,18 @@ function renderBenchmarkPreflight() {
   return snapshot;
 }
 
+function benchmarkPromptConfirmationLabel(prompt) {
+  const clean = String(prompt || "").trim();
+  if (!clean) return "court standard OutilsIA";
+  if (
+    clean === BENCHMARK_COMMONS_STANDARD_QUESTION
+    || clean === BENCHMARK_COMMONS_STANDARD_PROMPT
+  ) {
+    return `standard Benchmark Commons (${clean.length} caractères)`;
+  }
+  return `personnalisé (${clean.length} caractères)`;
+}
+
 function benchmarkConfirmationText(model, options = {}) {
   const snapshot = benchmarkPreflightSnapshot(model);
   const forceCpu = Boolean(options.forceCpu);
@@ -6786,7 +6798,7 @@ function benchmarkConfirmationText(model, options = {}) {
     `Runtime : ${runtimeLabel}`,
     `Mode : ${forceCpu ? "CPU seul, GPU désactivé pour ce test" : "automatique, accélération GPU si disponible"}`,
     `Durée maximale : ${timeoutSeconds} secondes`,
-    `Prompt : ${prompt ? `personnalisé (${prompt.length} caractères)` : "court standard OutilsIA"}`,
+    `Prompt : ${benchmarkPromptConfirmationLabel(prompt)}`,
     "",
     "Le modèle est déjà installé. Aucun téléchargement ni envoi cloud.",
     "Le test peut mobiliser fortement le CPU, le GPU et la mémoire pendant la mesure."

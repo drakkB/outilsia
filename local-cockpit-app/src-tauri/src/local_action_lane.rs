@@ -2174,8 +2174,47 @@ mod tests {
             .and_then(Value::as_str)
             .expect("prepared request id")
             .to_string();
+        let plan_sha256 = prepared_json
+            .pointer("/result/structuredContent/plan_sha256")
+            .and_then(Value::as_str)
+            .expect("prepared plan digest")
+            .to_string();
         assert_eq!(
             prepared_json
+                .pointer("/result/structuredContent/state")
+                .and_then(Value::as_str),
+            Some("awaiting_human")
+        );
+
+        let duplicate = network_mcp_post(
+            port,
+            Some(&started.token),
+            &json!({
+                "jsonrpc": "2.0",
+                "id": 31,
+                "method": "tools/call",
+                "params": {
+                    "name": "outilsia_prepare_report_export",
+                    "arguments": {"format": "markdown"}
+                }
+            }),
+        );
+        assert!(response_status(&duplicate).contains("200 OK"));
+        let duplicate_json = response_json(&duplicate);
+        let duplicate_request_id = duplicate_json
+            .pointer("/result/structuredContent/request_id")
+            .and_then(Value::as_str)
+            .expect("duplicate request id")
+            .to_string();
+        assert_ne!(request_id, duplicate_request_id);
+        assert_eq!(
+            duplicate_json
+                .pointer("/result/structuredContent/plan_sha256")
+                .and_then(Value::as_str),
+            Some(plan_sha256.as_str())
+        );
+        assert_eq!(
+            duplicate_json
                 .pointer("/result/structuredContent/state")
                 .and_then(Value::as_str),
             Some("awaiting_human")
@@ -2220,10 +2259,35 @@ mod tests {
                 .and_then(Value::as_str),
             Some("cancelled")
         );
+        let duplicate_cancelled = network_mcp_post(
+            port,
+            Some(&started.token),
+            &json!({
+                "jsonrpc": "2.0",
+                "id": 6,
+                "method": "tools/call",
+                "params": {
+                    "name": "outilsia_cancel_action_request",
+                    "arguments": {"request_id": duplicate_request_id}
+                }
+            }),
+        );
+        assert_eq!(
+            response_json(&duplicate_cancelled)
+                .pointer("/result/structuredContent/state")
+                .and_then(Value::as_str),
+            Some("cancelled")
+        );
         let native_requests = list_local_action_requests().expect("native queue");
-        assert_eq!(native_requests.len(), 1);
-        assert_eq!(native_requests[0].state, "cancelled");
-        assert!(native_requests[0].result.is_none());
+        assert_eq!(native_requests.len(), 2);
+        assert!(native_requests
+            .iter()
+            .all(|request| request.state == "cancelled" && request.result.is_none()));
+        assert_ne!(native_requests[0].request_id, native_requests[1].request_id);
+        assert_eq!(
+            native_requests[0].plan_sha256,
+            native_requests[1].plan_sha256
+        );
 
         let stopped = stop_local_action_lane().expect("lane stop");
         assert!(!stopped.running);

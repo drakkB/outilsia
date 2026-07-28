@@ -8,6 +8,7 @@ const repoRoot = resolve(appRoot, "..");
 const workflowPath = join(repoRoot, ".github", "workflows", "local-cockpit-release-candidate.yml");
 const text = readFileSync(workflowPath, "utf8");
 const packager = readFileSync(join(appRoot, "scripts", "package-release-candidate.mjs"), "utf8");
+const kitMaker = readFileSync(join(appRoot, "scripts", "make-release-candidate-kit.mjs"), "utf8");
 
 function fail(message) {
   throw new Error(message);
@@ -35,6 +36,18 @@ if (!packager.includes("Inspect one artifact per process")
 }
 if (!packager.includes('key.toLowerCase() !== "psmodulepath"')) {
   fail("RC packager must not pass a PowerShell 7 module path into Windows PowerShell");
+}
+for (const marker of [
+  "Probe-Local-Action-Lane.py",
+  "Action Lane probe differs from the candidate source commit",
+  "${sourceCommit}:${actionLaneProbeRepoPath}",
+  "action_lane_probe:",
+  "execution_available: false",
+  "token_persisted: false",
+]) {
+  if (!kitMaker.includes(marker)) {
+    fail(`RC kit must bind the external Action Lane probe to the candidate commit: ${marker}`);
+  }
 }
 
 const forbidden = [

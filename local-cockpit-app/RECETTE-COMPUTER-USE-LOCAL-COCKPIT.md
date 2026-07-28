@@ -65,12 +65,10 @@ Le test ne doit pas seulement vérifier qu'un bouton répond. Il doit détermine
 
 - Tester uniquement OutilsIA Local Cockpit et, dans le lot optionnel, ses pages
   officielles sur `https://outilsia.fr`.
-- Ne pas ouvrir, modifier ou tester GardenArena, Strategy Arena, ScoreLook,
-  ScoreCredit, Vigi-Sky ou un autre produit.
+- Ne pas ouvrir, modifier ou tester un autre produit.
 - Une mention Strategy Arena est acceptable uniquement comme passerelle
   d'export en lecture seule.
-- Toute présence de GardenArena, Garden, Fable Joint Sentinel ou règles de
-  jardin dans OutilsIA Local Cockpit est une contamination produit P0.
+- Toute logique étrangère au Local Cockpit est une contamination produit P0.
 
 ### 2.3 Actions interdites
 
@@ -1136,7 +1134,7 @@ Répondre explicitement :
 - 4080 SUPER à 16 Go ;
 - Recommendation Engine lançable ;
 - aucun `undefined/100` ;
-- aucune contamination GardenArena ;
+- aucune logique étrangère au Local Cockpit ;
 - fonctions candidates non revendiquées comme publiques.
 
 ### 10. Next 5

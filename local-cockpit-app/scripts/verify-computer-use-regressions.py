@@ -109,6 +109,9 @@ def main():
         require(consent["status"], "puis clique", "second consentement")
         assert consent["button"].strip(), consent
 
+        page.locator("#benchmarkPromptInput").fill(
+            "Pourquoi la VRAM est importante pour un LLM local ?"
+        )
         native_consent = page.evaluate(
             """async () => {
               const button = document.querySelector('#benchmarkBtn');
@@ -151,6 +154,16 @@ def main():
         require(native_consent["cancelledStatus"], "annulé avant exécution", "annulation benchmark")
         require(native_consent["messages"][0], "Hermes 3 8B", "modèle confirmation benchmark")
         require(native_consent["messages"][0], "Ollama Windows", "runtime confirmation benchmark")
+        require(
+            native_consent["messages"][0],
+            "Prompt : standard Benchmark Commons",
+            "classification du prompt standard",
+        )
+        forbid(
+            native_consent["messages"][0],
+            "personnalisé",
+            "classification du prompt standard",
+        )
         require(native_consent["messages"][0], "Aucun téléchargement ni envoi cloud", "frontière benchmark")
         assert native_consent["afterAccept"].strip() != native_consent["before"].strip(), native_consent
         require(native_consent["acceptedStatus"], "Test réussi", "benchmark après consentement")
@@ -303,7 +316,8 @@ def main():
 
     print(
         "computer_use_regressions_ok "
-        "stale_install=blocked consent=native_cancel_then_accept report=visible "
+        "stale_install=blocked consent=native_cancel_then_accept "
+        "standard_prompt=identified report=visible "
         "cpu=wrapped promptforge=heuristic chat=complete "
         "history=complete presets=historical model_actions=progressive responsive=963"
     )

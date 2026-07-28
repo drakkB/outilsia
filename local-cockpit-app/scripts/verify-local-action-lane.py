@@ -11,6 +11,7 @@ HTML = ROOT / "src" / "index.html"
 APP_JS = ROOT / "src" / "app.js"
 RUST = ROOT / "src-tauri" / "src" / "local_action_lane.rs"
 READ_ONLY_RUST = ROOT / "src-tauri" / "src" / "local_capability_bridge.rs"
+EXTERNAL_PROBE = ROOT / "scripts" / "probe-local-action-lane.py"
 OUT = ROOT / ".artifacts" / "visual-ui"
 OUT.mkdir(parents=True, exist_ok=True)
 
@@ -19,6 +20,7 @@ def assert_static_contract() -> None:
     app_js = APP_JS.read_text(encoding="utf-8")
     rust = RUST.read_text(encoding="utf-8")
     read_only = READ_ONLY_RUST.read_text(encoding="utf-8")
+    external_probe = EXTERNAL_PROBE.read_text(encoding="utf-8")
     exposed_tools_match = re.search(
         r"const ACTION_TOOL_NAMES:\s*\[&str;\s*5\]\s*=\s*\[(.*?)\];",
         rust,
@@ -63,6 +65,21 @@ def assert_static_contract() -> None:
     ]:
         if expected not in app_js:
             raise AssertionError(f"missing native consent guard: {expected}")
+
+    for expected in [
+        'TOKEN_ENV = "OUTILSIA_LOCAL_ACTION_TOKEN"',
+        '"outilsia_prepare_report_export"',
+        '"outilsia_cancel_action_request"',
+        '"outilsia_execute_action"',
+        "requests_distinct",
+        "actions_started",
+        "token_leaked",
+        "clear_clipboard()",
+    ]:
+        if expected not in external_probe:
+            raise AssertionError(f"missing external Action Lane probe guard: {expected}")
+    if "--token" in external_probe:
+        raise AssertionError("the external Action Lane probe must never accept a token argument")
 
 
 def verify_viewport(browser, width: int, height: int, label: str) -> Path:

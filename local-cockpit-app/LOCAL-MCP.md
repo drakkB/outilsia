@@ -263,6 +263,28 @@ npm run verify:local-action-lane:native
 cargo test --lib
 ```
 
+### Sonde MCP externe sans DevTools
+
+Le kit RC contient aussi `04-SONDER-ACTION-LANE.cmd`. Cette sonde parle
+uniquement au serveur HTTP MCP loopback. Elle récupère successivement la
+configuration sans secret et le jeton éphémère depuis le presse-papiers, efface
+ce dernier, puis :
+
+1. vérifie le refus sans Bearer et les cinq outils exposés ;
+2. vérifie l'absence d'outil MCP d'approbation ou d'exécution ;
+3. prépare deux fois le même export de rapport figé ;
+4. exige deux identifiants distincts et un même digest de plan ;
+5. laisse les deux demandes en `awaiting_human` pour contrôle visuel ;
+6. annule les deux demandes par MCP ;
+7. confirme qu'aucune capacité n'a été consommée et qu'aucun résultat n'existe.
+
+La sonde ne reçoit jamais le jeton en argument de commande, ne crée aucun
+fichier et ne peut pas écrire le rapport. Hors kit :
+
+```bash
+npm run probe:local-action-lane
+```
+
 La recette Playwright produit les captures desktop/mobile dans
 `.artifacts/visual-ui/`. Les tests Rust couvrent le réseau MCP réel, la file,
 les capacités et la validation des reçus. La recette native Windows pilote la

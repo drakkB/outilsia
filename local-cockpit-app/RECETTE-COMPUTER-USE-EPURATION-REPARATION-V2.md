@@ -97,20 +97,11 @@ après un test vert et dans une mission distincte. Cette recette ne déploie pas
 
 ### 3.2 Produits interdits
 
-Ne jamais ouvrir, modifier, tester ou mentionner comme fonctionnalité interne :
+Ne jamais ouvrir, modifier, tester ou mentionner comme fonctionnalité interne
+un autre produit, site, dépôt ou jeu. Strategy Arena reste limitée au contrat
+d'export en lecture seule déjà présent.
 
-- GardenArena ;
-- Garden ;
-- Fable Joint Sentinel ;
-- Strategy Arena, sauf le contrat d'export en lecture seule déjà présent ;
-- ScoreLook ;
-- ScoreCredit ;
-- Vigi-Sky ;
-- Dragon Labyrinth ;
-- Pac-Man ;
-- un autre site ou dépôt.
-
-Toute contamination GardenArena ou logique de jeu dans le Local Cockpit est P0.
+Toute logique étrangère au Local Cockpit est une contamination P0.
 
 ### 3.3 Fichiers étrangers à ignorer
 
