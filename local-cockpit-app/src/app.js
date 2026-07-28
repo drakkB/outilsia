@@ -789,6 +789,7 @@ let operationConsoleLines = [];
 let activeInstallModel = "";
 let operationLive = false;
 let primaryAnalysisBusy = false;
+let benchmarkBusy = false;
 let arenaBusy = false;
 let recommendationEngineBusy = false;
 let privateWorkloadBusy = false;
@@ -6770,6 +6771,26 @@ function renderBenchmarkPreflight() {
   `;
   els.benchmarkBtn.textContent = snapshot.test_label;
   return snapshot;
+}
+
+function benchmarkConfirmationText(model, options = {}) {
+  const snapshot = benchmarkPreflightSnapshot(model);
+  const forceCpu = Boolean(options.forceCpu);
+  const prompt = String(els.benchmarkPromptInput?.value || "").trim();
+  const runtimeLabel = snapshot?.runtime_label || "Runtime à confirmer";
+  const timeoutSeconds = snapshot?.timeout_seconds || benchmarkTimeoutSeconds(model);
+  return [
+    "Lancer maintenant ce benchmark local ?",
+    "",
+    `Modèle : ${snapshot?.label || benchmarkModelDisplayLabel(model)}`,
+    `Runtime : ${runtimeLabel}`,
+    `Mode : ${forceCpu ? "CPU seul, GPU désactivé pour ce test" : "automatique, accélération GPU si disponible"}`,
+    `Durée maximale : ${timeoutSeconds} secondes`,
+    `Prompt : ${prompt ? `personnalisé (${prompt.length} caractères)` : "court standard OutilsIA"}`,
+    "",
+    "Le modèle est déjà installé. Aucun téléchargement ni envoi cloud.",
+    "Le test peut mobiliser fortement le CPU, le GPU et la mémoire pendant la mesure."
+  ].join("\n");
 }
 
 function renderCommands(models) {
@@ -17575,6 +17596,10 @@ function renderFlightRecorder() {
 
 async function runBenchmark(options = {}) {
   const forceCpu = Boolean(options.forceCpu);
+  if (benchmarkBusy) {
+    setStatus("Un benchmark est déjà en cours", "warn");
+    return;
+  }
   const rawModel = els.benchmarkModelInput.value.trim();
   const model = ollamaActionRef(rawModel);
   if (!model) {
@@ -17604,6 +17629,12 @@ async function runBenchmark(options = {}) {
       return;
     }
   }
+  if (!window.confirm(benchmarkConfirmationText(model, { forceCpu }))) {
+    setStatus("Benchmark annulé avant exécution", "warn");
+    appendOperationLine(`Benchmark annulé avant exécution : ${model}`, "info");
+    return;
+  }
+  benchmarkBusy = true;
   els.benchmarkBtn.disabled = true;
   const activeTuning = forceCpu ? null : activeModelAutopilotProfile(model);
   const timeoutSeconds = benchmarkTimeoutSeconds(model);
@@ -17694,6 +17725,7 @@ async function runBenchmark(options = {}) {
     finishOperationMonitor(benchmarkOutcomeLabel(failedResult));
     setStatus(message, failedResult.timed_out ? "warn" : "bad");
   } finally {
+    benchmarkBusy = false;
     els.benchmarkBtn.disabled = false;
     renderBenchmarkPreflight();
     renderModelAutopilot();

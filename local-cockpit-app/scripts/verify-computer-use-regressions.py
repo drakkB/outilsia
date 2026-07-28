@@ -109,6 +109,52 @@ def main():
         require(consent["status"], "puis clique", "second consentement")
         assert consent["button"].strip(), consent
 
+        native_consent = page.evaluate(
+            """async () => {
+              const button = document.querySelector('#benchmarkBtn');
+              const result = document.querySelector('#benchmarkResult');
+              const status = document.querySelector('#statusText');
+              const originalConfirm = window.confirm;
+              const messages = [];
+              const before = result?.textContent || '';
+              try {
+                window.confirm = (message) => {
+                  messages.push(String(message || ''));
+                  return false;
+                };
+                button?.click();
+                await new Promise((resolve) => setTimeout(resolve, 120));
+                const afterCancel = result?.textContent || '';
+                const cancelledStatus = status?.textContent || '';
+
+                window.confirm = (message) => {
+                  messages.push(String(message || ''));
+                  return true;
+                };
+                button?.click();
+                await new Promise((resolve) => setTimeout(resolve, 220));
+                return {
+                  messages,
+                  before,
+                  afterCancel,
+                  afterAccept: result?.textContent || '',
+                  cancelledStatus,
+                  acceptedStatus: status?.textContent || ''
+                };
+              } finally {
+                window.confirm = originalConfirm;
+              }
+            }"""
+        )
+        assert len(native_consent["messages"]) == 2, native_consent
+        assert native_consent["afterCancel"].strip() == native_consent["before"].strip(), native_consent
+        require(native_consent["cancelledStatus"], "annulé avant exécution", "annulation benchmark")
+        require(native_consent["messages"][0], "Hermes 3 8B", "modèle confirmation benchmark")
+        require(native_consent["messages"][0], "Ollama Windows", "runtime confirmation benchmark")
+        require(native_consent["messages"][0], "Aucun téléchargement ni envoi cloud", "frontière benchmark")
+        assert native_consent["afterAccept"].strip() != native_consent["before"].strip(), native_consent
+        require(native_consent["acceptedStatus"], "Test réussi", "benchmark après consentement")
+
         report_state = page.evaluate(
             "() => window.__OUTILSIA_TEST__.applyReportNeededState()"
         )
@@ -257,7 +303,7 @@ def main():
 
     print(
         "computer_use_regressions_ok "
-        "stale_install=blocked consent=two_clicks report=visible "
+        "stale_install=blocked consent=native_cancel_then_accept report=visible "
         "cpu=wrapped promptforge=heuristic chat=complete "
         "history=complete presets=historical model_actions=progressive responsive=963"
     )

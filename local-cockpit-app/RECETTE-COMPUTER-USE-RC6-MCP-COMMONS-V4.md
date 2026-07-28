@@ -1,6 +1,6 @@
-# Recette Computer Use V3 - Palier MCP local, actions gardées et Benchmark Commons
+# Recette Computer Use V4 - RC6 MCP local, actions gardées et Benchmark Commons
 
-Version de la recette : 3.0
+Version de la recette : 4.0
 
 Date : 28 juillet 2026
 
@@ -12,9 +12,11 @@ lecture seule
 ## Prompt exact à donner à Codex Computer Use
 
 > Lis intégralement le fichier
-> `C:\Users\chris\outilsia-repo\local-cockpit-app\RECETTE-COMPUTER-USE-PALIER-MCP-COMMONS-V3.md`.
-> Exécute la mission dans l'ordre, sur l'application native Windows issue d'un
-> commit qui contient ce fichier. Commence en boîte noire et gèle les preuves
+> `C:\Users\chris\outilsia-repo\local-cockpit-app\RECETTE-COMPUTER-USE-RC6-MCP-COMMONS-V4.md`.
+> Exécute la mission dans l'ordre, uniquement sur l'EXE portable contenu dans
+> `C:\Users\chris\Downloads\OutilsIA-Local-Cockpit-0.1.2-rc.6-Test`.
+> N'utilise aucun RC5, aucun kit du Bureau et aucun artefact du repo. Commence
+> en boîte noire et gèle les preuves
 > avant de lire le code ou les tests. Vérifie le MCP local read-only, la
 > frontière de Local Action Lane, l'export pseudonymisé Benchmark Commons,
 > l'absence d'envoi automatique, le double consentement, la confidentialité et
@@ -77,7 +79,31 @@ Application :
 
 `C:\Users\chris\outilsia-repo\local-cockpit-app`
 
-Le binaire à tester doit provenir d'un kit privé contenant :
+### 3.1 Verrou de sélection RC6
+
+Le seul kit autorisé est :
+
+`C:\Users\chris\Downloads\OutilsIA-Local-Cockpit-0.1.2-rc.6-Test`
+
+Le seul manifeste autorisé est :
+
+`C:\Users\chris\Downloads\OutilsIA-Local-Cockpit-0.1.2-rc.6-Test\release-candidate.json`
+
+Interdictions :
+
+- ne pas chercher de candidat sur le Bureau ;
+- ne pas utiliser `_OutilsIA\OutilsIA-Local-Cockpit-0.1.2-rc.5-Test` ;
+- ne pas utiliser `.artifacts\github-run-*` ;
+- ne pas choisir un EXE par date, nom approchant ou ordre d'affichage ;
+- ne pas continuer si le manifeste exact ci-dessus est absent ;
+- ne pas continuer si son label n'est pas `0.1.2-rc.6`.
+
+Si le dossier exact manque, conclure `BLOCKED_BINARY_NOT_BUILT`. Ne pas se
+rabattre sur une autre candidate.
+
+### 3.2 Identité cryptographique
+
+Le kit privé doit contenir :
 
 - un `release-candidate.json` ;
 - un EXE portable ;
@@ -99,15 +125,19 @@ Vérification obligatoire :
 
 ```powershell
 git -C C:\Users\chris\outilsia-repo cat-file -e `
-  "<COMMIT_DU_MANIFEST>:local-cockpit-app/RECETTE-COMPUTER-USE-PALIER-MCP-COMMONS-V3.md"
+  "<COMMIT_DU_MANIFEST>:local-cockpit-app/RECETTE-COMPUTER-USE-RC6-MCP-COMMONS-V4.md"
 ```
 
 Si cette commande échoue, le binaire précède ce palier. Classer
 `BLOCKED_VERSION` et ne pas lui attribuer les résultats attendus ici.
 
-Si aucun nouveau kit n'existe, ne pas tester l'ancien RC4 comme s'il contenait
-ces changements. Exécuter uniquement les contrôles source de la section 18 et
-conclure `BLOCKED_BINARY_NOT_BUILT`.
+Calculer le SHA-256 réel de l'EXE portable du dossier autorisé et exiger une
+égalité exacte avec `files[].sha256` dans ce manifeste. Inscrire également le
+chemin absolu du kit dans `IDENTITE-CANDIDAT.json`.
+
+Si un contrôle d'identité échoue, ne pas tester RC4 ou RC5 à la place. Exécuter
+uniquement les contrôles source de la section 18 et conclure avec le code
+approprié.
 
 ## 4. Frontière absolue
 
@@ -1000,6 +1030,7 @@ Soumission serveur encore active : OUI/NON/NOT_RUN_EXPECTED
 La recette est terminée seulement si :
 
 - le binaire testé contient ce document dans son commit source ;
+- le binaire provient du seul dossier RC6 autorisé dans Downloads ;
 - la boîte noire précède la lecture du code ;
 - aucun ancien RC n'est présenté comme le nouveau palier ;
 - toutes les lignes de la matrice ont un code valide ;
