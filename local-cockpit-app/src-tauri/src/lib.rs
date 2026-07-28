@@ -2551,31 +2551,77 @@ pub(crate) fn command_output_with_timeout(
     timeout: Duration,
     label: &str,
 ) -> Result<(std::process::Output, bool), String> {
+    const MAX_CAPTURE_BYTES_PER_STREAM: usize = 1024 * 1024;
+
+    fn spawn_bounded_collector<R: Read + Send + 'static>(
+        mut reader: R,
+    ) -> thread::JoinHandle<std::io::Result<Vec<u8>>> {
+        thread::spawn(move || {
+            let mut captured = Vec::new();
+            let mut buffer = [0_u8; 8192];
+            loop {
+                let size = reader.read(&mut buffer)?;
+                if size == 0 {
+                    break;
+                }
+                let remaining = MAX_CAPTURE_BYTES_PER_STREAM.saturating_sub(captured.len());
+                captured.extend_from_slice(&buffer[..size.min(remaining)]);
+            }
+            Ok(captured)
+        })
+    }
+
+    fn collect_stream(
+        reader: thread::JoinHandle<std::io::Result<Vec<u8>>>,
+        label: &str,
+        stream: &str,
+    ) -> Result<Vec<u8>, String> {
+        reader
+            .join()
+            .map_err(|_| format!("Lecture {stream} {label} interrompue."))?
+            .map_err(|err| format!("Lecture {stream} {label} impossible: {err}"))
+    }
+
     let started = Instant::now();
     let mut child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|err| format!("Impossible de lancer {label}: {err}"))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| format!("Sortie standard {label} indisponible."))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| format!("Sortie erreur {label} indisponible."))?;
+    let stdout_reader = spawn_bounded_collector(stdout);
+    let stderr_reader = spawn_bounded_collector(stderr);
     let mut timed_out = false;
-    loop {
-        if child
+    let status = loop {
+        if let Some(status) = child
             .try_wait()
             .map_err(|err| format!("{label} illisible: {err}"))?
-            .is_some()
         {
-            break;
+            break status;
         }
         if started.elapsed() >= timeout {
             timed_out = true;
             let _ = child.kill();
-            break;
+            break child
+                .wait()
+                .map_err(|err| format!("Fin {label} indisponible: {err}"))?;
         }
         std::thread::sleep(Duration::from_millis(120));
-    }
-    let output = child
-        .wait_with_output()
-        .map_err(|err| format!("Sortie {label} indisponible: {err}"))?;
+    };
+    let stdout = collect_stream(stdout_reader, label, "stdout")?;
+    let stderr = collect_stream(stderr_reader, label, "stderr")?;
+    let output = std::process::Output {
+        status,
+        stdout,
+        stderr,
+    };
     Ok((output, timed_out))
 }
 
@@ -5856,6 +5902,31 @@ mod tests {
         command
     }
 
+    #[cfg(target_os = "windows")]
+    fn large_output_command(kibibytes_per_stream: usize) -> Command {
+        let mut command = Command::new("powershell.exe");
+        command.args([
+            "-NoProfile",
+            "-Command",
+            &format!(
+                "$chunk = 'x' * 1024; 1..{kibibytes_per_stream} | ForEach-Object {{ [Console]::Out.Write($chunk) }}; 1..{kibibytes_per_stream} | ForEach-Object {{ [Console]::Error.Write($chunk) }}"
+            ),
+        ]);
+        command
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn large_output_command(kibibytes_per_stream: usize) -> Command {
+        let mut command = Command::new("sh");
+        command.args([
+            "-c",
+            &format!(
+                "i=0; while [ \"$i\" -lt {kibibytes_per_stream} ]; do printf '%1024s' x; i=$((i+1)); done; {{ i=0; while [ \"$i\" -lt {kibibytes_per_stream} ]; do printf '%1024s' y; i=$((i+1)); done; }} >&2"
+            ),
+        ]);
+        command
+    }
+
     #[test]
     fn validates_ollama_model_refs() {
         assert_eq!(
@@ -5879,6 +5950,21 @@ mod tests {
         )
         .unwrap();
         assert!(timed_out);
+    }
+
+    #[test]
+    fn command_output_drains_large_stdout_and_stderr() {
+        const KIBIBYTES_PER_STREAM: usize = 128;
+        let (output, timed_out) = command_output_with_timeout(
+            large_output_command(KIBIBYTES_PER_STREAM),
+            Duration::from_secs(15),
+            "test-large-output",
+        )
+        .unwrap();
+        assert!(!timed_out);
+        assert!(output.status.success());
+        assert!(output.stdout.len() >= KIBIBYTES_PER_STREAM * 1024);
+        assert!(output.stderr.len() >= KIBIBYTES_PER_STREAM * 1024);
     }
 
     #[test]
