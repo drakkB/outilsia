@@ -1671,16 +1671,28 @@ fn write_json_no_overwrite(path: &Path, document: &Value) -> Result<usize, Strin
     Ok(bytes.len())
 }
 
-fn build_receipt(
-    action: &str,
-    contribution_id: &str,
-    observation_sha256: &str,
-    document_sha256: &str,
-    destination: &str,
-    filename: &str,
+struct ReceiptInput<'a> {
+    action: &'a str,
+    contribution_id: &'a str,
+    observation_sha256: &'a str,
+    document_sha256: &'a str,
+    destination: &'a str,
+    filename: &'a str,
     file_deleted: bool,
     now: u128,
-) -> Result<Value, String> {
+}
+
+fn build_receipt(input: ReceiptInput<'_>) -> Result<Value, String> {
+    let ReceiptInput {
+        action,
+        contribution_id,
+        observation_sha256,
+        document_sha256,
+        destination,
+        filename,
+        file_deleted,
+        now,
+    } = input;
     let human_status = if action == "export" {
         "explicitly_approved_in_native_ui"
     } else {
@@ -1776,16 +1788,16 @@ pub(crate) fn export_benchmark_contribution_state(
     let directory = export_directory(app, &prepared.destination)?;
     let path = directory.join(&filename);
     let bytes_written = write_json_no_overwrite(&path, &prepared.contribution)?;
-    let receipt = build_receipt(
-        "export",
-        &prepared.contribution_id,
-        &prepared.observation_sha256,
-        &prepared.document_sha256,
-        &prepared.destination,
-        &filename,
-        false,
+    let receipt = build_receipt(ReceiptInput {
+        action: "export",
+        contribution_id: &prepared.contribution_id,
+        observation_sha256: &prepared.observation_sha256,
+        document_sha256: &prepared.document_sha256,
+        destination: &prepared.destination,
+        filename: &filename,
+        file_deleted: false,
         now,
-    )?;
+    })?;
     let record = json!({
         "contribution_id": prepared.contribution_id,
         "observation_sha256": prepared.observation_sha256,
@@ -1942,16 +1954,16 @@ pub(crate) fn revoke_benchmark_contribution_state(
         request.document_sha256.trim(),
         now,
     )?;
-    let receipt = build_receipt(
-        "revoke",
-        request.contribution_id.trim(),
-        &observation_sha256,
-        request.document_sha256.trim(),
-        &destination,
-        &filename,
-        file_present,
+    let receipt = build_receipt(ReceiptInput {
+        action: "revoke",
+        contribution_id: request.contribution_id.trim(),
+        observation_sha256: &observation_sha256,
+        document_sha256: request.document_sha256.trim(),
+        destination: &destination,
+        filename: &filename,
+        file_deleted: file_present,
         now,
-    )?;
+    })?;
     let revocations_dir = registry_directory(app)?.join("revocations");
     let revocation_filename = format!(
         "outilsia-benchmark-revocation-{}.json",
@@ -2309,16 +2321,16 @@ mod tests {
         contribution["observation"]["metrics"]["generation_tokens_per_second"] = json!(9999);
         assert!(validate_contribution(&contribution).is_err());
 
-        let mut receipt = build_receipt(
-            "export",
-            "bc-1234567890abcdef12345678",
-            &"a".repeat(64),
-            &"b".repeat(64),
-            "downloads",
-            "outilsia-benchmark-contribution.json",
-            false,
+        let mut receipt = build_receipt(ReceiptInput {
+            action: "export",
+            contribution_id: "bc-1234567890abcdef12345678",
+            observation_sha256: &"a".repeat(64),
+            document_sha256: &"b".repeat(64),
+            destination: "downloads",
+            filename: "outilsia-benchmark-contribution.json",
+            file_deleted: false,
             now,
-        )
+        })
         .expect("receipt");
         receipt["network"]["sent"] = json!(true);
         sign_document(&mut receipt).expect("rehashed forged receipt");
@@ -2436,16 +2448,16 @@ mod tests {
             .unwrap()
             .to_string();
         let filename = contribution_filename(&contribution_id);
-        let receipt = build_receipt(
-            "export",
-            &contribution_id,
-            &observation_sha256,
-            &document_sha256,
-            "app_data",
-            &filename,
-            false,
+        let receipt = build_receipt(ReceiptInput {
+            action: "export",
+            contribution_id: &contribution_id,
+            observation_sha256: &observation_sha256,
+            document_sha256: &document_sha256,
+            destination: "app_data",
+            filename: &filename,
+            file_deleted: false,
             now,
-        )
+        })
         .expect("receipt");
         registry["exports"] = json!([{
             "contribution_id": contribution_id,

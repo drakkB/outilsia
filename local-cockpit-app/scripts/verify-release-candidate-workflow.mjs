@@ -9,6 +9,7 @@ const workflowPath = join(repoRoot, ".github", "workflows", "local-cockpit-relea
 const text = readFileSync(workflowPath, "utf8");
 const packager = readFileSync(join(appRoot, "scripts", "package-release-candidate.mjs"), "utf8");
 const kitMaker = readFileSync(join(appRoot, "scripts", "make-release-candidate-kit.mjs"), "utf8");
+const provenance = readFileSync(join(appRoot, "scripts", "release-kit-source-provenance.mjs"), "utf8");
 
 function fail(message) {
   throw new Error(message);
@@ -41,12 +42,34 @@ for (const marker of [
   "Probe-Local-Action-Lane.py",
   "Action Lane probe differs from the candidate source commit",
   "${sourceCommit}:${actionLaneProbeRepoPath}",
+  "writeCommittedText(",
   "action_lane_probe:",
   "execution_available: false",
   "token_persisted: false",
 ]) {
   if (!kitMaker.includes(marker)) {
     fail(`RC kit must bind the external Action Lane probe to the candidate commit: ${marker}`);
+  }
+}
+for (const marker of [
+  'replaceAll("\\r\\n", "\\n")',
+  "writeFileSync(target, committed)",
+]) {
+  if (!provenance.includes(marker)) {
+    fail(`RC kit source provenance must normalize checkout EOL and write committed bytes: ${marker}`);
+  }
+}
+for (const marker of [
+  "MCP-SDK-CONFORMANCE.md",
+  "MCP SDK conformance documentation differs from the candidate source commit",
+  "${sourceCommit}:${mcpConformanceRepoPath}",
+  "mcp_sdk_conformance:",
+  'version: "1.30.0"',
+  "runtime_dependency: false",
+  "token_persisted: false",
+]) {
+  if (!kitMaker.includes(marker)) {
+    fail(`RC kit must bind MCP SDK conformance evidence to the candidate commit: ${marker}`);
   }
 }
 

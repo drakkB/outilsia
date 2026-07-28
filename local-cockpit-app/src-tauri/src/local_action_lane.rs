@@ -185,6 +185,14 @@ struct FrozenExport {
     content_sha256: String,
 }
 
+struct ValidatedStartRequest {
+    client_id: String,
+    client_label: String,
+    models: HashMap<String, FrozenModel>,
+    export: Option<FrozenExport>,
+    ttl_seconds: u64,
+}
+
 #[derive(Debug, Clone)]
 struct ActionCapability {
     capability_id: String,
@@ -413,16 +421,7 @@ fn validate_filename(value: &str) -> Result<String, String> {
 
 fn validate_start_request(
     request: StartLocalActionLaneRequest,
-) -> Result<
-    (
-        String,
-        String,
-        HashMap<String, FrozenModel>,
-        Option<FrozenExport>,
-        u64,
-    ),
-    String,
-> {
+) -> Result<ValidatedStartRequest, String> {
     if request.schema != ACTION_LANE_START_SCHEMA {
         return Err("Contrat de demarrage Action Lane invalide.".to_string());
     }
@@ -500,7 +499,13 @@ fn validate_start_request(
         .ttl_seconds
         .unwrap_or(DEFAULT_SESSION_TTL_SECONDS)
         .clamp(MIN_SESSION_TTL_SECONDS, MAX_SESSION_TTL_SECONDS);
-    Ok((client_id, client_label, models, export, ttl_seconds))
+    Ok(ValidatedStartRequest {
+        client_id,
+        client_label,
+        models,
+        export,
+        ttl_seconds,
+    })
 }
 
 fn stop_runtime(runtime: &ActionLaneRuntime) {
@@ -672,7 +677,13 @@ fn status_snapshot() -> Result<LocalActionLaneStatus, String> {
 pub(crate) fn start_local_action_lane(
     request: StartLocalActionLaneRequest,
 ) -> Result<LocalActionLaneStart, String> {
-    let (client_id, client_label, models, export, ttl_seconds) = validate_start_request(request)?;
+    let ValidatedStartRequest {
+        client_id,
+        client_label,
+        models,
+        export,
+        ttl_seconds,
+    } = validate_start_request(request)?;
     let server = Server::http(("127.0.0.1", 0))
         .map_err(|error| format!("Ouverture Action Lane impossible: {error}"))?;
     let port = server
@@ -2292,6 +2303,74 @@ mod tests {
         let stopped = stop_local_action_lane().expect("lane stop");
         assert!(!stopped.running);
         assert!(!stopped.token_exposed);
+    }
+
+    #[test]
+    #[ignore = "requires Node.js and npm ci for the official MCP SDK"]
+    fn official_mcp_sdk_conforms_to_action_lane_without_execution() {
+        let _serial = test_lock();
+        let private_report = "# Rapport prive\n\nAbsent du rapport de conformite SDK.";
+        let started = start_local_action_lane(StartLocalActionLaneRequest {
+            schema: ACTION_LANE_START_SCHEMA.to_string(),
+            client: ActionLaneClient {
+                id: "sdk-conformance".to_string(),
+                label: "Official MCP SDK Conformance".to_string(),
+            },
+            allowed_models: Vec::new(),
+            export_snapshot: Some(ActionExportSnapshot {
+                format: "markdown".to_string(),
+                filename: "rapport-sdk-test.md".to_string(),
+                destination: "app_data".to_string(),
+                content: private_report.to_string(),
+            }),
+            ttl_seconds: Some(60),
+        })
+        .expect("lane start");
+        let probe = crate::mcp_sdk_conformance::run_sdk_probe(
+            "action_lane",
+            &started.mcp_url,
+            &started.token,
+            true,
+        );
+        let requests = list_local_action_requests().expect("native Action Lane queue");
+        let stopped = stop_local_action_lane().expect("lane stop");
+        assert!(!stopped.running);
+        assert_eq!(requests.len(), 2);
+        assert!(requests
+            .iter()
+            .all(|request| request.state == "cancelled" && request.result.is_none()));
+        let report = probe.expect("official MCP SDK Action Lane conformance");
+        assert_eq!(
+            report.get("sdk").and_then(Value::as_str),
+            Some("@modelcontextprotocol/sdk@1.30.0")
+        );
+        assert_eq!(report.get("tool_count").and_then(Value::as_u64), Some(5));
+        assert_eq!(
+            report.get("requests_prepared").and_then(Value::as_u64),
+            Some(2)
+        );
+        assert_eq!(
+            report.get("requests_cancelled").and_then(Value::as_u64),
+            Some(2)
+        );
+        assert_eq!(
+            report.get("requests_distinct").and_then(Value::as_bool),
+            Some(true)
+        );
+        assert_eq!(
+            report.get("plans_equal").and_then(Value::as_bool),
+            Some(true)
+        );
+        assert_eq!(
+            report
+                .get("execution_tool_available")
+                .and_then(Value::as_bool),
+            Some(false)
+        );
+        assert_eq!(
+            report.get("actions_started").and_then(Value::as_bool),
+            Some(false)
+        );
     }
 
     #[test]

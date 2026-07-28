@@ -14,6 +14,8 @@ mod forgebench_sandbox;
 mod forgebench_vault;
 mod local_action_lane;
 mod local_capability_bridge;
+#[cfg(test)]
+mod mcp_sdk_conformance;
 mod workstack_arena;
 mod workstack_composer;
 mod workstack_review;

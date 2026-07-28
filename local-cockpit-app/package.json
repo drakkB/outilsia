@@ -56,6 +56,8 @@
     "probe:local-action-lane": "python scripts/probe-local-action-lane.py",
     "verify:local-capability-bridge:native": "python scripts/verify-local-mcp-native.py",
     "verify:local-capability-bridge:clients": "python scripts/verify-local-mcp-clients.py",
+    "verify:mcp-sdk-conformance": "node --check scripts/probe-mcp-sdk.mjs && node scripts/test-mcp-sdk-probe.mjs && node scripts/verify-mcp-sdk-workflows.mjs",
+    "verify:mcp-sdk-conformance:native": "cargo test --manifest-path src-tauri/Cargo.toml --lib official_mcp_sdk -- --ignored --nocapture",
     "verify:local-capability-bridge-seo": "node scripts/verify-local-capability-bridge-seo.mjs",
     "verify:board-observer": "python3 scripts/verify-board-observer.py",
     "verify:workstack-composer": "python3 scripts/verify-workstack-composer.py",
@@ -74,7 +76,7 @@
     "verify:activation-funnel:contract": "node scripts/verify-activation-funnel.mjs",
     "verify:activation-funnel": "npm run verify:activation-funnel:contract && python3 scripts/verify-activation-funnel.py",
     "verify:product-truth": "node scripts/verify-product-truth.mjs",
-    "verify:ci-source": "node --check src/app.js && node --check src/release-update-policy.js && node --check src/agent-adapter-policy.js && npm run test:release-update-policy && npm run verify:ui && npm run verify:activation-funnel:contract && npm run verify:product-truth && npm run verify:agent-adapter-policy:contract && npm run verify:kimi-frontier && npm run verify:machine-replay:contract && npm run verify:machine-replay:seo && npm run verify:private-workload-catalog && npm run verify:private-workload-seo && npm run verify:local-capability-bridge-seo && npm run verify:install-safety-preflight-seo && npm run verify:forgebench:runtime && npm run test:release-candidate && npm run test:release-candidate:promotion && npm run verify:release-candidate:workflow && npm run verify:windows-signing && npm run verify:release-promotion:workflow",
+    "verify:ci-source": "node --check src/app.js && node --check src/release-update-policy.js && node --check src/agent-adapter-policy.js && npm run test:release-update-policy && npm run verify:ui && npm run verify:activation-funnel:contract && npm run verify:product-truth && npm run verify:agent-adapter-policy:contract && npm run verify:kimi-frontier && npm run verify:machine-replay:contract && npm run verify:machine-replay:seo && npm run verify:private-workload-catalog && npm run verify:private-workload-seo && npm run verify:local-capability-bridge-seo && npm run verify:mcp-sdk-conformance && npm run verify:install-safety-preflight-seo && npm run verify:forgebench:runtime && npm run test:release-candidate && npm run test:release-candidate:promotion && npm run verify:release-candidate:workflow && npm run verify:windows-signing && npm run verify:release-promotion:workflow",
     "verify:runtime-driver-seo": "node scripts/verify-runtime-driver-seo.mjs",
     "verify:catalog": "node scripts/verify-model-catalog.mjs",
     "verify:model-catalog": "node scripts/verify-model-catalog.mjs",
@@ -135,7 +137,7 @@
     "test:import:merge": "node scripts/test-import-beta-merge.mjs",
     "test:linux:artifacts": "bash scripts/test-linux-artifacts-verifier.sh",
     "test:publish:cross-platform": "node scripts/test-publish-cross-platform.mjs",
-    "test:release-candidate": "node scripts/test-release-candidate.mjs",
+    "test:release-candidate": "node scripts/test-release-kit-source-provenance.mjs && node scripts/test-release-candidate.mjs",
     "test:release-candidate:promotion": "node scripts/test-release-candidate-promotion.mjs",
     "test:release-update-policy": "node scripts/test-release-update-policy.mjs",
     "verify:release-candidate:workflow": "node scripts/verify-release-candidate-workflow.mjs",
@@ -155,6 +157,8 @@
     "smoke:live:account": "python3 scripts/smoke-live-desktop-account.py https://outilsia.fr"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.11.3"
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@tauri-apps/cli": "^2.11.3",
+    "zod": "4.4.3"
   }
 }

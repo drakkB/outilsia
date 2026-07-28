@@ -12,6 +12,7 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { writeCommittedText } from "./release-kit-source-provenance.mjs";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(appRoot, "..");
@@ -114,12 +115,35 @@ function main() {
   if (committedProbe.status !== 0) {
     fail("Action Lane probe is absent from the candidate source commit");
   }
-  if (!readFileSync(actionLaneProbeSource).equals(committedProbe.stdout)) {
-    fail("Action Lane probe differs from the candidate source commit");
-  }
-  copyFileSync(actionLaneProbeSource, actionLaneProbeTarget);
+  writeCommittedText(
+    actionLaneProbeSource,
+    actionLaneProbeTarget,
+    committedProbe.stdout,
+    "Action Lane probe differs from the candidate source commit",
+  );
   const actionLaneProbeSha = createHash("sha256")
     .update(readFileSync(actionLaneProbeTarget))
+    .digest("hex");
+  const mcpConformanceDocName = "MCP-SDK-CONFORMANCE.md";
+  const mcpConformanceDocSource = join(appRoot, mcpConformanceDocName);
+  const mcpConformanceDocTarget = join(output, mcpConformanceDocName);
+  const mcpConformanceRepoPath = `local-cockpit-app/${mcpConformanceDocName}`;
+  const committedMcpConformanceDoc = spawnSync(
+    "git",
+    ["-C", repoRoot, "show", `${sourceCommit}:${mcpConformanceRepoPath}`],
+    { encoding: null }
+  );
+  if (committedMcpConformanceDoc.status !== 0) {
+    fail("MCP SDK conformance documentation is absent from the candidate source commit");
+  }
+  writeCommittedText(
+    mcpConformanceDocSource,
+    mcpConformanceDocTarget,
+    committedMcpConformanceDoc.stdout,
+    "MCP SDK conformance documentation differs from the candidate source commit",
+  );
+  const mcpConformanceDocSha = createHash("sha256")
+    .update(readFileSync(mcpConformanceDocTarget))
     .digest("hex");
 
   const portable = windowsFiles.find((file) => file.kind === "portable") || null;
@@ -551,6 +575,10 @@ PromptForge, Dialogue, Arena et le deuxième modèle restent optionnels pour ce 
 Audit Action Lane optionnel : lire \`ACTION-LANE-PROBE.md\`, puis lancer
 \`04-SONDER-ACTION-LANE.cmd\`. Cette sonde prépare et annule deux demandes via
 un client MCP externe ; elle ne peut ni les approuver ni les exécuter.
+
+Conformité automatisée : \`MCP-SDK-CONFORMANCE.md\` décrit les tests Windows et
+Linux réalisés avec le client TypeScript officiel. Le SDK reste une dépendance
+de développement et n'est pas embarqué dans l'application.
 `);
   write(join(output, "CAMPAGNE-5-MACHINES.md"), `# Campagne terrain OutilsIA Local Cockpit ${candidate.label}
 
@@ -603,6 +631,18 @@ Toutes les machines doivent utiliser ce même candidat :
       external_http_client: true,
       approval_available: false,
       execution_available: false,
+      token_persisted: false,
+    },
+    mcp_sdk_conformance: {
+      documentation: mcpConformanceDocName,
+      documentation_sha256: mcpConformanceDocSha,
+      client: "@modelcontextprotocol/sdk",
+      version: "1.30.0",
+      transport: "streamable_http",
+      protocol_version: "2025-11-25",
+      windows_ci: true,
+      linux_ci: true,
+      runtime_dependency: false,
       token_persisted: false,
     },
     smoke_validator: "02-VALIDER-LE-TEST.cmd",

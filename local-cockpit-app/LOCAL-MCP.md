@@ -148,6 +148,32 @@ Une future action locale devra utiliser un autre contrat :
 
 La v0.1 read-only ne sera pas élargie silencieusement à ces actions.
 
+## Conformite avec un client MCP standard
+
+Les clients HTTP historiques du projet restent utiles pour les tests negatifs
+bas niveau, mais ils ne constituent pas a eux seuls une preuve
+d'interoperabilite. La matrice candidate utilise donc aussi
+`@modelcontextprotocol/sdk@1.30.0` et son
+`StreamableHTTPClientTransport` contre les deux vrais serveurs Rust.
+
+Le test read-only negocie le handshake et la notification `initialized`, appelle
+les huit outils, lit les quatre ressources et refuse un outil d'installation.
+Le test Action Lane prepare deux demandes distinctes portant le meme plan,
+verifie l'absence d'outil d'approbation ou d'execution, refuse une tentative
+d'execution puis annule les deux demandes. Aucun jeton, port, profil machine,
+contenu de rapport ou identifiant de demande ne rejoint la sortie.
+
+La dependance reste strictement reservee aux tests. Les workflows Windows et
+Linux lancent explicitement cette matrice apres `npm ci` :
+
+```text
+npm run verify:mcp-sdk-conformance
+npm run verify:mcp-sdk-conformance:native
+```
+
+Voir `MCP-SDK-CONFORMANCE.md`. Cette preuve automatisee ne remplace pas la
+recette native visible ni une session MCP Inspector manuelle.
+
 ## Local Action Lane v0 - candidat implémenté
 
 La voie d'action est un service séparé du MCP read-only. Elle réutilise les

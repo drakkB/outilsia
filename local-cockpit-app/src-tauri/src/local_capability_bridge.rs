@@ -1498,6 +1498,48 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires Node.js and npm ci for the official MCP SDK"]
+    fn official_mcp_sdk_conforms_to_read_only_server() {
+        let _guard = TEST_LOCK.lock().expect("test lock");
+        let started = start_local_capability_bridge(LocalCapabilityBridgeRequest {
+            payload: valid_payload(),
+            ttl_seconds: Some(60),
+        })
+        .expect("bridge start");
+        let probe = crate::mcp_sdk_conformance::run_sdk_probe(
+            "read_only",
+            &started.mcp_url,
+            &started.token,
+            true,
+        );
+        let stopped = stop_local_capability_bridge().expect("bridge stop");
+        assert!(!stopped.running);
+        let report = probe.expect("official MCP SDK read-only conformance");
+        assert_eq!(
+            report.get("sdk").and_then(Value::as_str),
+            Some("@modelcontextprotocol/sdk@1.30.0")
+        );
+        assert_eq!(report.get("tool_count").and_then(Value::as_u64), Some(8));
+        assert_eq!(
+            report.get("resource_count").and_then(Value::as_u64),
+            Some(4)
+        );
+        assert_eq!(report.get("tool_calls").and_then(Value::as_u64), Some(8));
+        assert_eq!(
+            report.get("resource_reads").and_then(Value::as_u64),
+            Some(4)
+        );
+        assert_eq!(
+            report.get("forbidden_rejected").and_then(Value::as_bool),
+            Some(true)
+        );
+        assert_eq!(
+            report.get("actions_started").and_then(Value::as_bool),
+            Some(false)
+        );
+    }
+
+    #[test]
     fn mcp_loopback_handles_a_short_request_burst() {
         let _guard = TEST_LOCK.lock().expect("test lock");
         let started = start_local_capability_bridge(LocalCapabilityBridgeRequest {

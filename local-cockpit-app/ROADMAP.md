@@ -456,7 +456,11 @@ Premier jalon candidat v1 terminé le 12 juillet 2026 dans le build Windows/Linu
 - [x] Publier dans le handshake MCP les instructions de frontière et annoter chaque outil `readOnlyHint=true`, `destructiveHint=false`, `openWorldHint=false`.
 - [ ] Ajouter le consommateur côté Strategy Arena dans une session séparée, sans déplacer la gestion Ollama.
 - [x] Recetter les lectures bornées avec Codex CLI et Claude Code sur le candidat Windows, sans persister le jeton ni les transcriptions.
-- [ ] Ajouter MCP Inspector à la matrice Windows/Linux avant toute promotion publique du serveur local.
+- [x] Ajouter le client TypeScript MCP officiel à la matrice Windows/Linux :
+  handshake, notification initialized, huit outils/quatre ressources read-only,
+  cinq outils Action Lane, refus d'exécution, annulation et absence de fuite.
+- [ ] Conserver une recette MCP Inspector visible avant promotion publique ; la
+  conformité automatisée au SDK officiel ne remplace pas cette preuve manuelle.
 - [ ] Étudier séparément une v0.2 `prepare -> confirmer dans l'app -> exécuter`, sans modifier le contrat read-only v0.1.
 
 ## Phase 7 - Workstack Composer

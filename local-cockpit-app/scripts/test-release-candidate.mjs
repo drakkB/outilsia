@@ -105,8 +105,20 @@ try {
     "--output-dir", kit,
     "--replace",
   ]);
-  for (const required of ["START-HERE.html", "CAMPAGNE-5-MACHINES.md", "01-LANCER-LE-RC.cmd", "02-VALIDER-LE-TEST.cmd", "RC-KIT-MANIFEST.json", "AUTHENTICODE.json"]) {
+  for (const required of ["START-HERE.html", "CAMPAGNE-5-MACHINES.md", "01-LANCER-LE-RC.cmd", "02-VALIDER-LE-TEST.cmd", "RC-KIT-MANIFEST.json", "AUTHENTICODE.json", "MCP-SDK-CONFORMANCE.md"]) {
     if (!existsSync(join(kit, required))) throw new Error(`RC kit missing ${required}`);
+  }
+  const kitManifest = JSON.parse(readFileSync(join(kit, "RC-KIT-MANIFEST.json"), "utf8"));
+  if (kitManifest.mcp_sdk_conformance?.version !== "1.30.0"
+    || kitManifest.mcp_sdk_conformance?.windows_ci !== true
+    || kitManifest.mcp_sdk_conformance?.linux_ci !== true
+    || kitManifest.mcp_sdk_conformance?.runtime_dependency !== false
+    || kitManifest.mcp_sdk_conformance?.token_persisted !== false) {
+    throw new Error("RC kit MCP SDK conformance evidence is incomplete");
+  }
+  const kitMcpDocSha = hash(readFileSync(join(kit, "MCP-SDK-CONFORMANCE.md")));
+  if (kitManifest.mcp_sdk_conformance?.documentation_sha256 !== kitMcpDocSha) {
+    throw new Error("RC kit MCP SDK conformance documentation SHA differs");
   }
   if (process.platform === "win32") {
     const powershellSyntax = spawnSync("powershell.exe", [
