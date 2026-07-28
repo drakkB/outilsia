@@ -19090,7 +19090,7 @@ function benchmarkCommonsContributionMarkup(contribution, stateLabel = "") {
   const metrics = observation.metrics || {};
   const digest = String(contribution?.integrity?.digest || "");
   return `
-    <strong>${escapeHtml(stateLabel || "Aperçu anonymisé prêt")}</strong>
+    <strong>${escapeHtml(stateLabel || "Aperçu pseudonymisé prêt")}</strong>
     <div class="benchmark-commons-proof">
       <div>
         <strong>${escapeHtml(model.ollama_ref || "modèle inconnu")}</strong>
@@ -19228,7 +19228,7 @@ async function prepareBenchmarkCommons() {
     return;
   }
   els.prepareBenchmarkCommonsBtn.disabled = true;
-  setStatus("Préparation locale de l'aperçu anonymisé…");
+  setStatus("Préparation locale de l'aperçu pseudonymisé…");
   try {
     const result = await invoke("prepare_benchmark_contribution", {
       request: {
@@ -19243,7 +19243,7 @@ async function prepareBenchmarkCommons() {
     if (result?.already_exported) {
       setStatus("Cette observation a déjà un export local actif", "warn");
     } else {
-      setStatus("Aperçu anonymisé prêt. Vérifie-le avant d'autoriser.", "ok");
+      setStatus("Aperçu pseudonymisé prêt. Vérifie-le avant d'autoriser.", "ok");
     }
   } catch (error) {
     setStatus(String(error), "bad");

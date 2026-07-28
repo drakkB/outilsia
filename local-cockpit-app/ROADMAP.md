@@ -130,8 +130,13 @@ leaderboard décoratif.
 - [x] Tester falsification, faux statut communautaire, faux envoi réseau,
   expiration, consentement séparé, rotation, réécriture du registre Windows et
   UI desktop/mobile.
-- [ ] Construire un endpoint de soumission séparé avec reçu serveur, contrôle de
-  cohorte et déduplication robuste. Le candidat actuel n'envoie aucune donnée.
+- [x] Implémenter hors production un endpoint candidat authentifié : validation
+  stricte du document, cohérence avec la machine et le benchmark déjà
+  synchronisés, déduplication par sujet serveur, reçu HMAC, révocation et
+  rétention maximale de 180 jours.
+- [ ] Relier l'application à cet endpoint seulement après revue du contrat,
+  configuration de la clé serveur, consentement réseau natif séparé et recette
+  de révocation bout en bout. Le candidat desktop actuel n'envoie aucune donnée.
 - [ ] Afficher médiane, dispersion et taille d'échantillon ; aucun classement
   public sous trois machines distinctes pour une même cohorte.
 - [ ] Publier des pages GPU/modèle uniquement à partir de cohortes vérifiées et
@@ -144,7 +149,11 @@ candidates et ne possède volontairement aucun code réseau. Un fichier exporté
 reste sous le contrôle de son propriétaire. Il porte explicitement
 `field_test_proof=false`, `community_verified=false` et
 `leaderboard_eligible=false`. Il ne sera pas présenté sur le site comme une
-preuve communautaire avant mise en place et audit du palier serveur.
+preuve communautaire avant mise en place et audit du palier serveur. Le contrat
+serveur privé candidat refuse toute contribution sans compte desktop, machine
+native et benchmark synchronisés cohérents. Il ne retourne aucune ligne brute
+et masque toute cohorte sous trois machines distinctes ; il n'est ni déployé ni
+annoncé dans le manifeste de l'application.
 
 ### Monétisation produit, pas péage sur la preuve
 
@@ -546,7 +555,7 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 ## Phase 8 - Réseau et communauté opt-in
 
 - Découvrir plusieurs machines OutilsIA sur un réseau privé et router vers la capacité disponible.
-- Collecter uniquement sur consentement des benchmarks anonymisés et vérifiables.
+- Collecter uniquement sur consentement des benchmarks pseudonymisés et vérifiables.
 - Recaler les estimations d'upgrade et produire des pages SEO/GEO depuis des mesures réelles.
 
 ## Garde-fous permanents

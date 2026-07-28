@@ -1823,4 +1823,109 @@ mod tests {
         sign_document(&mut registry).expect("rehashed forged registry");
         assert!(verify_registry(&registry).is_err());
     }
+
+    #[test]
+    fn standard_prompt_digest_matches_the_server_contract_vector() {
+        let prompt = prepare_benchmark_prompt(Some(STANDARD_BENCHMARK_QUESTION.to_string()), false);
+        assert_eq!(
+            canonical_sha256(&Value::String(prompt)),
+            "15604e00ed0d0ae61dfde437cd1d3fa7b973681b111b6b377e617e9855d4d04d"
+        );
+    }
+
+    #[test]
+    fn contribution_digest_matches_the_python_server_contract_vector() {
+        let mut contribution = json!({
+            "schema": CONTRIBUTION_SCHEMA,
+            "contract_version": CONTRACT_VERSION,
+            "contribution_id": "bc-923350fff2758ab7ab5f78e7",
+            "created_at_ms": 1_785_196_800_000_u64,
+            "contributor": {
+                "pseudonym": "anon-000000000000000000000001",
+                "pseudonym_expires_at_ms": 1_787_788_800_000_u64,
+                "rotating": true,
+                "account_linked": false
+            },
+            "observation": {
+                "measured_at_ms": 1_785_196_799_000_u64,
+                "hardware": {
+                    "cpu_name": "AMD Ryzen 7 7800X3D",
+                    "cpu_cores": 8,
+                    "ram_gb": 64,
+                    "gpu_name": "NVIDIA GeForce RTX 4080 SUPER",
+                    "gpu_vendor": "NVIDIA",
+                    "vram_gb": 16,
+                    "unified_memory": false,
+                    "os_family": "windows"
+                },
+                "runtime": {
+                    "kind": "native",
+                    "ollama_version": "0.12.3",
+                    "execution_mode": "auto",
+                    "processor": "gpu",
+                    "evidence_source": "ollama_api_ps"
+                },
+                "model": {
+                    "ollama_ref": "qwen3:14b"
+                },
+                "protocol": {
+                    "id": "outilsia.benchmark.short.v1",
+                    "measurement_source": "ollama_api",
+                    "standard_prompt_sha256": "15604e00ed0d0ae61dfde437cd1d3fa7b973681b111b6b377e617e9855d4d04d",
+                    "prompt_included": false
+                },
+                "metrics": {
+                    "generation_tokens_per_second": 50.0,
+                    "prompt_tokens_per_second": 180.0,
+                    "total_duration_ms": 1400,
+                    "load_duration_ms": 100,
+                    "prompt_eval_count": 40,
+                    "prompt_eval_duration_ms": 220,
+                    "eval_count": 64,
+                    "eval_duration_ms": 1200,
+                    "model_size_bytes": 9_100_000_000_u64,
+                    "vram_bytes": 9_100_000_000_u64,
+                    "gpu_offload_percent": 100.0
+                },
+                "release": {
+                    "app_version": "0.1.2",
+                    "channel": "candidate",
+                    "build_id": "20260728120000",
+                    "source_commit": "86afd72",
+                    "target_os": "windows",
+                    "target_arch": "x86_64"
+                }
+            },
+            "proof": {
+                "observation_sha256": "2e108dc0caff9d76a98d7345118bf503d9316b45e7a31f97cd8e6312f06e9d30",
+                "source": "local_measurement",
+                "field_test_proof": false,
+                "community_verified": false,
+                "leaderboard_eligible": false
+            },
+            "privacy": {
+                "prompt_included": false,
+                "model_output_included": false,
+                "raw_scan_included": false,
+                "machine_key_included": false,
+                "hostname_included": false,
+                "account_included": false,
+                "token_included": false,
+                "file_path_included": false,
+                "personal_file_included": false,
+                "network_sent": false
+            },
+            "limits": [
+                "Fichier local exporte volontairement; aucune donnee n'est envoyee.",
+                "Cette observation n'est ni une preuve terrain ni une validation communautaire.",
+                "Aucun classement public ne peut etre produit depuis ce fichier seul."
+            ]
+        });
+        let digest = sign_document(&mut contribution).expect("sign vector");
+        assert_eq!(
+            digest,
+            "0a11bd1a36529b1ecf69776b50c62b2d49fa26294ceb8d1880d8dc5e08c22707"
+        );
+        validate_contribution(&contribution).expect("server vector accepted by Rust");
+    }
 }

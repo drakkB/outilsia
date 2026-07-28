@@ -157,7 +157,7 @@ cargo test --lib
 
 Après un benchmark standard réellement mesuré par l'API Ollama, l'espace
 **Tests > Historique benchmarks** peut préparer un document communautaire
-anonymisé. Le candidat ne l'envoie nulle part : il montre l'aperçu exact,
+pseudonymisé. Le candidat ne l'envoie nulle part : il montre l'aperçu exact,
 recueille un consentement natif, exige un second clic, puis écrit un JSON local
 sans écraser un fichier existant.
 
@@ -172,7 +172,10 @@ jours ; l'observation a une empreinte de déduplication, sans identité stable.
 révocation locale signée. Les deux gestes ajoutent un reçu minimal à Evidence
 Ledger. Ils ne valent ni test terrain, ni validation communautaire, ni
 éligibilité à un classement. L'upload, la vérification serveur, les cohortes et
-les pages publiques restent hors de ce palier.
+les pages publiques restent hors de ce palier. Un contrat serveur privé est
+testé séparément avec authentification desktop, correspondance machine/mesure,
+reçu HMAC, révocation et seuil de trois machines ; il n'est ni relié au client,
+ni déployé, ni annoncé dans le manifeste.
 
 Contrôle dédié :
 
