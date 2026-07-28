@@ -7,7 +7,7 @@ const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
 const agentAdapterPolicyJs = readFileSync(resolve(root, "src/agent-adapter-policy.js"), "utf8");
 const allJs = `${js}\n${agentAdapterPolicyJs}`;
-const rust = ["lib.rs", "local_capability_bridge.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "agent_adapter_policy.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runtime.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_hidden.rs", "forgebench_candidate.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
+const rust = ["lib.rs", "local_capability_bridge.rs", "local_action_lane.rs", "benchmark_commons.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "agent_adapter_policy.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runtime.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_hidden.rs", "forgebench_candidate.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
@@ -166,6 +166,26 @@ const requiredFeatureText = [
   ["rust local MCP tool annotations", rust, "\"readOnlyHint\": true"],
   ["rust local MCP no actions", rust, "\"actions_exposed\": false"],
   ["css local capability bridge", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".local-capability-bridge-box"],
+  ["html local action lane", html, "localActionLaneBox"],
+  ["html local action queue", html, "localActionQueue"],
+  ["js local action lane schema", js, "outilsia.local_action_lane.v0"],
+  ["js local action human acknowledgement", js, "client IA ne peut pas cocher cette case"],
+  ["js local action separate execution", js, "Cette capacité sera consommée immédiatement"],
+  ["rust local action loopback", rust, "Server::http((\"127.0.0.1\", 0))"],
+  ["rust local action one use", rust, "CAPABILITY_TTL_MS"],
+  ["rust local action no MCP execution", rust, "actions_execute_over_mcp: false"],
+  ["rust local action queue ephemeral", rust, "queue_persisted: false"],
+  ["css local action lane", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".local-action-lane-box"],
+  ["html Benchmark Commons", html, "benchmarkCommonsBox"],
+  ["html Benchmark Commons consent", html, "benchmarkCommonsConsent"],
+  ["js Benchmark Commons schema", js, "outilsia.benchmark_commons.prepare_request.v1"],
+  ["js Benchmark Commons separate export", js, "Un second clic reste nécessaire"],
+  ["rust Benchmark Commons contribution", rust, "outilsia.benchmark_commons.contribution.v1"],
+  ["rust Benchmark Commons local only", rust, "\"network_sent\": false"],
+  ["rust Benchmark Commons no leaderboard", rust, "\"leaderboard_eligible\": false"],
+  ["rust Benchmark Commons rotating pseudonym", rust, "ROTATION_MS"],
+  ["rust Benchmark Commons native consent", rust, "confirmed_in_native_ui"],
+  ["css Benchmark Commons", readFileSync(resolve(root, "src/styles.css"), "utf8"), ".benchmark-commons-box"],
   ["html board observer", html, "boardObserverBox"],
   ["html board observer ephemeral key", html, "boardObserverApiKey"],
   ["js board observer request schema", js, "outilsia.board_observer_request.v1"],

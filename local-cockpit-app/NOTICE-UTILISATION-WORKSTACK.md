@@ -1,6 +1,6 @@
 # Notice d'utilisation - Workstacks et preuves OutilsIA
 
-Version de la notice : 2026-07-27
+Version de la notice : 2026-07-28
 Périmètre : OutilsIA Local Cockpit, espace **Atelier IA**
 
 ## Navigation du cockpit
@@ -28,6 +28,8 @@ Les actions transversales ouvrent automatiquement l'espace correspondant. Par ex
 | Capability Router | Détecter les CLI et modèles locaux disponibles, puis proposer un planificateur, un exécutant et un vérificateur distinct. | Ne lit pas les jetons, ne vérifie pas les quotas et ne transmet pas la mission aux agents. |
 | Agent Adapter Policy | Afficher le contrat signé propre à Codex CLI, Claude Code, Hermes Agent et Kimi Code : état d'exécution, consentements, budget et interdits. | Le registre n'autorise et ne lance aucun run. Codex reste borné à Signal Maze public ; Claude Code, Hermes et Kimi restent en détection seule. |
 | Serveur MCP local | Donner à un client local huit vues typées sur le dernier Passport : cockpit, machine, Doctor, modèles, recommandation, benchmarks et handoff Strategy Arena. | Aucun scan, installation, suppression, benchmark, dialogue, fichier, backtest ou trading. Le serveur est arrêté par défaut et expire après 15 minutes. |
+| Local Action Lane v0 | Laisser un client local préparer une installation Ollama bornée, un benchmark déjà installé ou l'export du rapport figé, puis présenter le plan exact au propriétaire. | Aucun outil MCP ne peut approuver ou exécuter. Pas de shell, chemin/URL arbitraire, suppression, pilote, élévation, accès distant, backtest ou trading. Le palier reste candidat. |
+| Benchmark Commons v1 | Préparer après une mesure standard un JSON anonymisé, le vérifier avant export et permettre son retrait local. | Aucun upload, synchronisation, preuve terrain, validation communautaire ou classement. |
 | Evidence Ledger | Conserver une trace locale chaînée des étapes validées et de leurs empreintes. | Ne stocke ni description brute, prompt, réponse de modèle, credential ou fichier projet. Il ne prouve pas à lui seul la qualité du résultat. |
 | ForgeBench | Préparer un protocole équitable `Signal Maze v1`, publier un contrat de gameplay observable, vérifier une référence clavier/souris/tactile, sceller localement des seeds privés, tester bubblewrap puis Chromium sans réseau, exécuter un pilote technique, puis appeler facultativement un modèle Ollama local sur le seul contrat public. | Le préflight Chromium n'installe rien : il teste une page minimale et propose au besoin une commande Playwright à copier. Après consentement, le code candidat est gelé, contrôlé publiquement puis soumis à un second Chromium holdout sans réseau. Cette preuve locale ne vaut encore ni score scientifique ni vainqueur : familles de checks publiques, vault non chiffré, pairs et énergie restent des blocages. ForgeBench ne lance pas seul un agent CLI. |
 | Workstack Arena | Dans le candidat source, lancer **Codex CLI uniquement sur Signal Maze public** dans un workspace jetable, avec un seul essai borné, puis enregistrer une décision humaine structurée sur le reçu signé. | Aucun projet utilisateur, board, test caché, fusion ou publication. La revue n'inspecte ni capture ni code et n'autorise ni livraison ni gagnant. Claude Code, Hermes, Kimi et l'exécution d'une carte arbitraire restent indisponibles. Le build public actuel ne contient pas encore ce pilote. |
@@ -44,6 +46,70 @@ Les actions transversales ouvrent automatiquement l'espace correspondant. Par ex
 6. Arrêter le serveur depuis OutilsIA après la consultation. Toute nouvelle preuve ou expiration arrête aussi la connexion.
 
 Le POST JSON-RPC utilisé par MCP ne constitue pas une autorisation d'écriture sur la machine. Les outils ne prennent aucun argument d'action et ne lisent que l'instantané figé au démarrage.
+
+## Actions locales pilotées par IA - candidat
+
+La Local Action Lane n'élargit pas le serveur MCP read-only. Elle démarre un
+second serveur sur un autre port loopback, avec un autre jeton et une file
+uniquement en mémoire.
+
+1. Scanner la machine puis générer un **AI Capability Passport** à jour.
+2. Générer le rapport si l'export doit être disponible.
+3. Dans **Actions pilotées par IA**, choisir le client local et la destination
+   d'export, puis cliquer sur **Démarrer les demandes 15 min**.
+4. Copier la configuration MCP sans secret, puis copier séparément le jeton dans
+   `OUTILSIA_LOCAL_ACTION_TOKEN`. Ne jamais le versionner ou le filmer.
+5. Le client voit exactement cinq outils : préparer une installation, préparer
+   un benchmark, préparer l'export, lire une demande et l'annuler.
+6. Lorsqu'une demande apparaît, relire modèle, runtime, taille ou destination,
+   effets, délai et empreinte. Cocher l'accusé puis confirmer
+   **Autoriser 2 min**. Le client IA ne peut produire aucun de ces gestes.
+7. L'autorisation ne lance encore rien. Cliquer séparément sur
+   **Exécuter maintenant** pour consommer la capacité à usage unique.
+8. Vérifier le résultat et son reçu dans **Evidence Ledger**. Un refus humain y
+   est également enregistré ; une annulation par le client ne vaut pas décision
+   humaine.
+9. Utiliser **Arrêt d'urgence** après le test. Une nouvelle preuve, un nouveau
+   scan, l'expiration ou la fermeture de l'app révoque aussi la session.
+
+L'installation repasse le préflight runtime/stockage juste avant son lancement.
+Le benchmark refuse tout modèle qui n'est plus installé dans le runtime figé.
+L'export écrit uniquement le contenu déjà figé par l'app vers le dossier
+OutilsIA choisi ; le client ne fournit ni contenu ni chemin.
+
+Cette fonction est présente dans les sources candidates. La recette native
+Windows du 28 juillet est verte ; elle ne rejoint pas la release publique tant
+que les tests terrain et la promotion explicite d'une release cohérente ne sont
+pas validés.
+
+## Contribution Benchmark Commons - candidat local
+
+1. Dans **Tests**, lancer **Préparer le test standard**.
+2. Vérifier la référence du modèle et lancer le benchmark après le consentement
+   normal de l'application.
+3. Seule une mesure réussie via l'API Ollama, liée au scan natif courant et au
+   prompt standard, devient éligible. Une estimation CLI, un prompt personnalisé
+   ou un test incomplet est refusé.
+4. Choisir la destination puis cliquer sur **Préparer l'aperçu**. Rien n'est
+   écrit ou envoyé à ce stade.
+5. Relire matériel normalisé, runtime, modèle, métriques, pseudonyme et
+   empreinte. Le document exclut prompt, réponse, scan brut, `machine_key`,
+   hostname, compte, jeton, chemin et fichier personnel.
+6. Cocher l'accusé puis confirmer **Autoriser 2 min**. Cette autorisation
+   n'écrit encore aucun fichier.
+7. Cliquer séparément sur **Exporter le JSON**. Le fichier est créé sans
+   écrasement dans la destination choisie ; aucun réseau n'est utilisé.
+8. Utiliser **Retirer l'export** pour supprimer la copie locale si elle existe et
+   produire une révocation locale. Une copie transmise manuellement ailleurs
+   n'est pas supprimée par ce geste.
+9. **Changer de pseudonyme** annule les aperçus en attente, sans réécrire les
+   exports antérieurs.
+
+Le pseudonyme tourne automatiquement tous les trente jours. Export et révocation
+ajoutent au Ledger uniquement action, contribution, empreintes, nom de fichier
+non personnel, décision native et drapeaux de confidentialité. Le document et
+le reçu imposent `network_sent=false`, `field_test_proof=false`,
+`community_verified=false` et `leaderboard_eligible=false`.
 
 ## Parcours disponible aujourd'hui
 
@@ -98,6 +164,15 @@ Une entrée du Ledger prouve localement que :
 - pour `isolated_visible_and_hidden_holdout_candidate`, le modèle Ollama identifié a réellement répondu après un second consentement, puis sa soumission gelée a passé sept contrôles statiques, 39 contrôles publics et cinq familles de holdout dans des processus isolés ; le Ledger ne conserve aucun seed ou résultat privé détaillé ;
 - pour `isolated_codex_visible_browser_pilot`, le Codex CLI identifié a réellement été invoqué une fois sur Signal Maze public, sa sortie bornée a été matérialisée dans un workspace jetable, puis la soumission a passé les mêmes sept contrôles statiques et 39 contrôles Chromium publics ;
 - pour `explicit_local_human_review`, le propriétaire local a choisi une décision structurée sur l'empreinte exacte du reçu public, après avoir reconnu ses limites ; cette preuve ne signifie jamais que le code ou les captures ont été inspectés ;
+- pour `signed_local_action_execution_receipt`, un plan exact a reçu une
+  autorisation dans l'interface native, sa capacité a été consommée une fois et
+  l'action bornée a terminé ou échoué ;
+- pour `signed_local_action_human_decision`, le propriétaire a explicitement
+  refusé le plan dans l'interface native avant toute exécution ;
+- pour `signed_local_opt_in_export_receipt`, le propriétaire a autorisé puis
+  exporté localement une contribution Benchmark Commons exacte, sans envoi ;
+- pour `signed_local_opt_in_revocation_receipt`, le propriétaire a retiré cet
+  export local et créé une révocation locale liée aux mêmes empreintes ;
 - seuls les claims minimaux et métriques prévus ont été conservés.
 
 Le Ledger refuse :
@@ -108,7 +183,12 @@ Le Ledger refuse :
 - un type d'événement qui ne correspond pas au schéma source ;
 - une chaîne locale altérée ;
 - le même document source ajouté deux fois sous le même type d'événement ;
-- une seconde décision humaine pour le même run Workstack Arena.
+- une seconde décision humaine pour le même run Workstack Arena ;
+- un reçu Action Lane dont le consentement prétend venir du client MCP ;
+- un reçu Action Lane altéré, rejoué ou annonçant la conservation d'un prompt,
+  d'une sortie brute, d'un contenu exporté, d'un credential ou d'un secret ;
+- un reçu Benchmark Commons re-signé qui prétend un envoi réseau, une preuve
+  terrain, une validation communautaire ou une éligibilité au classement.
 
 Le Ledger **ne prouve pas** :
 
@@ -132,6 +212,10 @@ Le Ledger **ne prouve pas** :
 9. `isolated_visible_and_hidden_holdout_candidate` : modèle Ollama installé appelé sur la seule tâche publique, sortie brute non conservée, sept checks statiques, 39 checks publics Chromium puis cinq familles de holdout sur des seeds injectés seulement après gel du code. Seuls compteurs et empreintes sortent du second évaluateur. Ce niveau prouve ce run borné, pas une qualité scientifique ou une victoire comparative.
 10. `isolated_codex_visible_browser_pilot` : Codex CLI invoqué une fois sur la seule tâche Signal Maze publique, workspace jetable, sortie bornée, sept checks statiques et 39 checks Chromium publics. Le coût fournisseur reste inconnu et ce niveau ne vaut ni accès à un projet, ni test caché, ni victoire comparative.
 11. `explicit_local_human_review` : acceptation pour comparaison, demande de correction ou rejet du reçu public signé par le propriétaire humain. Cette décision ne conserve pas de texte libre, ne prouve aucune inspection du code ou des captures et n'autorise jamais livraison, gagnant, board, fusion ou publication.
+12. `signed_local_action_execution_receipt` : action allowlistée exécutée après autorisation native, capacité liée au plan consommée une fois et résultat minimal signé. Ce niveau ne prouve ni qualité générale ni validation terrain.
+13. `signed_local_action_human_decision` : refus explicite dans l'interface native, lié au plan exact et enregistré sans exécution.
+14. `signed_local_opt_in_export_receipt` : export JSON local après aperçu, consentement natif et second clic. Ce niveau prouve l'action locale, pas une réception serveur.
+15. `signed_local_opt_in_revocation_receipt` : retrait local lié à la contribution exportée. Il ne supprime pas une copie transmise manuellement.
 
 ## Ce que prépare ForgeBench
 
@@ -266,6 +350,9 @@ Le fichier persistant se trouve dans le dossier applicatif Tauri sous le nom `ev
 - `outilsia.workstack_human_review_result.v1`
 - `outilsia.forgebench_experiment.v1`
 - `outilsia.forgebench_compile_result.v1`
+- `outilsia.benchmark_commons.contribution.v1`
+- `outilsia.benchmark_commons.receipt.v1`
+- `outilsia.benchmark_commons.revocation.v1`
 - `outilsia.evidence_entry.v1`
 - `outilsia.evidence_ledger.v1`
 

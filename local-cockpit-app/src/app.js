@@ -59,6 +59,9 @@ const state = {
   upgradeDigitalTwinRun: null,
   capabilityPassport: null,
   localCapabilityBridge: null,
+  localActionLane: null,
+  localActionRequests: [],
+  benchmarkCommons: null,
   boardObserver: null,
   workstackComposer: null,
   workstackSelectedCard: null,
@@ -133,6 +136,19 @@ const LOCAL_MCP_RESOURCE_URIS = Object.freeze([
   "outilsia://recommendation/current",
   "outilsia://strategy-arena/handoff"
 ]);
+const LOCAL_ACTION_LANE_SCHEMA = "outilsia.local_action_lane.v0";
+const LOCAL_ACTION_LANE_START_SCHEMA = "outilsia.local_action_lane_start.v0";
+const LOCAL_ACTION_APPROVAL_SCHEMA = "outilsia.local_action_approval.v0";
+const LOCAL_ACTION_REJECTION_SCHEMA = "outilsia.local_action_rejection.v0";
+const LOCAL_ACTION_LANE_CONTRACT_VERSION = "2026-07-28";
+const LOCAL_ACTION_LANE_TTL_SECONDS = 15 * 60;
+const LOCAL_ACTION_TOOL_NAMES = Object.freeze([
+  "outilsia_prepare_model_install",
+  "outilsia_prepare_benchmark",
+  "outilsia_prepare_report_export",
+  "outilsia_get_action_request",
+  "outilsia_cancel_action_request"
+]);
 const BOARD_OBSERVER_REQUEST_SCHEMA = "outilsia.board_observer_request.v1";
 const BOARD_OBSERVER_RESULT_SCHEMA = "outilsia.board_observer_result.v1";
 const WORKSTACK_COMPILE_REQUEST_SCHEMA = "outilsia.workstack_compile_request.v1";
@@ -166,6 +182,13 @@ const FORGEBENCH_OLLAMA_CANDIDATE_RESULT_SCHEMA = "outilsia.forgebench_ollama_ca
 const EVIDENCE_APPEND_REQUEST_SCHEMA = "outilsia.evidence_append_request.v1";
 const EVIDENCE_APPEND_RESULT_SCHEMA = "outilsia.evidence_append_result.v1";
 const EVIDENCE_LEDGER_SCHEMA = "outilsia.evidence_ledger.v1";
+const BENCHMARK_COMMONS_PREPARE_SCHEMA = "outilsia.benchmark_commons.prepare_request.v1";
+const BENCHMARK_COMMONS_APPROVE_SCHEMA = "outilsia.benchmark_commons.approve_request.v1";
+const BENCHMARK_COMMONS_EXPORT_SCHEMA = "outilsia.benchmark_commons.export_request.v1";
+const BENCHMARK_COMMONS_REVOKE_SCHEMA = "outilsia.benchmark_commons.revoke_request.v1";
+const BENCHMARK_COMMONS_ROTATE_SCHEMA = "outilsia.benchmark_commons.rotate_request.v1";
+const BENCHMARK_COMMONS_STANDARD_QUESTION = "Pourquoi la VRAM est importante pour un LLM local ?";
+const BENCHMARK_COMMONS_STANDARD_PROMPT = `${BENCHMARK_COMMONS_STANDARD_QUESTION}\nRéponse finale uniquement, une phrase courte en français.`;
 const INSTALL_SAFETY_PREFLIGHT_SCHEMA = "outilsia.install_safety_preflight.v1";
 const INSTALL_SAFETY_MIN_RESERVE_GB = 3;
 const MODEL_AUTOPILOT_PROTOCOL = "outilsia.autopilot.v1";
@@ -498,6 +521,16 @@ const els = {
   copyLocalCapabilityBridgeBtn: $("copyLocalCapabilityBridgeBtn"),
   refreshLocalCapabilityBridgeBtn: $("refreshLocalCapabilityBridgeBtn"),
   stopLocalCapabilityBridgeBtn: $("stopLocalCapabilityBridgeBtn"),
+  localActionLaneState: $("localActionLaneState"),
+  localActionLaneBox: $("localActionLaneBox"),
+  localActionClientSelect: $("localActionClientSelect"),
+  localActionExportDestination: $("localActionExportDestination"),
+  startLocalActionLaneBtn: $("startLocalActionLaneBtn"),
+  copyLocalActionConfigBtn: $("copyLocalActionConfigBtn"),
+  copyLocalActionTokenBtn: $("copyLocalActionTokenBtn"),
+  refreshLocalActionLaneBtn: $("refreshLocalActionLaneBtn"),
+  stopLocalActionLaneBtn: $("stopLocalActionLaneBtn"),
+  localActionQueue: $("localActionQueue"),
   boardObserverState: $("boardObserverState"),
   boardObserverUrl: $("boardObserverUrl"),
   boardObserverBoardId: $("boardObserverBoardId"),
@@ -678,6 +711,16 @@ const els = {
   benchmarkHistoryBox: $("benchmarkHistoryBox"),
   copyBenchmarkHistoryBtn: $("copyBenchmarkHistoryBtn"),
   clearBenchmarkHistoryBtn: $("clearBenchmarkHistoryBtn"),
+  benchmarkCommonsState: $("benchmarkCommonsState"),
+  benchmarkCommonsDestination: $("benchmarkCommonsDestination"),
+  benchmarkCommonsBox: $("benchmarkCommonsBox"),
+  benchmarkCommonsConsent: $("benchmarkCommonsConsent"),
+  prepareBenchmarkCommonsBtn: $("prepareBenchmarkCommonsBtn"),
+  prepareBenchmarkCommonsTestBtn: $("prepareBenchmarkCommonsTestBtn"),
+  approveBenchmarkCommonsBtn: $("approveBenchmarkCommonsBtn"),
+  exportBenchmarkCommonsBtn: $("exportBenchmarkCommonsBtn"),
+  revokeBenchmarkCommonsBtn: $("revokeBenchmarkCommonsBtn"),
+  rotateBenchmarkCommonsBtn: $("rotateBenchmarkCommonsBtn"),
   promptForgePanel: document.querySelector(".promptforge-panel"),
   promptForgeState: $("promptForgeState"),
   promptForgeInput: $("promptForgeInput"),
@@ -849,6 +892,7 @@ const WORKSPACE_SECTIONS = {
     ["Vérifier les preuves", ".evidence-ledger-panel"],
     ["Créer le passeport IA", ".capability-passport-panel"],
     ["Connecter une IA", ".local-capability-bridge-panel"],
+    ["Autoriser une action IA", ".local-action-lane-panel"],
     ["Préparer Strategy Arena", ".strategy-bridge-panel"]
   ],
   account: [
@@ -928,6 +972,13 @@ const WORKSPACE_FEATURES = Object.freeze({
     target: ".local-capability-bridge-panel",
     focus: "#startLocalCapabilityBridgeBtn",
     label: "Serveur MCP local"
+  },
+  action_lane: {
+    tab: "workflows",
+    panel: ".local-action-lane-panel",
+    target: ".local-action-lane-panel",
+    focus: "#startLocalActionLaneBtn",
+    label: "Actions IA contrôlées"
   },
   board: {
     tab: "workflows",
@@ -4456,6 +4507,7 @@ function renderScan(scan) {
   renderStrategyBridgePanel();
   renderFieldTestPanel();
   renderFlightRecorder();
+  renderBenchmarkCommonsPanel();
   renderPrimaryAction();
 }
 
@@ -11431,6 +11483,7 @@ async function buildCapabilityPassport() {
 function renderCapabilityPassportPanel() {
   if (!els.capabilityPassportBox) return;
   queueMicrotask(renderLocalCapabilityBridgePanel);
+  queueMicrotask(renderLocalActionLanePanel);
   const passport = capabilityPassportIsCurrent() ? state.capabilityPassport : null;
   els.generateCapabilityPassportBtn.disabled = !state.scan;
   els.copyCapabilityPassportBtn.disabled = !passport;
@@ -11532,11 +11585,18 @@ function capabilityPassportMarkdown(passport = state.capabilityPassport) {
 
 function invalidateCapabilityPassport() {
   const bridgeWasRunning = localCapabilityBridgeIsRunning();
+  const actionLaneWasRunning = localActionLaneIsRunning();
   state.capabilityPassport = null;
   state.localCapabilityBridge = null;
+  state.localActionLane = null;
+  state.localActionRequests = [];
   if (bridgeWasRunning && invoke) {
     void invoke("stop_local_capability_bridge").catch(() => {});
   }
+  if (actionLaneWasRunning && invoke) {
+    void invoke("stop_local_action_lane").catch(() => {});
+  }
+  queueMicrotask(renderLocalActionLanePanel);
 }
 
 function localCapabilityBridgePolicy() {
@@ -11945,6 +12005,462 @@ async function copyLocalCapabilityBridgeToken() {
     setStatus("Jeton MCP copié · secret temporaire valable 15 minutes maximum", "warn");
   } catch (error) {
     setStatus(String(error), "warn");
+  }
+}
+
+function localActionLaneIsRunning(runtime = state.localActionLane) {
+  return Boolean(runtime?.running && Number(runtime.expires_at_ms || 0) > Date.now());
+}
+
+function localActionClient() {
+  const key = els.localActionClientSelect?.value || "codex";
+  return {
+    id: key === "claude" ? "claude-code-windows" : key === "other" ? "local-mcp-client" : "codex-windows",
+    label: key === "claude" ? "Claude Code Windows" : key === "other" ? "Client MCP local" : "Codex Windows"
+  };
+}
+
+function localActionAllowedModels() {
+  const models = new Map();
+  const add = (ref, runtime, installed) => {
+    const model = ollamaActionRef(ref);
+    if (!model) return;
+    const normalizedRuntime = runtime === "wsl" || runtime === "ollama-wsl" ? "wsl" : "native";
+    const key = `${normalizeOllamaRef(model)}::${normalizedRuntime}`;
+    const budget = modelInstallSizeBudget(model);
+    const current = models.get(key);
+    models.set(key, {
+      model,
+      runtime: normalizedRuntime,
+      installed: Boolean(installed || current?.installed),
+      estimated_download_gb: budget.estimated_download_gb,
+      estimated_upper_gb: budget.estimated_upper_gb,
+      required_free_gb: budget.required_free_gb,
+      benchmark_timeout_seconds: benchmarkTimeoutSeconds(model)
+    });
+  };
+  for (const installed of state.scan?.installed_models || []) {
+    const ref = modelLabel(installed);
+    add(ref, modelRuntimeFromSource(installed.source || installed.runtime), true);
+  }
+  const compatibility = state.compatibility?.compatibility || state.compatibility || {};
+  for (const model of extractModels(compatibility)) {
+    const ref = actionableOllamaRef(model);
+    if (!ref) continue;
+    add(ref, defaultOllamaRuntime(ref), isOllamaModelInstalled(ref));
+  }
+  return [...models.values()].slice(0, 96);
+}
+
+function localActionExportSnapshot() {
+  if (!state.reportGeneratedAt || !String(state.markdown || "").trim()) return null;
+  const machine = String(state.scan?.machine_key || "machine")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40) || "machine";
+  const stamp = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
+  return {
+    format: "markdown",
+    filename: `outilsia-${machine}-${stamp}.md`,
+    destination: els.localActionExportDestination?.value === "downloads" ? "downloads" : "app_data",
+    content: String(state.markdown).trim()
+  };
+}
+
+function localActionLaneStartPayload() {
+  return {
+    schema: LOCAL_ACTION_LANE_START_SCHEMA,
+    client: localActionClient(),
+    allowed_models: localActionAllowedModels(),
+    export_snapshot: localActionExportSnapshot(),
+    ttl_seconds: LOCAL_ACTION_LANE_TTL_SECONDS
+  };
+}
+
+function localActionLaneClientConfig() {
+  const runtime = state.localActionLane;
+  if (!localActionLaneIsRunning(runtime) || !runtime?.mcp_url) {
+    throw new Error("Démarre d'abord la Local Action Lane");
+  }
+  const client = els.localActionClientSelect?.value || "codex";
+  if (client === "claude") {
+    return `${JSON.stringify({
+      mcpServers: {
+        outilsia_actions: {
+          type: "http",
+          url: runtime.mcp_url,
+          headers: {
+            Authorization: "Bearer ${OUTILSIA_LOCAL_ACTION_TOKEN}"
+          }
+        }
+      }
+    }, null, 2)}\n`;
+  }
+  return [
+    "[mcp_servers.outilsia_actions]",
+    `url = "${runtime.mcp_url}"`,
+    'bearer_token_env_var = "OUTILSIA_LOCAL_ACTION_TOKEN"',
+    "enabled = true",
+    "required = false",
+    'default_tools_approval_mode = "writes"',
+    ""
+  ].join("\n");
+}
+
+function localActionStateLabel(value) {
+  return ({
+    awaiting_human: "En attente de votre décision",
+    approved: "Autorisé pendant 2 minutes",
+    executing: "Exécution en cours",
+    completed: "Terminé",
+    failed: "Échec borné",
+    rejected: "Refusé",
+    cancelled: "Annulé par le client",
+    expired: "Autorisation expirée"
+  })[value] || value || "Inconnu";
+}
+
+function localActionLabel(value) {
+  return ({
+    install_model: "Installer un modèle Ollama",
+    benchmark_model: "Benchmarker un modèle installé",
+    export_report: "Exporter le rapport figé"
+  })[value] || value || "Action locale";
+}
+
+function localActionTargetLines(request) {
+  const plan = request?.plan || {};
+  const target = plan.target || {};
+  if (request?.action === "export_report") {
+    return [
+      `Fichier : ${target.filename || "rapport.md"}`,
+      `Destination : ${target.destination === "downloads" ? "Téléchargements / OutilsIA" : "Dossier sécurisé OutilsIA"}`,
+      `Contenu figé : SHA-256 ${String(target.content_sha256 || "").slice(0, 16)}…`
+    ];
+  }
+  const lines = [
+    `Modèle : ${target.model || "inconnu"}`,
+    `Runtime : ${target.runtime === "wsl" ? "Ollama WSL" : "Ollama natif"}`
+  ];
+  if (request?.action === "install_model") {
+    const preflight = plan.preflight || {};
+    lines.push(
+      `Téléchargement haut : ${preflight.estimated_upper_gb == null ? "inconnu" : `${preflight.estimated_upper_gb} Go`}`,
+      `Espace libre : ${preflight.storage_free_gb == null ? "non mesuré" : `${preflight.storage_free_gb} Go`}`
+    );
+  } else {
+    lines.push(`Délai maximal : ${plan.limits?.timeout_seconds || 45} s`, "Téléchargement : aucun");
+  }
+  return lines;
+}
+
+function renderLocalActionRequest(request) {
+  const stateKey = request.state || "unknown";
+  const planShort = request.plan_sha256
+    ? `${request.plan_sha256.slice(0, 12)}…${request.plan_sha256.slice(-8)}`
+    : "empreinte absente";
+  const target = localActionTargetLines(request);
+  const result = request.result || {};
+  const resultText = stateKey === "completed"
+    ? request.action === "benchmark_model"
+      ? `${result.estimated_tokens_per_second ?? "--"} tok/s · ${result.elapsed_ms ?? "--"} ms`
+      : request.action === "export_report"
+        ? `${result.bytes_written ?? 0} octets écrits`
+        : `${result.elapsed_ms ?? "--"} ms`
+    : stateKey === "failed" ? "Le noyau a arrêté ou refusé l'opération." : "";
+  const approval = stateKey === "awaiting_human" ? `
+    <label class="local-action-consent">
+      <input type="checkbox" data-local-action-ack="${escapeHtml(request.request_id)}">
+      <span>J'ai relu la cible, le runtime, les effets et l'empreinte. Le client IA ne peut pas cocher cette case.</span>
+    </label>
+    <div class="row-actions">
+      <button type="button" data-local-action-approve="${escapeHtml(request.request_id)}" disabled>Autoriser 2 min</button>
+      <button type="button" data-local-action-reject="${escapeHtml(request.request_id)}">Refuser</button>
+    </div>
+  ` : stateKey === "approved" ? `
+    <div class="row-actions">
+      <button type="button" data-local-action-execute="${escapeHtml(request.request_id)}">Exécuter maintenant</button>
+      <button type="button" data-local-action-reject="${escapeHtml(request.request_id)}">Révoquer</button>
+    </div>
+  ` : "";
+  return `
+    <article class="local-action-request ${escapeHtml(stateKey)}" data-local-action-request="${escapeHtml(request.request_id)}">
+      <div class="local-action-request-head">
+        <div>
+          <strong>${escapeHtml(localActionLabel(request.action))}</strong>
+          <small>${escapeHtml(request.client_label || request.client_id || "Client local")} · ${escapeHtml(request.request_id)}</small>
+        </div>
+        <span>${escapeHtml(localActionStateLabel(stateKey))}</span>
+      </div>
+      <div class="local-action-request-proof">
+        ${target.map((line) => `<span>${escapeHtml(line)}</span>`).join("")}
+      </div>
+      <small>Plan SHA-256 ${escapeHtml(planShort)} · aucune approbation ni exécution disponible par MCP</small>
+      ${resultText ? `<strong>${escapeHtml(resultText)}</strong>` : ""}
+      ${approval}
+    </article>
+  `;
+}
+
+function renderLocalActionLanePanel() {
+  if (!els.localActionLaneBox || !els.localActionQueue) return;
+  const runtime = state.localActionLane;
+  const running = localActionLaneIsRunning(runtime);
+  const passportCurrent = capabilityPassportIsCurrent();
+  els.startLocalActionLaneBtn.disabled = !invoke || !passportCurrent || running;
+  els.copyLocalActionConfigBtn.disabled = !running || !runtime?.mcp_url;
+  els.copyLocalActionTokenBtn.disabled = !running || !runtime?.token;
+  els.refreshLocalActionLaneBtn.disabled = !invoke || !running;
+  els.stopLocalActionLaneBtn.disabled = !invoke || !running || Boolean(runtime?.executing_request_id);
+  if (els.localActionClientSelect) els.localActionClientSelect.disabled = running;
+  if (els.localActionExportDestination) els.localActionExportDestination.disabled = running;
+
+  if (!invoke && !runtime?.test_mode) {
+    els.localActionLaneState.textContent = "app native requise";
+    els.localActionLaneBox.className = "local-action-lane-box empty";
+    els.localActionLaneBox.textContent = "Cette voie d'action existe uniquement dans l'application Windows/Linux.";
+  } else if (!state.scan) {
+    els.localActionLaneState.textContent = "scan requis";
+    els.localActionLaneBox.className = "local-action-lane-box empty";
+    els.localActionLaneBox.textContent = "Scanne la machine avant de figer les modèles et runtimes autorisés.";
+  } else if (!passportCurrent && !running) {
+    els.localActionLaneState.textContent = "Passport requis";
+    els.localActionLaneBox.className = "local-action-lane-box empty";
+    els.localActionLaneBox.textContent = "Génère un Passport à jour. La voie d'action reste arrêtée par défaut.";
+  } else if (!running) {
+    els.localActionLaneState.textContent = "désactivée";
+    els.localActionLaneBox.className = "local-action-lane-box empty";
+    els.localActionLaneBox.innerHTML = `
+      <strong>Trois actions bornées, jamais silencieuses.</strong>
+      <span>Installation d'une référence validée, benchmark d'un modèle déjà installé ou export du rapport figé. Chaque demande exige deux gestes humains et expire.</span>
+    `;
+  } else {
+    const remainingMinutes = Math.max(1, Math.ceil((Number(runtime.expires_at_ms) - Date.now()) / 60_000));
+    els.localActionLaneState.textContent = `active · ${remainingMinutes} min`;
+    els.localActionLaneBox.className = "local-action-lane-box";
+    els.localActionLaneBox.innerHTML = `
+      <strong>${escapeHtml(runtime.client_label || runtime.client_id)} peut préparer des demandes.</strong>
+      <span>${escapeHtml((runtime.mcp_tools || LOCAL_ACTION_TOOL_NAMES).length)} outils MCP · 127.0.0.1 · file en mémoire · aucun outil d'exécution.</span>
+      <span>Une autorisation est liée au plan, au client et à cette session, valable 2 minutes et consommable une fois.</span>
+    `;
+  }
+
+  if (!running) {
+    els.localActionQueue.className = "local-action-queue empty";
+    els.localActionQueue.textContent = "Aucune file active. Le jeton, les demandes et les capacités restent uniquement en mémoire.";
+    return;
+  }
+  const requests = state.localActionRequests || [];
+  if (!requests.length) {
+    els.localActionQueue.className = "local-action-queue empty";
+    els.localActionQueue.textContent = "En attente d'une demande préparée par le client local.";
+    return;
+  }
+  els.localActionQueue.className = "local-action-queue";
+  els.localActionQueue.innerHTML = requests.map(renderLocalActionRequest).join("");
+}
+
+async function startLocalActionLane() {
+  if (!invoke) {
+    setStatus("Local Action Lane disponible uniquement dans l'app native", "warn");
+    return null;
+  }
+  if (!capabilityPassportIsCurrent()) {
+    setStatus("Génère d'abord un AI Capability Passport à jour", "warn");
+    return null;
+  }
+  const payload = localActionLaneStartPayload();
+  if (!payload.allowed_models.length && !payload.export_snapshot) {
+    setStatus("Aucun modèle ni rapport à figer dans la voie d'action", "warn");
+    return null;
+  }
+  const confirmed = window.confirm(
+    `${payload.client.label} pourra préparer pendant 15 minutes des demandes locales bornées.\n\n` +
+    "Il ne pourra ni les approuver ni les exécuter. Chaque action restera visible ici et demandera deux gestes humains.\n\nOuvrir la Local Action Lane ?"
+  );
+  if (!confirmed) return null;
+  try {
+    const result = await invoke("start_local_action_lane", { request: payload });
+    if (result?.schema !== LOCAL_ACTION_LANE_SCHEMA || !result?.running || !result?.token) {
+      throw new Error("réponse native incomplète");
+    }
+    state.localActionLane = { ...result, token_persisted: false, queue_persisted: false };
+    state.localActionRequests = [];
+    renderLocalActionLanePanel();
+    setStatus("Local Action Lane active pour 15 minutes", "ok");
+    return result;
+  } catch (error) {
+    state.localActionLane = null;
+    state.localActionRequests = [];
+    renderLocalActionLanePanel();
+    setStatus(`Local Action Lane impossible : ${error}`, "error");
+    return null;
+  }
+}
+
+async function stopLocalActionLane(silent = false) {
+  try {
+    if (invoke) await invoke("stop_local_action_lane");
+  } catch (error) {
+    if (!silent) setStatus(`Arrêt Action Lane incomplet : ${error}`, "error");
+  } finally {
+    state.localActionLane = null;
+    state.localActionRequests = [];
+    renderLocalActionLanePanel();
+  }
+  if (!silent) setStatus("Local Action Lane arrêtée et capacités révoquées", "ok");
+}
+
+async function refreshLocalActionLaneStatus(silent = false) {
+  if (!invoke) return null;
+  try {
+    const status = await invoke("get_local_action_lane_status");
+    if (!status?.running) {
+      state.localActionLane = null;
+      state.localActionRequests = [];
+    } else {
+      state.localActionLane = state.localActionLane
+        ? { ...state.localActionLane, ...status }
+        : { ...status, token: "" };
+      state.localActionRequests = await invoke("list_local_action_requests");
+    }
+    renderLocalActionLanePanel();
+    if (!silent) setStatus(status?.running ? "File Action Lane actualisée" : "Local Action Lane arrêtée", "ok");
+    return status;
+  } catch (error) {
+    if (!silent) setStatus(`Actualisation Action Lane impossible : ${error}`, "error");
+    return null;
+  }
+}
+
+async function copyLocalActionConfig() {
+  try {
+    await navigator.clipboard.writeText(localActionLaneClientConfig());
+    setStatus("Configuration Action Lane copiée sans secret", "ok");
+  } catch (error) {
+    setStatus(String(error), "warn");
+  }
+}
+
+async function copyLocalActionToken() {
+  const runtime = state.localActionLane;
+  if (!localActionLaneIsRunning(runtime) || !runtime?.token) {
+    setStatus("Démarre d'abord la Local Action Lane", "warn");
+    return;
+  }
+  await navigator.clipboard.writeText(runtime.token);
+  setStatus("Jeton Action Lane copié · secret éphémère", "warn");
+}
+
+function localActionRequestById(requestId) {
+  return (state.localActionRequests || []).find((request) => request.request_id === requestId) || null;
+}
+
+async function approveLocalActionRequest(requestId) {
+  const request = localActionRequestById(requestId);
+  if (!request || request.state !== "awaiting_human") return;
+  const details = localActionTargetLines(request).join("\n");
+  const confirmed = window.confirm(
+    `${localActionLabel(request.action)}\n\n${details}\n\nPlan SHA-256 : ${request.plan_sha256}\n\nAutoriser ce plan exact pendant 2 minutes ?`
+  );
+  if (!confirmed) return;
+  try {
+    await invoke("approve_local_action_request", {
+      request: {
+        schema: LOCAL_ACTION_APPROVAL_SCHEMA,
+        request_id: request.request_id,
+        plan_sha256: request.plan_sha256,
+        human_acknowledged: true
+      }
+    });
+    await refreshLocalActionLaneStatus(true);
+    setStatus("Plan exact autorisé pendant 2 minutes · pas encore exécuté", "warn");
+  } catch (error) {
+    setStatus(`Autorisation refusée : ${error}`, "error");
+  }
+}
+
+async function rejectLocalActionRequest(requestId) {
+  const request = localActionRequestById(requestId);
+  if (!request || !["awaiting_human", "approved"].includes(request.state)) return;
+  if (!window.confirm(`Refuser et révoquer ${localActionLabel(request.action)} ?`)) return;
+  try {
+    const result = await invoke("reject_local_action_request", {
+      request: {
+        schema: LOCAL_ACTION_REJECTION_SCHEMA,
+        request_id: request.request_id,
+        plan_sha256: request.plan_sha256,
+        human_acknowledged: true,
+        reason: "human_rejected"
+      }
+    });
+    await Promise.all([refreshLocalActionLaneStatus(true), loadEvidenceLedger(true)]);
+    setStatus(
+      result?.ledger?.appended || result?.ledger?.duplicate
+        ? "Demande refusée et reçu ajouté au Ledger"
+        : "Demande refusée · reçu Ledger non écrit",
+      result?.ledger?.appended || result?.ledger?.duplicate ? "ok" : "warn"
+    );
+  } catch (error) {
+    setStatus(`Refus non enregistré : ${error}`, "error");
+  }
+}
+
+async function executeLocalActionRequest(requestId) {
+  const request = localActionRequestById(requestId);
+  if (!request || request.state !== "approved") return;
+  if (!window.confirm(`Exécuter maintenant le plan ${request.plan_sha256.slice(0, 16)}… ? Cette capacité sera consommée immédiatement.`)) return;
+  setStatus(`${localActionLabel(request.action)} en cours...`, "warn");
+  try {
+    const result = await invoke("execute_local_action_request", {
+      request: {
+        request_id: request.request_id,
+        plan_sha256: request.plan_sha256
+      }
+    });
+    await Promise.all([refreshLocalActionLaneStatus(true), loadEvidenceLedger(true)]);
+    const completed = result?.request || localActionRequestById(requestId);
+    if (request.action === "benchmark_model" && completed?.result) {
+      state.benchmark = {
+        ...completed.result,
+        model: request.plan?.target?.model || completed.result.model,
+        runtime: request.plan?.target?.runtime || "native",
+        machine_key: state.scan?.machine_key || "",
+        success: Boolean(completed.result.success),
+        created_at_ms: Date.now(),
+        prompt: "",
+        output_preview: "",
+        output_text: ""
+      };
+      if (state.benchmark.success) recordActivationMilestone("first_benchmark_success");
+      renderBenchmark(state.benchmark);
+      saveBenchmarkHistoryEntry(state.benchmark);
+      refreshDigitalTwinAfterProofChange();
+      renderPrimaryAction();
+      renderFirstTestPanel();
+      renderPreparePanel();
+      renderReadinessPanel();
+      renderArenaPanel();
+      renderPrivateWorkloadPanel();
+      renderStrategyBridgePanel();
+      renderFieldTestPanel();
+      renderModelAutopilot();
+      renderFlightRecorder();
+      invalidateCapabilityPassport();
+      renderCapabilityPassportPanel();
+    } else if (request.action === "install_model" && result?.success) {
+      await scanMachine().catch(() => {});
+    }
+    const ledgerRecorded = Boolean(result?.ledger?.appended || result?.ledger?.duplicate);
+    const resultMessage = result?.message || (result?.success ? "Action locale terminée" : "Action locale terminée avec erreur");
+    setStatus(
+      ledgerRecorded ? resultMessage : `${resultMessage} · reçu Ledger non écrit`,
+      ledgerRecorded ? (result?.success ? "ok" : "error") : "warn"
+    );
+  } catch (error) {
+    await refreshLocalActionLaneStatus(true);
+    setStatus(`Exécution locale refusée : ${error}`, "error");
   }
 }
 
@@ -14624,7 +15140,9 @@ function evidenceEventLabel(value) {
     forgebench_reference_pilot_verified: "Pilote ForgeBench vérifié",
     forgebench_ollama_candidate_verified: "Candidat Ollama vérifié",
     workstack_arena_codex_pilot_verified: "Pilote Codex vérifié",
-    workstack_human_review_recorded: "Décision humaine enregistrée"
+    workstack_human_review_recorded: "Décision humaine enregistrée",
+    local_action_execution_recorded: "Action locale exécutée",
+    local_action_decision_recorded: "Action locale refusée"
   })[value] || value;
 }
 
@@ -14638,6 +15156,7 @@ function evidenceActorLabel(value) {
     forgebench_runner: "ForgeBench Runner",
     forgebench_candidate_runner: "ForgeBench Candidat local",
     workstack_arena: "Workstack Arena",
+    local_action_lane: "Local Action Lane",
     local_owner: "Propriétaire local"
   })[value] || value;
 }
@@ -18407,6 +18926,7 @@ function writeBenchmarkHistory(items) {
   const normalized = Array.isArray(items) ? items.slice(0, MAX_BENCHMARK_HISTORY) : [];
   window.localStorage?.setItem(BENCHMARK_HISTORY_KEY, JSON.stringify(normalized));
   renderBenchmarkHistory(normalized);
+  renderBenchmarkCommonsPanel();
 }
 
 function benchmarkHistoryEntry(result) {
@@ -18529,6 +19049,311 @@ function renderBenchmarkHistory(items = readBenchmarkHistory()) {
       `).join("")}
     </div>
   `;
+}
+
+function benchmarkCommonsEligibleBenchmark() {
+  const machineKey = String(state.scan?.machine_key || "").trim();
+  if (!machineKey) return null;
+  const candidates = [state.benchmark, ...readBenchmarkHistory()].filter(Boolean);
+  return candidates.find((item) => (
+    item.success === true
+    && item.timed_out !== true
+    && String(item.measurement_source || "") === "ollama_api"
+    && String(item.prompt || "") === BENCHMARK_COMMONS_STANDARD_PROMPT
+    && Number(item.eval_count || 0) > 0
+    && Number(item.eval_duration_ms || 0) >= 200
+    && Number(item.estimated_tokens_per_second || 0) > 0
+    && String(item.machine_key || item.machine?.machine_key || "") === machineKey
+  )) || null;
+}
+
+function benchmarkCommonsPreparedRequest(status = state.benchmarkCommons) {
+  const requests = Array.isArray(status?.prepared) ? status.prepared : [];
+  return requests.find((item) => ["approved", "awaiting_human"].includes(String(item?.state || ""))) || null;
+}
+
+function benchmarkCommonsActiveExport(status = state.benchmarkCommons) {
+  const exports = Array.isArray(status?.registry?.exports) ? status.registry.exports : [];
+  return exports.find((item) => !item?.revoked_at_ms) || null;
+}
+
+function benchmarkCommonsPseudonymLabel(status = state.benchmarkCommons) {
+  const value = String(status?.registry?.pseudonym?.value || "");
+  return value.length > 16 ? `${value.slice(0, 12)}…${value.slice(-4)}` : value || "à créer";
+}
+
+function benchmarkCommonsContributionMarkup(contribution, stateLabel = "") {
+  const observation = contribution?.observation || {};
+  const hardware = observation.hardware || {};
+  const runtime = observation.runtime || {};
+  const model = observation.model || {};
+  const metrics = observation.metrics || {};
+  const digest = String(contribution?.integrity?.digest || "");
+  return `
+    <strong>${escapeHtml(stateLabel || "Aperçu anonymisé prêt")}</strong>
+    <div class="benchmark-commons-proof">
+      <div>
+        <strong>${escapeHtml(model.ollama_ref || "modèle inconnu")}</strong>
+        <span>${escapeHtml(metrics.generation_tokens_per_second || 0)} tok/s · ${escapeHtml(metrics.total_duration_ms || 0)} ms · offload ${escapeHtml(metrics.gpu_offload_percent || 0)} %</span>
+      </div>
+      <div>
+        <strong>${escapeHtml(hardware.gpu_name || "GPU inconnu")} · ${escapeHtml(hardware.vram_gb ?? "?")} Go</strong>
+        <span>${escapeHtml(hardware.cpu_name || "CPU inconnu")} · ${escapeHtml(hardware.ram_gb ?? "?")} Go RAM</span>
+      </div>
+      <div>
+        <strong>${escapeHtml(runtime.kind || "runtime inconnu")} · Ollama ${escapeHtml(runtime.ollama_version || "inconnu")}</strong>
+        <span>${escapeHtml(runtime.processor || "placement inconnu")} · source ${escapeHtml(runtime.evidence_source || "non mesurée")}</span>
+      </div>
+      <div>
+        <strong>Pseudonyme ${escapeHtml(benchmarkCommonsPseudonymLabel())}</strong>
+        <span>SHA-256 ${escapeHtml(digest ? `${digest.slice(0, 12)}…${digest.slice(-8)}` : "absent")}</span>
+      </div>
+    </div>
+    <span>Exclus : prompt, réponse, scan brut, machine_key, hostname, compte, jeton, chemin et fichier personnel.</span>
+  `;
+}
+
+function renderBenchmarkCommonsPanel() {
+  if (!els.benchmarkCommonsBox) return;
+  const native = Boolean(invoke);
+  const eligible = benchmarkCommonsEligibleBenchmark();
+  const status = state.benchmarkCommons;
+  const pending = benchmarkCommonsPreparedRequest(status);
+  const activeExport = benchmarkCommonsActiveExport(status);
+  const pendingState = String(pending?.state || "");
+
+  els.prepareBenchmarkCommonsBtn.disabled = !native || !eligible || Boolean(pending) || Boolean(activeExport);
+  els.prepareBenchmarkCommonsTestBtn.disabled = !state.scan;
+  els.benchmarkCommonsDestination.disabled = Boolean(pending);
+  els.benchmarkCommonsConsent.disabled = pendingState !== "awaiting_human";
+  if (pendingState !== "awaiting_human") els.benchmarkCommonsConsent.checked = false;
+  els.approveBenchmarkCommonsBtn.disabled = !(
+    native
+    && pendingState === "awaiting_human"
+    && els.benchmarkCommonsConsent.checked
+  );
+  els.exportBenchmarkCommonsBtn.disabled = !(native && pendingState === "approved");
+  els.revokeBenchmarkCommonsBtn.disabled = !(native && activeExport);
+  els.rotateBenchmarkCommonsBtn.disabled = !native;
+
+  if (!native) {
+    els.benchmarkCommonsState.textContent = "app native requise";
+    els.benchmarkCommonsBox.className = "benchmark-commons-box empty";
+    els.benchmarkCommonsBox.textContent = "L'aperçu et l'export sont disponibles uniquement dans l'application Windows/Linux.";
+    return;
+  }
+  if (!state.scan) {
+    els.benchmarkCommonsState.textContent = "scan requis";
+    els.benchmarkCommonsBox.className = "benchmark-commons-box empty";
+    els.benchmarkCommonsBox.textContent = "Analyse la machine avant de préparer une contribution.";
+    return;
+  }
+  if (!status) {
+    els.benchmarkCommonsState.textContent = "chargement";
+    els.benchmarkCommonsBox.className = "benchmark-commons-box empty";
+    els.benchmarkCommonsBox.textContent = "Lecture du registre local Benchmark Commons…";
+    return;
+  }
+  if (pending) {
+    const contribution = pending.contribution || {};
+    els.benchmarkCommonsState.textContent = pendingState === "approved" ? "autorisé · 2 min" : "aperçu à vérifier";
+    els.benchmarkCommonsBox.className = "benchmark-commons-box";
+    els.benchmarkCommonsBox.innerHTML = benchmarkCommonsContributionMarkup(
+      contribution,
+      pendingState === "approved" ? "Export autorisé, second clic requis" : "Aperçu figé, aucun envoi"
+    );
+    return;
+  }
+  if (activeExport) {
+    els.benchmarkCommonsState.textContent = "export local";
+    els.benchmarkCommonsBox.className = "benchmark-commons-box";
+    els.benchmarkCommonsBox.innerHTML = `
+      ${benchmarkCommonsContributionMarkup(activeExport.contribution || {}, "Contribution exportée localement")}
+      <span>Fichier : ${escapeHtml(activeExport.filename || "export JSON")} · destination ${escapeHtml(activeExport.destination || "locale")} · réseau : aucun envoi.</span>
+    `;
+    return;
+  }
+  if (!eligible) {
+    els.benchmarkCommonsState.textContent = "mesure standard requise";
+    els.benchmarkCommonsBox.className = "benchmark-commons-box empty";
+    els.benchmarkCommonsBox.textContent = "Lance le test standard avec le prompt VRAM. Les estimations CLI, prompts personnalisés et tests échoués restent exclus.";
+    return;
+  }
+  els.benchmarkCommonsState.textContent = "prêt à préparer";
+  els.benchmarkCommonsBox.className = "benchmark-commons-box";
+  els.benchmarkCommonsBox.innerHTML = `
+    <strong>${escapeHtml(eligible.model)} · ${escapeHtml(eligible.estimated_tokens_per_second)} tok/s mesurés</strong>
+    <span>Mesure Ollama API exacte · ${escapeHtml(eligible.eval_duration_ms)} ms de génération · runtime ${escapeHtml(eligible.runtime || defaultOllamaRuntime(eligible.model))}.</span>
+    <span>Pseudonyme rotatif : ${escapeHtml(benchmarkCommonsPseudonymLabel())}. Clique sur Préparer pour voir le document exact avant toute autorisation.</span>
+  `;
+}
+
+async function refreshBenchmarkCommonsStatus(silent = false) {
+  if (!invoke) {
+    renderBenchmarkCommonsPanel();
+    return null;
+  }
+  try {
+    state.benchmarkCommons = await invoke("get_benchmark_commons_status");
+  } catch (error) {
+    state.benchmarkCommons = null;
+    if (!silent) setStatus(String(error), "bad");
+  }
+  renderBenchmarkCommonsPanel();
+  return state.benchmarkCommons;
+}
+
+function prepareBenchmarkCommonsStandardTest() {
+  if (!state.scan) {
+    setStatus("Analyse ce PC avant de préparer le test standard", "warn");
+    return;
+  }
+  const current = normalizeOllamaRef(state.benchmark?.model || "");
+  const installed = Array.from(installedOllamaRefs());
+  const model = current && isOllamaModelInstalled(current)
+    ? current
+    : installed[0] || prepareFlowState().testModel || "qwen3:0.6b";
+  els.benchmarkModelInput.value = model;
+  els.benchmarkPromptInput.value = BENCHMARK_COMMONS_STANDARD_QUESTION;
+  renderBenchmarkPreflight();
+  revealWorkspacePanel("tests", els.benchmarkPanel);
+  window.requestAnimationFrame(() => els.benchmarkPromptInput.focus());
+  setStatus(`Test standard préparé pour ${model}. Relis puis lance le benchmark.`, "ok");
+}
+
+async function prepareBenchmarkCommons() {
+  const benchmark = benchmarkCommonsEligibleBenchmark();
+  if (!invoke || !state.scan || !benchmark) {
+    setStatus("Un benchmark standard mesuré est requis", "warn");
+    return;
+  }
+  els.prepareBenchmarkCommonsBtn.disabled = true;
+  setStatus("Préparation locale de l'aperçu anonymisé…");
+  try {
+    const result = await invoke("prepare_benchmark_contribution", {
+      request: {
+        schema: BENCHMARK_COMMONS_PREPARE_SCHEMA,
+        scan: state.scan,
+        benchmark,
+        runtime: benchmark.runtime || defaultOllamaRuntime(benchmark.model),
+        destination: els.benchmarkCommonsDestination.value === "app_data" ? "app_data" : "downloads"
+      }
+    });
+    await refreshBenchmarkCommonsStatus(true);
+    if (result?.already_exported) {
+      setStatus("Cette observation a déjà un export local actif", "warn");
+    } else {
+      setStatus("Aperçu anonymisé prêt. Vérifie-le avant d'autoriser.", "ok");
+    }
+  } catch (error) {
+    setStatus(String(error), "bad");
+  } finally {
+    renderBenchmarkCommonsPanel();
+  }
+}
+
+async function approveBenchmarkCommons() {
+  const pending = benchmarkCommonsPreparedRequest();
+  if (!invoke || pending?.state !== "awaiting_human" || !els.benchmarkCommonsConsent.checked) return;
+  const contribution = pending.contribution || {};
+  const model = contribution.observation?.model?.ollama_ref || "modèle";
+  const speed = contribution.observation?.metrics?.generation_tokens_per_second || 0;
+  const confirmed = window.confirm(
+    `Autoriser cet export pendant 2 minutes ?\n\n${model} · ${speed} tok/s\nSHA-256 ${pending.document_sha256}\n\nAucune donnée ne sera envoyée.`
+  );
+  if (!confirmed) return;
+  try {
+    await invoke("approve_benchmark_contribution", {
+      request: {
+        schema: BENCHMARK_COMMONS_APPROVE_SCHEMA,
+        request_id: pending.request_id,
+        plan_sha256: pending.plan_sha256,
+        privacy_acknowledged: true,
+        not_field_proof_acknowledged: true
+      }
+    });
+    await refreshBenchmarkCommonsStatus(true);
+    const approved = benchmarkCommonsPreparedRequest();
+    const approvalExpiresAt = Number(approved?.approval_expires_at_ms || 0);
+    if (approvalExpiresAt > Date.now()) {
+      window.setTimeout(
+        () => void refreshBenchmarkCommonsStatus(true),
+        Math.min(approvalExpiresAt - Date.now() + 250, 121_000)
+      );
+    }
+    setStatus("Export autorisé pour 2 minutes. Un second clic reste nécessaire.", "ok");
+  } catch (error) {
+    setStatus(String(error), "bad");
+    await refreshBenchmarkCommonsStatus(true);
+  }
+}
+
+async function exportBenchmarkCommons() {
+  const pending = benchmarkCommonsPreparedRequest();
+  if (!invoke || pending?.state !== "approved") return;
+  if (!window.confirm(`Exporter maintenant ${pending.contribution_id}.json ?\n\nAucun envoi réseau ne sera effectué.`)) return;
+  try {
+    const result = await invoke("export_benchmark_contribution", {
+      request: {
+        schema: BENCHMARK_COMMONS_EXPORT_SCHEMA,
+        request_id: pending.request_id,
+        plan_sha256: pending.plan_sha256
+      }
+    });
+    await Promise.all([refreshBenchmarkCommonsStatus(true), loadEvidenceLedger(true)]);
+    const ledgerOk = Boolean(result?.ledger?.appended || result?.ledger?.duplicate);
+    setStatus(
+      ledgerOk
+        ? `Contribution exportée : ${result.filename}`
+        : `Contribution exportée : ${result.filename} · reçu Ledger non écrit`,
+      ledgerOk ? "ok" : "warn"
+    );
+  } catch (error) {
+    setStatus(String(error), "bad");
+    await refreshBenchmarkCommonsStatus(true);
+  }
+}
+
+async function revokeBenchmarkCommons() {
+  const active = benchmarkCommonsActiveExport();
+  if (!invoke || !active) return;
+  if (!window.confirm(`Retirer l'export local ${active.contribution_id} ?\n\nLe fichier local sera supprimé s'il existe. Une révocation locale sera conservée.`)) return;
+  try {
+    const result = await invoke("revoke_benchmark_contribution", {
+      request: {
+        schema: BENCHMARK_COMMONS_REVOKE_SCHEMA,
+        contribution_id: active.contribution_id,
+        document_sha256: active.document_sha256,
+        confirmed_in_native_ui: true
+      }
+    });
+    await Promise.all([refreshBenchmarkCommonsStatus(true), loadEvidenceLedger(true)]);
+    setStatus(
+      result?.file_deleted
+        ? "Export retiré et révocation locale enregistrée"
+        : "Révocation locale enregistrée; le fichier était déjà absent",
+      "ok"
+    );
+  } catch (error) {
+    setStatus(String(error), "bad");
+  }
+}
+
+async function rotateBenchmarkCommonsPseudonym() {
+  if (!invoke) return;
+  if (!window.confirm("Changer le pseudonyme rotatif ?\n\nLes aperçus en attente seront annulés. Les exports existants restent inchangés.")) return;
+  try {
+    await invoke("rotate_benchmark_commons_pseudonym", {
+      request: {
+        schema: BENCHMARK_COMMONS_ROTATE_SCHEMA,
+        confirmed_in_native_ui: true
+      }
+    });
+    await refreshBenchmarkCommonsStatus(true);
+    setStatus("Nouveau pseudonyme local créé", "ok");
+  } catch (error) {
+    setStatus(String(error), "bad");
+  }
 }
 
 function benchmarkHistoryMarkdown(items = readBenchmarkHistory()) {
@@ -20253,6 +21078,162 @@ function installTestHarness() {
         panel: els.localCapabilityBridgeBox?.textContent || ""
       };
     },
+    async applyLocalActionLaneState() {
+      const passportState = await this.applyCapabilityPassportState();
+      const now = Date.now();
+      const token = `action-lane-test-${"s".repeat(48)}`;
+      const installPlan = {
+        schema: "outilsia.local_action_plan.v0",
+        contract_version: LOCAL_ACTION_LANE_CONTRACT_VERSION,
+        action: "install_model",
+        target: { model: "qwen3:14b", runtime: "native" },
+        preflight: {
+          runtime_ready: true,
+          model_already_installed: false,
+          storage_free_gb: 312,
+          storage_path_exposed: false,
+          estimated_download_gb: 9,
+          estimated_upper_gb: 11,
+          required_free_gb: 16,
+          storage_warning: false
+        },
+        effects: ["download_model_layers", "write_ollama_model_store"],
+        limits: {
+          timeout_seconds: 1800,
+          shell_exposed: false,
+          arbitrary_url_exposed: false,
+          arbitrary_path_exposed: false
+        },
+        consent: {
+          human_required: true,
+          client_cannot_approve: true,
+          capability_ttl_seconds: 120,
+          one_use: true
+        }
+      };
+      const benchmarkPlan = {
+        schema: "outilsia.local_action_plan.v0",
+        contract_version: LOCAL_ACTION_LANE_CONTRACT_VERSION,
+        action: "benchmark_model",
+        target: { model: "qwen3:8b", runtime: "native" },
+        effects: ["run_fixed_local_benchmark", "temporary_compute_load"],
+        limits: {
+          timeout_seconds: 55,
+          prompt_profile: "outilsia_fixed_v1",
+          download_allowed: false,
+          custom_prompt_allowed: false
+        },
+        consent: {
+          human_required: true,
+          client_cannot_approve: true,
+          capability_ttl_seconds: 120,
+          one_use: true
+        }
+      };
+      const exportPlan = {
+        schema: "outilsia.local_action_plan.v0",
+        contract_version: LOCAL_ACTION_LANE_CONTRACT_VERSION,
+        action: "export_report",
+        target: {
+          format: "markdown",
+          filename: "outilsia-machine-demo-20260728120000.md",
+          destination: "app_data",
+          content_sha256: "e".repeat(64)
+        },
+        effects: ["write_frozen_report"],
+        limits: {
+          overwrite_allowed: false,
+          arbitrary_path_exposed: false,
+          client_content_allowed: false
+        },
+        consent: {
+          human_required: true,
+          client_cannot_approve: true,
+          capability_ttl_seconds: 120,
+          one_use: true
+        }
+      };
+      const request = (id, action, requestState, plan, result = null) => ({
+        schema: "outilsia.local_action_request.v0",
+        contract_version: LOCAL_ACTION_LANE_CONTRACT_VERSION,
+        request_id: id,
+        session_id: "als-ui-test",
+        client_id: "codex-windows",
+        client_label: "Codex Windows",
+        action,
+        state: requestState,
+        created_at_ms: now - 5000,
+        updated_at_ms: now,
+        plan,
+        plan_sha256: action === "install_model" ? "a".repeat(64) : action === "benchmark_model" ? "b".repeat(64) : "c".repeat(64),
+        human_decision: requestState === "awaiting_human" ? "not_recorded" : "explicitly_approved_in_native_ui",
+        capability_expires_at_ms: requestState === "approved" ? now + 120_000 : null,
+        capability_consumed: requestState === "completed",
+        result,
+        privacy: {
+          raw_prompt_exposed: false,
+          raw_model_output_exposed: false,
+          export_content_exposed: false,
+          capability_secret_exposed: false
+        }
+      });
+      state.localActionLane = {
+        schema: LOCAL_ACTION_LANE_SCHEMA,
+        contract_version: LOCAL_ACTION_LANE_CONTRACT_VERSION,
+        running: true,
+        base_url: "http://127.0.0.1:43128",
+        mcp_url: "http://127.0.0.1:43128/mcp",
+        mcp_protocol_version: LOCAL_MCP_PROTOCOL_VERSION,
+        mcp_server_version: "0.1.0",
+        mcp_tools: [...LOCAL_ACTION_TOOL_NAMES],
+        token,
+        session_id: "als-ui-test",
+        client_id: "codex-windows",
+        client_label: "Codex Windows",
+        expires_at_ms: now + (LOCAL_ACTION_LANE_TTL_SECONDS * 1000),
+        ttl_seconds: LOCAL_ACTION_LANE_TTL_SECONDS,
+        bind: "127.0.0.1",
+        enabled_by_default: false,
+        token_persisted: false,
+        queue_persisted: false,
+        actions_execute_over_mcp: false,
+        test_mode: true
+      };
+      state.localActionRequests = [
+        request("larq-install-ui", "install_model", "awaiting_human", installPlan),
+        request("larq-benchmark-ui", "benchmark_model", "approved", benchmarkPlan),
+        request("larq-export-ui", "export_report", "completed", exportPlan, {
+          success: true,
+          filename: exportPlan.target.filename,
+          destination: exportPlan.target.destination,
+          content_sha256: exportPlan.target.content_sha256,
+          bytes_written: 4821
+        })
+      ];
+      renderLocalActionLanePanel();
+      return {
+        runtime: { ...state.localActionLane, token: undefined },
+        requests: JSON.parse(JSON.stringify(state.localActionRequests)),
+        config: localActionLaneClientConfig(),
+        token,
+        passport: passportState.passport,
+        panel: els.localActionLaneBox?.textContent || "",
+        queue: els.localActionQueue?.textContent || ""
+      };
+    },
+    invalidateLocalActionLaneState() {
+      invalidateCapabilityPassport();
+      renderCapabilityPassportPanel();
+      renderLocalCapabilityBridgePanel();
+      renderLocalActionLanePanel();
+      return {
+        running: localActionLaneIsRunning(),
+        hasRuntime: Boolean(state.localActionLane),
+        requestCount: state.localActionRequests.length,
+        panel: els.localActionLaneBox?.textContent || "",
+        queue: els.localActionQueue?.textContent || ""
+      };
+    },
     applyBoardObserverState() {
       clearWorkstackComposer(true);
       state.boardObserver = {
@@ -21357,6 +22338,176 @@ function installTestHarness() {
         wsl: wslRuntimeInfo(scan)
       };
     },
+    applyBenchmarkCommonsState(stage = "awaiting_human") {
+      this.applyDemoState();
+      const now = Date.now();
+      const scan = {
+        ...demoScan(),
+        name: "RTX 3090 / Ryzen 9 · test Commons",
+        source: "tauri-local-cockpit",
+        os_name: "Windows",
+        os_version: "11"
+      };
+      renderScan(scan);
+      renderCompatibility(demoCompatibility());
+      const benchmark = {
+        ...demoBenchmark("qwen3:14b"),
+        machine_key: scan.machine_key,
+        prompt: BENCHMARK_COMMONS_STANDARD_PROMPT,
+        runtime: "native",
+        elapsed_ms: 1380,
+        total_duration_ms: 1380,
+        eval_count: 69,
+        eval_duration_ms: 1200,
+        estimated_tokens_per_second: 57.5,
+        prompt_eval_count: 31,
+        prompt_eval_duration_ms: 155,
+        prompt_tokens_per_second: 200,
+        runtime_model_size_bytes: 9_100_000_000,
+        runtime_vram_bytes: 9_100_000_000,
+        runtime_gpu_offload_percent: 100,
+        runtime_processor: "gpu",
+        runtime_evidence_source: "ollama_api_ps",
+        created_at_ms: now - 500
+      };
+      state.benchmark = benchmark;
+      writeBenchmarkHistory([benchmark]);
+      renderBenchmark(benchmark);
+
+      const contribution = {
+        schema: "outilsia.benchmark_commons.contribution.v1",
+        contract_version: "2026-07-28",
+        contribution_id: "bc-1234567890abcdef12345678",
+        contributor: {
+          pseudonym: "anon-1234567890abcdef12345678",
+          pseudonym_expires_at_ms: now + (30 * 24 * 60 * 60 * 1000),
+          rotating: true,
+          account_linked: false
+        },
+        observation: {
+          measured_at_ms: benchmark.created_at_ms,
+          hardware: {
+            cpu_name: scan.cpu_name,
+            cpu_cores: scan.cpu_cores,
+            ram_gb: scan.ram_gb,
+            gpu_name: scan.gpu_name,
+            gpu_vendor: scan.gpu_vendor,
+            vram_gb: scan.vram_gb,
+            unified_memory: false
+          },
+          runtime: {
+            kind: "native",
+            ollama_version: "0.12.3",
+            processor: "gpu",
+            gpu_offload_percent: 100,
+            evidence_source: "ollama_api_ps"
+          },
+          model: {
+            ollama_ref: benchmark.model,
+            size_bytes: benchmark.runtime_model_size_bytes
+          },
+          protocol: {
+            id: "outilsia.benchmark.short.v1",
+            measurement_source: "ollama_api",
+            standard_prompt_sha256: "d".repeat(64),
+            prompt_included: false
+          },
+          metrics: {
+            generation_tokens_per_second: benchmark.estimated_tokens_per_second,
+            prompt_tokens_per_second: benchmark.prompt_tokens_per_second,
+            total_duration_ms: benchmark.total_duration_ms,
+            eval_duration_ms: benchmark.eval_duration_ms,
+            eval_count: benchmark.eval_count,
+            gpu_offload_percent: benchmark.runtime_gpu_offload_percent
+          }
+        },
+        proof: {
+          observation_sha256: "a".repeat(64),
+          app_build_id: "20260728120000",
+          field_test_proof: false,
+          community_verified: false,
+          leaderboard_eligible: false
+        },
+        privacy: {
+          prompt_included: false,
+          model_output_included: false,
+          raw_scan_included: false,
+          machine_key_included: false,
+          hostname_included: false,
+          account_included: false,
+          token_included: false,
+          file_path_included: false,
+          personal_file_included: false,
+          network_sent: false
+        },
+        integrity: {
+          algorithm: "sha256",
+          digest: "b".repeat(64)
+        }
+      };
+      const pending = {
+        request_id: "bcr-1234567890abcdef12345678",
+        contribution_id: contribution.contribution_id,
+        state: stage === "approved" ? "approved" : "awaiting_human",
+        document_sha256: contribution.integrity.digest,
+        observation_sha256: contribution.proof.observation_sha256,
+        plan_sha256: "c".repeat(64),
+        destination: "downloads",
+        created_at_ms: now,
+        expires_at_ms: now + (15 * 60 * 1000),
+        approved_at_ms: stage === "approved" ? now : null,
+        approval_expires_at_ms: stage === "approved" ? now + (2 * 60 * 1000) : null,
+        contribution
+      };
+      const exportRecord = {
+        contribution_id: contribution.contribution_id,
+        observation_sha256: contribution.proof.observation_sha256,
+        document_sha256: contribution.integrity.digest,
+        destination: "downloads",
+        filename: `outilsia-benchmark-contribution-${contribution.contribution_id}.json`,
+        exported_at_ms: now,
+        revoked_at_ms: stage === "revoked" ? now + 1000 : null,
+        file_deleted: stage === "revoked",
+        contribution
+      };
+      state.benchmarkCommons = {
+        schema: "outilsia.benchmark_commons.status.v1",
+        contract_version: "2026-07-28",
+        mode: "local_export_only",
+        upload_available: false,
+        network_sent: false,
+        field_test_proof: false,
+        community_verified: false,
+        leaderboard_available: false,
+        registry: {
+          pseudonym: {
+            value: contribution.contributor.pseudonym,
+            issued_at_ms: now,
+            expires_at_ms: contribution.contributor.pseudonym_expires_at_ms,
+            rotation_days: 30
+          },
+          exports: ["exported", "revoked"].includes(stage) ? [exportRecord] : []
+        },
+        prepared: ["awaiting_human", "approved"].includes(stage) ? [pending] : []
+      };
+      renderBenchmarkCommonsPanel();
+      return {
+        stage,
+        benchmark,
+        contribution,
+        status: state.benchmarkCommons,
+        eligible: Boolean(benchmarkCommonsEligibleBenchmark()),
+        ui: els.benchmarkCommonsBox?.textContent || "",
+        stateLabel: els.benchmarkCommonsState?.textContent || "",
+        controls: {
+          prepareDisabled: Boolean(els.prepareBenchmarkCommonsBtn?.disabled),
+          consentDisabled: Boolean(els.benchmarkCommonsConsent?.disabled),
+          approveDisabled: Boolean(els.approveBenchmarkCommonsBtn?.disabled),
+          exportDisabled: Boolean(els.exportBenchmarkCommonsBtn?.disabled),
+          revokeDisabled: Boolean(els.revokeBenchmarkCommonsBtn?.disabled)
+        }
+      };
+    },
     applyFieldTestReadyState() {
       this.applyDemoState();
       const base = state.scan || demoScan();
@@ -22256,6 +23407,19 @@ els.copyLocalCapabilityTokenBtn?.addEventListener("click", copyLocalCapabilityBr
 els.copyLocalCapabilityBridgeBtn?.addEventListener("click", copyLocalCapabilityBridgeConnection);
 els.refreshLocalCapabilityBridgeBtn?.addEventListener("click", () => refreshLocalCapabilityBridgeStatus(false));
 els.stopLocalCapabilityBridgeBtn?.addEventListener("click", () => stopLocalCapabilityBridge(false));
+els.startLocalActionLaneBtn?.addEventListener("click", startLocalActionLane);
+els.copyLocalActionConfigBtn?.addEventListener("click", copyLocalActionConfig);
+els.copyLocalActionTokenBtn?.addEventListener("click", copyLocalActionToken);
+els.refreshLocalActionLaneBtn?.addEventListener("click", () => refreshLocalActionLaneStatus(false));
+els.stopLocalActionLaneBtn?.addEventListener("click", () => stopLocalActionLane(false));
+els.prepareBenchmarkCommonsBtn?.addEventListener("click", prepareBenchmarkCommons);
+els.prepareBenchmarkCommonsTestBtn?.addEventListener("click", prepareBenchmarkCommonsStandardTest);
+els.approveBenchmarkCommonsBtn?.addEventListener("click", approveBenchmarkCommons);
+els.exportBenchmarkCommonsBtn?.addEventListener("click", exportBenchmarkCommons);
+els.revokeBenchmarkCommonsBtn?.addEventListener("click", revokeBenchmarkCommons);
+els.rotateBenchmarkCommonsBtn?.addEventListener("click", rotateBenchmarkCommonsPseudonym);
+els.benchmarkCommonsConsent?.addEventListener("change", renderBenchmarkCommonsPanel);
+els.benchmarkCommonsDestination?.addEventListener("change", renderBenchmarkCommonsPanel);
 els.observeBoardBtn?.addEventListener("click", observePlankaBoard);
 els.copyBoardSnapshotBtn?.addEventListener("click", copyBoardObserverSnapshot);
 els.clearBoardObserverBtn?.addEventListener("click", clearBoardObserver);
@@ -22404,6 +23568,21 @@ els.downloadBtn.addEventListener("click", downloadMarkdown);
 els.vaultBtn.addEventListener("click", exportVault);
 els.openVaultBtn.addEventListener("click", openVault);
 document.addEventListener("click", async (event) => {
+  const localActionApprove = event.target?.closest?.("[data-local-action-approve]")?.getAttribute?.("data-local-action-approve") || "";
+  if (localActionApprove) {
+    await approveLocalActionRequest(localActionApprove);
+    return;
+  }
+  const localActionReject = event.target?.closest?.("[data-local-action-reject]")?.getAttribute?.("data-local-action-reject") || "";
+  if (localActionReject) {
+    await rejectLocalActionRequest(localActionReject);
+    return;
+  }
+  const localActionExecute = event.target?.closest?.("[data-local-action-execute]")?.getAttribute?.("data-local-action-execute") || "";
+  if (localActionExecute) {
+    await executeLocalActionRequest(localActionExecute);
+    return;
+  }
   const composeCard = event.target?.closest?.("[data-compose-board-card]")?.getAttribute?.("data-compose-board-card") || "";
   if (composeCard) {
     selectWorkstackCard(composeCard);
@@ -22714,6 +23893,15 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+document.addEventListener("change", (event) => {
+  const acknowledgement = event.target?.closest?.("[data-local-action-ack]");
+  if (!acknowledgement) return;
+  const requestId = acknowledgement.getAttribute("data-local-action-ack") || "";
+  const requestCard = acknowledgement.closest("[data-local-action-request]");
+  const approveButton = requestCard?.querySelector?.(`[data-local-action-approve="${CSS.escape(requestId)}"]`);
+  if (approveButton) approveButton.disabled = !acknowledgement.checked;
+});
+
 if (!invoke) {
   setStatus("Mode navigateur démo: lance l'app Tauri pour scanner le PC", "warn");
 }
@@ -22723,6 +23911,7 @@ restoreWorkspaceTab();
 installPanelStatusObserver();
 loadHistory();
 renderBenchmarkHistory();
+renderBenchmarkCommonsPanel();
 renderBenchmarkModelOptions();
 renderBenchmarkPreflight();
 renderModelAutopilot();
@@ -22731,6 +23920,7 @@ renderPromptLibrary();
 renderChatHistory();
 renderPrivateWorkloadPanel();
 renderLocalCapabilityBridgePanel();
+renderLocalActionLanePanel();
 renderBoardObserverPanel();
 renderWorkstackComposerPanel();
 renderCapabilityRouterPanel();
@@ -22754,11 +23944,17 @@ if (invoke) {
   void loadForgeBenchSandbox(true);
   void loadEvidenceLedger(true);
   void refreshLocalCapabilityBridgeStatus(true);
+  void refreshLocalActionLaneStatus(true);
+  void refreshBenchmarkCommonsStatus(true);
   window.setInterval(() => {
     if (state.localCapabilityBridge) void refreshLocalCapabilityBridgeStatus(true);
   }, 15_000);
+  window.setInterval(() => {
+    if (state.localActionLane) void refreshLocalActionLaneStatus(true);
+  }, 2_000);
   window.addEventListener("beforeunload", () => {
     void invoke("stop_local_capability_bridge");
+    void invoke("stop_local_action_lane");
   });
 }
 

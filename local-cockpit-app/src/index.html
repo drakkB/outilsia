@@ -386,6 +386,43 @@
           </details>
         </article>
 
+        <article class="panel local-action-lane-panel advanced-panel" data-workspace="workflows">
+          <div class="panel-title">
+            <h2>Actions pilotées par IA <small>Local Action Lane v0</small></h2>
+            <span id="localActionLaneState">désactivée</span>
+          </div>
+          <div id="localActionLaneBox" class="local-action-lane-box empty">
+            La voie d'action est séparée du MCP en lecture seule. Un client peut préparer une demande, mais seul un clic dans cette fenêtre peut l'autoriser puis l'exécuter.
+          </div>
+          <div class="local-action-lane-controls">
+            <label>
+              <span class="field-label">Client local</span>
+              <select id="localActionClientSelect">
+                <option value="codex">Codex Windows</option>
+                <option value="claude">Claude Code Windows</option>
+                <option value="other">Autre client MCP local</option>
+              </select>
+            </label>
+            <label>
+              <span class="field-label">Destination du rapport</span>
+              <select id="localActionExportDestination">
+                <option value="app_data">Dossier sécurisé OutilsIA</option>
+                <option value="downloads">Téléchargements / OutilsIA</option>
+              </select>
+            </label>
+          </div>
+          <div class="row-actions">
+            <button id="startLocalActionLaneBtn" type="button" disabled>Démarrer les demandes 15 min</button>
+            <button id="copyLocalActionConfigBtn" type="button" disabled>Copier la config MCP</button>
+            <button id="copyLocalActionTokenBtn" type="button" disabled>Copier le jeton</button>
+            <button id="refreshLocalActionLaneBtn" type="button" disabled>Actualiser</button>
+            <button id="stopLocalActionLaneBtn" type="button" disabled>Arrêt d'urgence</button>
+          </div>
+          <div id="localActionQueue" class="local-action-queue empty" aria-live="polite">
+            Aucune file active. Le jeton, les demandes et les capacités restent uniquement en mémoire.
+          </div>
+        </article>
+
         <article class="panel board-observer-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
             <h2>Lire un board <small>Board Observer</small></h2>
@@ -1125,6 +1162,42 @@
             <button id="copyBenchmarkHistoryBtn" type="button" disabled>Copier</button>
             <button id="clearBenchmarkHistoryBtn" type="button" disabled>Vider</button>
           </div>
+          <section class="benchmark-commons" aria-labelledby="benchmarkCommonsTitle">
+            <div class="benchmark-commons-head">
+              <div>
+                <strong id="benchmarkCommonsTitle">Contribution volontaire</strong>
+                <span>Benchmark Commons v1 · export local uniquement</span>
+              </div>
+              <span id="benchmarkCommonsState">désactivé</span>
+            </div>
+            <p class="benchmark-commons-intro">
+              Prépare un fichier anonymisé à partir d'un benchmark standard mesuré. Rien n'est envoyé et ce fichier ne vaut ni preuve terrain ni classement communautaire.
+            </p>
+            <div class="benchmark-commons-controls">
+              <label>
+                <span class="field-label">Destination du fichier</span>
+                <select id="benchmarkCommonsDestination">
+                  <option value="downloads">Téléchargements / OutilsIA</option>
+                  <option value="app_data">Dossier sécurisé OutilsIA</option>
+                </select>
+              </label>
+              <button id="prepareBenchmarkCommonsBtn" type="button" disabled>Préparer l'aperçu</button>
+              <button id="prepareBenchmarkCommonsTestBtn" class="ghost-btn" type="button">Préparer le test standard</button>
+            </div>
+            <div id="benchmarkCommonsBox" class="benchmark-commons-box empty" aria-live="polite">
+              Lance un benchmark standard pour préparer une contribution locale.
+            </div>
+            <label class="benchmark-commons-consent">
+              <input id="benchmarkCommonsConsent" type="checkbox" disabled />
+              <span>J'ai vérifié l'aperçu : aucun prompt, résultat brut, fichier, compte, jeton ou identifiant stable n'est inclus.</span>
+            </label>
+            <div class="row-actions">
+              <button id="approveBenchmarkCommonsBtn" type="button" disabled>Autoriser 2 min</button>
+              <button id="exportBenchmarkCommonsBtn" type="button" disabled>Exporter le JSON</button>
+              <button id="revokeBenchmarkCommonsBtn" type="button" disabled>Retirer l'export</button>
+              <button id="rotateBenchmarkCommonsBtn" class="ghost-btn" type="button" disabled>Changer de pseudonyme</button>
+            </div>
+          </section>
         </article>
 
         <article class="panel account-panel advanced-panel" data-workspace="account">

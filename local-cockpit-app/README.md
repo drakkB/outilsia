@@ -125,6 +125,62 @@ Le jeton Bearer aléatoire reste uniquement en mémoire. Aucun outil MCP ne déc
 
 Voir [LOCAL-MCP.md](LOCAL-MCP.md) pour le contrat et la recette de connexion.
 
+### Local Action Lane v0 candidate
+
+Les sources du 28 juillet ajoutent une voie d'action locale distincte. Un
+client MCP peut uniquement préparer une installation Ollama validée, un
+benchmark d'un modèle déjà installé ou l'export du rapport figé. Il peut aussi
+lire ou annuler sa demande. Il ne peut ni l'approuver ni l'exécuter.
+
+La demande apparaît dans l'application avec sa cible, son runtime, ses effets,
+ses limites et son SHA-256. L'utilisateur doit cocher l'accusé, confirmer
+l'autorisation, puis cliquer séparément sur **Exécuter maintenant**. La capacité
+ainsi créée expire après deux minutes et ne fonctionne qu'une fois pour ce plan,
+ce client et cette session. Le jeton, la file et les capacités restent en
+mémoire. Toute nouvelle preuve, fermeture ou arrêt d'urgence les révoque.
+
+Les résultats minimaux et les refus humains rejoignent Evidence Ledger sans
+prompt, sortie brute, contenu du rapport, chemin personnel ou secret. Ce palier
+est candidat uniquement. Sa recette native Windows est verte ; il n'est pas
+attribué au téléchargement public avant validation terrain et promotion
+explicite d'une release cohérente.
+
+Contrôles dédiés :
+
+```bash
+npm run verify:local-action-lane
+npm run verify:local-action-lane:native
+cargo test --lib
+```
+
+### Benchmark Commons v1 candidate
+
+Après un benchmark standard réellement mesuré par l'API Ollama, l'espace
+**Tests > Historique benchmarks** peut préparer un document communautaire
+anonymisé. Le candidat ne l'envoie nulle part : il montre l'aperçu exact,
+recueille un consentement natif, exige un second clic, puis écrit un JSON local
+sans écraser un fichier existant.
+
+Le document conserve uniquement le matériel normalisé, le runtime et la version
+Ollama, la référence du modèle, le protocole versionné, les métriques exactes,
+le placement GPU, le build et des SHA-256. Prompt, réponse, scan brut,
+`machine_key`, hostname, compte, jeton, chemin et fichier personnel sont
+interdits par le validateur. Un pseudonyme aléatoire tourne tous les trente
+jours ; l'observation a une empreinte de déduplication, sans identité stable.
+
+**Retirer l'export** supprime le fichier local s'il existe et conserve une
+révocation locale signée. Les deux gestes ajoutent un reçu minimal à Evidence
+Ledger. Ils ne valent ni test terrain, ni validation communautaire, ni
+éligibilité à un classement. L'upload, la vérification serveur, les cohortes et
+les pages publiques restent hors de ce palier.
+
+Contrôle dédié :
+
+```bash
+npm run verify:benchmark-commons
+cargo test --lib
+```
+
 ## Workstacks, preuves et benchmarks
 
 La notice utilisateur canonique est [NOTICE-UTILISATION-WORKSTACK.md](NOTICE-UTILISATION-WORKSTACK.md). Elle distingue Board Observer, Workstack Composer, Capability Router, Evidence Ledger, ForgeBench, Workstack Arena, MemoryForge et Strategy Arena. Toute évolution de l'orchestration doit mettre cette notice à jour dans le même commit.

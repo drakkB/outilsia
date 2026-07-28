@@ -148,12 +148,17 @@ Une future action locale devra utiliser un autre contrat :
 
 La v0.1 read-only ne sera pas élargie silencieusement à ces actions.
 
-## Local Action Lane - contrat de conception
+## Local Action Lane v0 - candidat implémenté
 
-La voie d'action sera un service séparé du MCP read-only. Elle réutilisera les
-commandes Rust existantes, mais n'exposera ni shell, ni chemin arbitraire, ni
+La voie d'action est un service séparé du MCP read-only. Elle réutilise les
+commandes Rust existantes, mais n'expose ni shell, ni chemin arbitraire, ni
 commande Ollama libre. Un champ fourni par le modèle, y compris
 `confirm: true`, ne constitue jamais un consentement humain.
+
+État au 28 juillet 2026 : noyau, serveur loopback, file native, UI de
+consentement, trois exécutions allowlistées, reçus Ledger et tests négatifs sont
+présents dans les sources candidates. La fonction n'appartient pas encore au
+build public et ne doit pas être présentée comme disponible au téléchargement.
 
 ### Cycle de vie
 
@@ -168,20 +173,19 @@ commande Ollama libre. Un champ fourni par le modèle, y compris
 7. Evidence Ledger conserve le résultat minimal, les durées, les empreintes et
    la décision humaine, sans prompt ni sortie brute.
 
-États autorisés :
+États effectivement autorisés :
 
 ```text
-proposed -> awaiting_human -> approved -> executing -> completed
-                         \-> rejected
-approved                 \-> expired
-proposed/awaiting_human   \-> cancelled
-executing                 \-> failed
+awaiting_human -> approved -> executing -> completed
+              \-> rejected            \-> failed
+approved      \-> expired
+awaiting_human/approved -> cancelled
 ```
 
 Un redémarrage de l'app, l'arrêt du serveur, une modification du plan ou un
 nouveau scan invalident toutes les capacités encore ouvertes.
 
-### Outils envisagés
+### Outils MCP disponibles dans le candidat
 
 Les outils de préparation ne réalisent aucune action :
 
@@ -189,14 +193,13 @@ Les outils de préparation ne réalisent aucune action :
 |---|---|
 | `outilsia_prepare_model_install` | Référence Ollama exacte, runtime, taille haute, volume et délai |
 | `outilsia_prepare_benchmark` | Modèle déjà installé, runtime, protocole, délai et charge probable |
-| `outilsia_prepare_model_comparison` | Deux ou trois modèles installés, ordre, budget global et zéro téléchargement |
 | `outilsia_prepare_report_export` | Format borné et destination choisie dans l'app |
 | `outilsia_get_action_request` | État et résumé expurgé d'une demande |
 | `outilsia_cancel_action_request` | Annulation d'une demande non exécutée |
 
-`outilsia_get_model_recommendation` reste une lecture et n'a besoin d'aucune
-confirmation. L'installation, la suppression, l'exécution d'un benchmark, la
-modification d'un profil et l'écriture d'un export restent des actions.
+Il n'existe aucun outil MCP `approve` ou `execute`. L'approbation et l'exécution
+restent des commandes Tauri accessibles seulement depuis la fenêtre native.
+`outilsia_get_model_recommendation` demeure dans le serveur read-only séparé.
 
 La première version ne proposera pas :
 
@@ -208,18 +211,62 @@ La première version ne proposera pas :
 - action groupée qui masquerait plusieurs consentements ;
 - élévation administrateur lancée par l'IA.
 
-### Propriétés de sécurité à tester
+### Utilisation candidate
+
+1. Scanner la machine et générer un Passport à jour.
+2. Générer un rapport si l'export doit être proposé.
+3. Dans **Actions pilotées par IA**, choisir le client et la destination.
+4. Démarrer la voie pour quinze minutes.
+5. Copier la configuration MCP, puis fournir séparément le jeton par la variable
+   `OUTILSIA_LOCAL_ACTION_TOKEN`.
+6. Laisser le client préparer une demande.
+7. Dans OutilsIA, relire le plan, cocher l'accusé et confirmer l'autorisation.
+8. Cliquer séparément sur **Exécuter maintenant** dans les deux minutes.
+9. Contrôler le reçu minimal dans Evidence Ledger puis arrêter la voie.
+
+Configuration Codex :
+
+```toml
+[mcp_servers.outilsia_actions]
+url = "http://127.0.0.1:PORT/mcp"
+bearer_token_env_var = "OUTILSIA_LOCAL_ACTION_TOKEN"
+enabled = true
+required = false
+default_tools_approval_mode = "writes"
+```
+
+Le fichier de configuration ne contient pas le jeton. Le port et le secret
+expirent ; ils doivent être renouvelés à chaque session.
+
+### Propriétés vérifiées
 
 - une instruction dans un prompt ne peut pas approuver sa propre demande ;
-- un token rejoué, expiré ou lié à un plan modifié est refusé ;
-- le runtime et la référence de modèle exécutés correspondent octet pour octet
-  au plan affiché ;
-- deux clients ne peuvent pas consommer la même capacité ;
-- aucun appel MCP ne contourne le préflight stockage ou les limites de temps ;
-- l'arrêt d'urgence révoque la session et annule les demandes non exécutées ;
-- le reçu distingue demande, consentement, exécution et résultat ;
-- les tests négatifs recherchent shell, chemins, URL, variables
-  d'environnement, credentials et sorties brutes.
+- un plan modifié, une capacité expirée ou rejouée est refusé ;
+- deux actions ne peuvent pas s'exécuter en même temps ;
+- une reconstruction interne invalide ne consomme pas la capacité et ne bloque
+  pas la file ;
+- le runtime et la référence exécutés viennent du plan exact affiché ;
+- l'installation repasse le préflight stockage/runtime juste avant l'action ;
+- le benchmark exige encore le modèle dans le runtime approuvé ;
+- le client ne fournit ni prompt de benchmark, ni chemin, ni contenu d'export ;
+- l'arrêt, la fermeture et toute invalidation du Passport révoquent la session ;
+- les vues MCP et reçus excluent jeton, capacité, prompt, sortie brute, contenu
+  exporté, credential et chemin personnel ;
+- le serveur réseau exige loopback et Bearer, expose cinq outils et refuse tout
+  nom d'outil d'approbation ou d'exécution.
 
-Cette voie ne sera exposée aux clients réels qu'après validation de la recette
-physique et revue séparée de son modèle de menace.
+Recettes automatisées :
+
+```bash
+npm run verify:local-action-lane
+npm run verify:local-action-lane:native
+cargo test --lib
+```
+
+La recette Playwright produit les captures desktop/mobile dans
+`.artifacts/visual-ui/`. Les tests Rust couvrent le réseau MCP réel, la file,
+les capacités et la validation des reçus. La recette native Windows pilote la
+vraie fenêtre via CDP et un client HTTP indépendant. Le 28 juillet 2026, elle a
+refusé une installation sans téléchargement, mesuré un modèle installé, exporté
+un rapport figé et vérifié trois nouveaux reçus sans conserver le jeton. Les
+tests terrain restent obligatoires avant toute promotion publique.

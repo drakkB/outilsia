@@ -1,3 +1,4 @@
+use crate::benchmark_commons::validate_receipt as validate_benchmark_commons_receipt;
 use crate::capability_router::validate_capability_router_result;
 use crate::forgebench::validate_forgebench_result;
 use crate::forgebench_candidate::validate_forgebench_ollama_candidate_result;
@@ -147,8 +148,18 @@ fn verify_entry(
     let is_reference_run = event_type == "forgebench_reference_pilot_verified";
     let is_candidate_run = event_type == "forgebench_ollama_candidate_verified";
     let is_arena_run = event_type == "workstack_arena_codex_pilot_verified";
+    let is_local_action_execution = event_type == "local_action_execution_recorded";
+    let is_local_action_decision = event_type == "local_action_decision_recorded";
+    let is_benchmark_commons = matches!(
+        event_type,
+        "benchmark_commons_export_recorded" | "benchmark_commons_revocation_recorded"
+    );
     let is_human_review = event_type == "workstack_human_review_recorded";
-    let is_executed_run = is_reference_run || is_candidate_run || is_arena_run;
+    let is_executed_run = is_reference_run
+        || is_candidate_run
+        || is_arena_run
+        || is_local_action_execution
+        || is_benchmark_commons;
     let invalid_execution_contract = if is_reference_run {
         entry
             .pointer("/execution/api_cost_eur")
@@ -187,6 +198,58 @@ fn verify_entry(
                 .pointer("/human_decision/status")
                 .and_then(Value::as_str)
                 != Some("explicitly_confirmed_codex_cli_pilot")
+    } else if is_local_action_execution {
+        entry
+            .pointer("/execution/api_cost_eur")
+            .and_then(Value::as_u64)
+            != Some(0)
+            || entry
+                .pointer("/execution/cost_status")
+                .and_then(Value::as_str)
+                != Some("local_action_no_api_cost")
+            || entry
+                .pointer("/human_decision/status")
+                .and_then(Value::as_str)
+                != Some("explicitly_approved_in_native_ui")
+            || !matches!(
+                entry
+                    .pointer("/evidence/claims/action")
+                    .and_then(Value::as_str),
+                Some("install_model" | "benchmark_model" | "export_report")
+            )
+    } else if is_benchmark_commons {
+        entry
+            .pointer("/execution/api_cost_eur")
+            .and_then(Value::as_u64)
+            != Some(0)
+            || entry
+                .pointer("/execution/cost_status")
+                .and_then(Value::as_str)
+                != Some("local_export_no_api_cost")
+            || !matches!(
+                entry
+                    .pointer("/human_decision/status")
+                    .and_then(Value::as_str),
+                Some("explicitly_approved_in_native_ui" | "explicitly_revoked_in_native_ui")
+            )
+            || !matches!(
+                entry
+                    .pointer("/evidence/claims/action")
+                    .and_then(Value::as_str),
+                Some("export" | "revoke")
+            )
+            || entry
+                .pointer("/evidence/claims/network_sent")
+                .and_then(Value::as_bool)
+                != Some(false)
+            || entry
+                .pointer("/evidence/claims/field_test_proof")
+                .and_then(Value::as_bool)
+                != Some(false)
+            || entry
+                .pointer("/evidence/claims/community_verified")
+                .and_then(Value::as_bool)
+                != Some(false)
     } else {
         false
     };
@@ -204,6 +267,19 @@ fn verify_entry(
                 .pointer("/execution/cost_status")
                 .and_then(Value::as_str)
                 != Some("not_incurred"));
+    let invalid_local_action_decision = is_local_action_decision
+        && (entry
+            .pointer("/execution/api_cost_eur")
+            .and_then(Value::as_u64)
+            != Some(0)
+            || entry
+                .pointer("/execution/cost_status")
+                .and_then(Value::as_str)
+                != Some("not_incurred")
+            || entry
+                .pointer("/human_decision/status")
+                .and_then(Value::as_str)
+                != Some("explicitly_rejected_in_native_ui"));
     if entry
         .pointer("/privacy/raw_source_stored")
         .and_then(Value::as_bool)
@@ -215,6 +291,7 @@ fn verify_entry(
             != Some(is_executed_run)
         || (is_executed_run && invalid_execution_contract)
         || invalid_human_review
+        || invalid_local_action_decision
     {
         return Err("Entree Evidence Ledger non conforme a la politique locale.".to_string());
     }
@@ -356,6 +433,91 @@ fn validate_board_source(source: &Value) -> Result<(), String> {
     if !is_sha256(response_digest) {
         return Err("Empreinte de reponse Board Observer invalide.".to_string());
     }
+    Ok(())
+}
+
+fn validate_local_action_receipt(source: &Value) -> Result<(), String> {
+    if source.get("schema").and_then(Value::as_str)
+        != Some(crate::local_action_lane::ACTION_RECEIPT_SCHEMA)
+        || source.get("contract_version").and_then(Value::as_str)
+            != Some(crate::local_action_lane::ACTION_LANE_CONTRACT_VERSION)
+        || !matches!(
+            source.get("action").and_then(Value::as_str),
+            Some("install_model" | "benchmark_model" | "export_report")
+        )
+        || !matches!(
+            source.get("state").and_then(Value::as_str),
+            Some("completed" | "failed" | "rejected")
+        )
+        || !source
+            .get("plan_sha256")
+            .and_then(Value::as_str)
+            .is_some_and(is_sha256)
+        || !source
+            .get("session_id_sha256")
+            .and_then(Value::as_str)
+            .is_some_and(is_sha256)
+        || source
+            .pointer("/privacy/raw_source_stored")
+            .and_then(Value::as_bool)
+            != Some(false)
+        || source
+            .pointer("/privacy/raw_prompt_stored")
+            .and_then(Value::as_bool)
+            != Some(false)
+        || source
+            .pointer("/privacy/raw_model_output_stored")
+            .and_then(Value::as_bool)
+            != Some(false)
+        || source
+            .pointer("/privacy/credentials_stored")
+            .and_then(Value::as_bool)
+            != Some(false)
+        || source
+            .pointer("/privacy/export_content_stored")
+            .and_then(Value::as_bool)
+            != Some(false)
+        || source
+            .pointer("/privacy/capability_secret_stored")
+            .and_then(Value::as_bool)
+            != Some(false)
+        || source
+            .pointer("/capability/secret_stored")
+            .and_then(Value::as_bool)
+            != Some(false)
+        || source
+            .pointer("/capability/secret_exposed")
+            .and_then(Value::as_bool)
+            != Some(false)
+    {
+        return Err("Recu Local Action Lane non conforme.".to_string());
+    }
+    let execution_started = source
+        .pointer("/execution/started")
+        .and_then(Value::as_bool)
+        .ok_or_else(|| "Etat execution Local Action Lane absent.".to_string())?;
+    let human_status = source
+        .pointer("/human_decision/status")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if execution_started {
+        if !matches!(
+            source.get("state").and_then(Value::as_str),
+            Some("completed" | "failed")
+        ) || human_status != "explicitly_approved_in_native_ui"
+            || source
+                .pointer("/capability/consumed_at_ms")
+                .and_then(Value::as_u64)
+                .is_none()
+        {
+            return Err("Execution Local Action Lane non prouvee.".to_string());
+        }
+    } else if source.get("state").and_then(Value::as_str) != Some("rejected")
+        || human_status != "explicitly_rejected_in_native_ui"
+    {
+        return Err("Decision Local Action Lane non prouvee.".to_string());
+    }
+    verify_document_integrity(source, "du recu Local Action Lane")?;
     Ok(())
 }
 
@@ -883,6 +1045,139 @@ fn source_contract(event_type: &str, source: &Value) -> Result<Value, String> {
                 "human_decision": {"status": "explicitly_confirmed_local_candidate"}
             }))
         }
+        "local_action_execution_recorded" | "local_action_decision_recorded" => {
+            validate_local_action_receipt(source)?;
+            let execution_started = source
+                .pointer("/execution/started")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let action = required_enum_claim(
+                source,
+                "/action",
+                &["install_model", "benchmark_model", "export_report"],
+                "Action locale",
+            )?;
+            let state = required_enum_claim(
+                source,
+                "/state",
+                &["completed", "failed", "rejected"],
+                "Etat Action Lane",
+            )?;
+            let human_status = required_enum_claim(
+                source,
+                "/human_decision/status",
+                &[
+                    "explicitly_approved_in_native_ui",
+                    "explicitly_rejected_in_native_ui",
+                ],
+                "Decision humaine Action Lane",
+            )?;
+            Ok(json!({
+                "actor": {
+                    "kind": if execution_started { "outilsia_component" } else { "human_operator" },
+                    "id": if execution_started { "local_action_lane" } else { "local_owner" }
+                },
+                "workstack_id": Value::Null,
+                "proof_level": if execution_started {
+                    "signed_local_action_execution_receipt"
+                } else {
+                    "signed_local_action_human_decision"
+                },
+                "source_integrity_sha256": source.pointer("/integrity/digest").cloned().unwrap_or(Value::Null),
+                "claims": {
+                    "request_id": source.get("request_id").cloned().unwrap_or(Value::Null),
+                    "session_id_sha256": source.get("session_id_sha256").cloned().unwrap_or(Value::Null),
+                    "client_id": source.get("client_id").cloned().unwrap_or(Value::Null),
+                    "action": action,
+                    "state": state,
+                    "plan_sha256": source.get("plan_sha256").cloned().unwrap_or(Value::Null),
+                    "target": source.get("target").cloned().unwrap_or(Value::Null),
+                    "success": source.pointer("/execution/success").cloned().unwrap_or(json!(false)),
+                    "capability_issued": source.pointer("/capability/issued").cloned().unwrap_or(json!(false)),
+                    "capability_consumed": source.pointer("/capability/consumed_at_ms").is_some_and(|value| !value.is_null()),
+                    "capability_secret_stored": false,
+                    "raw_prompt_stored": false,
+                    "raw_model_output_stored": false,
+                    "export_content_stored": false
+                },
+                "execution": {
+                    "started": execution_started,
+                    "latency_ms": source.pointer("/execution/elapsed_ms").cloned().unwrap_or(json!(0)),
+                    "api_cost_eur": 0,
+                    "cost_status": if execution_started { "local_action_no_api_cost" } else { "not_incurred" }
+                },
+                "validation": {
+                    "source_contract_valid": true,
+                    "independent_run_verification": execution_started
+                },
+                "human_decision": {
+                    "status": human_status,
+                    "native_ui": true
+                }
+            }))
+        }
+        "benchmark_commons_export_recorded" | "benchmark_commons_revocation_recorded" => {
+            validate_benchmark_commons_receipt(source)?;
+            let action = required_enum_claim(
+                source,
+                "/action",
+                &["export", "revoke"],
+                "Action Benchmark Commons",
+            )?;
+            let human_status = required_enum_claim(
+                source,
+                "/human_decision/status",
+                &[
+                    "explicitly_approved_in_native_ui",
+                    "explicitly_revoked_in_native_ui",
+                ],
+                "Decision Benchmark Commons",
+            )?;
+            Ok(json!({
+                "actor": {
+                    "kind": "human_operator",
+                    "id": "local_owner"
+                },
+                "workstack_id": Value::Null,
+                "proof_level": if action == "export" {
+                    "signed_local_opt_in_export_receipt"
+                } else {
+                    "signed_local_opt_in_revocation_receipt"
+                },
+                "source_integrity_sha256": source.pointer("/integrity/digest").cloned().unwrap_or(Value::Null),
+                "claims": {
+                    "action": action,
+                    "contribution_id": source.get("contribution_id").cloned().unwrap_or(Value::Null),
+                    "observation_sha256": source.get("observation_sha256").cloned().unwrap_or(Value::Null),
+                    "document_sha256": source.get("document_sha256").cloned().unwrap_or(Value::Null),
+                    "destination": source.pointer("/file/destination").cloned().unwrap_or(Value::Null),
+                    "filename": source.pointer("/file/filename").cloned().unwrap_or(Value::Null),
+                    "file_deleted": source.pointer("/file/deleted").cloned().unwrap_or(json!(false)),
+                    "path_stored": false,
+                    "network_sent": false,
+                    "field_test_proof": false,
+                    "community_verified": false,
+                    "leaderboard_eligible": false,
+                    "prompt_stored": false,
+                    "model_output_stored": false,
+                    "machine_key_stored": false
+                },
+                "execution": {
+                    "started": true,
+                    "latency_ms": 0,
+                    "api_cost_eur": 0,
+                    "cost_status": "local_export_no_api_cost"
+                },
+                "validation": {
+                    "source_contract_valid": true,
+                    "independent_run_verification": true
+                },
+                "human_decision": {
+                    "status": human_status,
+                    "native_ui": true
+                }
+            }))
+        }
         _ => Err("Type de preuve Evidence Ledger inconnu.".to_string()),
     }
 }
@@ -1031,6 +1326,61 @@ pub(crate) fn append_evidence_entry(
         &request.source_document,
         unix_ms(),
     )?;
+    if appended {
+        write_ledger(&app, &ledger)?;
+    }
+    Ok(json!({
+        "schema": APPEND_RESULT_SCHEMA,
+        "contract_version": CONTRACT_VERSION,
+        "appended": appended,
+        "duplicate": !appended,
+        "ledger": ledger
+    }))
+}
+
+pub(crate) fn append_local_action_receipt(app: AppHandle, receipt: Value) -> Result<Value, String> {
+    validate_local_action_receipt(&receipt)?;
+    let event_type = if receipt
+        .pointer("/execution/started")
+        .and_then(Value::as_bool)
+        == Some(true)
+    {
+        "local_action_execution_recorded"
+    } else {
+        "local_action_decision_recorded"
+    };
+    let _guard = ledger_lock()
+        .lock()
+        .map_err(|_| "Verrou Evidence Ledger indisponible.".to_string())?;
+    let current = read_ledger(&app)?;
+    let (ledger, appended) = append_to_ledger(current, event_type, &receipt, unix_ms())?;
+    if appended {
+        write_ledger(&app, &ledger)?;
+    }
+    Ok(json!({
+        "schema": APPEND_RESULT_SCHEMA,
+        "contract_version": CONTRACT_VERSION,
+        "appended": appended,
+        "duplicate": !appended,
+        "ledger": ledger
+    }))
+}
+
+pub(crate) fn append_benchmark_commons_receipt(
+    app: AppHandle,
+    receipt: Value,
+) -> Result<Value, String> {
+    validate_benchmark_commons_receipt(&receipt)?;
+    let event_type = match receipt.get("action").and_then(Value::as_str) {
+        Some("export") => "benchmark_commons_export_recorded",
+        Some("revoke") => "benchmark_commons_revocation_recorded",
+        _ => return Err("Action Benchmark Commons inconnue.".to_string()),
+    };
+    let _guard = ledger_lock()
+        .lock()
+        .map_err(|_| "Verrou Evidence Ledger indisponible.".to_string())?;
+    let current = read_ledger(&app)?;
+    let (ledger, appended) = append_to_ledger(current, event_type, &receipt, unix_ms())?;
     if appended {
         write_ledger(&app, &ledger)?;
     }
@@ -1299,6 +1649,116 @@ mod tests {
         result
     }
 
+    fn local_action_receipt(execution_started: bool) -> Value {
+        let (state, human_status, consumed_at_ms, result) = if execution_started {
+            (
+                "completed",
+                "explicitly_approved_in_native_ui",
+                json!(8_010),
+                json!({
+                    "success": true,
+                    "model": "qwen3:8b",
+                    "elapsed_ms": 1250,
+                    "estimated_tokens_per_second": 42.5
+                }),
+            )
+        } else {
+            (
+                "rejected",
+                "explicitly_rejected_in_native_ui",
+                Value::Null,
+                json!({"success": false, "reason": "human_rejected"}),
+            )
+        };
+        let mut receipt = json!({
+            "schema": crate::local_action_lane::ACTION_RECEIPT_SCHEMA,
+            "contract_version": crate::local_action_lane::ACTION_LANE_CONTRACT_VERSION,
+            "receipt_id": if execution_started { "lar-execution-test" } else { "lar-rejection-test" },
+            "request_id": if execution_started { "larq-execution-test" } else { "larq-rejection-test" },
+            "session_id_sha256": "a".repeat(64),
+            "client_id": "codex-test",
+            "action": "benchmark_model",
+            "state": state,
+            "plan_sha256": "b".repeat(64),
+            "target": {"model": "qwen3:8b", "runtime": "native"},
+            "capability": {
+                "issued": execution_started,
+                "issued_at_ms": if execution_started { json!(8_000) } else { Value::Null },
+                "expires_at_ms": if execution_started { json!(128_000) } else { Value::Null },
+                "consumed_at_ms": consumed_at_ms,
+                "secret_stored": false,
+                "secret_exposed": false
+            },
+            "human_decision": {
+                "status": human_status,
+                "native_ui": true
+            },
+            "execution": {
+                "started": execution_started,
+                "success": execution_started,
+                "elapsed_ms": if execution_started { 1250 } else { 0 }
+            },
+            "result": result,
+            "privacy": {
+                "raw_source_stored": false,
+                "raw_prompt_stored": false,
+                "raw_model_output_stored": false,
+                "credentials_stored": false,
+                "export_content_stored": false,
+                "capability_secret_stored": false
+            }
+        });
+        sign_document(&mut receipt).expect("signed local action receipt");
+        receipt
+    }
+
+    fn benchmark_commons_receipt(action: &str) -> Value {
+        let mut receipt = json!({
+            "schema": crate::benchmark_commons::RECEIPT_SCHEMA,
+            "contract_version": "2026-07-28",
+            "receipt_id": format!("bcrec-{action}-test"),
+            "action": action,
+            "contribution_id": "bc-1234567890abcdef12345678",
+            "observation_sha256": "a".repeat(64),
+            "document_sha256": "b".repeat(64),
+            "recorded_at_ms": 9_000,
+            "file": {
+                "destination": "app_data",
+                "filename": "outilsia-benchmark-contribution-bc-test.json",
+                "path_included": false,
+                "deleted": action == "revoke"
+            },
+            "network": {"sent": false},
+            "proof": {
+                "field_test_proof": false,
+                "community_verified": false,
+                "leaderboard_eligible": false
+            },
+            "human_decision": {
+                "status": if action == "export" {
+                    "explicitly_approved_in_native_ui"
+                } else {
+                    "explicitly_revoked_in_native_ui"
+                },
+                "native_ui": true
+            },
+            "privacy": {
+                "prompt_included": false,
+                "model_output_included": false,
+                "raw_scan_included": false,
+                "machine_key_included": false,
+                "hostname_included": false,
+                "account_included": false,
+                "token_included": false,
+                "file_path_included": false,
+                "personal_file_included": false,
+                "network_sent": false
+            }
+        });
+        sign_document(&mut receipt).expect("signed Benchmark Commons receipt");
+        receipt
+    }
+
     #[test]
     fn empty_ledger_is_valid_and_contains_no_entry() {
         let ledger = empty_ledger().expect("empty ledger");
@@ -1511,6 +1971,160 @@ mod tests {
         assert_eq!(entry["execution"]["api_cost_eur"], 0);
         let duplicate = append_to_ledger(ledger, "workstack_human_review_recorded", &source, 7_000);
         assert!(duplicate.is_err());
+    }
+
+    #[test]
+    fn appends_local_action_execution_and_rejection_without_private_material() {
+        let execution = local_action_receipt(true);
+        let (ledger, execution_appended) = append_to_ledger(
+            empty_ledger().expect("empty"),
+            "local_action_execution_recorded",
+            &execution,
+            8_500,
+        )
+        .expect("local action execution");
+        assert!(execution_appended);
+        let rejection = local_action_receipt(false);
+        let (ledger, rejection_appended) =
+            append_to_ledger(ledger, "local_action_decision_recorded", &rejection, 8_600)
+                .expect("local action rejection");
+        assert!(rejection_appended);
+        verify_ledger(&ledger).expect("verified local action ledger");
+        assert_eq!(ledger["entries"][0]["execution"]["started"], true);
+        assert_eq!(
+            ledger["entries"][0]["human_decision"]["status"],
+            "explicitly_approved_in_native_ui"
+        );
+        assert_eq!(ledger["entries"][1]["execution"]["started"], false);
+        assert_eq!(
+            ledger["entries"][1]["human_decision"]["status"],
+            "explicitly_rejected_in_native_ui"
+        );
+        let serialized = serde_json::to_string(&ledger).expect("ledger JSON");
+        assert!(!serialized.contains("capability_secret_sha256"));
+        assert!(!serialized.contains("human_rejected"));
+        assert_eq!(
+            ledger["entries"][0]["evidence"]["claims"]["raw_prompt_stored"],
+            false
+        );
+        assert_eq!(
+            ledger["entries"][0]["evidence"]["claims"]["raw_model_output_stored"],
+            false
+        );
+        assert_eq!(
+            ledger["entries"][0]["evidence"]["claims"]["export_content_stored"],
+            false
+        );
+        assert!(serialized.contains("\"capability_secret_stored\":false"));
+    }
+
+    #[test]
+    fn rejects_rehashed_local_action_receipt_with_privacy_or_consent_forgery() {
+        let mut privacy_forgery = local_action_receipt(true);
+        privacy_forgery["privacy"]["raw_model_output_stored"] = json!(true);
+        sign_document(&mut privacy_forgery).expect("rehash privacy forgery");
+        assert!(append_to_ledger(
+            empty_ledger().expect("empty"),
+            "local_action_execution_recorded",
+            &privacy_forgery,
+            8_700,
+        )
+        .is_err());
+
+        let mut consent_forgery = local_action_receipt(true);
+        consent_forgery["human_decision"]["status"] = json!("approved_by_mcp_client");
+        sign_document(&mut consent_forgery).expect("rehash consent forgery");
+        assert!(append_to_ledger(
+            empty_ledger().expect("empty"),
+            "local_action_execution_recorded",
+            &consent_forgery,
+            8_800,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn appends_benchmark_commons_export_and_revocation_as_minimal_local_receipts() {
+        let export = benchmark_commons_receipt("export");
+        let (ledger, export_appended) = append_to_ledger(
+            empty_ledger().expect("empty"),
+            "benchmark_commons_export_recorded",
+            &export,
+            9_100,
+        )
+        .expect("Benchmark Commons export");
+        assert!(export_appended);
+        let revoke = benchmark_commons_receipt("revoke");
+        let (ledger, revoke_appended) = append_to_ledger(
+            ledger,
+            "benchmark_commons_revocation_recorded",
+            &revoke,
+            9_200,
+        )
+        .expect("Benchmark Commons revocation");
+        assert!(revoke_appended);
+        verify_ledger(&ledger).expect("verified Benchmark Commons ledger");
+        assert_eq!(
+            ledger["entries"][0]["evidence"]["claims"]["network_sent"],
+            false
+        );
+        assert_eq!(
+            ledger["entries"][0]["evidence"]["claims"]["community_verified"],
+            false
+        );
+        assert_eq!(
+            ledger["entries"][0]["evidence"]["claims"]["leaderboard_eligible"],
+            false
+        );
+        assert_eq!(
+            ledger["entries"][0]["evidence"]["proof_level"],
+            "signed_local_opt_in_export_receipt"
+        );
+        assert_eq!(
+            ledger["entries"][1]["evidence"]["proof_level"],
+            "signed_local_opt_in_revocation_receipt"
+        );
+        assert_eq!(
+            ledger["entries"][1]["human_decision"]["status"],
+            "explicitly_revoked_in_native_ui"
+        );
+        let serialized = serde_json::to_string(&ledger).expect("ledger JSON");
+        for forbidden in [
+            "machine-private-key",
+            "Pourquoi la VRAM",
+            "output_preview",
+            "C:\\\\Users\\\\",
+            "/home/",
+        ] {
+            assert!(!serialized.contains(forbidden));
+        }
+    }
+
+    #[test]
+    fn rejects_rehashed_benchmark_commons_receipt_with_false_network_or_proof_claim() {
+        let mut network_forgery = benchmark_commons_receipt("export");
+        network_forgery["network"]["sent"] = json!(true);
+        network_forgery["privacy"]["network_sent"] = json!(true);
+        sign_document(&mut network_forgery).expect("rehashed network forgery");
+        assert!(append_to_ledger(
+            empty_ledger().expect("empty"),
+            "benchmark_commons_export_recorded",
+            &network_forgery,
+            9_300,
+        )
+        .is_err());
+
+        let mut proof_forgery = benchmark_commons_receipt("export");
+        proof_forgery["proof"]["community_verified"] = json!(true);
+        proof_forgery["proof"]["leaderboard_eligible"] = json!(true);
+        sign_document(&mut proof_forgery).expect("rehashed proof forgery");
+        assert!(append_to_ledger(
+            empty_ledger().expect("empty"),
+            "benchmark_commons_export_recorded",
+            &proof_forgery,
+            9_400,
+        )
+        .is_err());
     }
 
     #[test]

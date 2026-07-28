@@ -15,7 +15,7 @@ WORKSPACES = {
     "models": ("workspaceModelsBtn", 6),
     "tests": ("workspaceTestsBtn", 9),
     "assistant": ("workspaceAssistantBtn", 4),
-    "workflows": ("workspaceWorkflowsBtn", 9),
+    "workflows": ("workspaceWorkflowsBtn", 10),
     "account": ("workspaceAccountBtn", 4),
 }
 
@@ -42,6 +42,7 @@ WORKSPACE_FIRST_SECTIONS = {
 HUMAN_PANEL_TITLES = {
     ".capability-passport-panel": ("Passeport IA", "AI Capability Passport"),
     ".local-capability-bridge-panel": ("Serveur MCP local", "lecture seule v0.1"),
+    ".local-action-lane-panel": ("Actions pilotées par IA", "Local Action Lane v0"),
     ".board-observer-panel": ("Lire un board", "Board Observer"),
     ".workstack-composer-panel": ("Composer le plan", "Workstack Composer"),
     ".capability-router-panel": ("Affecter les rôles", "Capability Router"),

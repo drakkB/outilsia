@@ -1,6 +1,6 @@
 # OutilsIA Local Cockpit - Roadmap produit
 
-Mise à jour : 2026-07-27
+Mise à jour : 2026-07-28
 
 ## Cap produit
 
@@ -71,49 +71,80 @@ strictement séparés :
   minutes, token 256 bits en mémoire.
 - [x] Vérifier les outils et ressources par client HTTP, Codex CLI et Claude
   Code sans conserver le jeton ou les transcriptions.
-- [ ] Formaliser un schéma versionné de demande avec action, modèle, runtime,
+- [x] Formaliser un schéma versionné de demande avec action, modèle, runtime,
   taille, durée, effets, risques, provenance client et hash canonique.
-- [ ] Ajouter une file native `proposed / awaiting_human / approved / executing
+- [x] Ajouter une file native `awaiting_human / approved / executing
   / completed / failed / rejected / expired / cancelled`.
-- [ ] Afficher dans Tauri une confirmation non contournable. Un paramètre
+- [x] Afficher dans Tauri une confirmation non contournable. Un paramètre
   `confirm:true` fourni par le modèle ne vaut jamais consentement humain.
-- [ ] Émettre après ce clic une capacité liée au plan, au client et à la session,
+- [x] Émettre après ce clic une capacité liée au plan, au client et à la session,
   valable deux minutes et consommable une seule fois.
-- [ ] Commencer par trois opérations allowlistées : installer une référence
+- [x] Commencer par trois opérations allowlistées : installer une référence
   Ollama validée, benchmarker un modèle déjà installé, exporter un rapport vers
   une destination choisie dans l'app.
-- [ ] Réutiliser Install Safety Preflight, les runtimes par modèle, les délais
+- [x] Réutiliser Install Safety Preflight, les runtimes par modèle, les délais
   adaptatifs, l'anti-réentrance et l'annulation existants ; ne dupliquer aucune
   logique dans le serveur MCP.
-- [ ] Écrire un reçu Evidence Ledger minimal séparant demande, consentement,
+- [x] Écrire un reçu Evidence Ledger minimal séparant demande, consentement,
   exécution et résultat, sans prompt, réponse brute, chemin personnel ou token.
-- [ ] Rejeter replay, expiration, altération du plan, consommation par un autre
+- [x] Rejeter replay, expiration, altération du plan, consommation par un autre
   client, arrêt serveur, redémarrage app et changement de Passport.
-- [ ] Garder hors périmètre : shell, chemin/URL arbitraire, pilote graphique,
+- [x] Garder hors périmètre : shell, chemin/URL arbitraire, pilote graphique,
   élévation lancée par l'IA, suppression de modèle, contrôle distant, backtest et
   trading.
+- [x] Tester le réseau loopback, l'absence d'outil MCP d'approbation/exécution,
+  l'UI desktop/mobile, l'anti-réentrance, l'expiration, le replay, l'altération,
+  l'annulation et la confidentialité des reçus.
+- [x] Exécuter la recette native sur une candidate Windows : refuser une
+  installation sans téléchargement, benchmarker un modèle déjà installé,
+  exporter un rapport figé et vérifier le Ledger.
+- [ ] Valider le même parcours sur les machines terrain avant toute promotion
+  publique. La source candidate ne vaut pas disponibilité dans le build public.
 
-La spécification détaillée vit dans `LOCAL-MCP.md`. La voie d'action ne sera
-jamais ajoutée silencieusement aux huit outils read-only.
+Le noyau candidat est implémenté dans les sources du 28 juillet 2026. Il utilise
+un second serveur, un second jeton et une seconde file ; aucun des cinq outils
+Action Lane ne rejoint les huit outils read-only. La recette native Windows a
+refusé `gemma4:12b` sans téléchargement, benchmarké réellement `qwen3:0.6b`,
+exporté un rapport figé et ajouté exactement trois reçus à une chaîne Ledger
+valide, sans jeton ni contenu brut. La spécification, la recette et la notice
+vivent dans `LOCAL-MCP.md`. La voie ne sera ni promue ni revendiquée dans le
+build public avant la gate terrain encore ouverte.
 
 ### Benchmark Commons v1 - preuve communautaire opt-in
 
 Le réseau communautaire doit construire un jeu de données utile, pas un
 leaderboard décoratif.
 
-- [ ] Proposer après un benchmark réussi un partage séparé, désactivé par défaut.
-- [ ] Envoyer uniquement matériel normalisé, runtime, version Ollama, modèle
+- [x] Proposer après un benchmark standard réussi un export séparé, désactivé
+  par défaut, précédé d'un aperçu et de deux gestes humains.
+- [x] Préparer uniquement matériel normalisé, runtime, version Ollama, modèle
   exact, protocole versionné, tok/s, latences, offload, date, build et hash de
   preuve ; exclure prompt, réponse, fichiers, hostname, compte et token.
-- [ ] Utiliser un identifiant pseudonyme rotatif et une déduplication serveur ;
-  ne jamais annoncer un nombre de machines à partir de simples lignes JSON.
-- [ ] Vérifier cohérence, plafonds, modèle/runtime, version de protocole et
-  signatures de reçu avant d'accepter une observation.
+- [x] Utiliser un pseudonyme local rotatif tous les trente jours et une empreinte
+  d'observation ; ne conserver aucun identifiant machine stable.
+- [x] Vérifier localement source native, réussite Ollama API, prompt standard,
+  âge, métriques plausibles, modèle/runtime, protocole, intégrité et champs
+  interdits avant l'export.
+- [x] Écrire sans écrasement, permettre retrait/révocation locale et chaîner des
+  reçus minimaux dans Evidence Ledger.
+- [x] Tester falsification, faux statut communautaire, faux envoi réseau,
+  expiration, consentement séparé, rotation, réécriture du registre Windows et
+  UI desktop/mobile.
+- [ ] Construire un endpoint de soumission séparé avec reçu serveur, contrôle de
+  cohorte et déduplication robuste. Le candidat actuel n'envoie aucune donnée.
 - [ ] Afficher médiane, dispersion et taille d'échantillon ; aucun classement
   public sous trois machines distinctes pour une même cohorte.
 - [ ] Publier des pages GPU/modèle uniquement à partir de cohortes vérifiées et
   datées, avec lien vers la méthode et les limites.
-- [ ] Permettre retrait local et révocation des données soumises.
+- [ ] Étendre la révocation au serveur si une collecte opt-in est un jour
+  déployée.
+
+État au 28 juillet 2026 : le palier local est implémenté dans les sources
+candidates et ne possède volontairement aucun code réseau. Un fichier exporté
+reste sous le contrôle de son propriétaire. Il porte explicitement
+`field_test_proof=false`, `community_verified=false` et
+`leaderboard_eligible=false`. Il ne sera pas présenté sur le site comme une
+preuve communautaire avant mise en place et audit du palier serveur.
 
 ### Monétisation produit, pas péage sur la preuve
 

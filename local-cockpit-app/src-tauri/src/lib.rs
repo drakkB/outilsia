@@ -1,4 +1,5 @@
 mod agent_adapter_policy;
+mod benchmark_commons;
 mod board_observer;
 mod capability_router;
 mod evidence_ledger;
@@ -11,15 +12,25 @@ mod forgebench_runner;
 mod forgebench_runtime;
 mod forgebench_sandbox;
 mod forgebench_vault;
+mod local_action_lane;
 mod local_capability_bridge;
 mod workstack_arena;
 mod workstack_composer;
 mod workstack_review;
 
 use agent_adapter_policy::get_agent_adapter_policy_catalog;
+use benchmark_commons::{
+    approve_benchmark_contribution, export_benchmark_contribution_state,
+    get_benchmark_commons_status, prepare_benchmark_contribution,
+    revoke_benchmark_contribution_state, rotate_benchmark_commons_pseudonym, BenchmarkCommonsState,
+    ExportContributionRequest, RevokeContributionRequest,
+};
 use board_observer::observe_planka_board;
 use capability_router::route_workstack_capabilities;
-use evidence_ledger::{append_evidence_entry, clear_evidence_ledger, get_evidence_ledger};
+use evidence_ledger::{
+    append_benchmark_commons_receipt, append_evidence_entry, append_local_action_receipt,
+    clear_evidence_ledger, get_evidence_ledger,
+};
 use forgebench::compile_forgebench_experiment;
 use forgebench_candidate::run_forgebench_ollama_candidate;
 use forgebench_isolation::probe_forgebench_isolation;
@@ -32,11 +43,18 @@ use forgebench_sandbox::{
 use forgebench_vault::{
     clear_forgebench_hidden_suite, get_forgebench_hidden_suite_status, seal_forgebench_hidden_suite,
 };
+use local_action_lane::{
+    approve_local_action_request, begin_local_action_execution, finish_local_action_execution,
+    get_local_action_lane_status, list_local_action_requests, reject_local_action_request_state,
+    start_local_action_lane, stop_local_action_lane, LocalActionExecution,
+    RejectLocalActionRequest,
+};
 use local_capability_bridge::{
     get_local_capability_bridge_status, start_local_capability_bridge, stop_local_capability_bridge,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::hash::{Hash, Hasher};
 use std::io::{Read, Write};
@@ -1889,7 +1907,7 @@ fn run_ollama_prompt(
     })
 }
 
-fn validate_ollama_model_ref(model: &str) -> Result<String, String> {
+pub(crate) fn validate_ollama_model_ref(model: &str) -> Result<String, String> {
     let trimmed = model.trim();
     if trimmed.is_empty() {
         return Err("Modèle Ollama requis.".to_string());
@@ -1904,6 +1922,28 @@ fn validate_ollama_model_ref(model: &str) -> Result<String, String> {
         return Err("Nom de modèle Ollama invalide.".to_string());
     }
     Ok(trimmed.to_string())
+}
+
+pub(crate) fn local_action_install_preflight(model: &str, runtime: &str) -> Result<Value, String> {
+    let model = validate_ollama_model_ref(model)?;
+    let runtime = normalize_ollama_runtime(Some(runtime));
+    let result = ollama_install_preflight_inner(model, runtime)?;
+    serde_json::to_value(result)
+        .map_err(|error| format!("Preflight Action Lane non serialisable: {error}"))
+}
+
+pub(crate) fn local_action_model_is_installed(model: &str, runtime: &str) -> bool {
+    let Ok(model) = validate_ollama_model_ref(model) else {
+        return false;
+    };
+    let runtime = normalize_ollama_runtime(Some(runtime));
+    run_ollama_command_for(runtime, &["list"])
+        .map(|output| {
+            parse_ollama_list_with_source(&output, ollama_runtime_name(runtime))
+                .iter()
+                .any(|installed| installed_model_matches_ref(installed, &model))
+        })
+        .unwrap_or(false)
 }
 
 fn emit_install_progress(
@@ -5182,9 +5222,382 @@ async fn response_json(response: reqwest::Response) -> Result<Value, String> {
     Ok(payload)
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+struct ExecuteLocalActionRequest {
+    request_id: String,
+    plan_sha256: String,
+}
+
+fn write_local_action_export(
+    app: &AppHandle,
+    filename: &str,
+    destination: &str,
+    content: &str,
+    expected_sha256: &str,
+) -> Result<Value, String> {
+    let actual_sha256 = {
+        let digest = Sha256::digest(content.as_bytes());
+        digest
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    };
+    if actual_sha256 != expected_sha256 {
+        return Err("Le rapport fige ne correspond plus au plan approuve.".to_string());
+    }
+    let directory = match destination {
+        "app_data" => app
+            .path()
+            .app_data_dir()
+            .map_err(|_| "Dossier OutilsIA indisponible.".to_string())?
+            .join("action-exports"),
+        "downloads" => app
+            .path()
+            .download_dir()
+            .map_err(|_| "Dossier Telechargements indisponible.".to_string())?
+            .join("OutilsIA"),
+        _ => return Err("Destination export non autorisee.".to_string()),
+    };
+    fs::create_dir_all(&directory)
+        .map_err(|_| "Creation du dossier export impossible.".to_string())?;
+    let target = directory.join(filename);
+    if target.exists() {
+        return Err("Un export portant ce nom existe deja.".to_string());
+    }
+    let temporary = directory.join(format!("{filename}.{}.tmp", now_ms()));
+    fs::write(&temporary, content.as_bytes())
+        .map_err(|_| "Ecriture temporaire du rapport impossible.".to_string())?;
+    if let Err(error) = fs::rename(&temporary, &target) {
+        let _ = fs::remove_file(&temporary);
+        return Err(format!("Finalisation du rapport impossible: {error}"));
+    }
+    Ok(json!({
+        "success": true,
+        "format": "markdown",
+        "filename": filename,
+        "destination": destination,
+        "content_sha256": actual_sha256,
+        "bytes_written": content.len()
+    }))
+}
+
+#[tauri::command]
+async fn execute_local_action_request(
+    app: AppHandle,
+    active_installs: State<'_, ActiveInstalls>,
+    request: ExecuteLocalActionRequest,
+) -> Result<Value, String> {
+    let execution = begin_local_action_execution(&request.request_id, &request.plan_sha256)?;
+    let request_id = execution.request_id().to_string();
+    let plan_sha256 = execution.plan_sha256().to_string();
+    let started = Instant::now();
+    let (success, raw_result, message) = match execution {
+        LocalActionExecution::Install {
+            model,
+            runtime,
+            timeout_seconds,
+            required_free_gb,
+            ..
+        } => {
+            let preflight = local_action_install_preflight(&model, &runtime);
+            let preflight_allowed = preflight.as_ref().is_ok_and(|value| {
+                value.get("runtime_ready").and_then(Value::as_bool) == Some(true)
+                    && value
+                        .get("model_already_installed")
+                        .and_then(Value::as_bool)
+                        != Some(true)
+                    && value
+                        .get("storage_free_gb")
+                        .and_then(Value::as_f64)
+                        .zip(required_free_gb)
+                        .is_none_or(|(free, required)| free >= required)
+            });
+            if !preflight_allowed {
+                (
+                    false,
+                    json!({"success": false}),
+                    "Le preflight final a bloque l'installation.".to_string(),
+                )
+            } else {
+                match install_ollama_model(
+                    app.clone(),
+                    active_installs,
+                    InstallModelRequest {
+                        model,
+                        timeout_seconds: Some(timeout_seconds),
+                        runtime: Some(runtime),
+                    },
+                ) {
+                    Ok(result) => {
+                        let success = result.success;
+                        (
+                            success,
+                            serde_json::to_value(result)
+                                .unwrap_or_else(|_| json!({"success": success})),
+                            if success {
+                                "Modele installe par la Local Action Lane.".to_string()
+                            } else {
+                                "Installation terminee avec une erreur.".to_string()
+                            },
+                        )
+                    }
+                    Err(_) => (
+                        false,
+                        json!({"success": false}),
+                        "Installation interrompue par le noyau local.".to_string(),
+                    ),
+                }
+            }
+        }
+        LocalActionExecution::Benchmark {
+            model,
+            runtime,
+            timeout_seconds,
+            ..
+        } => {
+            if !local_action_model_is_installed(&model, &runtime) {
+                (
+                    false,
+                    json!({"success": false}),
+                    "Le modele n'est plus installe dans le runtime approuve.".to_string(),
+                )
+            } else {
+                match benchmark_ollama(BenchmarkRequest {
+                    model,
+                    prompt: None,
+                    timeout_seconds: Some(timeout_seconds),
+                    runtime: Some(runtime),
+                    force_cpu: Some(false),
+                    protocol: Some("outilsia.local_action_benchmark.v1".to_string()),
+                    tuning: None,
+                })
+                .await
+                {
+                    Ok(result) => {
+                        let success = result.success;
+                        (
+                            success,
+                            serde_json::to_value(result)
+                                .unwrap_or_else(|_| json!({"success": success})),
+                            if success {
+                                "Benchmark Local Action Lane termine.".to_string()
+                            } else {
+                                "Benchmark termine sans preuve valide.".to_string()
+                            },
+                        )
+                    }
+                    Err(_) => (
+                        false,
+                        json!({"success": false}),
+                        "Benchmark interrompu par le noyau local.".to_string(),
+                    ),
+                }
+            }
+        }
+        LocalActionExecution::Export {
+            format,
+            filename,
+            destination,
+            content,
+            content_sha256,
+            ..
+        } => {
+            if format != "markdown" {
+                (
+                    false,
+                    json!({"success": false}),
+                    "Format export refuse.".to_string(),
+                )
+            } else {
+                match write_local_action_export(
+                    &app,
+                    &filename,
+                    &destination,
+                    &content,
+                    &content_sha256,
+                ) {
+                    Ok(result) => (
+                        true,
+                        result,
+                        "Rapport exporte par la Local Action Lane.".to_string(),
+                    ),
+                    Err(_) => (
+                        false,
+                        json!({"success": false}),
+                        "Export refuse ou interrompu par le noyau local.".to_string(),
+                    ),
+                }
+            }
+        }
+    };
+    let (request_view, receipt) = finish_local_action_execution(
+        &request_id,
+        success,
+        started.elapsed().as_millis(),
+        raw_result,
+    )?;
+    let (ledger_appended, ledger_duplicate, ledger_error) =
+        match append_local_action_receipt(app, receipt.clone()) {
+            Ok(ledger_result) => (
+                ledger_result
+                    .get("appended")
+                    .cloned()
+                    .unwrap_or(json!(false)),
+                ledger_result
+                    .get("duplicate")
+                    .cloned()
+                    .unwrap_or(json!(false)),
+                Value::Null,
+            ),
+            Err(_) => (
+                json!(false),
+                json!(false),
+                json!("receipt_persistence_failed"),
+            ),
+        };
+    Ok(json!({
+        "schema": "outilsia.local_action_execution_result.v0",
+        "contract_version": local_action_lane::ACTION_LANE_CONTRACT_VERSION,
+        "request_id": request_id,
+        "plan_sha256": plan_sha256,
+        "success": success,
+        "message": message,
+        "request": request_view,
+        "receipt": receipt,
+        "ledger": {
+            "appended": ledger_appended,
+            "duplicate": ledger_duplicate,
+            "error": ledger_error
+        }
+    }))
+}
+
+#[tauri::command]
+fn reject_local_action_request(
+    app: AppHandle,
+    request: RejectLocalActionRequest,
+) -> Result<Value, String> {
+    let result = reject_local_action_request_state(request)?;
+    let receipt = result
+        .get("receipt")
+        .cloned()
+        .ok_or_else(|| "Recu de refus Action Lane absent.".to_string())?;
+    let (ledger_appended, ledger_duplicate, ledger_error) =
+        match append_local_action_receipt(app, receipt) {
+            Ok(ledger_result) => (
+                ledger_result
+                    .get("appended")
+                    .cloned()
+                    .unwrap_or(json!(false)),
+                ledger_result
+                    .get("duplicate")
+                    .cloned()
+                    .unwrap_or(json!(false)),
+                Value::Null,
+            ),
+            Err(_) => (
+                json!(false),
+                json!(false),
+                json!("receipt_persistence_failed"),
+            ),
+        };
+    Ok(json!({
+        "schema": "outilsia.local_action_rejection_result.v0",
+        "request": result.get("request").cloned().unwrap_or(Value::Null),
+        "ledger": {
+            "appended": ledger_appended,
+            "duplicate": ledger_duplicate,
+            "error": ledger_error
+        }
+    }))
+}
+
+#[tauri::command]
+fn export_benchmark_contribution(
+    app: AppHandle,
+    state: State<'_, BenchmarkCommonsState>,
+    request: ExportContributionRequest,
+) -> Result<Value, String> {
+    let mut result = export_benchmark_contribution_state(&app, state.inner(), request)?;
+    let receipt = result
+        .get("receipt")
+        .cloned()
+        .ok_or_else(|| "Recu d'export Benchmark Commons absent.".to_string())?;
+    let (ledger_appended, ledger_duplicate, ledger_error) =
+        match append_benchmark_commons_receipt(app, receipt) {
+            Ok(ledger_result) => (
+                ledger_result
+                    .get("appended")
+                    .cloned()
+                    .unwrap_or(json!(false)),
+                ledger_result
+                    .get("duplicate")
+                    .cloned()
+                    .unwrap_or(json!(false)),
+                Value::Null,
+            ),
+            Err(_) => (
+                json!(false),
+                json!(false),
+                json!("receipt_persistence_failed"),
+            ),
+        };
+    result["ledger"] = json!({
+        "appended": ledger_appended,
+        "duplicate": ledger_duplicate,
+        "error": ledger_error
+    });
+    Ok(result)
+}
+
+#[tauri::command]
+fn revoke_benchmark_contribution(
+    app: AppHandle,
+    state: State<'_, BenchmarkCommonsState>,
+    request: RevokeContributionRequest,
+) -> Result<Value, String> {
+    let mut result = revoke_benchmark_contribution_state(&app, state.inner(), request)?;
+    let receipt = result.get("receipt").cloned().unwrap_or(Value::Null);
+    if receipt.is_null() {
+        result["ledger"] = json!({
+            "appended": false,
+            "duplicate": true,
+            "error": Value::Null
+        });
+        return Ok(result);
+    }
+    let (ledger_appended, ledger_duplicate, ledger_error) =
+        match append_benchmark_commons_receipt(app, receipt) {
+            Ok(ledger_result) => (
+                ledger_result
+                    .get("appended")
+                    .cloned()
+                    .unwrap_or(json!(false)),
+                ledger_result
+                    .get("duplicate")
+                    .cloned()
+                    .unwrap_or(json!(false)),
+                Value::Null,
+            ),
+            Err(_) => (
+                json!(false),
+                json!(false),
+                json!("receipt_persistence_failed"),
+            ),
+        };
+    result["ledger"] = json!({
+        "appended": ledger_appended,
+        "duplicate": ledger_duplicate,
+        "error": ledger_error
+    });
+    Ok(result)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .manage(ActiveInstalls::default())
+        .manage(BenchmarkCommonsState::default())
         .invoke_handler(tauri::generate_handler![
             scan_machine,
             open_external_url,
@@ -5242,6 +5655,19 @@ pub fn run() {
             start_local_capability_bridge,
             get_local_capability_bridge_status,
             stop_local_capability_bridge,
+            start_local_action_lane,
+            get_local_action_lane_status,
+            stop_local_action_lane,
+            list_local_action_requests,
+            approve_local_action_request,
+            reject_local_action_request,
+            execute_local_action_request,
+            prepare_benchmark_contribution,
+            approve_benchmark_contribution,
+            export_benchmark_contribution,
+            revoke_benchmark_contribution,
+            rotate_benchmark_commons_pseudonym,
+            get_benchmark_commons_status,
             generate_memoryforge,
             export_obsidian_vault,
             open_obsidian_vault
