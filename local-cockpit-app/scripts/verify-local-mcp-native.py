@@ -207,7 +207,7 @@ def start_bridge_from_ui(page: Page, timeout_ms: int) -> dict[str, Any]:
     assert not passport_button.is_disabled(), "Capability Passport remains disabled after scan"
     passport_button.click()
     page.wait_for_function(
-        "() => document.getElementById('capabilityPassportState')?.textContent?.includes('intégrité vérifiée')",
+        "() => document.getElementById('capabilityPassportState')?.textContent?.includes('cohérence vérifiée')",
         timeout=timeout_ms,
     )
 

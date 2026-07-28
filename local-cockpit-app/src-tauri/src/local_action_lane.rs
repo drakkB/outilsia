@@ -1,20 +1,23 @@
+use crate::local_mcp_http::{
+    allowed_loopback_host as allowed_host, allowed_loopback_origin as allowed_origin,
+    bearer_authorized as authorized, build_json_response, canonical_sha256, constant_time_eq,
+    read_request, sha256_bytes, tiny_response, HttpRequest, JsonResponsePolicy,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
-use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
-use std::io::{Cursor, Read};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tiny_http::{Header, Request as TinyRequest, Response as TinyResponse, Server, StatusCode};
+use tiny_http::Server;
 
 pub(crate) const ACTION_LANE_SCHEMA: &str = "outilsia.local_action_lane.v0";
-pub(crate) const ACTION_LANE_CONTRACT_VERSION: &str = "2026-07-28";
+pub(crate) const ACTION_LANE_CONTRACT_VERSION: &str = "2026-07-28-native-consent-v1";
 pub(crate) const ACTION_RECEIPT_SCHEMA: &str = "outilsia.local_action_receipt.v0";
 const ACTION_LANE_START_SCHEMA: &str = "outilsia.local_action_lane_start.v0";
-const ACTION_APPROVAL_SCHEMA: &str = "outilsia.local_action_approval.v0";
-const ACTION_REJECTION_SCHEMA: &str = "outilsia.local_action_rejection.v0";
+const ACTION_APPROVAL_SCHEMA: &str = "outilsia.local_action_approval.v1";
+const ACTION_REJECTION_SCHEMA: &str = "outilsia.local_action_rejection.v1";
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const MCP_SERVER_VERSION: &str = "0.1.0";
 const MCP_PATH: &str = "/mcp";
@@ -78,20 +81,33 @@ pub(crate) struct StartLocalActionLaneRequest {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) struct ApproveLocalActionRequest {
-    schema: String,
-    request_id: String,
-    plan_sha256: String,
-    human_acknowledged: bool,
+    pub(crate) schema: String,
+    pub(crate) request_id: String,
+    pub(crate) plan_sha256: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) struct RejectLocalActionRequest {
-    schema: String,
-    request_id: String,
-    plan_sha256: String,
-    human_acknowledged: bool,
-    reason: Option<String>,
+    pub(crate) schema: String,
+    pub(crate) request_id: String,
+    pub(crate) plan_sha256: String,
+    pub(crate) reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NativeActionConfirmationKind {
+    Approval,
+    Execution,
+    Rejection,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct NativeActionConfirmationPrompt {
+    pub(crate) title: String,
+    pub(crate) message: String,
+    pub(crate) confirm_label: String,
+    pub(crate) cancel_label: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -159,6 +175,8 @@ pub(crate) struct LocalActionRequestView {
     plan: Value,
     plan_sha256: String,
     human_decision: String,
+    decision_channel: String,
+    execution_confirmation_channel: String,
     capability_expires_at_ms: Option<u128>,
     capability_consumed: bool,
     result: Option<Value>,
@@ -218,6 +236,8 @@ struct StoredActionRequest {
     plan: Value,
     plan_sha256: String,
     human_decision: String,
+    decision_channel: String,
+    execution_confirmation_channel: String,
     capability: Option<ActionCapability>,
     result: Option<Value>,
 }
@@ -282,14 +302,6 @@ impl LocalActionExecution {
     }
 }
 
-#[derive(Debug)]
-struct HttpRequest {
-    method: String,
-    path: String,
-    headers: HashMap<String, String>,
-    body: Vec<u8>,
-}
-
 fn lane_state() -> &'static Mutex<Option<ActionLaneRuntime>> {
     LOCAL_ACTION_LANE.get_or_init(|| Mutex::new(None))
 }
@@ -308,65 +320,8 @@ fn random_hex(bytes_len: usize) -> Result<String, String> {
     Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
-fn sha256_bytes(bytes: &[u8]) -> String {
-    let digest = Sha256::digest(bytes);
-    digest.iter().map(|byte| format!("{byte:02x}")).collect()
-}
-
 fn is_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
-}
-
-fn constant_time_eq(left: &str, right: &str) -> bool {
-    if left.len() != right.len() {
-        return false;
-    }
-    left.as_bytes()
-        .iter()
-        .zip(right.as_bytes())
-        .fold(0_u8, |difference, (a, b)| difference | (a ^ b))
-        == 0
-}
-
-fn canonical_json(value: &Value, output: &mut String) {
-    match value {
-        Value::Null => output.push_str("null"),
-        Value::Bool(value) => output.push_str(if *value { "true" } else { "false" }),
-        Value::Number(value) => output.push_str(&value.to_string()),
-        Value::String(value) => {
-            output.push_str(&serde_json::to_string(value).unwrap_or_else(|_| "\"\"".to_string()))
-        }
-        Value::Array(values) => {
-            output.push('[');
-            for (index, item) in values.iter().enumerate() {
-                if index > 0 {
-                    output.push(',');
-                }
-                canonical_json(item, output);
-            }
-            output.push(']');
-        }
-        Value::Object(values) => {
-            output.push('{');
-            let mut keys = values.keys().collect::<Vec<_>>();
-            keys.sort_unstable();
-            for (index, key) in keys.into_iter().enumerate() {
-                if index > 0 {
-                    output.push(',');
-                }
-                output.push_str(&serde_json::to_string(key).unwrap_or_else(|_| "\"\"".to_string()));
-                output.push(':');
-                canonical_json(&values[key], output);
-            }
-            output.push('}');
-        }
-    }
-}
-
-fn canonical_sha256(value: &Value) -> String {
-    let mut canonical = String::new();
-    canonical_json(value, &mut canonical);
-    sha256_bytes(canonical.as_bytes())
 }
 
 fn safe_identifier(value: &str, label: &str, max_len: usize) -> Result<String, String> {
@@ -530,6 +485,8 @@ fn expire_capabilities(runtime: &mut ActionLaneRuntime, now: u128) {
             request.state = "expired".to_string();
             request.updated_at_ms = now;
             request.human_decision = "capability_expired".to_string();
+            request.decision_channel = "system_timeout".to_string();
+            request.execution_confirmation_channel = "none".to_string();
         }
     }
 }
@@ -579,6 +536,8 @@ fn request_view(request: &StoredActionRequest) -> LocalActionRequestView {
         plan: request.plan.clone(),
         plan_sha256: request.plan_sha256.clone(),
         human_decision: request.human_decision.clone(),
+        decision_channel: request.decision_channel.clone(),
+        execution_confirmation_channel: request.execution_confirmation_channel.clone(),
         capability_expires_at_ms: request
             .capability
             .as_ref()
@@ -789,12 +748,136 @@ pub(crate) fn list_local_action_requests() -> Result<Vec<LocalActionRequestView>
     Ok(runtime.requests.iter().rev().map(request_view).collect())
 }
 
-#[tauri::command]
-pub(crate) fn approve_local_action_request(
+fn native_action_target_summary(stored: &StoredActionRequest) -> Result<String, String> {
+    let target = stored
+        .plan
+        .get("target")
+        .ok_or_else(|| "Cible d'action absente.".to_string())?;
+    match stored.action.as_str() {
+        "install_model" | "benchmark_model" => {
+            let model = target
+                .get("model")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "Modele du plan absent.".to_string())?;
+            let runtime = match target.get("runtime").and_then(Value::as_str) {
+                Some("wsl") => "Ollama WSL",
+                Some("native") => "Ollama Windows/Linux natif",
+                _ => return Err("Runtime du plan invalide.".to_string()),
+            };
+            Ok(format!("Modele : {model}\nRuntime : {runtime}"))
+        }
+        "export_report" => {
+            let filename = target
+                .get("filename")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "Nom du rapport absent.".to_string())?;
+            let destination = match target.get("destination").and_then(Value::as_str) {
+                Some("downloads") => "Telechargements / OutilsIA",
+                Some("app_data") => "Dossier securise OutilsIA",
+                _ => return Err("Destination export invalide.".to_string()),
+            };
+            let content_sha256 = target
+                .get("content_sha256")
+                .and_then(Value::as_str)
+                .filter(|value| is_sha256(value))
+                .ok_or_else(|| "Empreinte du rapport invalide.".to_string())?;
+            Ok(format!(
+                "Fichier : {filename}\nDestination : {destination}\nContenu SHA-256 : {content_sha256}"
+            ))
+        }
+        _ => Err("Action locale non autorisee.".to_string()),
+    }
+}
+
+pub(crate) fn local_action_native_confirmation_prompt(
+    request_id: &str,
+    plan_sha256: &str,
+    kind: NativeActionConfirmationKind,
+) -> Result<NativeActionConfirmationPrompt, String> {
+    if !is_sha256(plan_sha256) {
+        return Err("Empreinte de plan invalide.".to_string());
+    }
+    let mut guard = lane_state()
+        .lock()
+        .map_err(|_| "Etat Action Lane indisponible.".to_string())?;
+    let runtime = guard
+        .as_mut()
+        .ok_or_else(|| "Action Lane arretee.".to_string())?;
+    expire_capabilities(runtime, unix_ms());
+    let stored = runtime
+        .requests
+        .iter()
+        .find(|stored| stored.request_id == request_id)
+        .ok_or_else(|| "Demande Action Lane introuvable.".to_string())?;
+    if !constant_time_eq(&stored.plan_sha256, plan_sha256) {
+        return Err("Le plan affiche a ete modifie ou remplace.".to_string());
+    }
+    match kind {
+        NativeActionConfirmationKind::Approval if stored.state != "awaiting_human" => {
+            return Err(format!(
+                "Demande non approuvable dans l'etat {}.",
+                stored.state
+            ));
+        }
+        NativeActionConfirmationKind::Execution if stored.state != "approved" => {
+            return Err(format!(
+                "Demande non executable dans l'etat {}.",
+                stored.state
+            ));
+        }
+        NativeActionConfirmationKind::Rejection
+            if !matches!(stored.state.as_str(), "awaiting_human" | "approved") =>
+        {
+            return Err(format!(
+                "Demande non refusable dans l'etat {}.",
+                stored.state
+            ));
+        }
+        _ => {}
+    }
+    let action = match stored.action.as_str() {
+        "install_model" => "Installer un modele Ollama",
+        "benchmark_model" => "Benchmarker un modele installe",
+        "export_report" => "Exporter le rapport fige",
+        _ => return Err("Action locale non autorisee.".to_string()),
+    };
+    let target = native_action_target_summary(stored)?;
+    let (title, consequence, confirm_label) = match kind {
+        NativeActionConfirmationKind::Approval => (
+            "Autorisation systeme OutilsIA",
+            "Ce plan exact sera autorise pendant 2 minutes. Il ne sera pas encore execute.",
+            "Autoriser 2 min",
+        ),
+        NativeActionConfirmationKind::Execution => (
+            "Derniere confirmation systeme",
+            "La capacite sera consommee une seule fois et l'action demarrera immediatement.",
+            "Executer maintenant",
+        ),
+        NativeActionConfirmationKind::Rejection => (
+            "Refus systeme OutilsIA",
+            "La demande sera refusee et toute capacite associee sera revoquee.",
+            "Refuser et revoquer",
+        ),
+    };
+    Ok(NativeActionConfirmationPrompt {
+        title: title.to_string(),
+        message: format!(
+            "{action}\n\n{target}\n\nPlan SHA-256 :\n{}\n\n{consequence}\n\nCette decision est recue par une boite de dialogue du systeme, hors de la page web.",
+            stored.plan_sha256
+        ),
+        confirm_label: confirm_label.to_string(),
+        cancel_label: "Annuler".to_string(),
+    })
+}
+
+pub(crate) fn approve_local_action_request_after_native_dialog(
     request: ApproveLocalActionRequest,
+    evidence: NativeActionConfirmationKind,
 ) -> Result<LocalActionRequestView, String> {
-    if request.schema != ACTION_APPROVAL_SCHEMA || !request.human_acknowledged {
-        return Err("Accord humain explicite requis.".to_string());
+    if request.schema != ACTION_APPROVAL_SCHEMA
+        || evidence != NativeActionConfirmationKind::Approval
+    {
+        return Err("Confirmation systeme d'autorisation requise.".to_string());
     }
     if !is_sha256(&request.plan_sha256) {
         return Err("Empreinte de plan invalide.".to_string());
@@ -834,15 +917,20 @@ pub(crate) fn approve_local_action_request(
     });
     stored.state = "approved".to_string();
     stored.human_decision = "explicitly_approved_in_native_ui".to_string();
+    stored.decision_channel = "os_native_dialog".to_string();
+    stored.execution_confirmation_channel = "none".to_string();
     stored.updated_at_ms = now;
     Ok(request_view(stored))
 }
 
-pub(crate) fn reject_local_action_request_state(
+pub(crate) fn reject_local_action_request_after_native_dialog(
     request: RejectLocalActionRequest,
+    evidence: NativeActionConfirmationKind,
 ) -> Result<Value, String> {
-    if request.schema != ACTION_REJECTION_SCHEMA || !request.human_acknowledged {
-        return Err("Refus humain explicite requis.".to_string());
+    if request.schema != ACTION_REJECTION_SCHEMA
+        || evidence != NativeActionConfirmationKind::Rejection
+    {
+        return Err("Confirmation systeme de refus requise.".to_string());
     }
     if !is_sha256(&request.plan_sha256) {
         return Err("Empreinte de plan invalide.".to_string());
@@ -870,6 +958,8 @@ pub(crate) fn reject_local_action_request_state(
     }
     stored.state = "rejected".to_string();
     stored.human_decision = "explicitly_rejected_in_native_ui".to_string();
+    stored.decision_channel = "os_native_dialog".to_string();
+    stored.execution_confirmation_channel = "none".to_string();
     stored.capability = None;
     stored.updated_at_ms = now;
     stored.result = Some(json!({
@@ -886,7 +976,11 @@ pub(crate) fn reject_local_action_request_state(
 pub(crate) fn begin_local_action_execution(
     request_id: &str,
     plan_sha256: &str,
+    evidence: NativeActionConfirmationKind,
 ) -> Result<LocalActionExecution, String> {
+    if evidence != NativeActionConfirmationKind::Execution {
+        return Err("Confirmation systeme d'execution requise.".to_string());
+    }
     let now = unix_ms();
     let mut guard = lane_state()
         .lock()
@@ -1012,6 +1106,7 @@ pub(crate) fn begin_local_action_execution(
         .ok_or_else(|| "Capacite locale absente.".to_string())?
         .consumed_at_ms = Some(now);
     stored.state = "executing".to_string();
+    stored.execution_confirmation_channel = "os_native_dialog".to_string();
     stored.updated_at_ms = now;
     runtime.executing_request_id = Some(stored.request_id.clone());
     Ok(execution)
@@ -1144,12 +1239,15 @@ fn build_receipt(
         },
         "human_decision": {
             "status": request.human_decision,
-            "native_ui": true
+            "channel": request.decision_channel,
+            "native_ui": request.decision_channel == "os_native_dialog"
         },
         "execution": {
             "started": execution_started,
             "success": success,
-            "elapsed_ms": elapsed_ms
+            "elapsed_ms": elapsed_ms,
+            "confirmation_channel": request.execution_confirmation_channel,
+            "native_ui_confirmed": request.execution_confirmation_channel == "os_native_dialog"
         },
         "result": request.result.clone().unwrap_or(Value::Null),
         "privacy": {
@@ -1205,31 +1303,11 @@ fn prepare_action(
         "outilsia_prepare_model_install" => {
             reject_unknown_arguments(arguments, &["model", "runtime"])?;
             let selected = select_model(arguments, &models, false)?;
-            if selected.installed
-                || crate::local_action_model_is_installed(&selected.model, &selected.runtime)
-            {
-                return Err("Ce modele est deja installe dans le runtime cible.".to_string());
+            if selected.installed {
+                return Err(
+                    "Ce modele etait deja installe dans le snapshot fige au demarrage.".to_string(),
+                );
             }
-            let preflight =
-                crate::local_action_install_preflight(&selected.model, &selected.runtime)?;
-            if preflight.get("runtime_ready").and_then(Value::as_bool) != Some(true) {
-                return Err("Le runtime cible ne repond pas au preflight.".to_string());
-            }
-            if preflight
-                .get("model_already_installed")
-                .and_then(Value::as_bool)
-                == Some(true)
-            {
-                return Err("Ce modele est deja installe selon le preflight courant.".to_string());
-            }
-            let free = preflight.get("storage_free_gb").and_then(Value::as_f64);
-            if free
-                .zip(selected.required_free_gb)
-                .is_some_and(|(free, required)| free < required)
-            {
-                return Err("Espace disque insuffisant selon le preflight courant.".to_string());
-            }
-            let storage_warning = free.is_none();
             (
                 "install_model".to_string(),
                 json!({
@@ -1241,16 +1319,20 @@ fn prepare_action(
                         "runtime": selected.runtime
                     },
                     "preflight": {
-                        "runtime_ready": true,
-                        "model_already_installed": false,
-                        "storage_free_gb": free,
-                        "storage_scope": preflight.get("storage_scope").cloned().unwrap_or(Value::Null),
-                        "storage_source": preflight.get("storage_source").cloned().unwrap_or(Value::Null),
+                        "snapshot_source": "frozen_at_lane_start",
+                        "snapshot_model_installed": false,
+                        "live_probes_run_during_prepare": false,
+                        "native_preflight_required_before_execution": true,
+                        "runtime_ready": null,
+                        "model_already_installed": null,
+                        "storage_free_gb": null,
+                        "storage_scope": null,
+                        "storage_source": null,
                         "storage_path_exposed": false,
                         "estimated_download_gb": selected.estimated_download_gb,
                         "estimated_upper_gb": selected.estimated_upper_gb,
                         "required_free_gb": selected.required_free_gb,
-                        "storage_warning": storage_warning
+                        "storage_warning": true
                     },
                     "effects": ["download_model_layers", "write_ollama_model_store"],
                     "limits": {
@@ -1271,10 +1353,11 @@ fn prepare_action(
         "outilsia_prepare_benchmark" => {
             reject_unknown_arguments(arguments, &["model", "runtime"])?;
             let selected = select_model(arguments, &models, true)?;
-            if !selected.installed
-                || !crate::local_action_model_is_installed(&selected.model, &selected.runtime)
-            {
-                return Err("Le benchmark Action Lane exige un modele deja installe.".to_string());
+            if !selected.installed {
+                return Err(
+                    "Le benchmark exige un modele present dans le snapshot fige au demarrage."
+                        .to_string(),
+                );
             }
             (
                 "benchmark_model".to_string(),
@@ -1287,6 +1370,12 @@ fn prepare_action(
                         "runtime": selected.runtime,
                         "protocol": "outilsia.local_action_benchmark.v1",
                         "prompt_profile": "fixed_short_french_v1"
+                    },
+                    "preflight": {
+                        "snapshot_source": "frozen_at_lane_start",
+                        "snapshot_model_installed": true,
+                        "live_probes_run_during_prepare": false,
+                        "native_installed_check_required_before_execution": true
                     },
                     "effects": ["load_model", "run_fixed_benchmark", "measure_generation"],
                     "limits": {
@@ -1358,6 +1447,8 @@ fn prepare_action(
         plan,
         plan_sha256,
         human_decision: "not_recorded".to_string(),
+        decision_channel: "none".to_string(),
+        execution_confirmation_channel: "none".to_string(),
         capability: None,
         result: None,
     };
@@ -1471,6 +1562,8 @@ fn cancel_request_for_client(
     }
     stored.state = "cancelled".to_string();
     stored.human_decision = "cancelled_by_requesting_client".to_string();
+    stored.decision_channel = "mcp_requesting_client".to_string();
+    stored.execution_confirmation_channel = "none".to_string();
     stored.capability = None;
     stored.updated_at_ms = unix_ms();
     Ok(request_view(stored))
@@ -1502,7 +1595,7 @@ fn serve_lane(
                         false,
                     )
                 } else {
-                    match read_request(&mut request) {
+                    match read_request(&mut request, MAX_REQUEST_BYTES) {
                         Ok(request) => {
                             response_for_request(&request, &token, &session_id, expires_at_ms)
                         }
@@ -1518,113 +1611,6 @@ fn serve_lane(
         }
     }
     alive.store(false, Ordering::SeqCst);
-}
-
-fn read_request(request: &mut TinyRequest) -> Result<HttpRequest, String> {
-    let header_bytes = request.headers().iter().fold(
-        request.method().as_str().len() + request.url().len(),
-        |total, header| {
-            total
-                .saturating_add(header.field.as_str().len())
-                .saturating_add(header.value.as_str().len())
-                .saturating_add(4)
-        },
-    );
-    let headers = request
-        .headers()
-        .iter()
-        .map(|header| {
-            (
-                header.field.as_str().to_ascii_lowercase().to_string(),
-                header.value.as_str().to_string(),
-            )
-        })
-        .collect::<HashMap<_, _>>();
-    if headers.contains_key("transfer-encoding") {
-        return Err("transfer_encoding_not_supported".to_string());
-    }
-    let content_length = request.body_length().unwrap_or(0);
-    if header_bytes.saturating_add(content_length) > MAX_REQUEST_BYTES {
-        return Err("request_too_large".to_string());
-    }
-    let mut body = Vec::with_capacity(content_length);
-    request
-        .as_reader()
-        .take((MAX_REQUEST_BYTES + 1) as u64)
-        .read_to_end(&mut body)
-        .map_err(|_| "request_body_unreadable".to_string())?;
-    if body.len() > MAX_REQUEST_BYTES {
-        return Err("request_too_large".to_string());
-    }
-    Ok(HttpRequest {
-        method: request.method().as_str().to_string(),
-        path: request.url().to_string(),
-        headers,
-        body,
-    })
-}
-
-fn tiny_response(raw: Vec<u8>) -> TinyResponse<Cursor<Vec<u8>>> {
-    let split = raw
-        .windows(4)
-        .position(|window| window == b"\r\n\r\n")
-        .map(|index| index + 4)
-        .unwrap_or(raw.len());
-    let head = String::from_utf8_lossy(&raw[..split.saturating_sub(4)]);
-    let mut lines = head.lines();
-    let status = lines
-        .next()
-        .and_then(|line| line.split_whitespace().nth(1))
-        .and_then(|value| value.parse::<u16>().ok())
-        .unwrap_or(500);
-    let headers = lines
-        .filter_map(|line| line.split_once(':'))
-        .filter(|(name, _)| {
-            !name.eq_ignore_ascii_case("content-length") && !name.eq_ignore_ascii_case("connection")
-        })
-        .filter_map(|(name, value)| Header::from_bytes(name.trim(), value.trim()).ok())
-        .collect::<Vec<_>>();
-    let body = raw[split..].to_vec();
-    let length = body.len();
-    TinyResponse::new(
-        StatusCode(status),
-        headers,
-        Cursor::new(body),
-        Some(length),
-        None,
-    )
-}
-
-fn allowed_host(host: &str) -> bool {
-    let normalized = host.trim().to_ascii_lowercase();
-    ["127.0.0.1", "localhost"].iter().any(|name| {
-        normalized == *name
-            || normalized
-                .strip_prefix(&format!("{name}:"))
-                .and_then(|port| port.parse::<u16>().ok())
-                .is_some()
-    })
-}
-
-fn allowed_origin(origin: &str) -> bool {
-    ["http://127.0.0.1", "http://localhost"]
-        .iter()
-        .any(|prefix| {
-            origin == *prefix
-                || origin
-                    .strip_prefix(&format!("{prefix}:"))
-                    .and_then(|port| port.parse::<u16>().ok())
-                    .is_some()
-        })
-}
-
-fn authorized(request: &HttpRequest, expected_token: &str) -> bool {
-    request
-        .headers
-        .get("authorization")
-        .and_then(|value| value.strip_prefix("Bearer "))
-        .map(|token| constant_time_eq(expected_token, token))
-        .unwrap_or(false)
 }
 
 fn response_for_request(
@@ -1806,7 +1792,7 @@ fn mcp_tool_definitions() -> Vec<Value> {
         mcp_action_tool(
             ACTION_TOOL_NAMES[0],
             "Preparer une installation Ollama",
-            "Prepare une installation limitee a une reference du catalogue fige par l'application. Le preflight stockage/runtime est execute, mais aucun telechargement ne demarre.",
+            "Prepare une installation limitee a une reference du catalogue fige par l'application. Aucune sonde ni commande systeme n'est lancee pendant cet appel MCP ; le preflight runtime/stockage reste dans l'execution native approuvee.",
             json!({
                 "type": "object",
                 "properties": {
@@ -1821,7 +1807,7 @@ fn mcp_tool_definitions() -> Vec<Value> {
         mcp_action_tool(
             ACTION_TOOL_NAMES[1],
             "Preparer un benchmark local",
-            "Prepare un benchmark fixe pour un modele deja installe dans le runtime observe. Aucun prompt client et aucun telechargement.",
+            "Prepare un benchmark fixe depuis le snapshot de modeles fige au demarrage. Aucune sonde ni commande systeme n'est lancee pendant cet appel MCP ; la presence du modele est recontrolee seulement dans l'execution native approuvee.",
             json!({
                 "type": "object",
                 "properties": {
@@ -1965,32 +1951,20 @@ fn mcp_rpc_error(id: Value, code: i64, message: &str) -> Value {
 }
 
 fn json_response(status: u16, status_text: &str, body: &Value, authenticate: bool) -> Vec<u8> {
-    let bytes = if status == 204 {
-        Vec::new()
-    } else {
-        serde_json::to_vec(body).unwrap_or_else(|_| b"{\"error\":\"serialization\"}".to_vec())
-    };
-    let mut headers = vec![
-        "Content-Type: application/json; charset=utf-8".to_string(),
-        "Cache-Control: no-store".to_string(),
-        "X-Content-Type-Options: nosniff".to_string(),
-        "Referrer-Policy: no-referrer".to_string(),
-        "Access-Control-Allow-Origin: null".to_string(),
-        "Access-Control-Allow-Headers: Authorization, Content-Type, MCP-Protocol-Version"
-            .to_string(),
-        "Access-Control-Allow-Methods: POST, GET".to_string(),
-    ];
-    if authenticate {
-        headers.push("WWW-Authenticate: Bearer realm=\"outilsia-local-action\"".to_string());
-    }
-    let mut response = format!(
-        "HTTP/1.1 {status} {status_text}\r\n{}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-        headers.join("\r\n"),
-        bytes.len()
+    build_json_response(
+        status,
+        status_text,
+        body,
+        JsonResponsePolicy {
+            allowed_methods: "POST, GET",
+            allowed_headers: "Authorization, Content-Type, MCP-Protocol-Version",
+            origin: None,
+            deny_browser_origin: true,
+            allow_private_network: false,
+            protocol_version: Some(MCP_PROTOCOL_VERSION),
+            bearer_realm: authenticate.then_some("outilsia-local-action"),
+        },
     )
-    .into_bytes();
-    response.extend(bytes);
-    response
 }
 
 #[cfg(test)]
@@ -2053,9 +2027,91 @@ mod tests {
             plan_sha256: canonical_sha256(&plan),
             plan,
             human_decision: "not_recorded".to_string(),
+            decision_channel: "none".to_string(),
+            execution_confirmation_channel: "none".to_string(),
             capability: None,
             result: None,
         }
+    }
+
+    fn frozen_model(installed: bool) -> FrozenModel {
+        FrozenModel {
+            model: "qwen3:8b".to_string(),
+            runtime: "native".to_string(),
+            installed,
+            estimated_download_gb: Some(5.2),
+            estimated_upper_gb: Some(6.0),
+            required_free_gb: Some(10.0),
+            benchmark_timeout_seconds: 45,
+        }
+    }
+
+    #[test]
+    fn mcp_preparation_uses_only_the_frozen_snapshot_and_defers_live_probes() {
+        let _serial = test_lock();
+        stop_current_lane().expect("clean lane");
+
+        let mut install_runtime = test_runtime();
+        let install_model = frozen_model(false);
+        install_runtime.models.insert(
+            model_key(&install_model.model, &install_model.runtime),
+            install_model,
+        );
+        *lane_state().lock().expect("lane state") = Some(install_runtime);
+        let install = prepare_action(
+            "als-test-session",
+            "outilsia_prepare_model_install",
+            &json!({"model": "qwen3:8b", "runtime": "native"}),
+        )
+        .expect("pure install preparation");
+        assert_eq!(
+            install
+                .plan
+                .pointer("/preflight/live_probes_run_during_prepare")
+                .and_then(Value::as_bool),
+            Some(false)
+        );
+        assert_eq!(
+            install
+                .plan
+                .pointer("/preflight/native_preflight_required_before_execution")
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+        assert!(install
+            .plan
+            .pointer("/preflight/storage_free_gb")
+            .is_some_and(Value::is_null));
+
+        stop_current_lane().expect("reset lane");
+        let mut benchmark_runtime = test_runtime();
+        let benchmark_model = frozen_model(true);
+        benchmark_runtime.models.insert(
+            model_key(&benchmark_model.model, &benchmark_model.runtime),
+            benchmark_model,
+        );
+        *lane_state().lock().expect("lane state") = Some(benchmark_runtime);
+        let benchmark = prepare_action(
+            "als-test-session",
+            "outilsia_prepare_benchmark",
+            &json!({"model": "qwen3:8b", "runtime": "native"}),
+        )
+        .expect("pure benchmark preparation");
+        assert_eq!(
+            benchmark
+                .plan
+                .pointer("/preflight/live_probes_run_during_prepare")
+                .and_then(Value::as_bool),
+            Some(false)
+        );
+        assert_eq!(
+            benchmark
+                .plan
+                .pointer("/preflight/native_installed_check_required_before_execution")
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+        stop_current_lane().expect("clean lane");
     }
 
     fn install_test_runtime(requests: Vec<StoredActionRequest>) {
@@ -2065,12 +2121,14 @@ mod tests {
     }
 
     fn approve_for_test(request_id: &str, plan_sha256: &str) -> LocalActionRequestView {
-        approve_local_action_request(ApproveLocalActionRequest {
-            schema: ACTION_APPROVAL_SCHEMA.to_string(),
-            request_id: request_id.to_string(),
-            plan_sha256: plan_sha256.to_string(),
-            human_acknowledged: true,
-        })
+        approve_local_action_request_after_native_dialog(
+            ApproveLocalActionRequest {
+                schema: ACTION_APPROVAL_SCHEMA.to_string(),
+                request_id: request_id.to_string(),
+                plan_sha256: plan_sha256.to_string(),
+            },
+            NativeActionConfirmationKind::Approval,
+        )
         .expect("approval")
     }
 
@@ -2382,14 +2440,102 @@ mod tests {
         mutated["target"]["model"] = json!("other:8b");
         assert_ne!(original, canonical_sha256(&mutated));
         install_test_runtime(vec![request.clone()]);
-        let error = approve_local_action_request(ApproveLocalActionRequest {
-            schema: ACTION_APPROVAL_SCHEMA.to_string(),
-            request_id: request.request_id,
-            plan_sha256: canonical_sha256(&mutated),
-            human_acknowledged: true,
-        })
+        let error = approve_local_action_request_after_native_dialog(
+            ApproveLocalActionRequest {
+                schema: ACTION_APPROVAL_SCHEMA.to_string(),
+                request_id: request.request_id,
+                plan_sha256: canonical_sha256(&mutated),
+            },
+            NativeActionConfirmationKind::Approval,
+        )
         .expect_err("mutated plan must fail");
         assert!(error.contains("modifie"));
+        stop_current_lane().expect("cleanup");
+    }
+
+    #[test]
+    fn scripted_evidence_cannot_approve_or_execute() {
+        let _serial = test_lock();
+        let request = test_request("benchmark_model");
+        let request_id = request.request_id.clone();
+        let digest = request.plan_sha256.clone();
+        install_test_runtime(vec![request]);
+
+        let wrong_approval = approve_local_action_request_after_native_dialog(
+            ApproveLocalActionRequest {
+                schema: ACTION_APPROVAL_SCHEMA.to_string(),
+                request_id: request_id.clone(),
+                plan_sha256: digest.clone(),
+            },
+            NativeActionConfirmationKind::Execution,
+        )
+        .expect_err("execution evidence cannot mint approval");
+        assert!(wrong_approval.contains("systeme"));
+        assert_eq!(
+            list_local_action_requests().expect("requests")[0].state,
+            "awaiting_human"
+        );
+
+        let approved = approve_for_test(&request_id, &digest);
+        assert_eq!(approved.decision_channel, "os_native_dialog");
+        let wrong_execution = begin_local_action_execution(
+            &request_id,
+            &digest,
+            NativeActionConfirmationKind::Approval,
+        )
+        .expect_err("approval evidence cannot execute");
+        assert!(wrong_execution.contains("execution"));
+        let still_approved = list_local_action_requests().expect("requests");
+        assert_eq!(still_approved[0].state, "approved");
+        assert!(!still_approved[0].capability_consumed);
+        assert_eq!(still_approved[0].execution_confirmation_channel, "none");
+        stop_current_lane().expect("cleanup");
+    }
+
+    #[test]
+    fn native_prompt_is_bound_to_state_digest_and_safe_target() {
+        let _serial = test_lock();
+        let request = test_request("export_report");
+        let request_id = request.request_id.clone();
+        let digest = request.plan_sha256.clone();
+        install_test_runtime(vec![request]);
+
+        let prompt = local_action_native_confirmation_prompt(
+            &request_id,
+            &digest,
+            NativeActionConfirmationKind::Approval,
+        )
+        .expect("approval prompt");
+        assert!(prompt.message.contains(&digest));
+        assert!(prompt.message.contains("rapport.md"));
+        assert!(prompt.message.contains("Contenu SHA-256"));
+        assert!(!prompt.message.contains("top secret report body"));
+        assert_eq!(prompt.confirm_label, "Autoriser 2 min");
+
+        let wrong_digest = "f".repeat(64);
+        let error = local_action_native_confirmation_prompt(
+            &request_id,
+            &wrong_digest,
+            NativeActionConfirmationKind::Approval,
+        )
+        .expect_err("foreign digest must fail before dialog");
+        assert!(error.contains("modifie"));
+
+        approve_for_test(&request_id, &digest);
+        let stale_approval = local_action_native_confirmation_prompt(
+            &request_id,
+            &digest,
+            NativeActionConfirmationKind::Approval,
+        )
+        .expect_err("approval dialog cannot reopen after capability issuance");
+        assert!(stale_approval.contains("non approuvable"));
+        let execution_prompt = local_action_native_confirmation_prompt(
+            &request_id,
+            &digest,
+            NativeActionConfirmationKind::Execution,
+        )
+        .expect("execution prompt");
+        assert_eq!(execution_prompt.confirm_label, "Executer maintenant");
         stop_current_lane().expect("cleanup");
     }
 
@@ -2401,9 +2547,18 @@ mod tests {
         let digest = request.plan_sha256.clone();
         install_test_runtime(vec![request]);
         approve_for_test(&request_id, &digest);
-        begin_local_action_execution(&request_id, &digest).expect("first consume");
-        let replay =
-            begin_local_action_execution(&request_id, &digest).expect_err("replay must fail");
+        begin_local_action_execution(
+            &request_id,
+            &digest,
+            NativeActionConfirmationKind::Execution,
+        )
+        .expect("first consume");
+        let replay = begin_local_action_execution(
+            &request_id,
+            &digest,
+            NativeActionConfirmationKind::Execution,
+        )
+        .expect_err("replay must fail");
         assert!(replay.contains("deja en cours") || replay.contains("non executable"));
         stop_current_lane().expect("cleanup");
     }
@@ -2430,8 +2585,12 @@ mod tests {
                 .expect("capability")
                 .expires_at_ms = unix_ms() - 1;
         }
-        let error = begin_local_action_execution(&request_id, &digest)
-            .expect_err("expired capability must fail");
+        let error = begin_local_action_execution(
+            &request_id,
+            &digest,
+            NativeActionConfirmationKind::Execution,
+        )
+        .expect_err("expired capability must fail");
         assert!(error.contains("expired") || error.contains("etat expired"));
         stop_current_lane().expect("cleanup");
     }
@@ -2447,8 +2606,12 @@ mod tests {
         let cancelled = cancel_request_for_client("als-test-session", &request_id).expect("cancel");
         assert_eq!(cancelled.state, "cancelled");
         assert!(!cancelled.capability_consumed);
-        let error = begin_local_action_execution(&request_id, &digest)
-            .expect_err("cancelled request must fail");
+        let error = begin_local_action_execution(
+            &request_id,
+            &digest,
+            NativeActionConfirmationKind::Execution,
+        )
+        .expect_err("cancelled request must fail");
         assert!(error.contains("cancelled"));
         stop_current_lane().expect("cleanup");
     }
@@ -2465,9 +2628,18 @@ mod tests {
         install_test_runtime(vec![first, second]);
         approve_for_test(&first_id, &first_digest);
         approve_for_test(&second_id, &second_digest);
-        begin_local_action_execution(&first_id, &first_digest).expect("first action");
-        let error = begin_local_action_execution(&second_id, &second_digest)
-            .expect_err("second action must wait");
+        begin_local_action_execution(
+            &first_id,
+            &first_digest,
+            NativeActionConfirmationKind::Execution,
+        )
+        .expect("first action");
+        let error = begin_local_action_execution(
+            &second_id,
+            &second_digest,
+            NativeActionConfirmationKind::Execution,
+        )
+        .expect_err("second action must wait");
         assert!(error.contains("deja en cours"));
         stop_current_lane().expect("cleanup");
     }
@@ -2480,7 +2652,12 @@ mod tests {
         let digest = request.plan_sha256.clone();
         install_test_runtime(vec![request]);
         approve_for_test(&request_id, &digest);
-        begin_local_action_execution(&request_id, &digest).expect("execution start");
+        begin_local_action_execution(
+            &request_id,
+            &digest,
+            NativeActionConfirmationKind::Execution,
+        )
+        .expect("execution start");
         {
             let mut guard = lane_state().lock().expect("lane lock");
             let runtime = guard.as_mut().expect("runtime");
@@ -2522,8 +2699,12 @@ mod tests {
         install_test_runtime(vec![request]);
         approve_for_test(&request_id, &digest);
 
-        let error = begin_local_action_execution(&request_id, &digest)
-            .expect_err("missing frozen export must fail before consumption");
+        let error = begin_local_action_execution(
+            &request_id,
+            &digest,
+            NativeActionConfirmationKind::Execution,
+        )
+        .expect_err("missing frozen export must fail before consumption");
         assert!(error.contains("Snapshot export indisponible"));
         let guard = lane_state().lock().expect("lane lock");
         let runtime = guard.as_ref().expect("runtime");
@@ -2559,6 +2740,8 @@ mod tests {
         let secret = "top-secret-capability";
         request.state = "completed".to_string();
         request.human_decision = "explicitly_approved_in_native_ui".to_string();
+        request.decision_channel = "os_native_dialog".to_string();
+        request.execution_confirmation_channel = "os_native_dialog".to_string();
         request.capability = Some(ActionCapability {
             capability_id: "cap-test".to_string(),
             capability_secret_sha256: sha256_bytes(secret.as_bytes()),
@@ -2583,6 +2766,8 @@ mod tests {
         assert!(!receipt.contains("top secret report body"));
         assert!(receipt.contains("\"raw_prompt_stored\":false"));
         assert!(receipt.contains("\"raw_model_output_stored\":false"));
+        assert!(receipt.contains("\"channel\":\"os_native_dialog\""));
+        assert!(receipt.contains("\"native_ui_confirmed\":true"));
         assert!(receipt.contains("\"export_content_stored\":false"));
     }
 }

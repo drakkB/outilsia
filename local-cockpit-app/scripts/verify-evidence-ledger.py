@@ -27,8 +27,10 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
     panel.scroll_into_view_if_needed()
 
     ledger = proof["ledger"]
-    if ledger["schema"] != "outilsia.evidence_ledger.v1":
+    if ledger["schema"] != "outilsia.evidence_ledger.v2":
         raise AssertionError(f"{label}: ledger schema mismatch")
+    if ledger["storage_version"] != 2 or not isinstance(ledger["migration_history"], list):
+        raise AssertionError(f"{label}: ledger migration metadata missing")
     if ledger["verification"]["chain_valid"] is not True:
         raise AssertionError(f"{label}: fixture chain is not valid")
     if ledger["verification"]["entries_verified"] != 3:

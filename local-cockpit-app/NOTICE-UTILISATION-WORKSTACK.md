@@ -315,6 +315,8 @@ Cette gate ne voit que le reçu public signé. Les captures, le DOM, les trois f
 
 Le fichier persistant se trouve dans le dossier applicatif Tauri sous le nom `evidence-ledger-v1.json`. L'interface n'affiche pas son chemin pour éviter d'exposer des informations système inutiles.
 
+Le nom du fichier reste stable pour retrouver les journaux déjà créés. Le contrat courant est `outilsia.evidence_ledger.v2` : à la première lecture, un Ledger v1 valide est vérifié, migré sans modifier ses entrées ni sa tête de chaîne, puis remplacé de façon atomique. L'ancien digest de document et le nombre d'entrées préservées sont inscrits dans `migration_history`. Une version inconnue est refusée sans écriture ni suppression du fichier.
+
 - **Copier JSON** : place le Ledger vérifié dans le presse-papiers.
 - **Télécharger** : crée une copie portable nommée avec l'identifiant du Ledger.
 - **Vérifier la chaîne** : relit le fichier local et refuse toute incohérence.
@@ -354,6 +356,6 @@ Le fichier persistant se trouve dans le dossier applicatif Tauri sous le nom `ev
 - `outilsia.benchmark_commons.receipt.v1`
 - `outilsia.benchmark_commons.revocation.v1`
 - `outilsia.evidence_entry.v1`
-- `outilsia.evidence_ledger.v1`
+- `outilsia.evidence_ledger.v2` (migration automatique et sans perte depuis v1)
 
 Cette notice doit évoluer dans le même commit que tout changement de responsabilité, de sécurité, de stockage ou d'exécution de ces modules.

@@ -40,7 +40,7 @@ WORKSPACE_FIRST_SECTIONS = {
 }
 
 HUMAN_PANEL_TITLES = {
-    ".capability-passport-panel": ("Passeport IA", "AI Capability Passport"),
+    ".capability-passport-panel": ("Instantané IA", "AI Capability Snapshot"),
     ".local-capability-bridge-panel": ("Serveur MCP local", "lecture seule v0.1"),
     ".local-action-lane-panel": ("Actions pilotées par IA", "Local Action Lane v0"),
     ".board-observer-panel": ("Lire un board", "Board Observer"),
@@ -54,7 +54,7 @@ HUMAN_PANEL_TITLES = {
 }
 
 WORKSPACE_FIRST_SELECTORS = {
-    "overview": ".readiness-panel",
+    "overview": "__all__",
     "machine": ".machine-panel",
     "models": ".models-panel",
     "tests": ".prepare-panel",
@@ -134,8 +134,13 @@ def inspect_workspace(page, workspace: str, expected_panels: int, label: str):
         raise AssertionError(
             f"{label}: expected {expected_panels} owned panels, got {state['ownedCount']}"
         )
-    if len(state["visible"]) != 1:
-        raise AssertionError(f"{label}: focused view should expose one panel, got {state['visible']}")
+    expected_visible = expected_panels if workspace == "overview" else 1
+    if len(state["visible"]) != expected_visible:
+        raise AssertionError(
+            f"{label}: expected {expected_visible} visible panel(s), got {state['visible']}"
+        )
+    if workspace == "overview" and state["section"] != "__all__":
+        raise AssertionError(f"{label}: overview should open on the complete decision view: {state}")
     leaked = [panel for panel in state["visible"] if workspace not in panel["workspace"].split()]
     if leaked:
         raise AssertionError(f"{label}: panels leaked from another workspace: {leaked}")
@@ -280,8 +285,26 @@ def check(browser, width: int, height: int, label: str):
         if "connecte ton compte" in account_text:
             raise AssertionError(f"{label}: connected account still asks the user to connect: {account_text}")
 
-    page.locator("#prepareBtn").click()
-    page.wait_for_function("() => !document.querySelector('#prepareBtn')?.disabled")
+    primary_action = page.evaluate(
+        """() => {
+          const expected = window.__OUTILSIA_TEST__.primaryActionState();
+          const button = document.querySelector('#prepareBtn');
+          return {
+            expectedLabel: expected.label,
+            expectedCommand: expected.command,
+            label: button?.querySelector('span')?.textContent?.trim() || '',
+            command: button?.dataset.primaryCommand || ''
+          };
+        }"""
+    )
+    if (
+        primary_action["label"] != primary_action["expectedLabel"]
+        or primary_action["command"] != primary_action["expectedCommand"]
+    ):
+        raise AssertionError(f"{label}: main button ignores the next action: {primary_action}")
+
+    page.evaluate("() => document.querySelector('#scanBtn')?.click()")
+    page.wait_for_function("() => !document.querySelector('#scanBtn')?.disabled")
     page.locator("#workspaceAccountBtn").click()
     page.locator("#workspaceSectionSelect").select_option(".account-panel")
     assert_account = page.locator("#syncResult").inner_text().strip().lower()

@@ -31,13 +31,26 @@ def main():
     serialized = json.dumps(passport, ensure_ascii=False)
 
     assert passport["schema"] == "outilsia.ai_capability_passport.v1", passport["schema"]
-    assert passport["passport_version"] == "1.3.0", passport["passport_version"]
+    assert passport["document_kind"] == "capability_snapshot", passport["document_kind"]
+    assert passport["passport_version"] == "1.4.0", passport["passport_version"]
     assert result["verified"] is True, result
     assert result["tamperedVerified"] is False, result
     assert result["staleSummary"] is None, result["staleSummary"]
     assert re.fullmatch(r"[0-9a-f]{64}", digest), digest
     assert passport["integrity"]["identity_signature"] is False
-    assert "ne prouve" in passport["integrity"]["statement"]
+    assert passport["integrity"]["verification_semantics"] == "coherence_not_provenance"
+    assert "aucune signature" in passport["integrity"]["statement"]
+    assert passport["assurance"] == {
+        "level": "self_consistency_only",
+        "producer_layer": "tauri_webview",
+        "digest_generated_by": "web_crypto_sha256",
+        "rust_rederived": False,
+        "os_key_attested": False,
+        "machine_identity_proven": False,
+        "owner_identity_proven": False,
+        "provenance_verified": False,
+        "portable_unsigned_json": True,
+    }
     assert passport["hardware_doctor"]["schema"] == "outilsia.hardware_doctor.v2"
     assert passport["hardware_doctor"]["confidence"] == "measured"
     runtime_driver = passport["hardware_doctor"]["runtime"]["driver_intelligence"]
@@ -94,10 +107,11 @@ def main():
     assert result["field"]["capability_passport_ok"] is True
     assert result["field"]["capability_passport_digest"] == digest
     assert digest in result["memory"]
-    assert "Empreinte d'intégrité, pas signature d'identité" in result["panel"]
+    assert "Checksum de cohérence uniquement" in result["panel"]
+    assert "provenance non vérifiée" in result["panel"]
 
     print(
-        "capability_passport_ok "
+        "capability_snapshot_ok assurance=coherence_not_provenance "
         f"schema={passport['schema']} doctor={passport['hardware_doctor']['score']} "
         f"runtime={evidence['processor']} digest={digest[:16]}"
     )

@@ -87,6 +87,7 @@
         <div>
           <span class="label">Potentiel matériel</span>
           <strong id="scoreText">--</strong>
+          <small class="score-method-limit">Estimation du matériel détecté ; seul un benchmark local mesure la vitesse réelle.</small>
         </div>
       </section>
 
@@ -175,7 +176,7 @@
             <button id="workspaceModelsBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="models" tabindex="-1">Modèles</button>
             <button id="workspaceTestsBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="tests" tabindex="-1">Tests</button>
             <button id="workspaceAssistantBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="assistant" tabindex="-1">Assistant</button>
-            <button id="workspaceWorkflowsBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="workflows" tabindex="-1">Atelier IA</button>
+            <button id="workspaceWorkflowsBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="workflows" tabindex="-1">Atelier avancé</button>
             <button id="workspaceAccountBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="account" tabindex="-1">Compte</button>
           </div>
           <div class="workspace-section-nav" aria-label="Naviguer dans les sections de l'espace actif">
@@ -296,7 +297,7 @@
           </div>
           <div class="private-workload-privacy">
             <strong>Aucun contenu envoyé au cloud</strong>
-            <span>Mêmes consignes pour chaque modèle · modèles déjà installés · prompts et réponses bruts exclus du Passport.</span>
+            <span>Mêmes consignes pour chaque modèle · modèles déjà installés · prompts et réponses bruts exclus de l'instantané IA.</span>
           </div>
           <label class="field-label" for="privateWorkloadPackSelect">Pack de travail</label>
           <select id="privateWorkloadPackSelect"></select>
@@ -340,11 +341,11 @@
 
         <article class="panel capability-passport-panel advanced-panel" data-workspace="workflows">
           <div class="panel-title">
-            <h2>Passeport IA <small>AI Capability Passport</small></h2>
+            <h2>Instantané IA <small>AI Capability Snapshot</small></h2>
             <span id="capabilityPassportState">scan requis</span>
           </div>
           <div id="capabilityPassportBox" class="capability-passport-box empty">
-            Scanne la machine pour créer un passeport portable de ses capacités IA locales. L'empreinte SHA-256 détecte une modification ; elle ne prouve pas l'identité du PC.
+            Scanne la machine pour créer un instantané portable de ses capacités IA locales. Son checksum vérifie la cohérence du JSON, pas sa provenance ni l'identité du PC.
           </div>
           <div class="row-actions">
             <button id="generateCapabilityPassportBtn" type="button" disabled>Générer</button>
@@ -359,7 +360,7 @@
             <span id="localCapabilityBridgeState">désactivée</span>
           </div>
           <div id="localCapabilityBridgeBox" class="local-capability-bridge-box empty">
-            Génère d'abord l'AI Capability Passport. Tu pourras ensuite connecter Codex, Claude Code ou un autre client MCP pendant 15 minutes, sans lui donner le droit d'agir sur le PC.
+            Génère d'abord l'instantané de capacités IA. Tu pourras ensuite connecter Codex, Claude Code ou un autre client MCP pendant 15 minutes, sans lui donner le droit d'agir sur le PC.
           </div>
           <div class="local-bridge-client-controls">
             <label>
@@ -373,7 +374,7 @@
             <button id="copyLocalCapabilityTokenBtn" type="button" disabled>Copier le jeton 15 min</button>
           </div>
           <div class="row-actions">
-            <button class="path-action" type="button" data-open-feature="passport">Préparer le Passport</button>
+            <button class="path-action" type="button" data-open-feature="passport">Préparer l'instantané</button>
             <button id="startLocalCapabilityBridgeBtn" type="button" disabled>Démarrer MCP 15 min</button>
             <button id="stopLocalCapabilityBridgeBtn" type="button" disabled>Arrêter</button>
           </div>

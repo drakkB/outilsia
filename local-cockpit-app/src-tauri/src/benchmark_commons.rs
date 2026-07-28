@@ -402,28 +402,27 @@ fn has_exact_keys(value: &Value, expected: &[&str]) -> bool {
     object.len() == expected.len() && expected.iter().all(|key| object.contains_key(*key))
 }
 
-fn validate_server_integrity_envelope(document: &Value) -> Result<String, String> {
-    let integrity = document
-        .get("server_integrity")
-        .ok_or_else(|| "Signature serveur Benchmark Commons absente.".to_string())?;
+fn validate_server_digest_declaration(document: &Value) -> Result<String, String> {
+    let declaration = document
+        .get("server_digest_declaration")
+        .ok_or_else(|| "Digest declare par le serveur Benchmark Commons absent.".to_string())?;
     if !has_exact_keys(
-        integrity,
-        &["algorithm", "canonicalization", "scope", "key_id", "digest"],
-    ) || integrity.get("algorithm").and_then(Value::as_str) != Some("HMAC-SHA256")
-        || integrity.get("canonicalization").and_then(Value::as_str)
-            != Some("recursive-key-sort-json-v1")
-        || integrity.get("scope").and_then(Value::as_str)
-            != Some("canonical_document_without_server_integrity")
-        || integrity.get("key_id").and_then(Value::as_str) != Some("benchmark-commons-server-v1")
+        declaration,
+        &["algorithm", "scope", "verification", "digest"],
+    ) || declaration.get("algorithm").and_then(Value::as_str) != Some("SHA-256")
+        || declaration.get("scope").and_then(Value::as_str)
+            != Some("opaque_server_receipt_correlation")
+        || declaration.get("verification").and_then(Value::as_str)
+            != Some("format_and_binding_only_not_cryptographic")
     {
-        return Err("Enveloppe de signature serveur non conforme.".to_string());
+        return Err("Declaration de digest serveur non conforme.".to_string());
     }
-    integrity
+    declaration
         .get("digest")
         .and_then(Value::as_str)
         .filter(|value| is_sha256(value))
         .map(str::to_string)
-        .ok_or_else(|| "Empreinte du recu serveur invalide.".to_string())
+        .ok_or_else(|| "Digest declare du recu serveur invalide.".to_string())
 }
 
 pub(crate) fn validate_server_submission_receipt(
@@ -448,7 +447,7 @@ pub(crate) fn validate_server_submission_receipt(
             "privacy",
             "revocation",
             "retention",
-            "server_integrity",
+            "server_digest_declaration",
         ],
     ) || receipt.get("schema").and_then(Value::as_str) != Some(SERVER_RECEIPT_SCHEMA)
         || receipt.get("contract_version").and_then(Value::as_str) != Some(CONTRACT_VERSION)
@@ -563,7 +562,7 @@ pub(crate) fn validate_server_submission_receipt(
     {
         return Err("Retention ou revocation serveur non conforme.".to_string());
     }
-    validate_server_integrity_envelope(receipt)
+    validate_server_digest_declaration(receipt)
 }
 
 pub(crate) fn validate_server_revocation_receipt(
@@ -585,7 +584,7 @@ pub(crate) fn validate_server_revocation_receipt(
             "reason",
             "proof",
             "privacy",
-            "server_integrity",
+            "server_digest_declaration",
         ],
     ) || receipt.get("schema").and_then(Value::as_str) != Some(SERVER_REVOCATION_SCHEMA)
         || receipt.get("contract_version").and_then(Value::as_str) != Some(CONTRACT_VERSION)
@@ -633,7 +632,7 @@ pub(crate) fn validate_server_revocation_receipt(
     {
         return Err("Confidentialite de revocation serveur invalide.".to_string());
     }
-    validate_server_integrity_envelope(receipt)
+    validate_server_digest_declaration(receipt)
 }
 
 fn registry_directory(app: &AppHandle) -> Result<PathBuf, String> {
@@ -2076,7 +2075,7 @@ fn public_registry_view(registry: &Value) -> Value {
                         "not_submitted"
                     };
                     let receipt_digest = record
-                        .pointer("/server_submission_receipt/server_integrity/digest")
+                        .pointer("/server_submission_receipt/server_digest_declaration/digest")
                         .cloned()
                         .unwrap_or(Value::Null);
                     json!({
@@ -2093,7 +2092,7 @@ fn public_registry_view(registry: &Value) -> Value {
                             "status": server_status,
                             "submitted_at_ms": submitted_at_ms,
                             "revoked_at_ms": revoked_at_ms,
-                            "receipt_hmac_digest": receipt_digest,
+                            "receipt_declared_digest": receipt_digest,
                             "network_received": server_status != "not_submitted",
                             "field_test_proof": false,
                             "community_verified": false,
@@ -2526,11 +2525,10 @@ mod tests {
                 "maximum_days": 180,
                 "revocation_supported": true
             },
-            "server_integrity": {
-                "algorithm": "HMAC-SHA256",
-                "canonicalization": "recursive-key-sort-json-v1",
-                "scope": "canonical_document_without_server_integrity",
-                "key_id": "benchmark-commons-server-v1",
+            "server_digest_declaration": {
+                "algorithm": "SHA-256",
+                "scope": "opaque_server_receipt_correlation",
+                "verification": "format_and_binding_only_not_cryptographic",
                 "digest": "d".repeat(64)
             }
         })
@@ -2561,11 +2559,10 @@ mod tests {
                 "machine_identifier_returned": false,
                 "subject_key_returned": false
             },
-            "server_integrity": {
-                "algorithm": "HMAC-SHA256",
-                "canonicalization": "recursive-key-sort-json-v1",
-                "scope": "canonical_document_without_server_integrity",
-                "key_id": "benchmark-commons-server-v1",
+            "server_digest_declaration": {
+                "algorithm": "SHA-256",
+                "scope": "opaque_server_receipt_correlation",
+                "verification": "format_and_binding_only_not_cryptographic",
                 "digest": "e".repeat(64)
             }
         })

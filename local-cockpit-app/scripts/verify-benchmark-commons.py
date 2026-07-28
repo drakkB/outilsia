@@ -131,7 +131,8 @@ def assert_static_contract() -> None:
         "Un second clic reste nécessaire",
         "Aucun envoi réseau ne sera effectué",
         "rattachement au compte et à la machine synchronisée",
-        "son HMAC reste vérifiable côté serveur",
+        "pas une signature cryptographique",
+        "Le digest reste une déclaration du serveur",
         "applyBenchmarkCommonsState",
     ):
         if expected not in app_js:
@@ -338,8 +339,8 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         raise AssertionError(f"{label}: local removal can orphan a server contribution")
     if "ne vaut ni preuve terrain" not in server_submitted["ui"]:
         raise AssertionError(f"{label}: server receipt overclaim boundary is missing")
-    if "HMAC reste vérifiable côté serveur" not in server_submitted["ui"]:
-        raise AssertionError(f"{label}: HMAC verification boundary is missing")
+    if "pas une signature cryptographique" not in server_submitted["ui"]:
+        raise AssertionError(f"{label}: server digest verification boundary is missing")
     network_screenshot = OUT / f"benchmark-commons-network-{label}.png"
     section.screenshot(path=str(network_screenshot))
 

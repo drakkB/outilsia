@@ -1122,6 +1122,15 @@ summary:focus-visible,
   display: none;
 }
 
+.score-method-limit {
+  color: var(--muted);
+  display: block;
+  font-size: 11px;
+  line-height: 1.35;
+  margin-top: 3px;
+  max-width: 34ch;
+}
+
 .runtime-driver-details {
   border-top: 1px solid rgba(255, 255, 255, 0.10);
   display: grid;
@@ -2027,7 +2036,7 @@ summary:focus-visible,
   display: none;
 }
 
-.mode-essential[data-scan-ready="false"][data-workspace-section=".readiness-panel"] .quick-decision-strip {
+.mode-essential[data-scan-ready="false"] .quick-decision-strip {
   display: none;
 }
 
@@ -3264,6 +3273,8 @@ dd {
   display: flex;
   gap: 7px;
   line-height: 1.35;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .local-action-consent input {

@@ -1,16 +1,23 @@
+use crate::local_mcp_http::{
+    allowed_loopback_host as allowed_host, allowed_loopback_origin as allowed_origin,
+    bearer_authorized as authorized, build_json_response, build_raw_json_response,
+    canonical_sha256, constant_time_eq, read_request, tiny_response, HttpRequest,
+    JsonResponsePolicy,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
-use std::collections::HashMap;
-use std::io::{Cursor, Read};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tiny_http::{Header, Request as TinyRequest, Response as TinyResponse, Server, StatusCode};
+use tiny_http::Server;
 
 const BRIDGE_SCHEMA: &str = "outilsia.local_capability_bridge.v1";
 const BRIDGE_CONTRACT_VERSION: &str = "2026-07-27";
+const CAPABILITY_DOCUMENT_SCHEMA: &str = "outilsia.ai_capability_passport.v1";
+const CAPABILITY_DOCUMENT_KIND: &str = "capability_snapshot";
+const CAPABILITY_DOCUMENT_VERSION: &str = "1.4.0";
+const CAPABILITY_ASSURANCE_LEVEL: &str = "self_consistency_only";
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const MCP_SERVER_VERSION: &str = "0.1.0";
 const MCP_PATH: &str = "/mcp";
@@ -94,14 +101,6 @@ struct BridgeBodies {
     snapshot: Arc<Value>,
 }
 
-#[derive(Debug)]
-struct HttpRequest {
-    method: String,
-    path: String,
-    headers: HashMap<String, String>,
-    body: Vec<u8>,
-}
-
 fn bridge_state() -> &'static Mutex<Option<BridgeRuntime>> {
     LOCAL_BRIDGE.get_or_init(|| Mutex::new(None))
 }
@@ -124,62 +123,20 @@ fn is_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
-fn canonical_json(value: &Value, output: &mut String) {
-    match value {
-        Value::Null => output.push_str("null"),
-        Value::Bool(value) => output.push_str(if *value { "true" } else { "false" }),
-        Value::Number(value) => output.push_str(&value.to_string()),
-        Value::String(value) => {
-            output.push_str(&serde_json::to_string(value).unwrap_or_else(|_| "\"\"".to_string()))
-        }
-        Value::Array(values) => {
-            output.push('[');
-            for (index, item) in values.iter().enumerate() {
-                if index > 0 {
-                    output.push(',');
-                }
-                canonical_json(item, output);
-            }
-            output.push(']');
-        }
-        Value::Object(values) => {
-            output.push('{');
-            let mut keys = values.keys().collect::<Vec<_>>();
-            keys.sort_unstable();
-            for (index, key) in keys.into_iter().enumerate() {
-                if index > 0 {
-                    output.push(',');
-                }
-                output.push_str(&serde_json::to_string(key).unwrap_or_else(|_| "\"\"".to_string()));
-                output.push(':');
-                canonical_json(&values[key], output);
-            }
-            output.push('}');
-        }
-    }
-}
-
-fn canonical_sha256(value: &Value) -> String {
-    let mut canonical = String::new();
-    canonical_json(value, &mut canonical);
-    let digest = Sha256::digest(canonical.as_bytes());
-    digest.iter().map(|byte| format!("{byte:02x}")).collect()
-}
-
 fn verify_passport_integrity(passport: &Value) -> Result<(), String> {
     if passport
         .pointer("/integrity/algorithm")
         .and_then(Value::as_str)
         != Some("SHA-256")
     {
-        return Err("Algorithme d'integrite du Passport invalide.".to_string());
+        return Err("Algorithme du checksum de l'instantane invalide.".to_string());
     }
     if passport
         .pointer("/integrity/canonicalization")
         .and_then(Value::as_str)
         != Some("recursive-key-sort-json-v1")
     {
-        return Err("Canonicalisation du Passport invalide.".to_string());
+        return Err("Canonicalisation de l'instantane invalide.".to_string());
     }
     let expected = passport
         .pointer("/integrity/digest")
@@ -187,7 +144,7 @@ fn verify_passport_integrity(passport: &Value) -> Result<(), String> {
         .unwrap_or_default()
         .to_ascii_lowercase();
     if !is_sha256(&expected) {
-        return Err("Empreinte SHA-256 du Passport invalide.".to_string());
+        return Err("Checksum SHA-256 de l'instantane invalide.".to_string());
     }
     let mut unsigned = passport.clone();
     if let Some(object) = unsigned.as_object_mut() {
@@ -195,8 +152,47 @@ fn verify_passport_integrity(passport: &Value) -> Result<(), String> {
     }
     let actual = canonical_sha256(&unsigned);
     if !constant_time_eq(&expected, &actual) {
-        return Err("Integrite du Passport non verifiee.".to_string());
+        return Err("Coherence de l'instantane non verifiee.".to_string());
     }
+    Ok(())
+}
+
+fn verify_snapshot_assurance(snapshot: &Value) -> Result<(), String> {
+    if snapshot.get("document_kind").and_then(Value::as_str) != Some(CAPABILITY_DOCUMENT_KIND) {
+        return Err("Type de document de capacites invalide.".to_string());
+    }
+    if snapshot.get("passport_version").and_then(Value::as_str) != Some(CAPABILITY_DOCUMENT_VERSION)
+    {
+        return Err("Version de l'instantane de capacites invalide.".to_string());
+    }
+    if snapshot.pointer("/assurance/level").and_then(Value::as_str)
+        != Some(CAPABILITY_ASSURANCE_LEVEL)
+        || snapshot
+            .pointer("/assurance/producer_layer")
+            .and_then(Value::as_str)
+            != Some("tauri_webview")
+        || snapshot
+            .pointer("/assurance/digest_generated_by")
+            .and_then(Value::as_str)
+            != Some("web_crypto_sha256")
+        || snapshot
+            .pointer("/integrity/verification_semantics")
+            .and_then(Value::as_str)
+            != Some("coherence_not_provenance")
+    {
+        return Err("Niveau d'assurance de l'instantane invalide.".to_string());
+    }
+    for pointer in [
+        "/assurance/rust_rederived",
+        "/assurance/os_key_attested",
+        "/assurance/machine_identity_proven",
+        "/assurance/owner_identity_proven",
+        "/assurance/provenance_verified",
+        "/integrity/identity_signature",
+    ] {
+        required_bool(snapshot, pointer, false)?;
+    }
+    required_bool(snapshot, "/assurance/portable_unsigned_json", true)?;
     Ok(())
 }
 
@@ -262,10 +258,11 @@ fn validate_payload(payload: &Value) -> Result<Vec<u8>, String> {
     }
 
     if payload.pointer("/passport/schema").and_then(Value::as_str)
-        != Some("outilsia.ai_capability_passport.v1")
+        != Some(CAPABILITY_DOCUMENT_SCHEMA)
     {
-        return Err("AI Capability Passport v1 requis.".to_string());
+        return Err("Schema de l'instantane de capacites invalide.".to_string());
     }
+    verify_snapshot_assurance(&payload["passport"])?;
     verify_passport_integrity(&payload["passport"])?;
 
     let serialized =
@@ -282,7 +279,7 @@ fn validate_payload(payload: &Value) -> Result<Vec<u8>, String> {
 
 fn bridge_bodies(payload: &Value, serialized: Vec<u8>) -> Result<BridgeBodies, String> {
     let passport = serde_json::to_vec(payload.get("passport").unwrap_or(&Value::Null))
-        .map_err(|err| format!("Passport local illisible: {err}"))?;
+        .map_err(|err| format!("Instantane local illisible: {err}"))?;
     let models = serde_json::to_vec(&json!({
         "schema": "outilsia.local_capability_models.v1",
         "read_only": true,
@@ -450,8 +447,6 @@ pub(crate) fn start_local_capability_bridge(
             "/v1/strategy-arena".to_string(),
         ],
         allowed_origins: vec![
-            "https://strategyarena.io".to_string(),
-            "https://www.strategyarena.io".to_string(),
             "http://localhost:<port>".to_string(),
             "http://127.0.0.1:<port>".to_string(),
         ],
@@ -502,7 +497,7 @@ fn serve_bridge(
                         false,
                     )
                 } else {
-                    match read_request(&mut request) {
+                    match read_request(&mut request, MAX_REQUEST_BYTES) {
                         Ok(request) => {
                             response_for_request(&request, &token, &bodies, expires_at_ms)
                         }
@@ -518,130 +513,6 @@ fn serve_bridge(
         }
     }
     alive.store(false, Ordering::SeqCst);
-}
-
-fn read_request(request: &mut TinyRequest) -> Result<HttpRequest, String> {
-    let header_bytes = request.headers().iter().fold(
-        request.method().as_str().len() + request.url().len(),
-        |total, header| {
-            total
-                .saturating_add(header.field.as_str().len())
-                .saturating_add(header.value.as_str().len())
-                .saturating_add(4)
-        },
-    );
-    let headers = request
-        .headers()
-        .iter()
-        .map(|header| {
-            (
-                header.field.as_str().to_ascii_lowercase().to_string(),
-                header.value.as_str().to_string(),
-            )
-        })
-        .collect::<HashMap<_, _>>();
-    if headers.contains_key("transfer-encoding") {
-        return Err("transfer_encoding_not_supported".to_string());
-    }
-    let content_length = request.body_length().unwrap_or(0);
-    if header_bytes.saturating_add(content_length) > MAX_REQUEST_BYTES {
-        return Err("request_too_large".to_string());
-    }
-    let mut body = Vec::with_capacity(content_length);
-    request
-        .as_reader()
-        .take((MAX_REQUEST_BYTES + 1) as u64)
-        .read_to_end(&mut body)
-        .map_err(|_| "request_body_unreadable".to_string())?;
-    if body.len() > MAX_REQUEST_BYTES {
-        return Err("request_too_large".to_string());
-    }
-    Ok(HttpRequest {
-        method: request.method().as_str().to_string(),
-        path: request.url().to_string(),
-        headers,
-        body,
-    })
-}
-
-fn tiny_response(raw: Vec<u8>) -> TinyResponse<Cursor<Vec<u8>>> {
-    let split = raw
-        .windows(4)
-        .position(|window| window == b"\r\n\r\n")
-        .map(|index| index + 4)
-        .unwrap_or(raw.len());
-    let head = String::from_utf8_lossy(&raw[..split.saturating_sub(4)]);
-    let mut lines = head.lines();
-    let status = lines
-        .next()
-        .and_then(|line| line.split_whitespace().nth(1))
-        .and_then(|value| value.parse::<u16>().ok())
-        .unwrap_or(500);
-    let headers = lines
-        .filter_map(|line| line.split_once(':'))
-        .filter(|(name, _)| {
-            !name.eq_ignore_ascii_case("content-length") && !name.eq_ignore_ascii_case("connection")
-        })
-        .filter_map(|(name, value)| Header::from_bytes(name.trim(), value.trim()).ok())
-        .collect::<Vec<_>>();
-    let body = raw[split..].to_vec();
-    let length = body.len();
-    TinyResponse::new(
-        StatusCode(status),
-        headers,
-        Cursor::new(body),
-        Some(length),
-        None,
-    )
-}
-
-fn local_dev_origin(origin: &str, prefix: &str) -> bool {
-    if origin == prefix.trim_end_matches(':') {
-        return true;
-    }
-    origin
-        .strip_prefix(prefix)
-        .and_then(|port| port.parse::<u16>().ok())
-        .is_some()
-}
-
-fn allowed_origin(origin: &str) -> bool {
-    matches!(
-        origin,
-        "https://strategyarena.io" | "https://www.strategyarena.io"
-    ) || local_dev_origin(origin, "http://localhost:")
-        || local_dev_origin(origin, "http://127.0.0.1:")
-}
-
-fn allowed_host(host: &str) -> bool {
-    let normalized = host.trim().to_ascii_lowercase();
-    ["127.0.0.1", "localhost"].iter().any(|name| {
-        normalized == *name
-            || normalized
-                .strip_prefix(&format!("{name}:"))
-                .and_then(|port| port.parse::<u16>().ok())
-                .is_some()
-    })
-}
-
-fn constant_time_eq(left: &str, right: &str) -> bool {
-    if left.len() != right.len() {
-        return false;
-    }
-    left.as_bytes()
-        .iter()
-        .zip(right.as_bytes())
-        .fold(0_u8, |difference, (a, b)| difference | (a ^ b))
-        == 0
-}
-
-fn authorized(request: &HttpRequest, expected_token: &str) -> bool {
-    request
-        .headers
-        .get("authorization")
-        .and_then(|value| value.strip_prefix("Bearer "))
-        .map(|token| constant_time_eq(expected_token, token))
-        .unwrap_or(false)
 }
 
 fn response_for_request(
@@ -891,7 +762,7 @@ fn mcp_initialize_result(params: Option<&Value>) -> Value {
             "name": "OutilsIA Local Cockpit",
             "version": MCP_SERVER_VERSION
         },
-        "instructions": "Serveur MCP local OutilsIA strictement en lecture seule. Utilise ses outils pour consulter l'instantané courant du matériel, du Hardware Doctor, des modèles installés, des benchmarks, de la recommandation et du Capability Passport. Il ne déclenche aucun scan, modèle, benchmark, téléchargement, fichier, backtest ou ordre de trading. Toute action locale reste dans l'application desktop avec consentement humain."
+        "instructions": "Serveur MCP local OutilsIA strictement en lecture seule. Utilise ses outils pour consulter l'instantané courant du matériel, du Hardware Doctor, des modèles installés, des benchmarks et de la recommandation. Le checksum du document prouve sa cohérence, jamais sa provenance. Le serveur ne déclenche aucun scan, modèle, benchmark, téléchargement, fichier, backtest ou ordre de trading. Toute action locale reste dans l'application desktop avec consentement humain."
     })
 }
 
@@ -925,7 +796,7 @@ fn mcp_tool_definitions() -> Vec<Value> {
         mcp_tool_definition(
             MCP_TOOL_NAMES[1],
             "Profil matériel",
-            "Lit le profil matériel déjà capturé dans l'AI Capability Passport actif. Ne déclenche aucune sonde système.",
+            "Lit le profil matériel déjà capturé dans l'instantané de capacités actif. Ne déclenche aucune sonde système.",
         ),
         mcp_tool_definition(
             MCP_TOOL_NAMES[2],
@@ -945,12 +816,12 @@ fn mcp_tool_definitions() -> Vec<Value> {
         mcp_tool_definition(
             MCP_TOOL_NAMES[5],
             "Preuves de benchmark",
-            "Retourne uniquement les preuves de benchmark incluses dans le Passport actif, sans prompt ni sortie brute.",
+            "Retourne uniquement les preuves de benchmark incluses dans l'instantané actif, sans prompt ni sortie brute.",
         ),
         mcp_tool_definition(
             MCP_TOOL_NAMES[6],
-            "Capability Passport",
-            "Lit l'AI Capability Passport complet et son empreinte d'intégrité. Le document reste local.",
+            "Instantané de capacités IA",
+            "Lit l'instantané de capacités complet et son checksum de cohérence. Le document reste local, non signé et sans provenance attestée.",
         ),
         mcp_tool_definition(
             MCP_TOOL_NAMES[7],
@@ -1075,8 +946,8 @@ fn mcp_resource_definitions() -> Vec<Value> {
     vec![
         json!({
             "uri": "outilsia://passport/current",
-            "name": "AI Capability Passport actif",
-            "description": "Snapshot local signé des capacités IA de la machine.",
+            "name": "Instantané de capacités IA actif",
+            "description": "Instantané local non signé ; son checksum atteste seulement la cohérence du JSON.",
             "mimeType": "application/json"
         }),
         json!({
@@ -1143,12 +1014,21 @@ fn json_response(
     origin: Option<&str>,
     bearer_challenge: bool,
 ) -> Vec<u8> {
-    let bytes = if status == 204 {
-        Vec::new()
-    } else {
-        serde_json::to_vec(body).unwrap_or_else(|_| b"{\"error\":\"serialization\"}".to_vec())
-    };
-    raw_json_response(status, label, &bytes, origin, bearer_challenge)
+    build_json_response(
+        status,
+        label,
+        body,
+        JsonResponsePolicy {
+            allowed_methods: "GET, POST, OPTIONS",
+            allowed_headers:
+                "Authorization, Content-Type, Accept, MCP-Protocol-Version, MCP-Session-Id",
+            origin,
+            deny_browser_origin: false,
+            allow_private_network: true,
+            protocol_version: Some(MCP_PROTOCOL_VERSION),
+            bearer_realm: bearer_challenge.then_some("OutilsIA Local Capability Bridge"),
+        },
+    )
 }
 
 fn raw_json_response(
@@ -1158,42 +1038,27 @@ fn raw_json_response(
     origin: Option<&str>,
     bearer_challenge: bool,
 ) -> Vec<u8> {
-    let mut headers = vec![
-        format!("HTTP/1.1 {status} {label}"),
-        "Content-Type: application/json; charset=utf-8".to_string(),
-        format!("Content-Length: {}", body.len()),
-        "Connection: close".to_string(),
-        "Cache-Control: no-store, max-age=0".to_string(),
-        "Pragma: no-cache".to_string(),
-        "X-Content-Type-Options: nosniff".to_string(),
-        "Content-Security-Policy: default-src 'none'; frame-ancestors 'none'".to_string(),
-        "Referrer-Policy: no-referrer".to_string(),
-        "Access-Control-Allow-Methods: GET, POST, OPTIONS".to_string(),
-        "Access-Control-Allow-Headers: Authorization, Content-Type, Accept, MCP-Protocol-Version, MCP-Session-Id".to_string(),
-        "Access-Control-Expose-Headers: MCP-Protocol-Version".to_string(),
-        "Access-Control-Max-Age: 60".to_string(),
-        format!("MCP-Protocol-Version: {MCP_PROTOCOL_VERSION}"),
-        "Vary: Origin".to_string(),
-    ];
-    if let Some(value) = origin.filter(|value| allowed_origin(value)) {
-        headers.push(format!("Access-Control-Allow-Origin: {value}"));
-        headers.push("Access-Control-Allow-Private-Network: true".to_string());
-    }
-    if bearer_challenge {
-        headers.push(
-            "WWW-Authenticate: Bearer realm=\"OutilsIA Local Capability Bridge\"".to_string(),
-        );
-    }
-    headers.push(String::new());
-    headers.push(String::new());
-    let mut response = headers.join("\r\n").into_bytes();
-    response.extend_from_slice(body);
-    response
+    build_raw_json_response(
+        status,
+        label,
+        body,
+        JsonResponsePolicy {
+            allowed_methods: "GET, POST, OPTIONS",
+            allowed_headers:
+                "Authorization, Content-Type, Accept, MCP-Protocol-Version, MCP-Session-Id",
+            origin,
+            deny_browser_origin: false,
+            allow_private_network: true,
+            protocol_version: Some(MCP_PROTOCOL_VERSION),
+            bearer_realm: bearer_challenge.then_some("OutilsIA Local Capability Bridge"),
+        },
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::io::{Read, Write};
     use std::net::TcpStream;
 
@@ -1201,14 +1066,28 @@ mod tests {
 
     fn valid_payload() -> Value {
         let mut passport = json!({
-            "schema": "outilsia.ai_capability_passport.v1",
-            "passport_version": "1.2.0",
+            "schema": CAPABILITY_DOCUMENT_SCHEMA,
+            "document_kind": CAPABILITY_DOCUMENT_KIND,
+            "passport_version": CAPABILITY_DOCUMENT_VERSION,
+            "assurance": {
+                "level": CAPABILITY_ASSURANCE_LEVEL,
+                "producer_layer": "tauri_webview",
+                "digest_generated_by": "web_crypto_sha256",
+                "rust_rederived": false,
+                "os_key_attested": false,
+                "machine_identity_proven": false,
+                "owner_identity_proven": false,
+                "provenance_verified": false,
+                "portable_unsigned_json": true
+            },
             "machine": {"gpu": "RTX test", "ram_gb": 32}
         });
         passport["integrity"] = json!({
             "algorithm": "SHA-256",
             "canonicalization": "recursive-key-sort-json-v1",
             "scope": "canonical_document_without_integrity",
+            "identity_signature": false,
+            "verification_semantics": "coherence_not_provenance",
             "digest": canonical_sha256(&passport)
         });
         json!({
@@ -1318,6 +1197,37 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_cannot_claim_signature_attestation_or_provenance() {
+        for pointer in [
+            "/passport/assurance/rust_rederived",
+            "/passport/assurance/os_key_attested",
+            "/passport/assurance/machine_identity_proven",
+            "/passport/assurance/owner_identity_proven",
+            "/passport/assurance/provenance_verified",
+            "/passport/integrity/identity_signature",
+        ] {
+            let mut payload = valid_payload();
+            *payload.pointer_mut(pointer).expect("assurance field") = Value::Bool(true);
+            let passport = payload.pointer_mut("/passport").expect("passport");
+            let unsigned = passport.as_object_mut().expect("passport object");
+            unsigned.remove("integrity");
+            let digest = canonical_sha256(passport);
+            passport["integrity"] = json!({
+                "algorithm": "SHA-256",
+                "canonicalization": "recursive-key-sort-json-v1",
+                "scope": "canonical_document_without_integrity",
+                "identity_signature": pointer.ends_with("identity_signature"),
+                "verification_semantics": "coherence_not_provenance",
+                "digest": digest
+            });
+            assert!(
+                validate_payload(&payload).is_err(),
+                "claim should be rejected: {pointer}"
+            );
+        }
+    }
+
+    #[test]
     fn canonical_digest_matches_javascript_reference_vector() {
         let value = json!({
             "z": 1,
@@ -1360,7 +1270,7 @@ mod tests {
                 "GET",
                 "/v1/capabilities",
                 Some(&token),
-                Some("https://strategyarena.io"),
+                Some("http://127.0.0.1:5173"),
             ),
             &token,
             &bodies,
@@ -1369,8 +1279,21 @@ mod tests {
         let authorized_text = String::from_utf8_lossy(&authorized);
         assert!(response_status(&authorized).contains("200 OK"));
         assert!(authorized_text.contains("qwen3:8b"));
-        assert!(authorized_text.contains("Access-Control-Allow-Origin: https://strategyarena.io"));
+        assert!(authorized_text.contains("Access-Control-Allow-Origin: http://127.0.0.1:5173"));
         assert!(authorized_text.contains("Access-Control-Allow-Private-Network: true"));
+
+        let remote_origin = response_for_request(
+            &request(
+                "GET",
+                "/v1/capabilities",
+                Some(&token),
+                Some("https://strategyarena.io"),
+            ),
+            &token,
+            &bodies,
+            expires,
+        );
+        assert!(response_status(&remote_origin).contains("403 Forbidden"));
 
         let write = response_for_request(
             &request("POST", "/v1/capabilities", Some(&token), None),

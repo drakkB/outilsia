@@ -14,6 +14,7 @@ mod forgebench_sandbox;
 mod forgebench_vault;
 mod local_action_lane;
 mod local_capability_bridge;
+mod local_mcp_http;
 #[cfg(test)]
 mod mcp_sdk_conformance;
 mod workstack_arena;
@@ -48,9 +49,11 @@ use forgebench_vault::{
     clear_forgebench_hidden_suite, get_forgebench_hidden_suite_status, seal_forgebench_hidden_suite,
 };
 use local_action_lane::{
-    approve_local_action_request, begin_local_action_execution, finish_local_action_execution,
-    get_local_action_lane_status, list_local_action_requests, reject_local_action_request_state,
-    start_local_action_lane, stop_local_action_lane, LocalActionExecution,
+    approve_local_action_request_after_native_dialog, begin_local_action_execution,
+    finish_local_action_execution, get_local_action_lane_status, list_local_action_requests,
+    local_action_native_confirmation_prompt, reject_local_action_request_after_native_dialog,
+    start_local_action_lane, stop_local_action_lane, ApproveLocalActionRequest,
+    LocalActionExecution, NativeActionConfirmationKind, NativeActionConfirmationPrompt,
     RejectLocalActionRequest,
 };
 use local_capability_bridge::{
@@ -71,6 +74,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env, fs};
 use sysinfo::{Disks, System};
 use tauri::{AppHandle, Emitter, Manager, State};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use workstack_arena::run_workstack_arena_codex_pilot;
 use workstack_composer::compile_work_card;
 use workstack_review::record_workstack_human_review;
@@ -5285,8 +5289,36 @@ async fn response_json(response: reqwest::Response) -> Result<Value, String> {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 struct ExecuteLocalActionRequest {
+    schema: String,
     request_id: String,
     plan_sha256: String,
+}
+
+const LOCAL_ACTION_EXECUTION_CONFIRMATION_SCHEMA: &str =
+    "outilsia.local_action_execution_confirmation.v1";
+
+async fn show_native_action_confirmation(
+    app: &AppHandle,
+    prompt: NativeActionConfirmationPrompt,
+) -> Result<bool, String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "Fenetre native OutilsIA indisponible.".to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        window
+            .dialog()
+            .message(prompt.message)
+            .title(prompt.title)
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                prompt.confirm_label,
+                prompt.cancel_label,
+            ))
+            .parent(&window)
+            .blocking_show()
+    })
+    .await
+    .map_err(|error| format!("Dialogue systeme OutilsIA interrompu: {error}"))
 }
 
 fn write_local_action_export(
@@ -5343,12 +5375,46 @@ fn write_local_action_export(
 }
 
 #[tauri::command]
-async fn execute_local_action_request(
+async fn request_native_local_action_approval(
+    app: AppHandle,
+    request: ApproveLocalActionRequest,
+) -> Result<local_action_lane::LocalActionRequestView, String> {
+    let prompt = local_action_native_confirmation_prompt(
+        &request.request_id,
+        &request.plan_sha256,
+        NativeActionConfirmationKind::Approval,
+    )?;
+    if !show_native_action_confirmation(&app, prompt).await? {
+        return Err("Autorisation annulee dans la boite de dialogue systeme.".to_string());
+    }
+    approve_local_action_request_after_native_dialog(
+        request,
+        NativeActionConfirmationKind::Approval,
+    )
+}
+
+#[tauri::command]
+async fn request_native_local_action_execution(
     app: AppHandle,
     active_installs: State<'_, ActiveInstalls>,
     request: ExecuteLocalActionRequest,
 ) -> Result<Value, String> {
-    let execution = begin_local_action_execution(&request.request_id, &request.plan_sha256)?;
+    if request.schema != LOCAL_ACTION_EXECUTION_CONFIRMATION_SCHEMA {
+        return Err("Schema de confirmation d'execution invalide.".to_string());
+    }
+    let prompt = local_action_native_confirmation_prompt(
+        &request.request_id,
+        &request.plan_sha256,
+        NativeActionConfirmationKind::Execution,
+    )?;
+    if !show_native_action_confirmation(&app, prompt).await? {
+        return Err("Execution annulee dans la boite de dialogue systeme.".to_string());
+    }
+    let execution = begin_local_action_execution(
+        &request.request_id,
+        &request.plan_sha256,
+        NativeActionConfirmationKind::Execution,
+    )?;
     let request_id = execution.request_id().to_string();
     let plan_sha256 = execution.plan_sha256().to_string();
     let started = Instant::now();
@@ -5534,11 +5600,22 @@ async fn execute_local_action_request(
 }
 
 #[tauri::command]
-fn reject_local_action_request(
+async fn request_native_local_action_rejection(
     app: AppHandle,
     request: RejectLocalActionRequest,
 ) -> Result<Value, String> {
-    let result = reject_local_action_request_state(request)?;
+    let prompt = local_action_native_confirmation_prompt(
+        &request.request_id,
+        &request.plan_sha256,
+        NativeActionConfirmationKind::Rejection,
+    )?;
+    if !show_native_action_confirmation(&app, prompt).await? {
+        return Err("Refus annule dans la boite de dialogue systeme.".to_string());
+    }
+    let result = reject_local_action_request_after_native_dialog(
+        request,
+        NativeActionConfirmationKind::Rejection,
+    )?;
     let receipt = result
         .get("receipt")
         .cloned()
@@ -5795,6 +5872,7 @@ fn revoke_benchmark_contribution(
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(ActiveInstalls::default())
         .manage(BenchmarkCommonsState::default())
         .invoke_handler(tauri::generate_handler![
@@ -5858,9 +5936,9 @@ pub fn run() {
             get_local_action_lane_status,
             stop_local_action_lane,
             list_local_action_requests,
-            approve_local_action_request,
-            reject_local_action_request,
-            execute_local_action_request,
+            request_native_local_action_approval,
+            request_native_local_action_rejection,
+            request_native_local_action_execution,
             prepare_benchmark_contribution,
             approve_benchmark_contribution,
             export_benchmark_contribution,

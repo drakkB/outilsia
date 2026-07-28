@@ -17,9 +17,11 @@ use tauri::{AppHandle, Manager};
 
 const APPEND_REQUEST_SCHEMA: &str = "outilsia.evidence_append_request.v1";
 const APPEND_RESULT_SCHEMA: &str = "outilsia.evidence_append_result.v1";
-const LEDGER_SCHEMA: &str = "outilsia.evidence_ledger.v1";
+const LEGACY_LEDGER_SCHEMA_V1: &str = "outilsia.evidence_ledger.v1";
+const LEDGER_SCHEMA: &str = "outilsia.evidence_ledger.v2";
+const LEDGER_STORAGE_VERSION: u64 = 2;
 const ENTRY_SCHEMA: &str = "outilsia.evidence_entry.v1";
-const CONTRACT_VERSION: &str = "2026-07-12";
+const CONTRACT_VERSION: &str = "2026-07-28";
 const LEDGER_FILENAME: &str = "evidence-ledger-v1.json";
 const MAX_ENTRIES: usize = 500;
 const MAX_LEDGER_BYTES: usize = 2 * 1024 * 1024;
@@ -102,7 +104,9 @@ fn verify_document_integrity(document: &Value, label: &str) -> Result<String, St
 fn empty_ledger() -> Result<Value, String> {
     let mut ledger = json!({
         "schema": LEDGER_SCHEMA,
+        "storage_version": LEDGER_STORAGE_VERSION,
         "contract_version": CONTRACT_VERSION,
+        "migration_history": [],
         "ledger_id": Value::Null,
         "created_at_ms": Value::Null,
         "updated_at_ms": Value::Null,
@@ -298,10 +302,7 @@ fn verify_entry(
     verify_document_integrity(entry, "d'entree")
 }
 
-fn verify_ledger(ledger: &Value) -> Result<(), String> {
-    if ledger.get("schema").and_then(Value::as_str) != Some(LEDGER_SCHEMA) {
-        return Err("Contrat Evidence Ledger invalide.".to_string());
-    }
+fn verify_ledger_contents(ledger: &Value) -> Result<(), String> {
     let entries = ledger
         .get("entries")
         .and_then(Value::as_array)
@@ -332,7 +333,78 @@ fn verify_ledger(ledger: &Value) -> Result<(), String> {
     Ok(())
 }
 
-fn read_ledger_file(path: &Path) -> Result<Value, String> {
+fn verify_legacy_ledger_v1(ledger: &Value) -> Result<(), String> {
+    if ledger.get("schema").and_then(Value::as_str) != Some(LEGACY_LEDGER_SCHEMA_V1) {
+        return Err("Contrat Evidence Ledger historique invalide.".to_string());
+    }
+    verify_ledger_contents(ledger)
+}
+
+fn verify_ledger(ledger: &Value) -> Result<(), String> {
+    if ledger.get("schema").and_then(Value::as_str) != Some(LEDGER_SCHEMA)
+        || ledger.get("storage_version").and_then(Value::as_u64) != Some(LEDGER_STORAGE_VERSION)
+        || !ledger.get("migration_history").is_some_and(Value::is_array)
+    {
+        return Err("Contrat Evidence Ledger invalide.".to_string());
+    }
+    verify_ledger_contents(ledger)
+}
+
+#[derive(Debug)]
+struct LoadedLedger {
+    ledger: Value,
+    migrated: bool,
+}
+
+fn migrate_ledger_to_current(mut ledger: Value) -> Result<LoadedLedger, String> {
+    match ledger.get("schema").and_then(Value::as_str) {
+        Some(LEDGER_SCHEMA) => {
+            verify_ledger(&ledger)?;
+            Ok(LoadedLedger {
+                ledger,
+                migrated: false,
+            })
+        }
+        Some(LEGACY_LEDGER_SCHEMA_V1) => {
+            verify_legacy_ledger_v1(&ledger)?;
+            let previous_document_sha256 = ledger
+                .pointer("/integrity/digest")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "Empreinte du Ledger historique absente.".to_string())?
+                .to_string();
+            let entries_preserved = ledger
+                .get("entries")
+                .and_then(Value::as_array)
+                .map(Vec::len)
+                .unwrap_or_default();
+            ledger["schema"] = json!(LEDGER_SCHEMA);
+            ledger["storage_version"] = json!(LEDGER_STORAGE_VERSION);
+            ledger["contract_version"] = json!(CONTRACT_VERSION);
+            ledger["migration_history"] = json!([{
+                "from_schema": LEGACY_LEDGER_SCHEMA_V1,
+                "to_schema": LEDGER_SCHEMA,
+                "method": "lossless_chain_preserving_resign",
+                "entries_preserved": entries_preserved,
+                "previous_document_sha256": previous_document_sha256
+            }]);
+            sign_document(&mut ledger)?;
+            verify_ledger(&ledger)?;
+            Ok(LoadedLedger {
+                ledger,
+                migrated: true,
+            })
+        }
+        Some(schema) => Err(format!(
+            "Version Evidence Ledger non prise en charge ({schema}). Le fichier local est conserve sans modification."
+        )),
+        None => Err(
+            "Version Evidence Ledger absente. Le fichier local est conserve sans modification."
+                .to_string(),
+        ),
+    }
+}
+
+fn read_ledger_file(path: &Path) -> Result<LoadedLedger, String> {
     let bytes =
         fs::read(path).map_err(|error| format!("Impossible de lire Evidence Ledger: {error}"))?;
     if bytes.len() > MAX_LEDGER_BYTES {
@@ -340,8 +412,7 @@ fn read_ledger_file(path: &Path) -> Result<Value, String> {
     }
     let ledger = serde_json::from_slice::<Value>(&bytes)
         .map_err(|error| format!("Evidence Ledger local corrompu: {error}"))?;
-    verify_ledger(&ledger)?;
-    Ok(ledger)
+    migrate_ledger_to_current(ledger)
 }
 
 fn read_ledger(app: &AppHandle) -> Result<Value, String> {
@@ -351,14 +422,21 @@ fn read_ledger(app: &AppHandle) -> Result<Value, String> {
 
 fn read_ledger_path(path: &Path) -> Result<Value, String> {
     if path.exists() {
-        return read_ledger_file(path);
+        let loaded = read_ledger_file(path)?;
+        if loaded.migrated {
+            write_ledger_path(path, &loaded.ledger)?;
+        }
+        return Ok(loaded.ledger);
     }
     let backup = backup_path(path);
     if backup.exists() {
-        let ledger = read_ledger_file(&backup)?;
+        let loaded = read_ledger_file(&backup)?;
         fs::rename(&backup, path)
             .map_err(|error| format!("Restauration Evidence Ledger impossible: {error}"))?;
-        return Ok(ledger);
+        if loaded.migrated {
+            write_ledger_path(path, &loaded.ledger)?;
+        }
+        return Ok(loaded.ledger);
     }
     empty_ledger()
 }
@@ -2230,5 +2308,89 @@ mod tests {
         assert!(path.exists());
         assert!(!backup.exists());
         fs::remove_dir_all(directory).expect("remove temporary ledger directory");
+    }
+
+    #[test]
+    fn legacy_v1_ledger_migrates_atomically_without_losing_the_chain() {
+        let directory = std::env::temp_dir().join(format!(
+            "outilsia-evidence-ledger-migration-{}-{}",
+            std::process::id(),
+            unix_ms()
+        ));
+        fs::create_dir_all(&directory).expect("temporary migration directory");
+        let path = directory.join(LEDGER_FILENAME);
+        let (mut legacy, _) = append_to_ledger(
+            empty_ledger().expect("empty"),
+            "workstack_compiled",
+            &workstack_source(),
+            1_000,
+        )
+        .expect("append");
+        let expected_head = legacy["head_digest"].clone();
+        legacy["schema"] = json!(LEGACY_LEDGER_SCHEMA_V1);
+        legacy["contract_version"] = json!("2026-07-12");
+        legacy
+            .as_object_mut()
+            .expect("legacy object")
+            .remove("storage_version");
+        legacy
+            .as_object_mut()
+            .expect("legacy object")
+            .remove("migration_history");
+        sign_document(&mut legacy).expect("sign legacy ledger");
+        verify_legacy_ledger_v1(&legacy).expect("valid legacy ledger");
+        let previous_document_sha256 = legacy["integrity"]["digest"]
+            .as_str()
+            .expect("legacy digest")
+            .to_string();
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&legacy).expect("serialize legacy"),
+        )
+        .expect("write legacy ledger");
+
+        let migrated = read_ledger_path(&path).expect("migrate legacy ledger");
+        assert_eq!(migrated["schema"], LEDGER_SCHEMA);
+        assert_eq!(migrated["storage_version"], LEDGER_STORAGE_VERSION);
+        assert_eq!(migrated["head_digest"], expected_head);
+        assert_eq!(migrated["entries"].as_array().map(Vec::len), Some(1));
+        assert_eq!(
+            migrated["migration_history"][0]["previous_document_sha256"],
+            previous_document_sha256
+        );
+        assert_eq!(
+            migrated["migration_history"][0]["method"],
+            "lossless_chain_preserving_resign"
+        );
+        verify_ledger(&migrated).expect("verified migrated ledger");
+
+        let persisted = read_ledger_file(&path).expect("read persisted migration");
+        assert!(!persisted.migrated);
+        assert_eq!(persisted.ledger["schema"], LEDGER_SCHEMA);
+        assert!(!backup_path(&path).exists());
+        fs::remove_dir_all(directory).expect("remove migration directory");
+    }
+
+    #[test]
+    fn unknown_ledger_version_is_rejected_without_touching_the_file() {
+        let directory = std::env::temp_dir().join(format!(
+            "outilsia-evidence-ledger-future-{}-{}",
+            std::process::id(),
+            unix_ms()
+        ));
+        fs::create_dir_all(&directory).expect("temporary future directory");
+        let path = directory.join(LEDGER_FILENAME);
+        let mut future = empty_ledger().expect("empty");
+        future["schema"] = json!("outilsia.evidence_ledger.v99");
+        future["storage_version"] = json!(99);
+        sign_document(&mut future).expect("sign future ledger");
+        let bytes = serde_json::to_vec_pretty(&future).expect("serialize future ledger");
+        fs::write(&path, &bytes).expect("write future ledger");
+
+        let error = read_ledger_path(&path).expect_err("future schema must be rejected");
+        assert!(error.contains("fichier local est conserve sans modification"));
+        assert_eq!(fs::read(&path).expect("read untouched ledger"), bytes);
+        assert!(!backup_path(&path).exists());
+        fs::remove_dir_all(directory).expect("remove future directory");
     }
 }

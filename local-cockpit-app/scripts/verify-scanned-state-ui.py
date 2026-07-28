@@ -60,9 +60,23 @@ def assert_idle_console_button_hidden(page, label: str):
 
 
 def assert_single_header_action(page, label: str):
-    primary = page.locator("#prepareBtn").inner_text(timeout=5000)
-    if "Actualiser l'analyse" not in primary and "Analyser ce PC" not in primary:
-        raise AssertionError(f"{label}: unstable header action label: {primary!r}")
+    expected = page.evaluate("() => window.__OUTILSIA_TEST__.primaryActionState()")
+    primary_button = page.locator("#prepareBtn")
+    primary_label = primary_button.locator("span").inner_text(timeout=5000).strip()
+    primary_detail = primary_button.locator("small").inner_text(timeout=5000).strip()
+    primary_command = primary_button.get_attribute("data-primary-command")
+    if primary_label != expected["label"]:
+        raise AssertionError(
+            f"{label}: header action label {primary_label!r} != {expected['label']!r}"
+        )
+    if primary_detail != expected["detail"]:
+        raise AssertionError(
+            f"{label}: header action detail {primary_detail!r} != {expected['detail']!r}"
+        )
+    if primary_command != expected["command"]:
+        raise AssertionError(
+            f"{label}: header action command {primary_command!r} != {expected['command']!r}"
+        )
     hidden = page.evaluate(
         """() => ['#scanBtn', '#checkBtn', '#saveBtn', '#topAccountBtn']
           .filter((selector) => {

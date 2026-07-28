@@ -58,9 +58,23 @@ def assert_no_horizontal_overflow(page, label: str):
 def assert_first_screen_contract(page, label: str, scanned: bool = False):
     if not visible(page, "#prepareBtn"):
         raise AssertionError(f"{label}: main analysis button must be visible")
-    primary = text(page, "#prepareBtn")
-    if "Analyser ce PC" not in primary and "Actualiser l'analyse" not in primary:
-        raise AssertionError(f"{label}: primary action unclear: {primary!r}")
+    expected_action = page.evaluate("() => window.__OUTILSIA_TEST__.primaryActionState()")
+    primary_button = page.locator("#prepareBtn")
+    primary_label = primary_button.locator("span").inner_text(timeout=5000).strip()
+    primary_detail = primary_button.locator("small").inner_text(timeout=5000).strip()
+    primary_command = primary_button.get_attribute("data-primary-command")
+    if primary_label != expected_action["label"]:
+        raise AssertionError(
+            f"{label}: primary label {primary_label!r} != {expected_action['label']!r}"
+        )
+    if primary_detail != expected_action["detail"]:
+        raise AssertionError(
+            f"{label}: primary detail {primary_detail!r} != {expected_action['detail']!r}"
+        )
+    if primary_command != expected_action["command"]:
+        raise AssertionError(
+            f"{label}: primary command {primary_command!r} != {expected_action['command']!r}"
+        )
 
     if not visible(page, ".machine-summary-strip"):
         raise AssertionError(f"{label}: machine summary must be immediately visible")

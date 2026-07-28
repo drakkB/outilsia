@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HTML = ROOT / "src" / "index.html"
 APP_JS = ROOT / "src" / "app.js"
 RUST = ROOT / "src-tauri" / "src" / "local_action_lane.rs"
+LIB_RS = ROOT / "src-tauri" / "src" / "lib.rs"
 READ_ONLY_RUST = ROOT / "src-tauri" / "src" / "local_capability_bridge.rs"
 EXTERNAL_PROBE = ROOT / "scripts" / "probe-local-action-lane.py"
 OUT = ROOT / ".artifacts" / "visual-ui"
@@ -19,6 +20,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 def assert_static_contract() -> None:
     app_js = APP_JS.read_text(encoding="utf-8")
     rust = RUST.read_text(encoding="utf-8")
+    lib_rs = LIB_RS.read_text(encoding="utf-8")
     read_only = READ_ONLY_RUST.read_text(encoding="utf-8")
     external_probe = EXTERNAL_PROBE.read_text(encoding="utf-8")
     exposed_tools_match = re.search(
@@ -38,6 +40,9 @@ def assert_static_contract() -> None:
         '"outilsia_get_action_request"',
         '"outilsia_cancel_action_request"',
         "CAPABILITY_TTL_MS: u128 = 2 * 60 * 1000",
+        'ACTION_LANE_CONTRACT_VERSION: &str = "2026-07-28-native-consent-v1"',
+        "NativeActionConfirmationKind",
+        '"os_native_dialog"',
         "actions_execute_over_mcp: false",
         "queue_persisted: false",
         "token_persisted: false",
@@ -56,15 +61,68 @@ def assert_static_contract() -> None:
             raise AssertionError(f"read-only MCP widened: {forbidden}")
 
     for expected in [
-        'invoke("approve_local_action_request"',
-        'invoke("execute_local_action_request"',
-        'invoke("reject_local_action_request"',
-        'data-local-action-ack=',
-        "client IA ne peut pas cocher cette case",
-        "Cette capacité sera consommée immédiatement",
+        'invoke("request_native_local_action_approval"',
+        'invoke("request_native_local_action_execution"',
+        'invoke("request_native_local_action_rejection"',
+        "boîte de dialogue du système",
+        "Aucun script de cette page ne peut fournir la décision",
+        "Une seconde boîte de dialogue système est obligatoire",
     ]:
         if expected not in app_js:
             raise AssertionError(f"missing native consent guard: {expected}")
+
+    for forbidden in [
+        'invoke("approve_local_action_request"',
+        'invoke("execute_local_action_request"',
+        'invoke("reject_local_action_request"',
+        "human_acknowledged",
+        "data-local-action-ack=",
+    ]:
+        if forbidden in app_js or forbidden in rust:
+            raise AssertionError(f"scriptable consent path remains: {forbidden}")
+
+    for expected in [
+        ".plugin(tauri_plugin_dialog::init())",
+        "show_native_action_confirmation",
+        "MessageDialogButtons::OkCancelCustom",
+        "blocking_show()",
+        "NativeActionConfirmationKind::Approval",
+        "NativeActionConfirmationKind::Execution",
+        "NativeActionConfirmationKind::Rejection",
+    ]:
+        if expected not in lib_rs:
+            raise AssertionError(f"missing OS-native Rust confirmation: {expected}")
+    approval_body = app_js[
+        app_js.index("async function approveLocalActionRequest"):
+        app_js.index("async function rejectLocalActionRequest")
+    ]
+    execution_body = app_js[
+        app_js.index("async function executeLocalActionRequest"):
+        app_js.index("function boardObserverMissingLabel")
+    ]
+    if "window.confirm" in approval_body or "window.confirm" in execution_body:
+        raise AssertionError("Action Lane approval/execution still trusts a webview dialog")
+    prepare_body = rust[
+        rust.index("fn prepare_action("):
+        rust.index("fn reject_unknown_arguments")
+    ]
+    for forbidden in [
+        "local_action_install_preflight",
+        "local_action_model_is_installed",
+        "Command::new",
+        ".output()",
+    ]:
+        if forbidden in prepare_body:
+            raise AssertionError(
+                f"Action Lane MCP preparation still launches a live probe: {forbidden}"
+            )
+    for expected in [
+        '"live_probes_run_during_prepare": false',
+        '"native_preflight_required_before_execution": true',
+        '"native_installed_check_required_before_execution": true',
+    ]:
+        if expected not in prepare_body:
+            raise AssertionError(f"missing frozen preparation boundary: {expected}")
 
     for expected in [
         'TOKEN_ENV = "OUTILSIA_LOCAL_ACTION_TOKEN"',
@@ -147,30 +205,27 @@ def verify_viewport(browser, width: int, height: int, label: str) -> Path:
         raise AssertionError(f"{label}: lifecycle cards are incomplete")
 
     approve_button = awaiting.locator('[data-local-action-approve="larq-install-ui"]')
-    acknowledgement = awaiting.locator('[data-local-action-ack="larq-install-ui"]')
-    if not approve_button.is_disabled():
-        raise AssertionError(f"{label}: approval is enabled without native acknowledgement")
+    if approve_button.is_disabled():
+        raise AssertionError(f"{label}: native authorization button is disabled")
     if awaiting.locator("[data-local-action-execute]").count() != 0:
         raise AssertionError(f"{label}: awaiting request can execute")
-    acknowledgement.check()
-    if approve_button.is_disabled():
-        raise AssertionError(f"{label}: explicit acknowledgement does not unlock approval")
     if approved.locator('[data-local-action-execute="larq-benchmark-ui"]').count() != 1:
         raise AssertionError(f"{label}: approved request lacks separate execute gesture")
-    if approved.locator("[data-local-action-ack]").count() != 0:
-        raise AssertionError(f"{label}: approved request still exposes approval checkbox")
+    if panel.locator("[data-local-action-ack]").count() != 0:
+        raise AssertionError(f"{label}: obsolete scriptable acknowledgement remains")
     if completed.locator("button").count() != 0:
         raise AssertionError(f"{label}: completed request remains actionable")
 
     for expected in [
-        "aucun outil d'exécution",
+        "aucune sonde ni exécution pendant la préparation",
         "peut préparer des demandes",
         "Installer un modèle Ollama",
         "Benchmarker un modèle installé",
         "Exporter le rapport figé",
         "Plan SHA-256",
-        "Autoriser 2 min",
-        "Exécuter maintenant",
+        "Vérifier et autoriser",
+        "Confirmer l'exécution",
+        "boîte de dialogue du système",
         "4821 octets écrits",
     ]:
         if expected not in panel_text:
@@ -227,7 +282,7 @@ def main() -> None:
     print(
         "local_action_lane_ui_ok "
         f"desktop={desktop} mobile={mobile} "
-        "tools=5 approval=native execution=native token_leak=false"
+        "tools=5 approval=os_native_dialog execution=os_native_dialog token_leak=false"
     )
 
 

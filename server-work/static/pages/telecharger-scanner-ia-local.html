@@ -164,7 +164,7 @@
         <div><strong>Runtime prêt</strong><span>Le préflight refuse de lancer un pull vers un Ollama qui ne répond pas.</span></div>
         <div><strong>Budget prudent</strong><span>Taille haute estimée du modèle plus réserve disque explicite.</span></div>
         <div><strong>WSL séparé</strong><span>Le volume Linux de la distribution n'est pas confondu avec le disque système Windows.</span></div>
-        <div><strong>Aucun chemin exporté</strong><span>Rapport, PDF et Passport 1.3.0 gardent le verdict et les nombres, jamais le chemin personnel.</span></div>
+        <div><strong>Aucun chemin exporté</strong><span>Rapport, PDF et Instantané de capacités IA 1.4.0 gardent le verdict et les nombres, jamais le chemin personnel.</span></div>
       </div>
       <p class="fine">Fonction candidate, absente du build public actuel. Elle ne garantit ni les performances du modèle ni son offload GPU et ne constitue pas une preuve terrain physique.</p>
     </section>
@@ -177,7 +177,7 @@
         <div><strong>Modèles installés</strong><span>Aucun téléchargement ni installation pendant le run.</span></div>
         <div><strong>Budget fixe</strong><span>Une tâche, 2 à 3 candidats, 60 secondes maximum par modèle.</span></div>
         <div><strong>Score explicable</strong><span>Checks réussis, débit, latence et empreinte SHA-256 de chaque sortie.</span></div>
-        <div><strong>Confidentialité</strong><span>Consignes et réponses brutes exclues du rapport, PDF, MemoryForge et Passport 1.3.0.</span></div>
+        <div><strong>Confidentialité</strong><span>Consignes et réponses brutes exclues du rapport, PDF, MemoryForge et Instantané de capacités IA 1.4.0.</span></div>
       </div>
       <p class="fine">Fonction présente dans un candidat source postérieur au build public actuel. Le score compare des critères courts et bornés ; il ne mesure pas toute la qualité du modèle et ne compte jamais comme validation physique.</p>
     </section>
@@ -185,10 +185,10 @@
     <section class="wrap panel" id="passerelle-locale-capacites-ia" style="margin-bottom:18px;border-color:rgba(91,241,205,.36);background:linear-gradient(135deg,rgba(91,241,205,.10),rgba(15,23,42,.92),rgba(103,232,249,.06))">
       <span class="pill">Local Capability Bridge v1 · candidat</span>
       <h2>Une API locale temporaire pour lire les capacités, jamais pour piloter le PC</h2>
-      <p class="muted">Dans Détails, un Passport à jour peut être servi sur <code>127.0.0.1</code> pendant 15 minutes après consentement explicite. Les routes de données exigent un jeton Bearer aléatoire conservé uniquement en mémoire.</p>
+      <p class="muted">Dans l'Atelier avancé, un instantané de capacités à jour peut être servi sur <code>127.0.0.1</code> pendant 15 minutes après consentement explicite. Les routes de données exigent un jeton Bearer aléatoire conservé uniquement en mémoire.</p>
       <div class="proof" style="margin-top:14px">
         <div><strong>Désactivée par défaut</strong><span>Aucun port n'est ouvert tant que l'utilisateur ne clique pas.</span></div>
-        <div><strong>GET uniquement</strong><span>Santé, capacités, Passport, modèles et handoff Strategy Arena.</span></div>
+        <div><strong>GET uniquement</strong><span>Santé, capacités, instantané, modèles et handoff Strategy Arena.</span></div>
         <div><strong>Aucune action distante</strong><span>Pas d'installation, suppression, benchmark, chat, configuration ou accès fichiers.</span></div>
         <div><strong>Frontière quant</strong><span>Pas de backtest ni trading dans OutilsIA ; Strategy Arena reste le validateur séparé.</span></div>
       </div>
@@ -260,17 +260,17 @@
     </section>
 
     <section class="wrap panel" id="hardware-doctor-capability-passport" style="margin-bottom:18px;border-color:rgba(103,232,249,.36);background:linear-gradient(135deg,rgba(103,232,249,.10),rgba(15,23,42,.92),rgba(34,197,94,.07))">
-      <span class="pill">Hardware Doctor 2.0 + AI Capability Passport v1</span>
+      <span class="pill">Hardware Doctor 2.0 + Instantané de capacités IA 1.4.0</span>
       <h2>Mesurer le PC, prouver l'offload Ollama, exporter les capacités</h2>
       <p class="muted">Le build courant distingue la présence d'un pilote de l'utilisation réelle du GPU. Après benchmark, Ollama <code>/api/ps</code> permet de classer l'exécution CPU, hybride ou GPU et d'enregistrer le pourcentage du modèle observé en VRAM. Une sonde GPU muette reste « GPU non déterminé », jamais automatiquement « CPU-only ».</p>
       <div class="proof" style="margin-top:14px">
         <div><strong>Hardware Truth</strong><span>Driver, VRAM, P-state, PCIe, ReBAR, thermiques, fréquence et modules RAM sont sourcés ; le mode mémoire reste inconnu si le système ne l'expose pas.</span></div>
         <div><strong>Preuve runtime</strong><span>Source <code>ollama_api_ps</code>, processeur observé et pourcentage d'offload GPU.</span></div>
-        <div><strong>Passport JSON</strong><span>Machine, build, capacités, modèles, preuves benchmark et recommandation exportables.</span></div>
-        <div><strong>SHA-256</strong><span>Empreinte d'intégrité du document, explicitement pas une signature d'identité.</span></div>
+        <div><strong>Instantané JSON</strong><span>Machine, build, capacités, modèles, preuves benchmark et recommandation exportables.</span></div>
+        <div><strong>Checksum SHA-256</strong><span>Cohérence du JSON uniquement : aucune signature Rust/OS, attestation ou provenance revendiquée.</span></div>
       </div>
-      <img src="/static/images/local-cockpit/local-cockpit-capability-passport-v1.png?v=20260710" alt="Module AI Capability Passport v1 dans OutilsIA Local Cockpit avec Doctor, runtime, modèles et preuve SHA-256" width="1256" height="223" loading="lazy" style="display:block;width:100%;height:auto;margin-top:16px;border:1px solid rgba(103,232,249,.22);border-radius:12px">
-      <p class="fine">Le passeport est généré uniquement sur demande dans le mode Détails. Il exclut prompts, réponses de modèles, fichiers personnels et jetons de compte.</p>
+      <img src="/static/images/local-cockpit/local-cockpit-capability-passport-v1.png?v=20260710" alt="Module Instantané de capacités IA dans OutilsIA Local Cockpit avec Doctor, runtime, modèles et checksum SHA-256" width="1256" height="223" loading="lazy" style="display:block;width:100%;height:auto;margin-top:16px;border:1px solid rgba(103,232,249,.22);border-radius:12px">
+      <p class="fine">L'instantané est généré uniquement sur demande dans l'Atelier avancé. Il exclut prompts, réponses de modèles, fichiers personnels et jetons de compte. Fonction candidate, absente du build public actuel.</p>
     </section>
 
     <section class="wrap panel" id="runtime-driver-intelligence" style="margin-bottom:18px;border-color:rgba(251,191,36,.36);background:linear-gradient(135deg,rgba(251,191,36,.09),rgba(15,23,42,.92),rgba(103,232,249,.06))">

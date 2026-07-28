@@ -8,7 +8,7 @@ Le cockpit est séparé en sept espaces persistants : **Accueil**, **Machine**, 
 
 Le **Bilan machine** ne présente plus les modules avancés comme une liste de statuts sans issue. Il sépare quatre preuves lisibles, trois actions utiles maximum et un volet technique replié. Chaque état incomplet possède un bouton qui ouvre exactement l'espace, la section et le contrôle concernés. La comparaison par usage est présentée comme **Choisir le meilleur modèle** ; `Recommendation Engine v2` reste le nom technique dans les exports. Ouvrir ce parcours ne lance ni benchmark ni téléchargement : un second clic explicite reste requis dans `Tests > Choisir le meilleur modèle`. Le profil, les deux candidats et l'action de comparaison restent visibles ; parcours, pack, rapport et exports sont repliés. Hardware Doctor applique la même hiérarchie à ses contrôles et mesures. Les fiches modèles placent Tester, Dialogue et Bench avant le volet Force/Usage/Limite. Sur mobile, les sept espaces tiennent sur une ligne horizontale compacte.
 
-Chaque espace utilise désormais un accent visuel distinct et limité au repérage : vert pour Accueil, ambre pour Machine, bleu pour Modèles, turquoise pour Tests, corail pour Assistant, violet pour Atelier IA et gris pour Compte. Les statuts prennent la forme de badges compacts et les commandes principales reprennent l'accent actif. Les modules dépendants ne se terminent plus sur un bouton grisé : Model Autopilot et Flight Recorder renvoient vers Benchmark ; Passerelle locale vers Passport ; Workstack vers Board Observer ; Router vers Workstack ; ForgeBench vers Router. Ces relais ouvrent le prérequis sans l'exécuter automatiquement.
+Chaque espace utilise désormais un accent visuel distinct et limité au repérage : vert pour Accueil, ambre pour Machine, bleu pour Modèles, turquoise pour Tests, corail pour Assistant, violet pour Atelier IA et gris pour Compte. Les statuts prennent la forme de badges compacts et les commandes principales reprennent l'accent actif. Les modules dépendants ne se terminent plus sur un bouton grisé : Model Autopilot et Flight Recorder renvoient vers Benchmark ; Passerelle locale vers l'instantané IA ; Workstack vers Board Observer ; Router vers Workstack ; ForgeBench vers Router. Ces relais ouvrent le prérequis sans l'exécuter automatiquement.
 
 Dans **Compte**, le candidat source distingue maintenant l'installation réellement lancée de la version publique. Le binaire Rust expose son OS et son architecture cibles ; l'interface choisit alors uniquement un artefact natif du manifeste. Windows x64 préfère l'EXE, Linux présente le choix AppImage/DEB/RPM et l'absence d'un paquet compatible ne retombe jamais sur l'EXE Windows. Les états **à jour**, **mise à jour disponible**, **candidat de test**, **version candidate**, **build local** et **version à vérifier** sont séparés. Un candidat plus récent que la version publique n'est donc jamais présenté comme une invitation à rétrograder. Le panneau affiche le build public, le format, la taille et le SHA disponible ; il ouvre le téléchargement ou la page de choix, sans installation silencieuse.
 
@@ -110,16 +110,16 @@ npm run verify:private-workload-packs
 npm run verify:private-workload-seo
 ```
 
-La source canonique est `server-work/static/data/private-workload-packs.json`. Le fichier `src/private-workload-packs.js` est généré par `npm run sync:private-workload-packs`. Une campagne compare une seule tâche sur deux ou trois modèles Ollama déjà installés, avec 60 secondes maximum par modèle et zéro téléchargement. Seuls scores, checks, métriques et SHA-256 sont persistés ; les consignes personnalisées et réponses brutes sont exclues du stockage, du rapport, du PDF, de MemoryForge et du Capability Passport 1.3.0.
+La source canonique est `server-work/static/data/private-workload-packs.json`. Le fichier `src/private-workload-packs.js` est généré par `npm run sync:private-workload-packs`. Une campagne compare une seule tâche sur deux ou trois modèles Ollama déjà installés, avec 60 secondes maximum par modèle et zéro téléchargement. Seuls scores, checks, métriques et SHA-256 sont persistés ; les consignes personnalisées et réponses brutes sont exclues du stockage, du rapport, du PDF, de MemoryForge et de l'instantané de capacités IA 1.4.0. Son SHA-256 prouve uniquement la cohérence du JSON : aucune signature Rust/OS, attestation matérielle, provenance ou identité n'est revendiquée.
 
 ## Local MCP v0.1 et Capability Bridge
 
-Le serveur est désactivé par défaut et disponible uniquement dans l'espace Atelier IA après génération d'un Passport à jour. Un consentement explicite ouvre pendant 15 minutes :
+Le serveur est désactivé par défaut et disponible uniquement dans l'espace Atelier IA après génération d'un instantané de capacités à jour. Un consentement explicite ouvre pendant 15 minutes :
 
 - un serveur MCP Streamable HTTP sur `http://127.0.0.1:<port>/mcp` ;
 - les anciennes routes GET du Capability Bridge pour les consommateurs locaux existants.
 
-Toutes les données viennent d'un instantané figé. Les huit outils MCP consultent l'état du cockpit, le matériel, Hardware Doctor, les modèles installés, la recommandation, les preuves de benchmark, le Passport et le handoff Strategy Arena. Les quatre ressources couvrent Passport, modèles, recommandation et handoff.
+Toutes les données viennent d'un instantané figé. Les huit outils MCP consultent l'état du cockpit, le matériel, Hardware Doctor, les modèles installés, la recommandation, les preuves de benchmark, l'instantané de capacités et le handoff Strategy Arena. Les quatre ressources couvrent instantané, modèles, recommandation et handoff.
 
 Le jeton Bearer aléatoire reste uniquement en mémoire. Aucun outil MCP ne déclenche de scan, téléchargement ou retrait de modèle, benchmark, chat, accès aux fichiers personnels, changement de configuration, backtest ou ordre de trading. La connexion complète est copiée depuis l'interface et expire avec le serveur.
 
@@ -131,19 +131,27 @@ Les sources du 28 juillet ajoutent une voie d'action locale distincte. Un
 client MCP peut uniquement préparer une installation Ollama validée, un
 benchmark d'un modèle déjà installé ou l'export du rapport figé. Il peut aussi
 lire ou annuler sa demande. Il ne peut ni l'approuver ni l'exécuter.
+La préparation lit exclusivement le snapshot figé lors de l'ouverture de la
+lane : elle ne lance ni `ollama`, ni WSL, ni sonde disque. Les contrôles live du
+runtime, du modèle installé et de l'espace libre sont différés jusqu'à
+l'exécution native approuvée, avant tout téléchargement ou benchmark.
 
 La demande apparaît dans l'application avec sa cible, son runtime, ses effets,
-ses limites et son SHA-256. L'utilisateur doit cocher l'accusé, confirmer
-l'autorisation, puis cliquer séparément sur **Exécuter maintenant**. La capacité
-ainsi créée expire après deux minutes et ne fonctionne qu'une fois pour ce plan,
-ce client et cette session. Le jeton, la file et les capacités restent en
-mémoire. Toute nouvelle preuve, fermeture ou arrêt d'urgence les révoque.
+ses limites et son SHA-256. **Vérifier et autoriser** ouvre une boîte de dialogue
+du système hors de la WebView ; aucun booléen d'accord n'est accepté depuis
+JavaScript. Une seconde boîte de dialogue système est exigée par
+**Confirmer l'exécution**. La capacité ainsi créée expire après deux minutes et
+ne fonctionne qu'une fois pour ce plan, ce client et cette session. Le jeton,
+la file et les capacités restent en mémoire. Toute nouvelle preuve, fermeture
+ou arrêt d'urgence les révoque.
 
 Les résultats minimaux et les refus humains rejoignent Evidence Ledger sans
-prompt, sortie brute, contenu du rapport, chemin personnel ou secret. Ce palier
-est candidat uniquement. Sa recette native Windows est verte ; il n'est pas
-attribué au téléchargement public avant validation terrain et promotion
-explicite d'une release cohérente.
+prompt, sortie brute, contenu du rapport, chemin personnel ou secret. Le reçu
+distingue désormais `os_native_dialog`, `mcp_requesting_client` et
+`system_timeout` au lieu de qualifier toute transition de décision humaine.
+Ce palier est candidat uniquement. Il n'est pas attribué au téléchargement
+public avant recette native, validation terrain et promotion explicite d'une
+release cohérente.
 
 Contrôles dédiés :
 
@@ -174,7 +182,7 @@ Ledger. Ils ne valent ni test terrain, ni validation communautaire, ni
 éligibilité à un classement. L'upload, la vérification serveur, les cohortes et
 les pages publiques restent hors de ce palier. Un contrat serveur privé est
 testé séparément avec authentification desktop, correspondance machine/mesure,
-reçu HMAC, révocation et seuil de trois machines. Le client candidat sait
+reçu rattaché, révocation et seuil de trois machines. Le client candidat sait
 désormais soumettre vers l'origine OutilsIA fixe, sans redirection, après export
 local, synchronisation du benchmark et consentement réseau distinct. Cette voie
 reste désactivée à la compilation sans
@@ -182,9 +190,11 @@ reste désactivée à la compilation sans
 le build public, ni annoncée dans le manifeste. Une soumission active doit être
 révoquée côté serveur avant que son export local puisse être supprimé. Le
 client vérifie la forme, les limites et le rattachement du reçu serveur ; il ne
-possède pas la clé HMAC et ne prétend donc pas authentifier lui-même cette
-signature. Le consentement indique que le serveur rattache la soumission au
-compte et à la machine synchronisée pour vérifier, dédupliquer et révoquer,
+possède aucune clé de vérification et ne prétend donc pas authentifier lui-même
+une signature. Le SHA-256 retourné est seulement un digest déclaré par le
+serveur pour corréler le reçu. Le consentement indique que le serveur rattache
+la soumission au compte et à la machine synchronisée pour vérifier, dédupliquer
+et révoquer,
 sans renvoyer ces identifiants. Les garanties d'absence d'IP et de User-Agent concernent
 explicitement l'enregistrement Benchmark Commons, pas les journaux techniques
 généraux de l'infrastructure HTTPS.

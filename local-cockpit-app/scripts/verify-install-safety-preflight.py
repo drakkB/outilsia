@@ -72,7 +72,7 @@ def main():
     assert result["report"]["install_safety_preflight"]["verdict"] == "ready"
 
     passport = result["passport"]
-    assert passport["passport_version"] == "1.3.0"
+    assert passport["passport_version"] == "1.4.0"
     assert passport["capabilities"]["install_safety_preflight_v1"] is True
     assert passport["privacy"]["excludes_ollama_storage_path"] is True
     assert passport["install_safety_preflight"]["storage_path_exposed"] is False

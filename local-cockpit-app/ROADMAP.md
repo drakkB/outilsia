@@ -132,8 +132,8 @@ leaderboard décoratif.
   UI desktop/mobile.
 - [x] Implémenter hors production un endpoint candidat authentifié : validation
   stricte du document, cohérence avec la machine et le benchmark déjà
-  synchronisés, déduplication par sujet serveur, reçu HMAC, révocation et
-  rétention maximale de 180 jours.
+  synchronisés, déduplication par sujet serveur, reçu strictement rattaché,
+  révocation et rétention maximale de 180 jours.
 - [x] Relier le client candidat derrière un drapeau de compilation : origine
   OutilsIA fixe, redirections refusées, compte desktop, machine et benchmark
   synchronisés, consentement réseau natif distinct, reçu serveur conservé dans
@@ -161,8 +161,10 @@ serveur privé candidat refuse toute contribution sans compte desktop, machine
 native et benchmark synchronisés cohérents. Il ne retourne aucune ligne brute
 et masque toute cohorte sous trois machines distinctes. Le client réseau existe
 uniquement derrière un drapeau de compilation désactivé ; ni l'endpoint, ni sa
-clé HMAC, ni une build activée ne sont déployés ou annoncés dans le manifeste
-de l'application.
+configuration privée, ni une build activée ne sont déployés ou annoncés dans le
+manifeste de l'application. Le client vérifie la forme et le rattachement du
+reçu ; son digest SHA-256 reste une déclaration du serveur, pas une signature
+cryptographique authentifiée localement.
 
 ### Monétisation produit, pas péage sur la preuve
 
@@ -518,9 +520,10 @@ Préflight Chromium guidé v1 implémenté dans les sources le 24 juillet 2026, 
 - [x] Ajouter un premier adaptateur CLI borné à Codex + Signal Maze public, avec contrat strict, budget, consentements, sortie limitée, workspace jetable et coût fournisseur inconnu.
 - [ ] Étendre ce mécanisme à Claude Code, Hermes, Kimi et aux cartes arbitraires seulement après un contrat de permissions et de budget propre à chaque adaptateur.
 
-Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans publication : le fichier local `evidence-ledger-v1.json` accepte volontairement les preuves Board Observer, Workstack Composer, Capability Router et préflight ForgeBench après validation de leur contrat. Chaque entrée contient uniquement auteur composant, claims bornés, métriques, empreinte source et empreinte précédente. La chaîne complète est revalidée à chaque lecture et écriture, les doublons sont refusés, une rotation de secours protège le remplacement du fichier et aucun contenu brut n'est persisté. Le Ledger ne transforme pas une empreinte en preuve d'identité ou de qualité et ne lance aucune exécution.
+Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans publication : le fichier local stable `evidence-ledger-v1.json` accepte volontairement les preuves Board Observer, Workstack Composer, Capability Router et préflight ForgeBench après validation de leur contrat. Chaque entrée contient uniquement auteur composant, claims bornés, métriques, empreinte source et empreinte précédente. La chaîne complète est revalidée à chaque lecture et écriture, les doublons sont refusés, une rotation de secours protège le remplacement du fichier et aucun contenu brut n'est persisté. Le Ledger ne transforme pas une empreinte en preuve d'identité ou de qualité et ne lance aucune exécution. Le contrat de stockage v2 ajouté le 28 juillet 2026 migre automatiquement un Ledger v1 valide en conservant ses entrées et sa tête de chaîne ; toute version inconnue est refusée sans toucher au fichier.
 
-- [x] Chaîner les entrées `outilsia.evidence_entry.v1` et signer le document `outilsia.evidence_ledger.v1`.
+- [x] Chaîner les entrées `outilsia.evidence_entry.v1` et signer le document `outilsia.evidence_ledger.v2`.
+- [x] Migrer sans perte le contrat v1 vers v2 avec historique, écriture atomique et refus non destructif des versions inconnues.
 - [x] Refuser Workstack modifiée, Router exécutable, worker identique au vérificateur et identifiants non bornés.
 - [x] Tester écriture/lecture réelle, restauration vérifiée, corruption, doublon et absence de contenu brut.
 - [x] Ajouter les actions explicites Ajouter, Vérifier, Copier, Télécharger et Réinitialiser dans Atelier IA.
@@ -570,6 +573,55 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - Découvrir plusieurs machines OutilsIA sur un réseau privé et router vers la capacité disponible.
 - Collecter uniquement sur consentement des benchmarks pseudonymisés et vérifiables.
 - Recaler les estimations d'upgrade et produire des pages SEO/GEO depuis des mesures réelles.
+
+### Cap six mois - mesurer, expliquer, diffuser
+
+Doctrine produit : soustraire ce qui détourne du premier résultat, évaluer avant
+d'affirmer et enseigner ce que la mesure signifie. Le parcours novice reste
+`scanner -> tester -> comprendre -> décider`. Les fonctions ci-dessous ne
+doivent pas ajouter une nouvelle falaise d'interface.
+
+1. **Benchmark Protocol v2 reproductible**
+   - Figer et versionner modèle exact, digest du prompt public, paramètres,
+     runtime, version Ollama, build OutilsIA, mode CPU/GPU, profil Autopilot et
+     conditions mesurables.
+   - Séparer génération, préremplissage, chargement, offload, mémoire et
+     thermiques ; ne jamais réduire la preuve à un unique score opaque.
+   - Refuser toute comparaison lorsque les conditions indispensables diffèrent
+     ou sont inconnues.
+2. **Expliqueur de goulot d'étranglement**
+   - Produire après mesure une décision courte : fait observé, cause possible,
+     inconnue restante et prochain test utile.
+   - Ne recommander un achat qu'après un blocage mesuré ; conserver explicitement
+     le verdict « n'achetez rien » lorsque la machine répond déjà à l'usage.
+   - Ne jamais transformer une corrélation, une estimation ou un catalogue en
+     causalité certaine.
+3. **Carte de preuve partageable**
+   - Transformer un rapport public révoquable `/r/{token}` en carte lisible,
+     Open Graph et embarquable : machine normalisée, modèle exact, protocole,
+     débit mesuré, date et limites.
+   - Réserver tout badge « mesuré » ou « vérifié » à une preuve réelle qui passe
+     les contrôles réseau et de cohérence ; les estimations restent visuellement
+     distinctes.
+   - Exclure hostname, compte, IP, token, chemin, prompt privé et réponse brute.
+4. **Corpus communautaire et pages factuelles**
+   - Publier médiane, dispersion et taille de cohorte seulement après opt-in,
+     révocation possible et seuil minimal de machines distinctes.
+   - Produire les pages `GPU X vs GPU Y` ou `modèle X vs modèle Y` depuis les
+     mesures comparables du corpus, jamais depuis des chiffres inventés.
+   - Exposer un index compact lisible par les moteurs et les LLM, avec provenance,
+     protocole, fraîcheur et limites de chaque agrégat.
+5. **Veille de régression et comparaison multi-machines**
+   - Prévenir lorsqu'une mesure comparable régresse après changement de pilote,
+     runtime ou réglage, sans attribuer automatiquement la cause.
+   - Comparer deux machines d'un même propriétaire avec les mêmes protocoles ;
+     aucune découverte réseau ou synchronisation implicite.
+
+Le seul composant appris envisagé à ce stade est un futur estimateur de débit
+calibré sur un corpus suffisant. Il devra retourner un intervalle et un niveau de
+confiance, être daté et céder systématiquement la place à une mesure locale
+réelle. Aucune marketplace de recettes agent n'est prioritaire avant un usage
+récurrent démontré et une demande explicite d'au moins 500 utilisateurs actifs.
 
 ## Garde-fous permanents
 

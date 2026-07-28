@@ -7,7 +7,7 @@ const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
 const agentAdapterPolicyJs = readFileSync(resolve(root, "src/agent-adapter-policy.js"), "utf8");
 const allJs = `${js}\n${agentAdapterPolicyJs}`;
-const rust = ["lib.rs", "local_capability_bridge.rs", "local_action_lane.rs", "benchmark_commons.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "agent_adapter_policy.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runtime.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_hidden.rs", "forgebench_candidate.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
+const rust = ["lib.rs", "local_mcp_http.rs", "local_capability_bridge.rs", "local_action_lane.rs", "benchmark_commons.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "agent_adapter_policy.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runtime.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_hidden.rs", "forgebench_candidate.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
@@ -169,8 +169,8 @@ const requiredFeatureText = [
   ["html local action lane", html, "localActionLaneBox"],
   ["html local action queue", html, "localActionQueue"],
   ["js local action lane schema", js, "outilsia.local_action_lane.v0"],
-  ["js local action human acknowledgement", js, "client IA ne peut pas cocher cette case"],
-  ["js local action separate execution", js, "Cette capacité sera consommée immédiatement"],
+  ["js local action native approval", js, "Le bouton ouvre une boîte de dialogue du système"],
+  ["js local action separate native execution", js, "Une seconde boîte de dialogue système est obligatoire"],
   ["rust local action loopback", rust, "Server::http((\"127.0.0.1\", 0))"],
   ["rust local action one use", rust, "CAPABILITY_TTL_MS"],
   ["rust local action no MCP execution", rust, "actions_execute_over_mcp: false"],
@@ -315,7 +315,7 @@ const requiredFeatureText = [
   ["html evidence ledger", html, "evidenceLedgerBox"],
   ["html evidence source", html, "evidenceLedgerSource"],
   ["js evidence append schema", js, "outilsia.evidence_append_request.v1"],
-  ["js evidence ledger schema", js, "outilsia.evidence_ledger.v1"],
+  ["js evidence ledger schema", js, "outilsia.evidence_ledger.v2"],
   ["rust evidence entry schema", rust, "outilsia.evidence_entry.v1"],
   ["rust evidence append only", rust, "append_only_between_resets"],
   ["rust evidence no raw source", rust, "raw_source_documents_stored\": false"],

@@ -138,9 +138,10 @@ const LOCAL_MCP_RESOURCE_URIS = Object.freeze([
 ]);
 const LOCAL_ACTION_LANE_SCHEMA = "outilsia.local_action_lane.v0";
 const LOCAL_ACTION_LANE_START_SCHEMA = "outilsia.local_action_lane_start.v0";
-const LOCAL_ACTION_APPROVAL_SCHEMA = "outilsia.local_action_approval.v0";
-const LOCAL_ACTION_REJECTION_SCHEMA = "outilsia.local_action_rejection.v0";
-const LOCAL_ACTION_LANE_CONTRACT_VERSION = "2026-07-28";
+const LOCAL_ACTION_APPROVAL_SCHEMA = "outilsia.local_action_approval.v1";
+const LOCAL_ACTION_REJECTION_SCHEMA = "outilsia.local_action_rejection.v1";
+const LOCAL_ACTION_EXECUTION_SCHEMA = "outilsia.local_action_execution_confirmation.v1";
+const LOCAL_ACTION_LANE_CONTRACT_VERSION = "2026-07-28-native-consent-v1";
 const LOCAL_ACTION_LANE_TTL_SECONDS = 15 * 60;
 const LOCAL_ACTION_TOOL_NAMES = Object.freeze([
   "outilsia_prepare_model_install",
@@ -181,7 +182,7 @@ const FORGEBENCH_OLLAMA_CANDIDATE_REQUEST_SCHEMA = "outilsia.forgebench_ollama_c
 const FORGEBENCH_OLLAMA_CANDIDATE_RESULT_SCHEMA = "outilsia.forgebench_ollama_candidate_result.v3";
 const EVIDENCE_APPEND_REQUEST_SCHEMA = "outilsia.evidence_append_request.v1";
 const EVIDENCE_APPEND_RESULT_SCHEMA = "outilsia.evidence_append_result.v1";
-const EVIDENCE_LEDGER_SCHEMA = "outilsia.evidence_ledger.v1";
+const EVIDENCE_LEDGER_SCHEMA = "outilsia.evidence_ledger.v2";
 const BENCHMARK_COMMONS_PREPARE_SCHEMA = "outilsia.benchmark_commons.prepare_request.v1";
 const BENCHMARK_COMMONS_APPROVE_SCHEMA = "outilsia.benchmark_commons.approve_request.v1";
 const BENCHMARK_COMMONS_EXPORT_SCHEMA = "outilsia.benchmark_commons.export_request.v1";
@@ -825,7 +826,7 @@ const UI_MODE_STORAGE_KEY = "outilsia-local-cockpit-ui-mode";
 const WORKSPACE_TAB_STORAGE_KEY = "outilsia-local-cockpit-workspace-tab";
 const WORKSPACE_SECTION_STORAGE_KEY = "outilsia-local-cockpit-workspace-sections";
 const WORKSPACE_LAYOUT_VERSION_KEY = "outilsia-local-cockpit-workspace-layout-version";
-const WORKSPACE_LAYOUT_VERSION = "focused-workspaces-2026-07-14";
+const WORKSPACE_LAYOUT_VERSION = "focused-workspaces-2026-07-28";
 const WORKSPACE_SECTION_ALL = "__all__";
 const WORKSPACE_TABS = ["overview", "machine", "models", "tests", "assistant", "workflows", "account"];
 const WORKSPACE_TITLES = {
@@ -900,7 +901,7 @@ const WORKSPACE_SECTIONS = {
     ["Comparer des stacks", ".forgebench-panel"],
     ["Lancer le pilote Codex", ".workstack-arena-panel"],
     ["Vérifier les preuves", ".evidence-ledger-panel"],
-    ["Créer le passeport IA", ".capability-passport-panel"],
+    ["Créer l'instantané IA", ".capability-passport-panel"],
     ["Connecter une IA", ".local-capability-bridge-panel"],
     ["Autoriser une action IA", ".local-action-lane-panel"],
     ["Préparer Strategy Arena", ".strategy-bridge-panel"]
@@ -974,7 +975,7 @@ const WORKSPACE_FEATURES = Object.freeze({
     panel: ".capability-passport-panel",
     target: ".capability-passport-panel",
     focus: "#generateCapabilityPassportBtn",
-    label: "Passeport de capacité"
+    label: "Instantané de capacités"
   },
   bridge: {
     tab: "workflows",
@@ -1115,7 +1116,7 @@ function restoreWorkspaceSectionState() {
     if (!saved || typeof saved !== "object" || Array.isArray(saved)) return;
     if (localStorage.getItem(WORKSPACE_LAYOUT_VERSION_KEY) !== WORKSPACE_LAYOUT_VERSION) {
       for (const tab of WORKSPACE_TABS) {
-        workspaceSectionState[tab] = WORKSPACE_SECTIONS[tab]?.[0]?.[1] || WORKSPACE_SECTION_ALL;
+        workspaceSectionState[tab] = defaultWorkspaceSection(tab);
       }
       persistWorkspaceSectionState();
       return;
@@ -1145,10 +1146,16 @@ function workspacePanels(tab) {
     .filter((panel) => String(panel.dataset.workspace || "").split(/\s+/).includes(tab));
 }
 
+function defaultWorkspaceSection(tab) {
+  return tab === "overview"
+    ? WORKSPACE_SECTION_ALL
+    : WORKSPACE_SECTIONS[tab]?.[0]?.[1] || WORKSPACE_SECTION_ALL;
+}
+
 function normalizedWorkspaceSection(tab, selector = "") {
   const entries = WORKSPACE_SECTIONS[tab] || [];
   if (selector === WORKSPACE_SECTION_ALL) return selector;
-  return entries.some(([, value]) => value === selector) ? selector : entries[0]?.[1] || WORKSPACE_SECTION_ALL;
+  return entries.some(([, value]) => value === selector) ? selector : defaultWorkspaceSection(tab);
 }
 
 function updateWorkspaceSectionControls(tab, selector) {
@@ -2909,19 +2916,14 @@ function renderPrimaryAction() {
   els.prepareBtn.classList.toggle("is-busy", primaryAnalysisBusy);
   if (label) label.textContent = primaryAnalysisBusy
     ? "Analyse en cours..."
-    : state.scan
-      ? "Actualiser l'analyse"
-      : state.analysisError
-        ? "Relancer l'analyse"
-        : "Analyser ce PC";
+    : action.label;
   if (detail) detail.textContent = primaryAnalysisBusy
     ? "détection matériel et modèles"
-    : state.analysisError && !state.scan
-      ? "le dernier scan a été interrompu"
-      : "scan matériel + modèles";
-  els.prepareBtn.dataset.primaryCommand = "analyze";
-  delete els.prepareBtn.dataset.primaryModel;
-  els.prepareBtn.title = "Analyse le matériel, détecte Ollama et charge les recommandations modèles.";
+    : action.detail;
+  els.prepareBtn.dataset.primaryCommand = action.command;
+  if (action.model) els.prepareBtn.dataset.primaryModel = action.model;
+  else delete els.prepareBtn.dataset.primaryModel;
+  els.prepareBtn.title = action.status;
   if (els.statusText && !els.statusText.className.includes("bad")) {
     els.statusText.textContent = state.scan
       ? state.compatibility ? "Analyse prête : matériel et modèles détectés" : "Scan terminé : recommandations à charger"
@@ -7302,7 +7304,7 @@ function readinessMarkdown(report = readinessReport()) {
     `- Statut: ${report.status}`,
     `- Potentiel matériel: ${report.score === null ? "non calculé" : `${report.score}/100`}`,
     `- État du runtime: ${report.runtime_readiness?.label || "non vérifié"} - ${report.runtime_readiness?.detail || ""}`,
-    `- AI Capability Passport: ${report.capability_passport ? `SHA-256 ${report.capability_passport.digest}` : "non généré ou à régénérer"}`,
+    `- Instantané de capacités IA: ${report.capability_passport ? `checksum SHA-256 ${report.capability_passport.digest}` : "non généré ou à régénérer"}`,
     `- Passerelle locale: ${report.local_capability_bridge?.running ? `active en lecture seule jusqu'à ${new Date(report.local_capability_bridge.expires_at_ms).toISOString()}` : "désactivée par défaut"}`,
     report.install_safety_preflight
       ? `- Préflight installation: ${report.install_safety_preflight.model} · ${report.install_safety_preflight.verdict} · ${report.install_safety_preflight.storage_free_gb == null ? "espace inconnu" : `${report.install_safety_preflight.storage_free_gb} Go libres`} · aucun chemin personnel exporté`
@@ -7449,7 +7451,7 @@ function readinessSummaryText(report = readinessReport()) {
     `Recommandation mesurée: ${report.recommendation_engine?.winner ? `${report.recommendation_engine.verdict} (${report.recommendation_engine.winner.score}/100, confiance ${report.recommendation_engine.confidence})` : "non lancée"}`,
     `Flight Recorder: ${report.flight_recorder?.comparison ? `${report.flight_recorder.comparison.headline} (confiance ${report.flight_recorder.comparison.confidence})` : "aucune référence"}`,
     `Upgrade Digital Twin: ${report.upgrade_digital_twin ? `${report.upgrade_digital_twin.decision.label} (${report.upgrade_digital_twin.compatibility.status}, confiance ${report.upgrade_digital_twin.compatibility.confidence})` : "aucun scénario"}`,
-    `AI Capability Passport: ${report.capability_passport ? `SHA-256 ${report.capability_passport.digest}` : "non généré"}`,
+    `Instantané de capacités IA: ${report.capability_passport ? `checksum SHA-256 ${report.capability_passport.digest}` : "non généré"}`,
     `Passerelle locale: ${report.local_capability_bridge?.running ? "active · 127.0.0.1 · lecture seule" : "désactivée"}`,
     `Préflight installation: ${report.install_safety_preflight ? `${report.install_safety_preflight.model} · ${report.install_safety_preflight.verdict}` : "non lancé"}`,
     `Upgrade utile: ${upgrade}`,
@@ -7556,7 +7558,7 @@ function premiumReportHtml(report = readinessReport()) {
     recommendation?.winner ? `Recommendation Engine : ${recommendation.verdict} (${recommendation.winner.score}/100)` : "Recommendation Engine v2 à lancer",
     privateWorkload?.winner ? `Tests privés : ${privateWorkload.winner.model} (${privateWorkload.winner.score}/100 · ${privateWorkload.pack})` : "Tests privés à lancer dans l'espace Tests",
     flightRecorder?.comparison ? `Flight Recorder : ${flightRecorder.comparison.headline} · confiance ${flightRecorder.comparison.confidence}` : "Flight Recorder : aucune référence locale",
-    report.capability_passport ? `Capability Passport : SHA-256 ${report.capability_passport.digest}` : "AI Capability Passport à générer dans Atelier IA",
+    report.capability_passport ? `Instantané IA : checksum SHA-256 ${report.capability_passport.digest}` : "Instantané de capacités IA à générer dans Atelier IA",
     report.local_capability_bridge?.running ? "Passerelle locale : active sur 127.0.0.1 · lecture seule" : "Passerelle locale : désactivée par défaut",
     report.install_safety_preflight ? `Préflight installation : ${report.install_safety_preflight.model} · ${report.install_safety_preflight.verdict}` : "Préflight installation : non lancé",
     model.ref ? `Modèle suivant : ${model.ref}` : "Modèle suivant à déterminer"
@@ -8391,7 +8393,7 @@ function renderReadinessPanel() {
     },
     {
       label: "Passeport de capacité",
-      technical: "AI Capability Passport",
+      technical: "Instantané de capacités IA",
       value: report.capability_passport ? `SHA-256 ${report.capability_passport.digest.slice(0, 12)}…` : "Non généré",
       feature: "passport"
     },
@@ -11222,7 +11224,7 @@ function strategyBridgeMarkdown() {
     `- Import Strategy Arena: ${profile.handoff_manifest?.import_label || "Modèles locaux disponibles via OutilsIA"}`,
     `- Fichier attendu: ${profile.handoff_manifest?.file_name || profile.import_file}`,
     `- Résumé: ${profile.bridge_summary}`,
-    `- AI Capability Passport: ${profile.capability_passport ? `${profile.capability_passport.schema} · SHA-256 ${profile.capability_passport.digest}` : "non généré"}`,
+    `- Instantané de capacités IA: ${profile.capability_passport ? `${profile.capability_passport.schema} · checksum SHA-256 ${profile.capability_passport.digest}` : "non généré"}`,
     `- Passerelle locale: ${profile.local_capability_bridge?.running ? "active sur 127.0.0.1 · lecture seule" : "désactivée par défaut"}`,
     `- Model Autopilot: ${profile.model_autopilot?.active ? `${profile.model_autopilot.active.label} · ${modelAutopilotTuningLabel(profile.model_autopilot.active.tuning)}` : "profil Ollama par défaut"}`,
     `- Flight Recorder: ${profile.flight_recorder?.comparison ? `${profile.flight_recorder.comparison.headline} · confiance ${profile.flight_recorder.comparison.confidence} · lecture seule` : "aucune référence"}`,
@@ -11343,6 +11345,7 @@ function capabilityPassportSummary(passport = state.capabilityPassport) {
   if (!capabilityPassportIsCurrent(passport)) return null;
   return {
     schema: passport.schema,
+    document_kind: passport.document_kind,
     passport_version: passport.passport_version,
     generated_at: passport.generated_at,
     machine_key: passport.binding.machine_key,
@@ -11355,12 +11358,14 @@ function capabilityPassportSummary(passport = state.capabilityPassport) {
     digest_algorithm: passport.integrity?.algorithm || "",
     digest: passport.integrity?.digest || "",
     identity_signature: false,
-    verified: true
+    assurance_level: passport.assurance?.level || "unknown",
+    coherence_verified: true,
+    provenance_verified: false
   };
 }
 
 function capabilityPassportDocument() {
-  if (!state.scan) throw new Error("Scan requis avant création du passeport");
+  if (!state.scan) throw new Error("Scan requis avant création de l'instantané");
   const proof = releaseProof();
   const scan = state.scan;
   const report = readinessReport();
@@ -11374,7 +11379,8 @@ function capabilityPassportDocument() {
   const storageSource = scan.storage_free_gb == null ? "not_detected" : "scan";
   return {
     schema: "outilsia.ai_capability_passport.v1",
-    passport_version: "1.3.0",
+    document_kind: "capability_snapshot",
+    passport_version: "1.4.0",
     generated_at: new Date().toISOString(),
     source_revision: capabilityPassportSourceRevision(),
     issuer: {
@@ -11485,6 +11491,17 @@ function capabilityPassportDocument() {
       excludes_ollama_storage_path: true,
       machine_key_is_local_pseudonymous_identifier: true
     },
+    assurance: {
+      level: "self_consistency_only",
+      producer_layer: "tauri_webview",
+      digest_generated_by: "web_crypto_sha256",
+      rust_rederived: false,
+      os_key_attested: false,
+      machine_identity_proven: false,
+      owner_identity_proven: false,
+      provenance_verified: false,
+      portable_unsigned_json: true
+    },
     limitations: [
       "Le diagnostic décrit les signaux exposés au moment du scan et du benchmark ; il ne certifie pas la stabilité sous charge longue.",
       "La fréquence et le canal mémoire peuvent être estimés selon les informations fournies par le système.",
@@ -11492,11 +11509,12 @@ function capabilityPassportDocument() {
       "Model Autopilot compare des réglages d'exécution sur le même modèle ; il ne mesure pas une nouvelle quantification et n'améliore pas les poids du modèle.",
       "Flight Recorder compare des mesures locales liées à une référence explicite ; ses causes possibles restent des hypothèses et ne constituent pas une preuve terrain physique.",
       "Upgrade Digital Twin simule des scénarios ; alimentation, connecteurs, dimensions, slots et QVL doivent être vérifiés physiquement avant achat.",
-      "Tests privés compare des sorties avec des critères déterministes bornés ; les prompts et réponses bruts ne sont pas inclus dans le Passport.",
+      "Tests privés compare des sorties avec des critères déterministes bornés ; les prompts et réponses bruts ne sont pas inclus dans l'instantané.",
       "Install Safety Preflight estime le budget du modèle et mesure l'espace du volume Ollama sans exporter son chemin ; il ne prédit pas la vitesse ni l'offload GPU.",
-      "Le serveur MCP local est désactivé par défaut, lié à 127.0.0.1, borné dans le temps et strictement en lecture seule ; son jeton éphémère n'est pas inclus dans ce Passport.",
-      "L'empreinte SHA-256 détecte une modification du document ; elle ne prouve ni l'identité du PC ni celle du propriétaire.",
-      "Ce passeport ne constitue pas une validation de stratégie financière ni un résultat de backtest."
+      "Le serveur MCP local est désactivé par défaut, lié à 127.0.0.1, borné dans le temps et strictement en lecture seule ; son jeton éphémère n'est pas inclus dans cet instantané.",
+      "Le checksum SHA-256 est produit dans la WebView puis relu par Rust à l'ouverture du MCP ; il prouve seulement la cohérence du JSON reçu, jamais sa provenance.",
+      "Cet instantané n'est ni signé par une clé Rust/OS, ni une attestation matérielle, ni une preuve d'identité du PC ou de son propriétaire.",
+      "Cet instantané ne constitue pas une validation de stratégie financière ni un résultat de backtest."
     ]
   };
 }
@@ -11517,7 +11535,8 @@ async function buildCapabilityPassport() {
     scope: "canonical_document_without_integrity",
     digest: await sha256Hex(passport),
     identity_signature: false,
-    statement: "Empreinte d'intégrité uniquement : elle ne prouve pas l'identité de la machine ou du propriétaire."
+    verification_semantics: "coherence_not_provenance",
+    statement: "Checksum de cohérence locale produit dans la WebView : aucune signature, attestation OS, provenance matérielle ou identité vérifiée."
   };
   return passport;
 }
@@ -11533,7 +11552,7 @@ function renderCapabilityPassportPanel() {
   if (!state.scan) {
     els.capabilityPassportState.textContent = "scan requis";
     els.capabilityPassportBox.className = "capability-passport-box empty";
-    els.capabilityPassportBox.textContent = "Scanne la machine pour créer un passeport portable de ses capacités IA locales.";
+    els.capabilityPassportBox.textContent = "Scanne la machine pour créer un instantané portable de ses capacités IA locales.";
     return;
   }
   if (!passport) {
@@ -11546,7 +11565,7 @@ function renderCapabilityPassportPanel() {
     return;
   }
   const digest = passport.integrity.digest;
-  els.capabilityPassportState.textContent = "intégrité vérifiée";
+  els.capabilityPassportState.textContent = "cohérence vérifiée";
   els.capabilityPassportBox.className = "capability-passport-box";
   els.capabilityPassportBox.innerHTML = `
     <div class="passport-proof-grid">
@@ -11556,14 +11575,14 @@ function renderCapabilityPassportPanel() {
     </div>
     <div class="doctor-status-row">
       <span>SHA-256 ${escapeHtml(`${digest.slice(0, 16)}…${digest.slice(-8)}`)}</span>
-      <span>Empreinte d'intégrité, pas signature d'identité.</span>
+      <span>Checksum de cohérence uniquement · provenance non vérifiée.</span>
     </div>
   `;
 }
 
 async function generateCapabilityPassport() {
   if (!state.scan) {
-    setStatus("Scan requis avant passeport IA", "warn");
+    setStatus("Scan requis avant instantané IA", "warn");
     return null;
   }
   try {
@@ -11572,47 +11591,47 @@ async function generateCapabilityPassport() {
     if (!verified) throw new Error("l'empreinte générée n'a pas pu être relue");
     renderCapabilityPassportPanel();
     renderReadinessPanel();
-    setStatus("AI Capability Passport généré et vérifié", "ok");
+    setStatus("Instantané IA généré · cohérence JSON vérifiée", "ok");
     return state.capabilityPassport;
   } catch (error) {
     invalidateCapabilityPassport();
     renderCapabilityPassportPanel();
-    setStatus(`Passeport impossible : ${error}`, "error");
+    setStatus(`Instantané impossible : ${error}`, "error");
     return null;
   }
 }
 
 async function copyCapabilityPassport() {
   if (!capabilityPassportIsCurrent()) {
-    setStatus("Génère d'abord un passeport à jour", "warn");
+    setStatus("Génère d'abord un instantané à jour", "warn");
     return;
   }
   await navigator.clipboard.writeText(`${JSON.stringify(state.capabilityPassport, null, 2)}\n`);
-  setStatus("AI Capability Passport copié", "ok");
+  setStatus("Instantané IA copié", "ok");
 }
 
 function downloadCapabilityPassport() {
   if (!capabilityPassportIsCurrent()) {
-    setStatus("Génère d'abord un passeport à jour", "warn");
+    setStatus("Génère d'abord un instantané à jour", "warn");
     return;
   }
   const blob = new Blob([`${JSON.stringify(state.capabilityPassport, null, 2)}\n`], { type: "application/json;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `outilsia-ai-capability-passport-${state.scan.machine_key || "local"}.json`;
+  link.download = `outilsia-ai-capability-snapshot-${state.scan.machine_key || "local"}.json`;
   document.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
-  setStatus("AI Capability Passport téléchargé", "ok");
+  setStatus("Instantané IA téléchargé", "ok");
 }
 
 function capabilityPassportMarkdown(passport = state.capabilityPassport) {
   const summary = capabilityPassportSummary(passport);
-  if (!summary) return "## AI Capability Passport\n\n- Non généré ou à régénérer après les dernières mesures.";
+  if (!summary) return "## Instantané de capacités IA\n\n- Non généré ou à régénérer après les dernières mesures.";
   return [
-    "## AI Capability Passport",
+    "## Instantané de capacités IA",
     "",
     `- Schéma: ${summary.schema}`,
     `- Généré: ${summary.generated_at}`,
@@ -11621,7 +11640,8 @@ function capabilityPassportMarkdown(passport = state.capabilityPassport) {
     `- Build: ${summary.build_id}`,
     `- SHA-256: ${summary.digest}`,
     `- Upgrade Digital Twin: ${passport.upgrade_digital_twin?.decision?.label || "aucun scénario"}`,
-    "- Portée: intégrité du document uniquement, pas signature d'identité."
+    "- Niveau d'assurance: cohérence du JSON uniquement.",
+    "- Provenance: non vérifiée ; aucune signature Rust/OS ou attestation matérielle."
   ].join("\n");
 }
 
@@ -11663,8 +11683,6 @@ function localCapabilityBridgePolicy() {
       resources: [...LOCAL_MCP_RESOURCE_URIS]
     },
     allowed_origins: [
-      "https://strategyarena.io",
-      "https://www.strategyarena.io",
       "http://localhost:<port>",
       "http://127.0.0.1:<port>"
     ],
@@ -11725,13 +11743,13 @@ function localCapabilityBridgeMarkdown(runtime = state.localCapabilityBridge) {
     "- Installation/suppression de modèle: non",
     "- Benchmark, backtest ou trading: non",
     summary.running && summary.snapshot_passport_digest
-      ? `- Passport servi: SHA-256 ${summary.snapshot_passport_digest}`
-      : "- Passport servi: aucun instantané actif"
+      ? `- Instantané servi: checksum SHA-256 ${summary.snapshot_passport_digest}`
+      : "- Instantané servi: aucun document actif"
   ].join("\n");
 }
 
 function localCapabilityBridgePayload() {
-  if (!capabilityPassportIsCurrent()) throw new Error("AI Capability Passport à jour requis");
+  if (!capabilityPassportIsCurrent()) throw new Error("Instantané de capacités IA à jour requis");
   const passport = state.capabilityPassport;
   const report = readinessReport();
   const strategy = strategyArenaReadiness();
@@ -11886,7 +11904,7 @@ function renderLocalCapabilityBridgePanel() {
     });
     els.localCapabilityBridgeState.textContent = "arrêt sécurité";
     els.localCapabilityBridgeBox.className = "local-capability-bridge-box empty";
-    els.localCapabilityBridgeBox.textContent = "Les preuves ont changé. La passerelle locale est arrêtée pour ne pas servir un Passport périmé.";
+    els.localCapabilityBridgeBox.textContent = "Les preuves ont changé. La passerelle locale est arrêtée pour ne pas servir un instantané périmé.";
     return;
   }
   if (!invoke && !runtime?.test_mode) {
@@ -11898,13 +11916,13 @@ function renderLocalCapabilityBridgePanel() {
   if (!state.scan) {
     els.localCapabilityBridgeState.textContent = "scan requis";
     els.localCapabilityBridgeBox.className = "local-capability-bridge-box empty";
-    els.localCapabilityBridgeBox.textContent = "Scanne la machine puis génère son AI Capability Passport.";
+    els.localCapabilityBridgeBox.textContent = "Scanne la machine puis génère son instantané de capacités IA.";
     return;
   }
   if (!passportCurrent && !running) {
-    els.localCapabilityBridgeState.textContent = "Passport requis";
+    els.localCapabilityBridgeState.textContent = "instantané requis";
     els.localCapabilityBridgeBox.className = "local-capability-bridge-box empty";
-    els.localCapabilityBridgeBox.textContent = "Génère un Passport à jour. Aucun serveur MCP local ne démarre automatiquement.";
+    els.localCapabilityBridgeBox.textContent = "Génère un instantané à jour. Aucun serveur MCP local ne démarre automatiquement.";
     return;
   }
   if (!running) {
@@ -11912,7 +11930,7 @@ function renderLocalCapabilityBridgePanel() {
     els.localCapabilityBridgeBox.className = "local-capability-bridge-box empty";
     els.localCapabilityBridgeBox.innerHTML = `
       <strong>Prête, mais arrêtée par défaut.</strong>
-      <span>Un clic ouvre un serveur MCP Streamable HTTP sur 127.0.0.1 pendant 15 minutes. Huit outils lisent uniquement le dernier Passport.</span>
+      <span>Un clic ouvre un serveur MCP Streamable HTTP sur 127.0.0.1 pendant 15 minutes. Huit outils lisent uniquement le dernier instantané.</span>
     `;
     return;
   }
@@ -11924,7 +11942,7 @@ function renderLocalCapabilityBridgePanel() {
     <div class="local-bridge-summary">
       <strong>${escapeHtml(runtime.mcp_url || `${runtime.base_url || "http://127.0.0.1"}/mcp`)}</strong>
       <span>Lecture seule · MCP ${escapeHtml(runtime.mcp_protocol_version || LOCAL_MCP_PROTOCOL_VERSION)} · ${escapeHtml((runtime.mcp_tools || LOCAL_MCP_TOOL_NAMES).length)} outils · expiration dans ${escapeHtml(remainingMinutes)} min</span>
-      <span>Passport SHA-256 ${escapeHtml(digest ? `${digest.slice(0, 16)}…${digest.slice(-8)}` : "non affiché")}</span>
+      <span>Checksum SHA-256 ${escapeHtml(digest ? `${digest.slice(0, 16)}…${digest.slice(-8)}` : "non affiché")} · provenance non vérifiée</span>
     </div>
     <div class="local-bridge-rules">
       <span>Jeton conservé uniquement en mémoire.</span>
@@ -11945,11 +11963,11 @@ async function startLocalCapabilityBridge() {
     return null;
   }
   if (!capabilityPassportIsCurrent()) {
-    setStatus("Génère d'abord un AI Capability Passport à jour", "warn");
+    setStatus("Génère d'abord un instantané de capacités IA à jour", "warn");
     return null;
   }
   const confirmed = window.confirm(
-    "Ouvrir pendant 15 minutes le serveur MCP local en lecture seule sur 127.0.0.1 ? Il exposera uniquement le Passport courant et ne pourra déclencher aucune action."
+    "Ouvrir pendant 15 minutes le serveur MCP local en lecture seule sur 127.0.0.1 ? Il exposera uniquement l'instantané courant et ne pourra déclencher aucune action."
   );
   if (!confirmed) return null;
   try {
@@ -12189,7 +12207,9 @@ function localActionTargetLines(request) {
     const preflight = plan.preflight || {};
     lines.push(
       `Téléchargement haut : ${preflight.estimated_upper_gb == null ? "inconnu" : `${preflight.estimated_upper_gb} Go`}`,
-      `Espace libre : ${preflight.storage_free_gb == null ? "non mesuré" : `${preflight.storage_free_gb} Go`}`
+      preflight.native_preflight_required_before_execution
+        ? "Runtime et espace disque : contrôlés après la confirmation système, avant tout téléchargement"
+        : `Espace libre : ${preflight.storage_free_gb == null ? "non mesuré" : `${preflight.storage_free_gb} Go`}`
     );
   } else {
     lines.push(`Délai maximal : ${plan.limits?.timeout_seconds || 45} s`, "Téléchargement : aucun");
@@ -12212,17 +12232,15 @@ function renderLocalActionRequest(request) {
         : `${result.elapsed_ms ?? "--"} ms`
     : stateKey === "failed" ? "Le noyau a arrêté ou refusé l'opération." : "";
   const approval = stateKey === "awaiting_human" ? `
-    <label class="local-action-consent">
-      <input type="checkbox" data-local-action-ack="${escapeHtml(request.request_id)}">
-      <span>J'ai relu la cible, le runtime, les effets et l'empreinte. Le client IA ne peut pas cocher cette case.</span>
-    </label>
+    <p class="local-action-consent">Le bouton ouvre une boîte de dialogue du système avec la cible et le SHA-256. Aucun script de cette page ne peut fournir la décision à la place de l'utilisateur.</p>
     <div class="row-actions">
-      <button type="button" data-local-action-approve="${escapeHtml(request.request_id)}" disabled>Autoriser 2 min</button>
+      <button type="button" data-local-action-approve="${escapeHtml(request.request_id)}">Vérifier et autoriser</button>
       <button type="button" data-local-action-reject="${escapeHtml(request.request_id)}">Refuser</button>
     </div>
   ` : stateKey === "approved" ? `
+    <p class="local-action-consent">Une seconde boîte de dialogue système est obligatoire avant de consommer la capacité.</p>
     <div class="row-actions">
-      <button type="button" data-local-action-execute="${escapeHtml(request.request_id)}">Exécuter maintenant</button>
+      <button type="button" data-local-action-execute="${escapeHtml(request.request_id)}">Confirmer l'exécution</button>
       <button type="button" data-local-action-reject="${escapeHtml(request.request_id)}">Révoquer</button>
     </div>
   ` : "";
@@ -12267,9 +12285,9 @@ function renderLocalActionLanePanel() {
     els.localActionLaneBox.className = "local-action-lane-box empty";
     els.localActionLaneBox.textContent = "Scanne la machine avant de figer les modèles et runtimes autorisés.";
   } else if (!passportCurrent && !running) {
-    els.localActionLaneState.textContent = "Passport requis";
+    els.localActionLaneState.textContent = "instantané requis";
     els.localActionLaneBox.className = "local-action-lane-box empty";
-    els.localActionLaneBox.textContent = "Génère un Passport à jour. La voie d'action reste arrêtée par défaut.";
+    els.localActionLaneBox.textContent = "Génère un instantané à jour. La voie d'action reste arrêtée par défaut.";
   } else if (!running) {
     els.localActionLaneState.textContent = "désactivée";
     els.localActionLaneBox.className = "local-action-lane-box empty";
@@ -12283,7 +12301,7 @@ function renderLocalActionLanePanel() {
     els.localActionLaneBox.className = "local-action-lane-box";
     els.localActionLaneBox.innerHTML = `
       <strong>${escapeHtml(runtime.client_label || runtime.client_id)} peut préparer des demandes.</strong>
-      <span>${escapeHtml((runtime.mcp_tools || LOCAL_ACTION_TOOL_NAMES).length)} outils MCP · 127.0.0.1 · file en mémoire · aucun outil d'exécution.</span>
+      <span>${escapeHtml((runtime.mcp_tools || LOCAL_ACTION_TOOL_NAMES).length)} outils MCP · 127.0.0.1 · file en mémoire · aucune sonde ni exécution pendant la préparation.</span>
       <span>Une autorisation est liée au plan, au client et à cette session, valable 2 minutes et consommable une fois.</span>
     `;
   }
@@ -12309,7 +12327,7 @@ async function startLocalActionLane() {
     return null;
   }
   if (!capabilityPassportIsCurrent()) {
-    setStatus("Génère d'abord un AI Capability Passport à jour", "warn");
+    setStatus("Génère d'abord un instantané de capacités IA à jour", "warn");
     return null;
   }
   const payload = localActionLaneStartPayload();
@@ -12402,38 +12420,30 @@ function localActionRequestById(requestId) {
 async function approveLocalActionRequest(requestId) {
   const request = localActionRequestById(requestId);
   if (!request || request.state !== "awaiting_human") return;
-  const details = localActionTargetLines(request).join("\n");
-  const confirmed = window.confirm(
-    `${localActionLabel(request.action)}\n\n${details}\n\nPlan SHA-256 : ${request.plan_sha256}\n\nAutoriser ce plan exact pendant 2 minutes ?`
-  );
-  if (!confirmed) return;
   try {
-    await invoke("approve_local_action_request", {
+    await invoke("request_native_local_action_approval", {
       request: {
         schema: LOCAL_ACTION_APPROVAL_SCHEMA,
         request_id: request.request_id,
-        plan_sha256: request.plan_sha256,
-        human_acknowledged: true
+        plan_sha256: request.plan_sha256
       }
     });
     await refreshLocalActionLaneStatus(true);
-    setStatus("Plan exact autorisé pendant 2 minutes · pas encore exécuté", "warn");
+    setStatus("Plan autorisé par le dialogue système pendant 2 minutes · pas encore exécuté", "warn");
   } catch (error) {
-    setStatus(`Autorisation refusée : ${error}`, "error");
+    setStatus(`Autorisation non accordée : ${error}`, "warn");
   }
 }
 
 async function rejectLocalActionRequest(requestId) {
   const request = localActionRequestById(requestId);
   if (!request || !["awaiting_human", "approved"].includes(request.state)) return;
-  if (!window.confirm(`Refuser et révoquer ${localActionLabel(request.action)} ?`)) return;
   try {
-    const result = await invoke("reject_local_action_request", {
+    const result = await invoke("request_native_local_action_rejection", {
       request: {
         schema: LOCAL_ACTION_REJECTION_SCHEMA,
         request_id: request.request_id,
         plan_sha256: request.plan_sha256,
-        human_acknowledged: true,
         reason: "human_rejected"
       }
     });
@@ -12445,18 +12455,18 @@ async function rejectLocalActionRequest(requestId) {
       result?.ledger?.appended || result?.ledger?.duplicate ? "ok" : "warn"
     );
   } catch (error) {
-    setStatus(`Refus non enregistré : ${error}`, "error");
+    setStatus(`Refus non confirmé : ${error}`, "warn");
   }
 }
 
 async function executeLocalActionRequest(requestId) {
   const request = localActionRequestById(requestId);
   if (!request || request.state !== "approved") return;
-  if (!window.confirm(`Exécuter maintenant le plan ${request.plan_sha256.slice(0, 16)}… ? Cette capacité sera consommée immédiatement.`)) return;
-  setStatus(`${localActionLabel(request.action)} en cours...`, "warn");
   try {
-    const result = await invoke("execute_local_action_request", {
+    setStatus("Vérifie la boîte de dialogue système avant l'exécution", "warn");
+    const result = await invoke("request_native_local_action_execution", {
       request: {
+        schema: LOCAL_ACTION_EXECUTION_SCHEMA,
         request_id: request.request_id,
         plan_sha256: request.plan_sha256
       }
@@ -12502,7 +12512,7 @@ async function executeLocalActionRequest(requestId) {
     );
   } catch (error) {
     await refreshLocalActionLaneStatus(true);
-    setStatus(`Exécution locale refusée : ${error}`, "error");
+    setStatus(`Exécution locale non confirmée : ${error}`, "warn");
   }
 }
 
@@ -19319,9 +19329,9 @@ function renderBenchmarkCommonsPanel() {
       : serverRevoked
         ? "retiré du serveur"
         : "export local";
-    const receiptDigest = String(activeExport.server?.receipt_hmac_digest || "");
+    const receiptDigest = String(activeExport.server?.receipt_declared_digest || "");
     const serverLine = serverActive
-      ? `<span>Serveur : reçu associé le ${escapeHtml(new Date(Number(activeExport.server?.submitted_at_ms || Date.now())).toLocaleString("fr-FR"))} · empreinte HMAC déclarée ${escapeHtml(receiptDigest ? `${receiptDigest.slice(0, 12)}…${receiptDigest.slice(-8)}` : "non exposée")}.</span>`
+      ? `<span>Serveur : reçu associé le ${escapeHtml(new Date(Number(activeExport.server?.submitted_at_ms || Date.now())).toLocaleString("fr-FR"))} · digest déclaré ${escapeHtml(receiptDigest ? `${receiptDigest.slice(0, 12)}…${receiptDigest.slice(-8)}` : "non exposé")}.</span>`
       : serverRevoked
         ? `<span>Serveur : contribution retirée le ${escapeHtml(new Date(Number(activeExport.server?.revoked_at_ms || Date.now())).toLocaleString("fr-FR"))}. L'export local peut maintenant être supprimé.</span>`
         : "<span>Serveur : aucune soumission. Le fichier reste strictement local.</span>";
@@ -19330,7 +19340,7 @@ function renderBenchmarkCommonsPanel() {
       ${benchmarkCommonsContributionMarkup(activeExport.contribution || {}, "Contribution exportée localement")}
       <span>Fichier : ${escapeHtml(activeExport.filename || "export JSON")} · destination ${escapeHtml(activeExport.destination || "locale")}.</span>
       ${serverLine}
-      ${serverActive ? "<span>Le client contrôle la forme et le rattachement du reçu ; son HMAC reste vérifiable côté serveur. Ce reçu ne vaut ni preuve terrain, ni validation communautaire, ni classement.</span>" : ""}
+      ${serverActive ? "<span>Le client contrôle la forme et le rattachement du reçu, pas une signature cryptographique. Le digest reste une déclaration du serveur. Ce reçu ne vaut ni preuve terrain, ni validation communautaire, ni classement.</span>" : ""}
     `;
     return;
   }
@@ -21418,6 +21428,8 @@ function installTestHarness() {
         plan,
         plan_sha256: action === "install_model" ? "a".repeat(64) : action === "benchmark_model" ? "b".repeat(64) : "c".repeat(64),
         human_decision: requestState === "awaiting_human" ? "not_recorded" : "explicitly_approved_in_native_ui",
+        decision_channel: requestState === "awaiting_human" ? "none" : "os_native_dialog",
+        execution_confirmation_channel: requestState === "completed" ? "os_native_dialog" : "none",
         capability_expires_at_ms: requestState === "approved" ? now + 120_000 : null,
         capability_consumed: requestState === "completed",
         result,
@@ -22103,7 +22115,9 @@ function installTestHarness() {
       this.applyCapabilityRouterState();
       state.evidenceLedger = {
         schema: EVIDENCE_LEDGER_SCHEMA,
-        contract_version: "2026-07-12",
+        storage_version: 2,
+        contract_version: "2026-07-28",
+        migration_history: [],
         ledger_id: "ledger-demo-signal-maze",
         created_at_ms: Date.now() - 3000,
         updated_at_ms: Date.now(),
@@ -22736,7 +22750,7 @@ function installTestHarness() {
               : "not_submitted",
           submitted_at_ms: ["server_submitted", "server_revoked"].includes(stage) ? now + 500 : null,
           revoked_at_ms: stage === "server_revoked" ? now + 1500 : null,
-          receipt_hmac_digest: ["server_submitted", "server_revoked"].includes(stage) ? "e".repeat(64) : null,
+          receipt_declared_digest: ["server_submitted", "server_revoked"].includes(stage) ? "e".repeat(64) : null,
           network_received: ["server_submitted", "server_revoked"].includes(stage),
           field_test_proof: false,
           community_verified: false,
@@ -24191,15 +24205,6 @@ document.addEventListener("click", async (event) => {
     prepareBenchmarkForConsent(model);
     return;
   }
-});
-
-document.addEventListener("change", (event) => {
-  const acknowledgement = event.target?.closest?.("[data-local-action-ack]");
-  if (!acknowledgement) return;
-  const requestId = acknowledgement.getAttribute("data-local-action-ack") || "";
-  const requestCard = acknowledgement.closest("[data-local-action-request]");
-  const approveButton = requestCard?.querySelector?.(`[data-local-action-approve="${CSS.escape(requestId)}"]`);
-  if (approveButton) approveButton.disabled = !acknowledgement.checked;
 });
 
 if (!invoke) {

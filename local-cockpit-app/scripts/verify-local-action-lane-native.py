@@ -3,8 +3,10 @@
 
 The script attaches to a running Tauri WebView2 through CDP. A separate HTTP
 client prepares requests over MCP, while every approval, refusal and execution
-is performed through the visible native UI. Tokens and report contents never
-enter the persisted recipe report.
+is performed through the visible native UI and an OS-native dialog outside the
+WebView. The operator must answer those system dialogs; this script never
+monkey-patches or auto-accepts them. Tokens and report contents never enter the
+persisted recipe report.
 """
 
 from __future__ import annotations
@@ -165,6 +167,18 @@ def click_with_confirm(page: Page, selector: str) -> None:
     page.locator(selector).click()
 
 
+def click_with_native_system_confirmation(
+    page: Page,
+    selector: str,
+    action_label: str,
+) -> None:
+    print(
+        f"NATIVE_SYSTEM_CONFIRMATION_REQUIRED action={action_label} "
+        "The operator must review and confirm the OS dialog."
+    )
+    page.locator(selector).click()
+
+
 def open_section(page: Page, workspace: str, selector: str) -> None:
     page.locator(f"#workspace{workspace.title()}Btn").click()
     page.locator("#workspaceSectionSelect").select_option(selector)
@@ -214,7 +228,7 @@ def generate_passport(page: Page, timeout_ms: int) -> None:
     assert not button.is_disabled(), "Passport unavailable after native scan"
     button.click()
     page.wait_for_function(
-        "() => document.getElementById('capabilityPassportState')?.textContent === 'intégrité vérifiée'",
+        "() => document.getElementById('capabilityPassportState')?.textContent === 'cohérence vérifiée'",
         timeout=timeout_ms,
     )
 
@@ -330,7 +344,11 @@ def reject_request_in_ui(page: Page, client: McpClient, request: dict[str, Any],
     card = page.locator(f'[data-local-action-request="{request_id}"]')
     card.wait_for(state="visible", timeout=timeout_ms)
     assert card.locator("[data-local-action-execute]").count() == 0
-    click_with_confirm(page, f'[data-local-action-reject="{request_id}"]')
+    click_with_native_system_confirmation(
+        page,
+        f'[data-local-action-reject="{request_id}"]',
+        "reject",
+    )
     page.wait_for_function(
         "(id) => document.querySelector(`[data-local-action-request=\"${id}\"]`)?.textContent?.includes('Refusé')",
         arg=request_id,
@@ -347,10 +365,13 @@ def approve_request_in_ui(page: Page, client: McpClient, request: dict[str, Any]
     card = page.locator(f'[data-local-action-request="{request_id}"]')
     card.wait_for(state="visible", timeout=timeout_ms)
     approve = card.locator(f'[data-local-action-approve="{request_id}"]')
-    assert approve.is_disabled()
-    card.locator(f'[data-local-action-ack="{request_id}"]').check()
     assert not approve.is_disabled()
-    click_with_confirm(page, f'[data-local-action-approve="{request_id}"]')
+    assert card.locator("[data-local-action-ack]").count() == 0
+    click_with_native_system_confirmation(
+        page,
+        f'[data-local-action-approve="{request_id}"]',
+        "approve",
+    )
     page.wait_for_function(
         "(id) => Boolean(document.querySelector(`[data-local-action-execute=\"${id}\"]`))",
         arg=request_id,
@@ -363,7 +384,11 @@ def approve_request_in_ui(page: Page, client: McpClient, request: dict[str, Any]
 
 def execute_request_in_ui(page: Page, request_id: str, timeout_ms: int) -> None:
     del timeout_ms
-    click_with_confirm(page, f'[data-local-action-execute="{request_id}"]')
+    click_with_native_system_confirmation(
+        page,
+        f'[data-local-action-execute="{request_id}"]',
+        "execute",
+    )
 
 
 def prepare_rejected_install(

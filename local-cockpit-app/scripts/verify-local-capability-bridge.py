@@ -139,7 +139,13 @@ def main():
     assert client_config_enabled is True
     assert token_copy_enabled is True
 
-    assert passport["passport_version"] == "1.3.0"
+    assert passport["document_kind"] == "capability_snapshot"
+    assert passport["passport_version"] == "1.4.0"
+    assert passport["assurance"]["level"] == "self_consistency_only"
+    assert passport["assurance"]["rust_rederived"] is False
+    assert passport["assurance"]["os_key_attested"] is False
+    assert passport["assurance"]["provenance_verified"] is False
+    assert passport["integrity"]["verification_semantics"] == "coherence_not_provenance"
     assert passport["capabilities"]["local_capability_bridge_v1"] is True
     assert passport["capabilities"]["local_mcp_read_only_v0_1"] is True
     interop = passport["interoperability"]["local_capability_bridge"]
