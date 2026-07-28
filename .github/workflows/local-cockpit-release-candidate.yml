@@ -117,6 +117,14 @@ jobs:
           workspaces: local-cockpit-app/src-tauri
       - name: Install dependencies
         run: npm ci
+      - name: Lock clean Linux source provenance
+        run: |
+          tracked_dirty="$(git -C .. status --porcelain --untracked-files=no)"
+          if [ -n "$tracked_dirty" ]; then
+            printf '%s\n' "Tracked changes detected before Linux RC build:" "$tracked_dirty"
+            exit 1
+          fi
+          echo "OUTILSIA_RC_SOURCE_TRACKED_DIRTY_AT_START=false" >> "$GITHUB_ENV"
       - name: Verify source
         run: |
           cargo test --manifest-path src-tauri/Cargo.toml --lib

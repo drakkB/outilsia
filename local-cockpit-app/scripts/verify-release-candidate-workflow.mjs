@@ -21,6 +21,18 @@ if (!text.includes("OUTILSIA_RELEASE_CHANNEL: rc")) fail("RC workflow must compi
 if (!text.includes("package:rc") || !text.includes("build-windows-release-candidate.ps1")) {
   fail("RC workflow must use the isolated packager on Windows and Linux");
 }
+for (const marker of [
+  "Lock clean Linux source provenance",
+  "git -C .. status --porcelain --untracked-files=no",
+  "OUTILSIA_RC_SOURCE_TRACKED_DIRTY_AT_START=false",
+]) {
+  if (!text.includes(marker)) fail(`Linux RC workflow must lock clean pre-build provenance: ${marker}`);
+}
+const linuxSourceLock = text.indexOf("- name: Lock clean Linux source provenance");
+const linuxBuild = text.indexOf("- name: Build Linux RC");
+if (linuxSourceLock < 0 || linuxBuild < 0 || linuxSourceLock >= linuxBuild) {
+  fail("Linux RC source provenance must be locked before the native build");
+}
 if (!text.includes(".artifacts/release-candidate")) fail("RC workflow must write under .artifacts");
 if (!text.includes("inspect-windows-authenticode.ps1")) {
   fail("RC workflow must rebuild when the Windows Authenticode inspector changes");
