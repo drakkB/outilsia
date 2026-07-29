@@ -696,6 +696,138 @@
           </div>
             </div>
           </details>
+          <details id="forgeBenchStackArenaDetails" class="forgebench-stack-arena-details">
+            <summary>
+              <span>
+                <strong>Ring des arrangements</strong>
+                <small>Plusieurs IA construisent ensemble, OutilsIA mesure l'artefact final</small>
+              </span>
+              <span id="forgeBenchStackArenaState">aucun arrangement</span>
+            </summary>
+            <div class="forgebench-stack-arena-body">
+              <div class="forgebench-stack-arena-intro">
+                <strong>Un arrangement complet, pas un modèle isolé</strong>
+                <span>Kimi peut concevoir, Grok construire, Claude relire puis Grok réparer. Chaque outil reste utilisé manuellement dans son environnement officiel. OutilsIA n'ouvre aucun abonnement et ne lit aucun identifiant.</span>
+              </div>
+              <div class="forgebench-stack-config">
+                <label>
+                  <span class="field-label">Arrangement de départ</span>
+                  <select id="forgeBenchStackPreset">
+                    <option value="kimi-grok-claude-grok">Kimi → Grok → Claude → Grok</option>
+                    <option value="local-codex-local">Local → Codex → Local</option>
+                    <option value="local-trio">Trois rôles en local</option>
+                    <option value="local-solo">Modèle local seul</option>
+                  </select>
+                </label>
+                <label>
+                  <span class="field-label">Nom de l'arrangement</span>
+                  <input id="forgeBenchStackLabel" type="text" maxlength="96" value="Kimi conçoit · Grok construit · Claude relit" autocomplete="off">
+                </label>
+                <label>
+                  <span class="field-label">Répétitions visées</span>
+                  <select id="forgeBenchStackTargetRuns">
+                    <option value="3" selected>3 runs · Arcade</option>
+                    <option value="5">5 runs · Boussole mensuelle</option>
+                  </select>
+                </label>
+                <label>
+                  <span class="field-label">Abonnements engagés / mois (€)</span>
+                  <input id="forgeBenchStackMonthlyCost" type="number" min="0" max="10000" step="0.01" value="60" inputmode="decimal">
+                </label>
+                <label>
+                  <span class="field-label">Amortissement local / run (€)</span>
+                  <input id="forgeBenchStackHardwareCost" type="number" min="0" max="10000" step="0.0001" placeholder="inconnu" inputmode="decimal">
+                </label>
+              </div>
+              <div class="forgebench-stack-stage-heading">
+                <strong>Relais versionnés</strong>
+                <span>Une identité vague rend le run non comparable</span>
+              </div>
+              <div id="forgeBenchStackStages" class="forgebench-stack-stages"></div>
+              <div class="row-actions">
+                <button id="compileForgeBenchStackBtn" type="button">Sceller l'arrangement</button>
+                <button id="exportForgeBenchStackBtn" type="button" disabled>Exporter le kit</button>
+                <button id="copyForgeBenchStackBriefBtn" type="button" disabled>Copier le brief</button>
+              </div>
+              <div id="forgeBenchStackPlanBox" class="forgebench-stack-plan-box empty">
+                Choisis les rôles, les outils et leurs versions exactes. Le SHA-256 contrôle la cohérence locale ; ce n'est pas une signature d'identité.
+              </div>
+              <div class="forgebench-stack-runner">
+                <div class="forgebench-stack-timer">
+                  <span>Temps de travail réel</span>
+                  <strong id="forgeBenchStackTimer">00:00:00</strong>
+                  <div class="row-actions">
+                    <button id="startForgeBenchStackTimerBtn" type="button" disabled>Démarrer</button>
+                    <button id="stopForgeBenchStackTimerBtn" type="button" disabled>Terminer</button>
+                    <button id="resetForgeBenchStackTimerBtn" type="button" disabled>Réinitialiser</button>
+                  </div>
+                </div>
+                <div class="forgebench-stack-observations">
+                  <label>
+                    <span class="field-label">Corrections demandées</span>
+                    <input id="forgeBenchStackInterventions" type="number" min="0" max="100" step="1" value="0" inputmode="numeric">
+                  </label>
+                  <label>
+                    <span class="field-label">Éditions humaines</span>
+                    <input id="forgeBenchStackManualEdits" type="number" min="0" max="100" step="1" value="0" inputmode="numeric">
+                  </label>
+                  <label>
+                    <span class="field-label">Clics de permission</span>
+                    <input id="forgeBenchStackPermissionClicks" type="number" min="0" max="1000" step="1" value="0" inputmode="numeric">
+                  </label>
+                  <label>
+                    <span class="field-label">Unité du quota</span>
+                    <select id="forgeBenchStackQuotaUnit">
+                      <option value="unknown">Inconnue</option>
+                      <option value="percent">Pourcentage</option>
+                      <option value="credits">Crédits</option>
+                      <option value="messages">Messages</option>
+                      <option value="minutes">Minutes</option>
+                      <option value="requests">Requêtes</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span class="field-label">Quota avant</span>
+                    <input id="forgeBenchStackQuotaBefore" type="number" min="0" step="0.0001" placeholder="inconnu" inputmode="decimal">
+                  </label>
+                  <label>
+                    <span class="field-label">Quota après</span>
+                    <input id="forgeBenchStackQuotaAfter" type="number" min="0" step="0.0001" placeholder="inconnu" inputmode="decimal">
+                  </label>
+                  <label>
+                    <span class="field-label">Dépassement API (€)</span>
+                    <input id="forgeBenchStackApiCost" type="number" min="0" max="10000" step="0.0001" placeholder="inconnu" inputmode="decimal">
+                  </label>
+                  <label>
+                    <span class="field-label">Énergie locale (Wh)</span>
+                    <input id="forgeBenchStackEnergyWh" type="number" min="0" max="1000000" step="0.1" placeholder="inconnue" inputmode="decimal">
+                  </label>
+                  <label>
+                    <span class="field-label">Électricité (€/kWh)</span>
+                    <input id="forgeBenchStackEnergyRate" type="number" min="0" max="10" step="0.0001" placeholder="inconnu" inputmode="decimal">
+                  </label>
+                </div>
+                <label class="forgebench-stack-consent">
+                  <input id="forgeBenchStackArtifactConsent" type="checkbox">
+                  <span>J'ai terminé cet arrangement. Je choisis moi-même ses trois fichiers finaux et j'autorise leur copie puis leur exécution hors ligne après une confirmation native.</span>
+                </label>
+                <div class="row-actions">
+                  <button id="evaluateForgeBenchStackBtn" type="button" disabled>Évaluer le dossier final</button>
+                </div>
+              </div>
+              <div id="forgeBenchStackRunsBox" class="forgebench-stack-runs-box empty">
+                Aucun run importé. Les échecs restent des échecs ; OutilsIA ne relance pas silencieusement un abonnement.
+              </div>
+              <div id="forgeBenchStackScoreboardBox" class="forgebench-stack-scoreboard-box empty">
+                Le tableau exploratoire apparaîtra après un run. Trois répétitions rendent un arrangement visible dans l'Arcade ; elles ne prouvent pas une supériorité générale.
+              </div>
+              <div class="row-actions">
+                <button id="copyForgeBenchStackRunBtn" type="button" disabled>Copier le dernier reçu</button>
+                <button id="copyForgeBenchStackScoreboardBtn" type="button" disabled>Copier le tableau</button>
+                <button id="clearForgeBenchStackRunsBtn" type="button" disabled>Effacer les runs locaux</button>
+              </div>
+            </div>
+          </details>
           <div id="forgeBenchBox" class="forgebench-box empty">
             Compile d'abord une Workstack puis un routage complet. ForgeBench préparera l'expérience sans l'exécuter.
           </div>
@@ -804,6 +936,8 @@
                 <option value="forgebench_experiment_compiled">Expérience ForgeBench préparée</option>
                 <option value="forgebench_isolation_probed">Isolation ForgeBench testée</option>
                 <option value="forgebench_reference_pilot_verified">Pilote ForgeBench vérifié</option>
+                <option value="forgebench_stack_run_verified">Run d'arrangement vérifié</option>
+                <option value="forgebench_stack_scoreboard_compiled">Tableau d'arrangements compilé</option>
                 <option value="forgebench_ollama_candidate_verified">Candidat Ollama vérifié</option>
                 <option value="workstack_arena_codex_pilot_verified">Pilote Codex vérifié</option>
                 <option value="workstack_human_review_recorded">Décision humaine enregistrée</option>

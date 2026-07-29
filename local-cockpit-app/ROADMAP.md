@@ -509,6 +509,8 @@ Holdout Ollama v1 implémenté dans les sources le 15 juillet 2026, sans publica
 
 Préflight Chromium guidé v1 implémenté dans les sources le 24 juillet 2026, sans publication : après un canari Bubblewrap valide, OutilsIA lance une page headless minimale dans le runtime Linux ou WSL sans réseau, ne retourne aucun chemin et n'exécute aucun worker. Si Chromium manque, l'app distingue `npx`, Playwright Python ou l'absence d'installateur compatible, puis propose au maximum une commande Playwright bornée à copier. Aucun téléchargement, réseau ou privilège n'est déclenché par le préflight ; les candidats Ollama et Codex restent bloqués tant que le canari navigateur n'est pas vert.
 
+ForgeBench Stack Arena v1 implémenté dans les sources le 29 juillet 2026, sans publication : le nouveau ring évalue un **arrangement collaboratif complet** et non chacun de ses modèles séparément. Le propriétaire décrit jusqu'à cinq relais ordonnés, avec exactement un builder, une identité et une version obligatoires. OutilsIA scelle le plan, exporte Signal Maze et des handoffs bornés, mais ne lance ni client, ni abonnement, ni modèle. L'utilisateur travaille dans les environnements officiels, chronomètre le parcours, déclare corrections, éditions, clics de permission, quota et coûts réellement connus, puis choisit lui-même les trois fichiers finaux. Après confirmation native, une copie privée jetable passe les contrôles statiques, Chromium visible et holdout hors ligne ; l'artefact est gelé avant lecture de la suite cachée et le dossier temporaire est supprimé. Trois reçus produisent une Arcade exploratoire, cinq une boussole mensuelle. Médiane, dispersion, aide humaine et coût alimentent une frontière de Pareto seulement sur les dimensions comparables. Le coût inconnu ne vaut jamais zéro, le prix mensuel n'est jamais présenté comme coût du run, le SHA-256 n'est pas présenté comme signature de provenance, et aucun vainqueur universel ou résultat scientifique n'est déclaré. L'attribution de l'artefact à l'arrangement reste déclarée par l'utilisateur, non attestée : ni échanges ni preuve d'auteur ne sont conservés. La V1 ne produit pas encore de reçu pour un artefact refusé et ne peut donc pas comparer honnêtement la fiabilité.
+
 - [x] Détecter les CLI officielles par commande de version bornée, sans retourner leur chemin.
 - [x] Distinguer Windows natif, Linux natif, WSL par défaut, Ollama natif et Ollama WSL.
 - [x] Router par capacités et type de mission sans verrouiller la proposition sur une marque.
@@ -518,6 +520,12 @@ Préflight Chromium guidé v1 implémenté dans les sources le 24 juillet 2026, 
 - [x] Ajouter un consentement séparé et strict pour le pilote technique de référence : aucun CLI candidat, réseau ou crédit payant.
 - [x] Ajouter un second consentement et un budget explicite avant l'appel d'un modèle Ollama local déjà installé, sans accès fichier, Internet ou API payante ; la suite cachée n'est lue qu'après gel du code et l'exécution du candidat comme du holdout requiert une autorisation explicite.
 - [x] Ajouter un premier adaptateur CLI borné à Codex + Signal Maze public, avec contrat strict, budget, consentements, sortie limitée, workspace jetable et coût fournisseur inconnu.
+- [x] Ajouter le Ring des arrangements guidé : rôles et versions exactes, kit et handoffs exportables, chrono réel, import choisi par l'utilisateur, coût/quota/autonomie déclarés, évaluation `51/51` et tableau exploratoire multi-runs.
+- [x] Séparer engagement mensuel, quota consommé, dépassement API, énergie et amortissement local ; conserver chaque inconnue et exclure le coût de Pareto lorsque les composants marginaux sont incomplets.
+- [x] Conserver dans Evidence Ledger les reçus minimaux de run et de tableau sans brief, artefact, chemin, compte, credential ou sortie brute.
+- [x] Garder le Ring replié dans Atelier IA et vérifier sa lisibilité à 1440 px et 390 px.
+- [ ] Ajouter des reçus d'échec signés avant toute comparaison de fiabilité ou de taux de réussite.
+- [ ] Ajouter une note de finition humaine bornée et séparée du score objectif, sans la déguiser en mesure déterministe.
 - [ ] Étendre ce mécanisme à Claude Code, Hermes, Kimi et aux cartes arbitraires seulement après un contrat de permissions et de budget propre à chaque adaptateur.
 
 Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans publication : le fichier local stable `evidence-ledger-v1.json` accepte volontairement les preuves Board Observer, Workstack Composer, Capability Router et préflight ForgeBench après validation de leur contrat. Chaque entrée contient uniquement auteur composant, claims bornés, métriques, empreinte source et empreinte précédente. La chaîne complète est revalidée à chaque lecture et écriture, les doublons sont refusés, une rotation de secours protège le remplacement du fichier et aucun contenu brut n'est persisté. Le Ledger ne transforme pas une empreinte en preuve d'identité ou de qualité et ne lance aucune exécution. Le contrat de stockage v2 ajouté le 28 juillet 2026 migre automatiquement un Ledger v1 valide en conservant ses entrées et sa tête de chaîne ; toute version inconnue est refusée sans toucher au fichier.
@@ -534,6 +542,7 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - [x] Ajouter `isolated_codex_visible_browser_pilot` après invocation réelle et bornée de Codex CLI, sans sortie brute, coût inventé, dépôt utilisateur ou claim de gagnant.
 - [x] Ajouter `explicit_local_human_review` pour une décision humaine structurée sur le reçu public signé, sans approbation visuelle, livraison ou gagnant.
 - [x] Ajouter une preuve de holdout Ollama après gel de la soumission, dans un évaluateur séparé du worker, avec uniquement compteurs et empreintes dans le Ledger.
+- [x] Ajouter `guided_multi_ai_arrangement_run` et `exploratory_stack_scoreboard` au Ledger avec validation native des contrats et absence de contenu brut.
 - [ ] Durcir ce holdout pour une prétention scientifique : logique de checks non publique, vault chiffré et inaccessible au même utilisateur, candidats pairs complets et énergie mesurée.
 
 - Séparer quatre responsabilités : Composer définit la chaîne, Workstack Arena exécute, ForgeBench évalue et Evidence Ledger conserve la preuve.
@@ -567,6 +576,9 @@ Evidence Ledger v0 implémenté dans les sources le 12 juillet 2026, sans public
 - Exiger un worktree et une session neufs par worker, un évaluateur indépendant, des versions datées et au moins trois seeds pour tout résultat présenté comme scientifique.
 - Invalider ou pénaliser les runs qui changent les règles, retirent des tests, élargissent les permissions ou reçoivent une aide non enregistrée.
 - Étendre ensuite ForgeBench aux pistes maintenance et évolution afin d'éviter un classement dépendant d'un seul mini-jeu.
+- Ajouter au minimum une seconde famille de tâche avant toute Boussole publique
+  sur les abonnements de code ; Signal Maze seul mesure un mini-jeu web
+  greenfield et rien de plus.
 
 ## Phase 8 - Réseau et communauté opt-in
 

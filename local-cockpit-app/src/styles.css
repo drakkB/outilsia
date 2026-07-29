@@ -4197,20 +4197,295 @@ dd {
   grid-template-columns: minmax(0, 2fr) minmax(130px, 1fr);
 }
 
+.forgebench-stack-arena-details {
+  background: rgba(10, 16, 18, 0.88);
+  border: 1px solid rgba(240, 138, 83, 0.30);
+  border-radius: 8px;
+  margin: 0 0 10px;
+  overflow: hidden;
+}
+
+.forgebench-stack-arena-details > summary {
+  align-items: center;
+  cursor: pointer;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  list-style: none;
+  min-height: 62px;
+  padding: 10px 12px;
+}
+
+.forgebench-stack-arena-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.forgebench-stack-arena-details > summary::after {
+  color: #f08a53;
+  content: "›";
+  font-size: 22px;
+  line-height: 1;
+  transform: rotate(90deg);
+  transition: transform 160ms ease;
+}
+
+.forgebench-stack-arena-details[open] > summary::after {
+  transform: rotate(-90deg);
+}
+
+.forgebench-stack-arena-details > summary > span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.forgebench-stack-arena-details > summary small,
+.forgebench-stack-arena-intro span,
+.forgebench-stack-stage-heading span,
+.forgebench-stack-plan-box span,
+.forgebench-stack-runs-box span,
+.forgebench-stack-scoreboard-box span,
+.forgebench-stack-card small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+#forgeBenchStackArenaState {
+  border: 1px solid rgba(240, 138, 83, 0.28);
+  border-radius: 999px;
+  color: #f6b07e;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.forgebench-stack-arena-body {
+  border-top: 1px solid rgba(139, 163, 174, 0.16);
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.forgebench-stack-arena-intro,
+.forgebench-stack-plan-box,
+.forgebench-stack-runs-box,
+.forgebench-stack-scoreboard-box {
+  background: rgba(6, 12, 14, 0.72);
+  border: 1px solid rgba(139, 163, 174, 0.18);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.forgebench-stack-arena-intro {
+  border-color: rgba(240, 138, 83, 0.25);
+}
+
+.forgebench-stack-plan-box:not(.empty) {
+  border-color: rgba(94, 193, 225, 0.28);
+}
+
+.forgebench-stack-runs-box:not(.empty) {
+  border-color: rgba(134, 239, 172, 0.26);
+}
+
+.forgebench-stack-scoreboard-box:not(.empty) {
+  border-color: rgba(229, 184, 92, 0.30);
+}
+
+.forgebench-stack-config,
+.forgebench-stack-observations {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.forgebench-stack-stage-heading {
+  align-items: baseline;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.forgebench-stack-stages {
+  display: grid;
+  gap: 8px;
+}
+
+.forgebench-stack-stage {
+  align-items: end;
+  background: rgba(14, 22, 25, 0.76);
+  border: 1px solid rgba(94, 193, 225, 0.18);
+  border-left: 3px solid #5ec1e1;
+  border-radius: 6px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(150px, 1fr) minmax(170px, 1.25fr) minmax(130px, 0.8fr);
+  padding: 9px;
+}
+
+.forgebench-stack-stage[data-provider="ollama_local"] {
+  border-left-color: #86efac;
+}
+
+.forgebench-stack-stage[data-provider="xai_grok"] {
+  border-left-color: #f08a53;
+}
+
+.forgebench-stack-stage[data-provider="anthropic_claude"] {
+  border-left-color: #e5b85c;
+}
+
+.forgebench-stack-stage input,
+.forgebench-stack-stage select {
+  width: 100%;
+}
+
+.forgebench-stack-runner {
+  background: rgba(14, 19, 21, 0.78);
+  border: 1px solid rgba(134, 239, 172, 0.20);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.forgebench-stack-timer {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.forgebench-stack-timer > strong {
+  color: #86efac;
+  font-family: "JetBrains Mono", "Cascadia Code", monospace;
+  font-size: 22px;
+  letter-spacing: 0;
+  min-width: 112px;
+  text-align: center;
+}
+
+.forgebench-stack-timer .row-actions {
+  justify-content: flex-end;
+  margin: 0;
+}
+
+.forgebench-stack-consent {
+  align-items: flex-start;
+  background: rgba(229, 184, 92, 0.07);
+  border: 1px solid rgba(229, 184, 92, 0.22);
+  border-radius: 6px;
+  display: flex;
+  gap: 9px;
+  padding: 9px;
+}
+
+.forgebench-stack-consent input {
+  flex: 0 0 auto;
+  height: 17px;
+  margin: 1px 0 0;
+  width: 17px;
+}
+
+.forgebench-stack-consent span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.forgebench-stack-run,
+.forgebench-stack-card {
+  border-top: 1px solid rgba(139, 163, 174, 0.14);
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(180px, 1.5fr) repeat(4, minmax(90px, 0.65fr));
+  padding: 8px 0;
+}
+
+.forgebench-stack-run:first-child,
+.forgebench-stack-card:first-child {
+  border-top: 0;
+}
+
+.forgebench-stack-run strong,
+.forgebench-stack-card strong {
+  overflow-wrap: anywhere;
+}
+
+.forgebench-stack-run span,
+.forgebench-stack-card span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.forgebench-stack-pareto {
+  background: rgba(229, 184, 92, 0.08);
+  border-left: 3px solid #e5b85c;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+  margin-top: 4px;
+  padding: 8px 9px;
+}
+
 @media (max-width: 640px) {
   .forgebench-candidate-controls {
     grid-template-columns: 1fr;
   }
 
-  .forgebench-execution-details > summary {
+  .forgebench-execution-details > summary,
+  .forgebench-stack-arena-details > summary {
     align-items: start;
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  #forgeBenchExecutionSummary {
+  .forgebench-stack-arena-details > summary {
+    grid-template-columns: minmax(0, 1fr);
+    padding-right: 38px;
+    position: relative;
+  }
+
+  .forgebench-stack-arena-details > summary::after {
+    position: absolute;
+    right: 13px;
+    top: 16px;
+  }
+
+  #forgeBenchExecutionSummary,
+  #forgeBenchStackArenaState {
     grid-column: 1 / -1;
     justify-self: start;
     white-space: normal;
+  }
+
+  #forgeBenchStackArenaState {
+    grid-column: auto;
+  }
+
+  .forgebench-stack-config,
+  .forgebench-stack-observations,
+  .forgebench-stack-stage,
+  .forgebench-stack-timer,
+  .forgebench-stack-run,
+  .forgebench-stack-card {
+    grid-template-columns: 1fr;
+  }
+
+  .forgebench-stack-stage-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .forgebench-stack-timer > strong {
+    text-align: left;
+  }
+
+  .forgebench-stack-timer .row-actions {
+    justify-content: flex-start;
   }
 }
 

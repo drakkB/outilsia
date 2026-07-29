@@ -79,6 +79,11 @@ const state = {
   forgeBenchRuntime: null,
   forgeBenchReferencePilot: null,
   forgeBenchOllamaCandidate: null,
+  forgeBenchStackPlan: null,
+  forgeBenchStackExport: null,
+  forgeBenchStackRuns: [],
+  forgeBenchStackScoreboard: null,
+  forgeBenchStackTiming: { startedAtMs: 0, endedAtMs: 0 },
   evidenceLedger: null,
   installSafetyPreflight: null,
   localSnapshots: [],
@@ -184,6 +189,16 @@ const FORGEBENCH_REFERENCE_PILOT_REQUEST_SCHEMA = "outilsia.forgebench_reference
 const FORGEBENCH_REFERENCE_PILOT_RESULT_SCHEMA = "outilsia.forgebench_reference_pilot_result.v1";
 const FORGEBENCH_OLLAMA_CANDIDATE_REQUEST_SCHEMA = "outilsia.forgebench_ollama_candidate_request.v3";
 const FORGEBENCH_OLLAMA_CANDIDATE_RESULT_SCHEMA = "outilsia.forgebench_ollama_candidate_result.v3";
+const FORGEBENCH_STACK_PLAN_COMPILE_REQUEST_SCHEMA = "outilsia.forgebench_stack_plan_compile_request.v1";
+const FORGEBENCH_STACK_PLAN_SCHEMA = "outilsia.forgebench_stack_plan.v1";
+const FORGEBENCH_STACK_EXPORT_REQUEST_SCHEMA = "outilsia.forgebench_stack_starter_export_request.v1";
+const FORGEBENCH_STACK_EXPORT_RESULT_SCHEMA = "outilsia.forgebench_stack_starter_export_result.v1";
+const FORGEBENCH_STACK_RUN_REQUEST_SCHEMA = "outilsia.forgebench_stack_run_request.v1";
+const FORGEBENCH_STACK_RUN_RESULT_SCHEMA = "outilsia.forgebench_stack_run_result.v1";
+const FORGEBENCH_STACK_SCOREBOARD_REQUEST_SCHEMA = "outilsia.forgebench_stack_scoreboard_request.v1";
+const FORGEBENCH_STACK_SCOREBOARD_SCHEMA = "outilsia.forgebench_stack_scoreboard.v1";
+const FORGEBENCH_STACK_CONSENT_SCOPE = "guided_stack_artifact_import_v1";
+const FORGEBENCH_STACK_RUNS_KEY = "outilsia.localCockpit.forgeBenchStackRuns.v1";
 const EVIDENCE_APPEND_REQUEST_SCHEMA = "outilsia.evidence_append_request.v1";
 const EVIDENCE_APPEND_RESULT_SCHEMA = "outilsia.evidence_append_result.v1";
 const EVIDENCE_LEDGER_SCHEMA = "outilsia.evidence_ledger.v2";
@@ -619,6 +634,38 @@ const els = {
   forgeBenchCandidateDuration: $("forgeBenchCandidateDuration"),
   forgeBenchCandidateBox: $("forgeBenchCandidateBox"),
   runForgeBenchCandidateBtn: $("runForgeBenchCandidateBtn"),
+  forgeBenchStackArenaDetails: $("forgeBenchStackArenaDetails"),
+  forgeBenchStackArenaState: $("forgeBenchStackArenaState"),
+  forgeBenchStackPreset: $("forgeBenchStackPreset"),
+  forgeBenchStackLabel: $("forgeBenchStackLabel"),
+  forgeBenchStackTargetRuns: $("forgeBenchStackTargetRuns"),
+  forgeBenchStackMonthlyCost: $("forgeBenchStackMonthlyCost"),
+  forgeBenchStackHardwareCost: $("forgeBenchStackHardwareCost"),
+  forgeBenchStackStages: $("forgeBenchStackStages"),
+  compileForgeBenchStackBtn: $("compileForgeBenchStackBtn"),
+  exportForgeBenchStackBtn: $("exportForgeBenchStackBtn"),
+  copyForgeBenchStackBriefBtn: $("copyForgeBenchStackBriefBtn"),
+  forgeBenchStackPlanBox: $("forgeBenchStackPlanBox"),
+  forgeBenchStackTimer: $("forgeBenchStackTimer"),
+  startForgeBenchStackTimerBtn: $("startForgeBenchStackTimerBtn"),
+  stopForgeBenchStackTimerBtn: $("stopForgeBenchStackTimerBtn"),
+  resetForgeBenchStackTimerBtn: $("resetForgeBenchStackTimerBtn"),
+  forgeBenchStackInterventions: $("forgeBenchStackInterventions"),
+  forgeBenchStackManualEdits: $("forgeBenchStackManualEdits"),
+  forgeBenchStackPermissionClicks: $("forgeBenchStackPermissionClicks"),
+  forgeBenchStackQuotaUnit: $("forgeBenchStackQuotaUnit"),
+  forgeBenchStackQuotaBefore: $("forgeBenchStackQuotaBefore"),
+  forgeBenchStackQuotaAfter: $("forgeBenchStackQuotaAfter"),
+  forgeBenchStackApiCost: $("forgeBenchStackApiCost"),
+  forgeBenchStackEnergyWh: $("forgeBenchStackEnergyWh"),
+  forgeBenchStackEnergyRate: $("forgeBenchStackEnergyRate"),
+  forgeBenchStackArtifactConsent: $("forgeBenchStackArtifactConsent"),
+  evaluateForgeBenchStackBtn: $("evaluateForgeBenchStackBtn"),
+  forgeBenchStackRunsBox: $("forgeBenchStackRunsBox"),
+  forgeBenchStackScoreboardBox: $("forgeBenchStackScoreboardBox"),
+  copyForgeBenchStackRunBtn: $("copyForgeBenchStackRunBtn"),
+  copyForgeBenchStackScoreboardBtn: $("copyForgeBenchStackScoreboardBtn"),
+  clearForgeBenchStackRunsBtn: $("clearForgeBenchStackRunsBtn"),
   evidenceLedgerState: $("evidenceLedgerState"),
   evidenceLedgerSource: $("evidenceLedgerSource"),
   evidenceLedgerBox: $("evidenceLedgerBox"),
@@ -825,6 +872,10 @@ let forgeBenchRunnerBusy = false;
 let forgeBenchRunnerError = "";
 let forgeBenchCandidateBusy = false;
 let forgeBenchCandidateError = "";
+let forgeBenchStackBusy = false;
+let forgeBenchStackError = "";
+let forgeBenchStackStagesDraft = [];
+let forgeBenchStackTimerHandle = 0;
 let evidenceLedgerBusy = false;
 let evidenceLedgerError = "";
 const privateWorkloadSelections = new Set();
@@ -13520,6 +13571,7 @@ async function loadForgeBenchVault(silent = false) {
     }
     if (status.exists && !forgeBenchVaultReceipt(status)) throw new Error("reçu Hidden Suite invalide");
     const compiledReceiptDigest = state.forgeBench?.experiment?.protocol?.hidden_suite?.receipt_digest || null;
+    const stackReceiptDigest = state.forgeBenchStackPlan?.hidden_suite_ref?.receipt_digest || null;
     const currentReceiptDigest = status?.receipt?.integrity?.digest || null;
     if (state.forgeBench && compiledReceiptDigest !== currentReceiptDigest) {
       state.forgeBench = null;
@@ -13529,6 +13581,9 @@ async function loadForgeBenchVault(silent = false) {
       forgeBenchError = "";
       forgeBenchRunnerError = "";
       forgeBenchCandidateError = "";
+    }
+    if (state.forgeBenchStackPlan && stackReceiptDigest !== currentReceiptDigest) {
+      invalidateForgeBenchStackPlan();
     }
     state.forgeBenchHiddenSuite = status;
     if (!silent) setStatus(status.exists ? "Suite cachée locale vérifiée" : "Aucune suite cachée locale", status.exists ? "ok" : "warn");
@@ -13545,6 +13600,7 @@ async function loadForgeBenchVault(silent = false) {
     renderForgeBenchSandboxPanel();
     renderForgeBenchRunnerPanel();
     renderForgeBenchCandidatePanel();
+    renderForgeBenchStackArena();
     renderEvidenceLedgerPanel();
   }
 }
@@ -13579,6 +13635,7 @@ async function sealForgeBenchVault() {
     state.forgeBench = null;
     state.forgeBenchReferencePilot = null;
     state.forgeBenchOllamaCandidate = null;
+    invalidateForgeBenchStackPlan();
     clearWorkstackArena(true);
     forgeBenchError = "";
     forgeBenchRunnerError = "";
@@ -13596,6 +13653,7 @@ async function sealForgeBenchVault() {
     renderForgeBenchSandboxPanel();
     renderForgeBenchRunnerPanel();
     renderForgeBenchCandidatePanel();
+    renderForgeBenchStackArena();
     renderEvidenceLedgerPanel();
   }
 }
@@ -13613,6 +13671,7 @@ async function clearForgeBenchVault() {
     state.forgeBench = null;
     state.forgeBenchReferencePilot = null;
     state.forgeBenchOllamaCandidate = null;
+    invalidateForgeBenchStackPlan();
     clearWorkstackArena(true);
     forgeBenchError = "";
     forgeBenchRunnerError = "";
@@ -13628,6 +13687,7 @@ async function clearForgeBenchVault() {
     renderForgeBenchSandboxPanel();
     renderForgeBenchRunnerPanel();
     renderForgeBenchCandidatePanel();
+    renderForgeBenchStackArena();
     renderEvidenceLedgerPanel();
   }
 }
@@ -14670,6 +14730,673 @@ async function runForgeBenchOllamaCandidate() {
   }
 }
 
+const FORGEBENCH_STACK_ROLES = Object.freeze([
+  ["planner", "Conception"],
+  ["builder", "Construction"],
+  ["reviewer", "Relecture"],
+  ["repairer", "Réparation"],
+  ["final_verifier", "Vérification finale"]
+]);
+
+const FORGEBENCH_STACK_PROVIDERS = Object.freeze([
+  ["ollama_local", "Ollama local"],
+  ["openai_codex", "OpenAI Codex"],
+  ["anthropic_claude", "Claude"],
+  ["moonshot_kimi", "Kimi"],
+  ["xai_grok", "Grok"],
+  ["zai_glm", "GLM"],
+  ["google_gemini", "Gemini"],
+  ["other_official", "Autre outil officiel"]
+]);
+
+const FORGEBENCH_STACK_PRESETS = Object.freeze({
+  "kimi-grok-claude-grok": {
+    label: "Kimi conçoit · Grok construit · Claude relit",
+    monthlyCost: "",
+    hardwareCost: "",
+    stages: [
+      { role: "planner", provider: "moonshot_kimi", identity: "Kimi", version: "" },
+      { role: "builder", provider: "xai_grok", identity: "Grok", version: "" },
+      { role: "reviewer", provider: "anthropic_claude", identity: "Claude", version: "" },
+      { role: "repairer", provider: "xai_grok", identity: "Grok", version: "" }
+    ]
+  },
+  "local-codex-local": {
+    label: "Local conçoit · Codex construit · Local vérifie",
+    monthlyCost: "",
+    hardwareCost: "",
+    stages: [
+      { role: "planner", provider: "ollama_local", identity: "Modèle Ollama local", version: "" },
+      { role: "builder", provider: "openai_codex", identity: "Codex", version: "" },
+      { role: "final_verifier", provider: "ollama_local", identity: "Modèle Ollama local", version: "" }
+    ]
+  },
+  "local-trio": {
+    label: "Stack locale à trois rôles",
+    monthlyCost: "",
+    hardwareCost: "",
+    stages: [
+      { role: "planner", provider: "ollama_local", identity: "Modèle local de conception", version: "" },
+      { role: "builder", provider: "ollama_local", identity: "Modèle local de code", version: "" },
+      { role: "reviewer", provider: "ollama_local", identity: "Modèle local de relecture", version: "" }
+    ]
+  },
+  "local-solo": {
+    label: "Modèle local seul",
+    monthlyCost: "",
+    hardwareCost: "",
+    stages: [
+      { role: "builder", provider: "ollama_local", identity: "Modèle Ollama local", version: "" }
+    ]
+  }
+});
+
+function forgeBenchStackRoleLabel(role) {
+  return FORGEBENCH_STACK_ROLES.find(([value]) => value === role)?.[1] || role;
+}
+
+function forgeBenchStackProviderLabel(provider) {
+  return FORGEBENCH_STACK_PROVIDERS.find(([value]) => value === provider)?.[1] || provider;
+}
+
+function optionalFiniteInput(element, max = Number.MAX_SAFE_INTEGER) {
+  const raw = String(element?.value ?? "").trim();
+  if (!raw) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 && value <= max ? value : Number.NaN;
+}
+
+function boundedIntegerInput(element, max) {
+  const value = Number(element?.value);
+  return Number.isInteger(value) && value >= 0 && value <= max ? value : Number.NaN;
+}
+
+function cloneForgeBenchStackStages(stages) {
+  return stages.map((stage) => ({ ...stage }));
+}
+
+function invalidateForgeBenchStackPlan() {
+  state.forgeBenchStackPlan = null;
+  state.forgeBenchStackExport = null;
+  state.forgeBenchStackTiming = { startedAtMs: 0, endedAtMs: 0 };
+  forgeBenchStackError = "";
+  if (els.forgeBenchStackArtifactConsent) els.forgeBenchStackArtifactConsent.checked = false;
+  stopForgeBenchStackTimerLoop();
+}
+
+function applyForgeBenchStackPreset(value = els.forgeBenchStackPreset?.value, silent = false) {
+  const preset = FORGEBENCH_STACK_PRESETS[value] || FORGEBENCH_STACK_PRESETS["kimi-grok-claude-grok"];
+  forgeBenchStackStagesDraft = cloneForgeBenchStackStages(preset.stages);
+  if (els.forgeBenchStackPreset) els.forgeBenchStackPreset.value = value in FORGEBENCH_STACK_PRESETS ? value : "kimi-grok-claude-grok";
+  if (els.forgeBenchStackLabel) els.forgeBenchStackLabel.value = preset.label;
+  if (els.forgeBenchStackMonthlyCost) els.forgeBenchStackMonthlyCost.value = preset.monthlyCost;
+  if (els.forgeBenchStackHardwareCost) els.forgeBenchStackHardwareCost.value = preset.hardwareCost;
+  invalidateForgeBenchStackPlan();
+  renderForgeBenchStackArena();
+  if (!silent) setStatus("Arrangement chargé : renseigne les versions exactes", "ok");
+}
+
+function forgeBenchStackDraftReady() {
+  if (!forgeBenchStackStagesDraft.length || forgeBenchStackStagesDraft.length > 5) return false;
+  const roles = forgeBenchStackStagesDraft.map((stage) => stage.role);
+  const roleRanks = roles.map((role) => FORGEBENCH_STACK_ROLES.findIndex(([value]) => value === role));
+  return roles.filter((role) => role === "builder").length === 1
+    && new Set(roles).size === roles.length
+    && roleRanks.every((rank, index) => rank >= 0 && (index === 0 || rank > roleRanks[index - 1]))
+    && forgeBenchStackStagesDraft.every((stage) => (
+      FORGEBENCH_STACK_PROVIDERS.some(([value]) => value === stage.provider)
+      && String(stage.identity || "").trim().length >= 2
+      && String(stage.version || "").trim().length >= 1
+    ));
+}
+
+function forgeBenchStackConfigReady() {
+  const label = String(els.forgeBenchStackLabel?.value || "").trim();
+  const monthly = optionalFiniteInput(els.forgeBenchStackMonthlyCost, 10000);
+  const hardware = optionalFiniteInput(els.forgeBenchStackHardwareCost, 10000);
+  const target = Number(els.forgeBenchStackTargetRuns?.value || 3);
+  return label.length >= 2
+    && label.length <= 96
+    && !Number.isNaN(monthly)
+    && !Number.isNaN(hardware)
+    && [3, 5].includes(target)
+    && forgeBenchStackDraftReady();
+}
+
+function forgeBenchStackPlanResult(value = state.forgeBenchStackPlan) {
+  if (
+    !value
+    || value.schema !== FORGEBENCH_STACK_PLAN_SCHEMA
+    || !String(value.plan_id || "").startsWith("fbsa-")
+    || !/^[a-f0-9]{64}$/i.test(String(value.integrity?.digest || ""))
+    || value.integrity?.kind !== "integrity_digest_not_signature"
+    || value.integrity?.provenance_authenticated !== false
+    || !Array.isArray(value.arrangement?.stages)
+    || value.security?.subscription_tool_started !== false
+    || value.security?.winner_declared !== false
+  ) return null;
+  return value;
+}
+
+function forgeBenchStackRunResult(value) {
+  if (
+    !value
+    || value.schema !== FORGEBENCH_STACK_RUN_RESULT_SCHEMA
+    || !String(value.run_id || "").startsWith("fbsr-")
+    || !/^[a-f0-9]{64}$/i.test(String(value.integrity?.digest || ""))
+    || value.security?.subscription_automation !== false
+    || value.provenance?.arrangement_attribution !== "user_declared"
+    || value.provenance?.artifact_authorship_verified !== false
+    || value.security?.temporary_workspace_removed !== true
+    || value.readiness?.winner_declared !== false
+    || value.readiness?.scientific_eligible !== false
+  ) return null;
+  return value;
+}
+
+function forgeBenchStackScoreboardResult(value = state.forgeBenchStackScoreboard) {
+  if (
+    !value
+    || value.schema !== FORGEBENCH_STACK_SCOREBOARD_SCHEMA
+    || !/^[a-f0-9]{64}$/i.test(String(value.integrity?.digest || ""))
+    || !Array.isArray(value.arrangements)
+    || value.claims?.single_global_winner_declared !== false
+    || value.claims?.scientific_superiority_claimed !== false
+    || value.claims?.arrangement_attribution !== "user_declared"
+    || value.claims?.artifact_authorship_verified !== false
+  ) return null;
+  return value;
+}
+
+function renderForgeBenchStackStages() {
+  if (!els.forgeBenchStackStages) return;
+  els.forgeBenchStackStages.innerHTML = forgeBenchStackStagesDraft.map((stage, index) => `
+    <div class="forgebench-stack-stage" data-stack-stage="${index}" data-provider="${escapeHtml(stage.provider)}">
+      <label>
+        <span class="field-label">Étape ${index + 1}</span>
+        <select data-stack-stage-field="role">
+          ${FORGEBENCH_STACK_ROLES.map(([value, label]) => `<option value="${value}"${stage.role === value ? " selected" : ""}>${escapeHtml(label)}</option>`).join("")}
+        </select>
+      </label>
+      <label>
+        <span class="field-label">Outil</span>
+        <select data-stack-stage-field="provider">
+          ${FORGEBENCH_STACK_PROVIDERS.map(([value, label]) => `<option value="${value}"${stage.provider === value ? " selected" : ""}>${escapeHtml(label)}</option>`).join("")}
+        </select>
+      </label>
+      <label>
+        <span class="field-label">Modèle / client exact</span>
+        <input data-stack-stage-field="identity" type="text" maxlength="160" value="${escapeHtml(stage.identity)}" placeholder="ex. Grok Code" autocomplete="off">
+      </label>
+      <label>
+        <span class="field-label">Version exacte</span>
+        <input data-stack-stage-field="version" type="text" maxlength="96" value="${escapeHtml(stage.version)}" placeholder="obligatoire" autocomplete="off">
+      </label>
+    </div>
+  `).join("");
+}
+
+function formatForgeBenchStackDuration(milliseconds) {
+  const totalSeconds = Math.max(0, Math.floor(Number(milliseconds || 0) / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
+}
+
+function stopForgeBenchStackTimerLoop() {
+  if (!forgeBenchStackTimerHandle) return;
+  window.clearInterval(forgeBenchStackTimerHandle);
+  forgeBenchStackTimerHandle = 0;
+}
+
+function forgeBenchStackElapsedMs() {
+  const started = Number(state.forgeBenchStackTiming?.startedAtMs || 0);
+  if (!started) return 0;
+  const ended = Number(state.forgeBenchStackTiming?.endedAtMs || 0);
+  return Math.max(0, (ended || Date.now()) - started);
+}
+
+function renderForgeBenchStackTimer() {
+  if (!els.forgeBenchStackTimer) return;
+  const plan = forgeBenchStackPlanResult();
+  const exported = Boolean(
+    state.forgeBenchStackExport
+    && state.forgeBenchStackExport.schema === FORGEBENCH_STACK_EXPORT_RESULT_SCHEMA
+    && state.forgeBenchStackExport.plan_ref?.plan_digest === plan?.integrity?.digest
+  );
+  const started = Number(state.forgeBenchStackTiming?.startedAtMs || 0);
+  const ended = Number(state.forgeBenchStackTiming?.endedAtMs || 0);
+  const running = started > 0 && ended === 0;
+  els.forgeBenchStackTimer.textContent = formatForgeBenchStackDuration(forgeBenchStackElapsedMs());
+  els.startForgeBenchStackTimerBtn.disabled = forgeBenchStackBusy || !plan || !exported || running;
+  els.stopForgeBenchStackTimerBtn.disabled = forgeBenchStackBusy || !running;
+  els.resetForgeBenchStackTimerBtn.disabled = forgeBenchStackBusy || !started;
+  const observationReady = forgeBenchStackObservation() !== null;
+  els.evaluateForgeBenchStackBtn.disabled = forgeBenchStackBusy
+    || !invoke
+    || !plan
+    || plan.readiness?.artifact_evaluation_ready !== true
+    || !exported
+    || !started
+    || !ended
+    || ended <= started
+    || !observationReady
+    || !els.forgeBenchStackArtifactConsent?.checked;
+  if (running && !forgeBenchStackTimerHandle) {
+    forgeBenchStackTimerHandle = window.setInterval(renderForgeBenchStackTimer, 1000);
+  } else if (!running) {
+    stopForgeBenchStackTimerLoop();
+  }
+}
+
+function forgeBenchStackObservation() {
+  const semantic = boundedIntegerInput(els.forgeBenchStackInterventions, 100);
+  const manual = boundedIntegerInput(els.forgeBenchStackManualEdits, 100);
+  const permissions = boundedIntegerInput(els.forgeBenchStackPermissionClicks, 1000);
+  const quotaUnit = els.forgeBenchStackQuotaUnit?.value || "unknown";
+  const quotaBefore = optionalFiniteInput(els.forgeBenchStackQuotaBefore, 1_000_000_000);
+  const quotaAfter = optionalFiniteInput(els.forgeBenchStackQuotaAfter, 1_000_000_000);
+  const apiCost = optionalFiniteInput(els.forgeBenchStackApiCost, 10000);
+  const energy = optionalFiniteInput(els.forgeBenchStackEnergyWh, 1_000_000);
+  const energyRate = optionalFiniteInput(els.forgeBenchStackEnergyRate, 10);
+  const invalid = [semantic, manual, permissions, quotaBefore, quotaAfter, apiCost, energy, energyRate]
+    .some((value) => Number.isNaN(value));
+  if (
+    invalid
+    || !["unknown", "percent", "credits", "messages", "minutes", "requests"].includes(quotaUnit)
+    || (quotaBefore === null) !== (quotaAfter === null)
+    || (quotaBefore !== null && quotaAfter > quotaBefore)
+    || (quotaUnit === "unknown" && quotaBefore !== null)
+    || (energy === null) !== (energyRate === null)
+  ) return null;
+  return {
+    autonomy: {
+      semantic_interventions: semantic,
+      manual_edits: manual,
+      permission_clicks: permissions
+    },
+    cost_observation: {
+      quota_unit: quotaUnit,
+      quota_before: quotaBefore,
+      quota_after: quotaAfter,
+      api_overage_eur: apiCost,
+      local_energy_wh: energy,
+      electricity_eur_per_kwh: energyRate
+    }
+  };
+}
+
+function persistForgeBenchStackRuns() {
+  try {
+    localStorage.setItem(
+      FORGEBENCH_STACK_RUNS_KEY,
+      JSON.stringify(state.forgeBenchStackRuns.slice(-100))
+    );
+  } catch {
+    // Le Ledger natif reste la voie durable si le stockage navigateur est indisponible.
+  }
+}
+
+function restoreForgeBenchStackRuns() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(FORGEBENCH_STACK_RUNS_KEY) || "[]");
+    state.forgeBenchStackRuns = Array.isArray(parsed)
+      ? parsed.filter((item) => forgeBenchStackRunResult(item)).slice(-100)
+      : [];
+  } catch {
+    state.forgeBenchStackRuns = [];
+  }
+}
+
+function forgeBenchStackCostLabel(cost = {}) {
+  const monthly = typeof cost.monthly_subscription_eur === "number" && Number.isFinite(cost.monthly_subscription_eur)
+    ? `${Number(cost.monthly_subscription_eur).toFixed(2)} €/mois`
+    : "abonnement inconnu";
+  const marginalValue = cost.median_marginal_eur ?? cost.known_marginal_components_eur;
+  const marginal = cost.marginal_cost_complete && typeof marginalValue === "number" && Number.isFinite(marginalValue)
+    ? `${Number(marginalValue).toFixed(4)} €/run`
+    : "coût/run incomplet";
+  return `${monthly} · ${marginal}`;
+}
+
+function renderForgeBenchStackArena() {
+  if (!els.forgeBenchStackPlanBox) return;
+  const plan = forgeBenchStackPlanResult();
+  const scoreboard = forgeBenchStackScoreboardResult();
+  const runs = state.forgeBenchStackRuns.filter((item) => forgeBenchStackRunResult(item));
+  const exported = Boolean(
+    state.forgeBenchStackExport
+    && state.forgeBenchStackExport.schema === FORGEBENCH_STACK_EXPORT_RESULT_SCHEMA
+    && state.forgeBenchStackExport.plan_ref?.plan_digest === plan?.integrity?.digest
+  );
+  renderForgeBenchStackStages();
+  els.compileForgeBenchStackBtn.disabled = forgeBenchStackBusy || !invoke || !forgeBenchStackConfigReady();
+  els.exportForgeBenchStackBtn.disabled = forgeBenchStackBusy || !invoke || !plan;
+  els.copyForgeBenchStackBriefBtn.disabled = !plan;
+  els.copyForgeBenchStackRunBtn.disabled = runs.length === 0;
+  els.copyForgeBenchStackScoreboardBtn.disabled = !scoreboard;
+  els.clearForgeBenchStackRunsBtn.disabled = forgeBenchStackBusy || runs.length === 0;
+  for (const control of [
+    els.forgeBenchStackPreset,
+    els.forgeBenchStackLabel,
+    els.forgeBenchStackTargetRuns,
+    els.forgeBenchStackMonthlyCost,
+    els.forgeBenchStackHardwareCost
+  ]) {
+    if (control) control.disabled = forgeBenchStackBusy;
+  }
+  for (const control of els.forgeBenchStackStages?.querySelectorAll("input, select") || []) {
+    control.disabled = forgeBenchStackBusy;
+  }
+
+  if (forgeBenchStackBusy) {
+    els.forgeBenchStackArenaState.textContent = "opération native";
+  } else if (forgeBenchStackError) {
+    els.forgeBenchStackArenaState.textContent = "action refusée";
+  } else if (Number(state.forgeBenchStackTiming?.startedAtMs || 0) && !Number(state.forgeBenchStackTiming?.endedAtMs || 0)) {
+    els.forgeBenchStackArenaState.textContent = "chrono en cours";
+  } else if (runs.length) {
+    els.forgeBenchStackArenaState.textContent = `${runs.length} run${runs.length > 1 ? "s" : ""} ${runs.length > 1 ? "locaux" : "local"}`;
+  } else if (plan) {
+    els.forgeBenchStackArenaState.textContent = exported ? "kit exporté" : "arrangement scellé";
+  } else {
+    els.forgeBenchStackArenaState.textContent = invoke ? "versions requises" : "app native requise";
+  }
+
+  if (forgeBenchStackError) {
+    els.forgeBenchStackPlanBox.className = "forgebench-stack-plan-box empty";
+    els.forgeBenchStackPlanBox.innerHTML = `<strong>Opération non validée</strong><span>${escapeHtml(forgeBenchStackError)}</span>`;
+  } else if (plan) {
+    const digest = plan.integrity?.digest || "";
+    const stages = plan.arrangement.stages.map((stage) => (
+      `${forgeBenchStackRoleLabel(stage.role)} : ${stage.identity} ${stage.version}`
+    )).join(" · ");
+    const ready = plan.readiness?.artifact_evaluation_ready === true;
+    els.forgeBenchStackPlanBox.className = "forgebench-stack-plan-box";
+    els.forgeBenchStackPlanBox.innerHTML = `
+      <strong>${escapeHtml(plan.arrangement.label)} · ${escapeHtml(plan.arrangement.lane)}</strong>
+      <span>${escapeHtml(stages)}</span>
+      <span>${plan.run_policy.target_runs} runs visés · holdout ${ready ? "scellé" : "à sceller"} · kit ${exported ? "exporté" : "non exporté"}</span>
+      <small>Intégrité SHA-256 ${escapeHtml(`${digest.slice(0, 14)}…${digest.slice(-8)}`)} · cohérence locale, pas signature de provenance · attribution future déclarée par l'utilisateur</small>
+    `;
+  } else {
+    els.forgeBenchStackPlanBox.className = "forgebench-stack-plan-box empty";
+    els.forgeBenchStackPlanBox.innerHTML = forgeBenchStackDraftReady()
+      ? "<strong>Arrangement prêt à sceller</strong><span>Le plan ne lance aucun outil. Scelle d'abord la suite cachée pour rendre l'évaluation possible.</span>"
+      : "<strong>Versions exactes requises</strong><span>Renseigne chaque client ou modèle et sa version. Les rôles doivent rester uniques et ordonnés.</span>";
+  }
+
+  if (runs.length) {
+    els.forgeBenchStackRunsBox.className = "forgebench-stack-runs-box";
+    els.forgeBenchStackRunsBox.innerHTML = [...runs].reverse().map((run) => `
+      <div class="forgebench-stack-run">
+        <strong>${escapeHtml(run.plan_ref?.label || run.plan_ref?.plan_id || "Arrangement")}</strong>
+        <span>${escapeHtml(`${run.quality?.objective_checks_passed || 0}/${run.quality?.objective_checks_total || 0} checks`)}</span>
+        <span>${escapeHtml(formatForgeBenchStackDuration(run.timing?.elapsed_ms))}</span>
+        <span>${escapeHtml(`${run.autonomy?.semantic_interventions || 0} correction(s)`)}</span>
+        <span>${escapeHtml(forgeBenchStackCostLabel(run.cost))}</span>
+      </div>
+    `).join("");
+  } else {
+    els.forgeBenchStackRunsBox.className = "forgebench-stack-runs-box empty";
+    els.forgeBenchStackRunsBox.textContent = "Aucun run importé. OutilsIA ne pilote aucun abonnement et n'invente ni durée, ni quota, ni coût.";
+  }
+
+  if (scoreboard) {
+    const frontier = new Set(scoreboard.pareto?.frontier_plan_digests || []);
+    els.forgeBenchStackScoreboardBox.className = "forgebench-stack-scoreboard-box";
+    els.forgeBenchStackScoreboardBox.innerHTML = `
+      ${scoreboard.arrangements.map((item) => `
+        <div class="forgebench-stack-card">
+          <strong>${escapeHtml(item.label || "Arrangement")}${frontier.has(item.plan_digest) ? " · Pareto" : ""}</strong>
+          <span>${item.runs_recorded}/${item.target_runs} runs</span>
+          <span>${item.quality?.objective_median_percent || 0}% objectif</span>
+          <span>${escapeHtml(formatForgeBenchStackDuration(item.speed?.median_ms))}</span>
+          <span>${escapeHtml(forgeBenchStackCostLabel(item.cost))}</span>
+        </div>
+      `).join("")}
+      <div class="forgebench-stack-pareto">
+        Frontière exploratoire : ${scoreboard.pareto?.eligible_arrangements || 0} arrangement(s) éligible(s), dimensions ${escapeHtml((scoreboard.pareto?.dimensions || []).join(", "))}. Attribution des arrangements déclarée par l'utilisateur, non attestée. Aucun vainqueur universel. Les échecs rejetés ne sont pas encore des reçus : la fiabilité comparative reste hors V1.
+      </div>
+    `;
+  } else {
+    els.forgeBenchStackScoreboardBox.className = "forgebench-stack-scoreboard-box empty";
+    els.forgeBenchStackScoreboardBox.textContent = "Le tableau apparaîtra après validation native des reçus. Trois runs ouvrent l'Arcade ; cinq runs donnent une boussole mensuelle, jamais une vérité universelle.";
+  }
+  renderForgeBenchStackTimer();
+}
+
+async function compileForgeBenchStackPlan() {
+  if (!invoke || forgeBenchStackBusy || !forgeBenchStackConfigReady()) return null;
+  forgeBenchStackBusy = true;
+  forgeBenchStackError = "";
+  invalidateForgeBenchStackPlan();
+  renderForgeBenchStackArena();
+  try {
+    const result = await invoke("compile_forgebench_stack_plan", {
+      request: {
+        schema: FORGEBENCH_STACK_PLAN_COMPILE_REQUEST_SCHEMA,
+        label: els.forgeBenchStackLabel.value.trim(),
+        target_runs: Number(els.forgeBenchStackTargetRuns.value),
+        stages: cloneForgeBenchStackStages(forgeBenchStackStagesDraft).map((stage) => ({
+          role: stage.role,
+          provider: stage.provider,
+          identity: stage.identity.trim(),
+          version: stage.version.trim()
+        })),
+        cost_profile: {
+          monthly_subscription_eur: optionalFiniteInput(els.forgeBenchStackMonthlyCost, 10000),
+          local_hardware_amortization_eur_per_run: optionalFiniteInput(els.forgeBenchStackHardwareCost, 10000)
+        }
+      }
+    });
+    state.forgeBenchStackPlan = result;
+    if (!forgeBenchStackPlanResult(result)) throw new Error("plan natif Stack Arena non conforme");
+    setStatus("Arrangement ForgeBench scellé sans lancer les IA", "ok");
+    return result;
+  } catch (error) {
+    state.forgeBenchStackPlan = null;
+    forgeBenchStackError = String(error || "Arrangement ForgeBench impossible");
+    setStatus(`Stack Arena : ${forgeBenchStackError}`, "error");
+    return null;
+  } finally {
+    forgeBenchStackBusy = false;
+    renderForgeBenchStackArena();
+  }
+}
+
+async function exportForgeBenchStackStarter() {
+  const plan = forgeBenchStackPlanResult();
+  if (!invoke || forgeBenchStackBusy || !plan) return null;
+  forgeBenchStackBusy = true;
+  forgeBenchStackError = "";
+  state.forgeBenchStackExport = null;
+  renderForgeBenchStackArena();
+  try {
+    const result = await invoke("export_forgebench_stack_starter", {
+      request: {
+        schema: FORGEBENCH_STACK_EXPORT_REQUEST_SCHEMA,
+        stack_plan: plan
+      }
+    });
+    if (
+      result?.schema !== FORGEBENCH_STACK_EXPORT_RESULT_SCHEMA
+      || result?.plan_ref?.plan_digest !== plan.integrity.digest
+      || result?.workspace_files_total !== 3
+      || result?.paths_returned !== false
+    ) throw new Error("reçu d'export Stack Arena non conforme");
+    state.forgeBenchStackExport = result;
+    setStatus(`Kit ${result.folder_name} exporté`, "ok");
+    return result;
+  } catch (error) {
+    forgeBenchStackError = String(error || "Export ForgeBench impossible");
+    setStatus(`Export Stack Arena : ${forgeBenchStackError}`, "error");
+    return null;
+  } finally {
+    forgeBenchStackBusy = false;
+    renderForgeBenchStackArena();
+  }
+}
+
+async function copyForgeBenchStackBrief() {
+  const brief = forgeBenchStackPlanResult()?.handoff?.brief_markdown;
+  if (!brief) return;
+  try {
+    await navigator.clipboard.writeText(brief);
+    setStatus("Brief de l'arrangement copié", "ok");
+  } catch (error) {
+    setStatus(`Copie du brief impossible : ${error}`, "error");
+  }
+}
+
+function startForgeBenchStackTimer() {
+  const plan = forgeBenchStackPlanResult();
+  const exported = state.forgeBenchStackExport?.plan_ref?.plan_digest === plan?.integrity?.digest;
+  if (!plan || !exported || forgeBenchStackBusy) return;
+  state.forgeBenchStackTiming = { startedAtMs: Date.now(), endedAtMs: 0 };
+  if (els.forgeBenchStackArtifactConsent) els.forgeBenchStackArtifactConsent.checked = false;
+  renderForgeBenchStackTimer();
+  setStatus("Chronomètre ForgeBench démarré", "ok");
+}
+
+function stopForgeBenchStackTimer() {
+  if (!state.forgeBenchStackTiming?.startedAtMs || state.forgeBenchStackTiming?.endedAtMs) return;
+  state.forgeBenchStackTiming.endedAtMs = Date.now();
+  renderForgeBenchStackTimer();
+  setStatus(`Travail terminé en ${formatForgeBenchStackDuration(forgeBenchStackElapsedMs())}`, "ok");
+}
+
+function resetForgeBenchStackTimer() {
+  state.forgeBenchStackTiming = { startedAtMs: 0, endedAtMs: 0 };
+  if (els.forgeBenchStackArtifactConsent) els.forgeBenchStackArtifactConsent.checked = false;
+  stopForgeBenchStackTimerLoop();
+  renderForgeBenchStackTimer();
+}
+
+async function compileForgeBenchStackScoreboard() {
+  const runs = state.forgeBenchStackRuns.filter((item) => forgeBenchStackRunResult(item));
+  if (!invoke || !runs.length) {
+    state.forgeBenchStackScoreboard = null;
+    renderForgeBenchStackArena();
+    return null;
+  }
+  try {
+    const result = await invoke("compile_forgebench_stack_scoreboard", {
+      request: {
+        schema: FORGEBENCH_STACK_SCOREBOARD_REQUEST_SCHEMA,
+        runs
+      }
+    });
+    state.forgeBenchStackScoreboard = result;
+    if (!forgeBenchStackScoreboardResult(result)) throw new Error("tableau Stack Arena non conforme");
+    renderEvidenceLedgerPanel();
+    return result;
+  } catch (error) {
+    state.forgeBenchStackScoreboard = null;
+    forgeBenchStackError = String(error || "Tableau ForgeBench impossible");
+    setStatus(`Tableau Stack Arena : ${forgeBenchStackError}`, "error");
+    return null;
+  } finally {
+    renderForgeBenchStackArena();
+  }
+}
+
+async function evaluateForgeBenchStackArtifact() {
+  const plan = forgeBenchStackPlanResult();
+  const observation = forgeBenchStackObservation();
+  const timing = state.forgeBenchStackTiming;
+  if (
+    !invoke
+    || forgeBenchStackBusy
+    || !plan
+    || !observation
+    || !timing?.startedAtMs
+    || !timing?.endedAtMs
+    || timing.endedAtMs <= timing.startedAtMs
+    || state.forgeBenchStackExport?.plan_ref?.plan_digest !== plan.integrity.digest
+    || !els.forgeBenchStackArtifactConsent?.checked
+  ) return null;
+  forgeBenchStackBusy = true;
+  forgeBenchStackError = "";
+  renderForgeBenchStackArena();
+  try {
+    const result = await invoke("evaluate_forgebench_stack_artifact", {
+      request: {
+        schema: FORGEBENCH_STACK_RUN_REQUEST_SCHEMA,
+        stack_plan: plan,
+        timing: {
+          started_at_ms: timing.startedAtMs,
+          ended_at_ms: timing.endedAtMs
+        },
+        autonomy: observation.autonomy,
+        cost_observation: observation.cost_observation,
+        consent: {
+          scope: FORGEBENCH_STACK_CONSENT_SCOPE,
+          confirmed: true,
+          folder_selected_by_user: true,
+          artifact_copy_allowed: true,
+          generated_code_execution_allowed: true,
+          hidden_holdout_allowed_after_artifact_freeze: true,
+          subscription_automation_allowed: false,
+          network_access_allowed: false,
+          publish_allowed: false
+        }
+      }
+    });
+    if (!forgeBenchStackRunResult(result)) throw new Error("reçu de run Stack Arena non conforme");
+    state.forgeBenchStackRuns.push(result);
+    state.forgeBenchStackRuns = state.forgeBenchStackRuns.slice(-100);
+    persistForgeBenchStackRuns();
+    resetForgeBenchStackTimer();
+    if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "forgebench_stack_run_verified";
+    await compileForgeBenchStackScoreboard();
+    setStatus(`Run validé : ${result.quality.objective_checks_passed}/${result.quality.objective_checks_total} checks`, "ok");
+    return result;
+  } catch (error) {
+    forgeBenchStackError = String(error || "Évaluation Stack Arena impossible");
+    setStatus(`Évaluation Stack Arena : ${forgeBenchStackError}`, "error");
+    return null;
+  } finally {
+    forgeBenchStackBusy = false;
+    renderForgeBenchStackArena();
+    renderEvidenceLedgerPanel();
+  }
+}
+
+async function copyForgeBenchStackScoreboard() {
+  const scoreboard = forgeBenchStackScoreboardResult();
+  if (!scoreboard) return;
+  try {
+    await navigator.clipboard.writeText(`${JSON.stringify(scoreboard, null, 2)}\n`);
+    setStatus("Tableau exploratoire ForgeBench copié", "ok");
+  } catch (error) {
+    setStatus(`Copie du tableau impossible : ${error}`, "error");
+  }
+}
+
+async function copyForgeBenchStackRun() {
+  const run = [...state.forgeBenchStackRuns].reverse().find((item) => forgeBenchStackRunResult(item));
+  if (!run) return;
+  try {
+    await navigator.clipboard.writeText(`${JSON.stringify(run, null, 2)}\n`);
+    setStatus("Dernier reçu ForgeBench copié", "ok");
+  } catch (error) {
+    setStatus(`Copie du reçu impossible : ${error}`, "error");
+  }
+}
+
+function clearForgeBenchStackRuns() {
+  if (!state.forgeBenchStackRuns.length) return;
+  if (!window.confirm("Effacer les reçus locaux du Ring des arrangements ? Les entrées déjà ajoutées à Evidence Ledger ne seront pas supprimées.")) return;
+  state.forgeBenchStackRuns = [];
+  state.forgeBenchStackScoreboard = null;
+  localStorage.removeItem(FORGEBENCH_STACK_RUNS_KEY);
+  renderForgeBenchStackArena();
+  renderEvidenceLedgerPanel();
+  setStatus("Runs locaux du Ring effacés", "ok");
+}
+
 function forgeBenchMarkdown(result = state.forgeBench) {
   const experiment = result?.experiment;
   if (!experiment) return "";
@@ -15478,6 +16205,8 @@ function evidenceEventLabel(value) {
     forgebench_isolation_probed: "Isolation ForgeBench testée",
     forgebench_reference_pilot_verified: "Pilote ForgeBench vérifié",
     forgebench_ollama_candidate_verified: "Candidat Ollama vérifié",
+    forgebench_stack_run_verified: "Run d'arrangement vérifié",
+    forgebench_stack_scoreboard_compiled: "Tableau d'arrangements compilé",
     workstack_arena_codex_pilot_verified: "Pilote Codex vérifié",
     workstack_human_review_recorded: "Décision humaine enregistrée",
     local_action_execution_recorded: "Action locale exécutée",
@@ -15494,6 +16223,7 @@ function evidenceActorLabel(value) {
     forgebench_isolation: "ForgeBench Isolation",
     forgebench_runner: "ForgeBench Runner",
     forgebench_candidate_runner: "ForgeBench Candidat local",
+    forgebench_stack_arena: "ForgeBench Stack Arena",
     workstack_arena: "Workstack Arena",
     local_action_lane: "Local Action Lane",
     local_owner: "Propriétaire local"
@@ -15508,13 +16238,17 @@ function evidenceSourceDocument(eventType) {
   if (eventType === "forgebench_isolation_probed") return forgeBenchIsolationResult() || null;
   if (eventType === "forgebench_reference_pilot_verified") return forgeBenchReferencePilotResult() || null;
   if (eventType === "forgebench_ollama_candidate_verified") return forgeBenchOllamaCandidateResult() || null;
+  if (eventType === "forgebench_stack_run_verified") {
+    return [...state.forgeBenchStackRuns].reverse().find((item) => forgeBenchStackRunResult(item)) || null;
+  }
+  if (eventType === "forgebench_stack_scoreboard_compiled") return forgeBenchStackScoreboardResult() || null;
   if (eventType === "workstack_arena_codex_pilot_verified") return workstackArenaResult() || null;
   if (eventType === "workstack_human_review_recorded") return workstackHumanReviewResult() || null;
   return null;
 }
 
 function evidenceAvailableTypes() {
-  return ["workstack_human_review_recorded", "workstack_arena_codex_pilot_verified", "forgebench_ollama_candidate_verified", "forgebench_reference_pilot_verified", "forgebench_isolation_probed", "forgebench_experiment_compiled", "capability_routing_proposed", "workstack_compiled", "board_observed"]
+  return ["forgebench_stack_scoreboard_compiled", "forgebench_stack_run_verified", "workstack_human_review_recorded", "workstack_arena_codex_pilot_verified", "forgebench_ollama_candidate_verified", "forgebench_reference_pilot_verified", "forgebench_isolation_probed", "forgebench_experiment_compiled", "capability_routing_proposed", "workstack_compiled", "board_observed"]
     .filter((eventType) => Boolean(evidenceSourceDocument(eventType)));
 }
 
@@ -22397,6 +23131,299 @@ function installTestHarness() {
         markdown: forgeBenchMarkdown()
       };
     },
+    applyForgeBenchStackArenaState() {
+      this.applyForgeBenchState();
+      const digestA = "1".repeat(64);
+      const digestB = "2".repeat(64);
+      forgeBenchStackStagesDraft = [
+        { role: "planner", provider: "moonshot_kimi", identity: "Kimi K2", version: "2026-07" },
+        { role: "builder", provider: "xai_grok", identity: "Grok Code", version: "4.2" },
+        { role: "reviewer", provider: "anthropic_claude", identity: "Claude Code", version: "2.1.206" },
+        { role: "repairer", provider: "xai_grok", identity: "Grok Code", version: "4.2" }
+      ];
+      if (els.forgeBenchStackPreset) els.forgeBenchStackPreset.value = "kimi-grok-claude-grok";
+      if (els.forgeBenchStackLabel) els.forgeBenchStackLabel.value = "Kimi conçoit · Grok construit · Claude relit";
+      if (els.forgeBenchStackTargetRuns) els.forgeBenchStackTargetRuns.value = "3";
+      if (els.forgeBenchStackMonthlyCost) els.forgeBenchStackMonthlyCost.value = "60";
+      if (els.forgeBenchStackHardwareCost) els.forgeBenchStackHardwareCost.value = "";
+      if (els.forgeBenchStackInterventions) els.forgeBenchStackInterventions.value = "1";
+      if (els.forgeBenchStackManualEdits) els.forgeBenchStackManualEdits.value = "0";
+      if (els.forgeBenchStackPermissionClicks) els.forgeBenchStackPermissionClicks.value = "4";
+      if (els.forgeBenchStackQuotaUnit) els.forgeBenchStackQuotaUnit.value = "unknown";
+      if (els.forgeBenchStackQuotaBefore) els.forgeBenchStackQuotaBefore.value = "";
+      if (els.forgeBenchStackQuotaAfter) els.forgeBenchStackQuotaAfter.value = "";
+      if (els.forgeBenchStackApiCost) els.forgeBenchStackApiCost.value = "";
+      if (els.forgeBenchStackEnergyWh) els.forgeBenchStackEnergyWh.value = "";
+      if (els.forgeBenchStackEnergyRate) els.forgeBenchStackEnergyRate.value = "";
+      if (els.forgeBenchStackArtifactConsent) els.forgeBenchStackArtifactConsent.checked = true;
+
+      const stagesA = forgeBenchStackStagesDraft.map((stage, index) => ({
+        ordinal: index + 1,
+        ...stage,
+        execution_by_outilsia: false
+      }));
+      state.forgeBenchStackPlan = {
+        schema: FORGEBENCH_STACK_PLAN_SCHEMA,
+        contract_version: "2026-07-29",
+        plan_id: "fbsa-demo-kimi-grok-stack",
+        benchmark: {
+          id: "signal-maze-v1",
+          version: "1.0.0-exploratory",
+          track: "guided_multi_ai_arrangement"
+        },
+        arrangement: {
+          label: "Kimi conçoit · Grok construit · Claude relit",
+          lane: "subscription",
+          stages: stagesA
+        },
+        run_policy: {
+          target_runs: 3,
+          tier: "arcade",
+          exact_versions_required: true
+        },
+        cost_profile: {
+          currency: "EUR",
+          monthly_subscription_eur: 60,
+          local_hardware_amortization_eur_per_run: null,
+          monthly_price_is_not_run_cost: true,
+          unknown_cost_is_zero: false
+        },
+        hidden_suite_ref: {
+          status: "locally_sealed",
+          hidden_seeds_total: 5,
+          private_checks_total: 5
+        },
+        handoff: {
+          brief_markdown: "# ForgeBench Arcade\n\nSignal Maze v1.",
+          raw_private_context_included: false
+        },
+        readiness: {
+          starter_export_ready: true,
+          artifact_evaluation_ready: true,
+          blockers: []
+        },
+        security: {
+          subscription_tool_started: false,
+          local_model_started: false,
+          network_called: false,
+          credential_read: false,
+          project_read: false,
+          hidden_suite_contents_returned: false,
+          winner_declared: false
+        },
+        integrity: {
+          algorithm: "SHA-256",
+          digest: digestA,
+          kind: "integrity_digest_not_signature",
+          provenance_authenticated: false
+        }
+      };
+      state.forgeBenchStackExport = {
+        schema: FORGEBENCH_STACK_EXPORT_RESULT_SCHEMA,
+        contract_version: "2026-07-29",
+        plan_ref: {
+          plan_id: state.forgeBenchStackPlan.plan_id,
+          plan_digest: digestA
+        },
+        exported: true,
+        personal_path_returned: false
+      };
+      state.forgeBenchStackTiming = {
+        startedAtMs: 1_000,
+        endedAtMs: 743_000
+      };
+
+      const receipt = ({
+        digest,
+        label,
+        lane,
+        runIndex,
+        durationMs,
+        monthly,
+        marginalComplete,
+        marginal,
+        semantic,
+        manual
+      }) => ({
+        schema: FORGEBENCH_STACK_RUN_RESULT_SCHEMA,
+        contract_version: "2026-07-29",
+        run_id: `fbsr-demo-${runIndex}`,
+        plan_ref: {
+          plan_id: `fbsa-demo-${runIndex}`,
+          plan_digest: digest,
+          label,
+          lane,
+          target_runs: 3
+        },
+        benchmark: {
+          id: "signal-maze-v1",
+          track: "guided_multi_ai_arrangement"
+        },
+        artifact: {
+          files_total: 3,
+          digest: String(runIndex).slice(-1).repeat(64),
+          raw_files_stored: false
+        },
+        timing: {
+          elapsed_ms: durationMs,
+          measurement_source: "outilsia_guided_stopwatch"
+        },
+        autonomy: {
+          semantic_interventions: semantic,
+          manual_edits: manual,
+          permission_clicks: 4,
+          permission_clicks_penalized: false,
+          exploratory_index: Math.max(0, 100 - semantic * 15 - manual * 25)
+        },
+        cost: {
+          currency: "EUR",
+          monthly_subscription_eur: monthly,
+          monthly_price_is_not_run_cost: true,
+          quota: { unit: "unknown", before: null, after: null, delta: null },
+          known_marginal_components_eur: marginal,
+          marginal_cost_complete: marginalComplete,
+          unknown_components: marginalComplete ? [] : ["api_overage_or_subscription_quota_value"],
+          unknown_cost_is_zero: false
+        },
+        quality: {
+          objective_checks_total: 51,
+          objective_checks_passed: 51,
+          objective_percent: 100,
+          subjective_polish_scored: false
+        },
+        provenance: {
+          arrangement_attribution: "user_declared",
+          artifact_authorship_verified: false,
+          handoff_trace_retained: false,
+          independently_authenticated: false
+        },
+        security: {
+          folder_selected_by_user: true,
+          subscription_automation: false,
+          external_network_during_evaluation: false,
+          artifact_frozen_before_hidden_suite_evaluation: true,
+          credentials_read: false,
+          personal_path_returned: false,
+          temporary_workspace_removed: true
+        },
+        readiness: {
+          run_verified: true,
+          comparison_eligible: true,
+          scientific_eligible: false,
+          winner_declared: false
+        },
+        integrity: {
+          algorithm: "SHA-256",
+          digest: ["a", "b", "c", "d", "e", "f"][runIndex - 1].repeat(64),
+          kind: "integrity_digest_not_signature",
+          provenance_authenticated: false
+        }
+      });
+      state.forgeBenchStackRuns = [
+        receipt({ digest: digestA, label: "Kimi conçoit · Grok construit · Claude relit", lane: "subscription", runIndex: 1, durationMs: 742_000, monthly: 60, marginalComplete: false, marginal: null, semantic: 1, manual: 0 }),
+        receipt({ digest: digestA, label: "Kimi conçoit · Grok construit · Claude relit", lane: "subscription", runIndex: 2, durationMs: 715_000, monthly: 60, marginalComplete: false, marginal: null, semantic: 1, manual: 0 }),
+        receipt({ digest: digestA, label: "Kimi conçoit · Grok construit · Claude relit", lane: "subscription", runIndex: 3, durationMs: 781_000, monthly: 60, marginalComplete: false, marginal: null, semantic: 2, manual: 0 }),
+        receipt({ digest: digestB, label: "Qwen local conçoit · Codex construit · Qwen vérifie", lane: "hybrid", runIndex: 4, durationMs: 968_000, monthly: 20, marginalComplete: true, marginal: 0.037, semantic: 0, manual: 0 }),
+        receipt({ digest: digestB, label: "Qwen local conçoit · Codex construit · Qwen vérifie", lane: "hybrid", runIndex: 5, durationMs: 941_000, monthly: 20, marginalComplete: true, marginal: 0.034, semantic: 0, manual: 0 }),
+        receipt({ digest: digestB, label: "Qwen local conçoit · Codex construit · Qwen vérifie", lane: "hybrid", runIndex: 6, durationMs: 1_012_000, monthly: 20, marginalComplete: true, marginal: 0.041, semantic: 0, manual: 0 })
+      ];
+      state.forgeBenchStackScoreboard = {
+        schema: FORGEBENCH_STACK_SCOREBOARD_SCHEMA,
+        contract_version: "2026-07-29",
+        benchmark: {
+          id: "signal-maze-v1",
+          track: "guided_multi_ai_arrangement"
+        },
+        status: "exploratory_comparison_ready",
+        runs_total: 6,
+        arrangements: [
+          {
+            plan_digest: digestA,
+            label: "Kimi conçoit · Grok construit · Claude relit",
+            lane: "subscription",
+            runs_recorded: 3,
+            target_runs: 3,
+            arcade_ready: true,
+            monthly_compass_ready: false,
+            quality: { objective_median_percent: 100, all_runs_passed: true },
+            speed: { median_ms: 742_000, min_ms: 715_000, max_ms: 781_000, spread_ms: 66_000 },
+            autonomy: { median_index: 85, median_semantic_interventions: 1, median_manual_edits: 0 },
+            cost: {
+              monthly_subscription_eur: 60,
+              marginal_cost_complete: false,
+              median_marginal_eur: null,
+              quota_unit: "unknown",
+              median_quota_delta: null,
+              unknown_cost_is_zero: false
+            },
+            reliability: { accepted_runs: 3, failed_runs_recorded: 0, failure_receipts_supported: false }
+          },
+          {
+            plan_digest: digestB,
+            label: "Qwen local conçoit · Codex construit · Qwen vérifie",
+            lane: "hybrid",
+            runs_recorded: 3,
+            target_runs: 3,
+            arcade_ready: true,
+            monthly_compass_ready: false,
+            quality: { objective_median_percent: 100, all_runs_passed: true },
+            speed: { median_ms: 968_000, min_ms: 941_000, max_ms: 1_012_000, spread_ms: 71_000 },
+            autonomy: { median_index: 100, median_semantic_interventions: 0, median_manual_edits: 0 },
+            cost: {
+              monthly_subscription_eur: 20,
+              marginal_cost_complete: true,
+              median_marginal_eur: 0.037,
+              quota_unit: "unknown",
+              median_quota_delta: null,
+              unknown_cost_is_zero: false
+            },
+            reliability: { accepted_runs: 3, failed_runs_recorded: 0, failure_receipts_supported: false }
+          }
+        ],
+        pareto: {
+          eligible_arrangements: 2,
+          frontier_plan_digests: [digestA, digestB],
+          dimensions: ["objective_quality", "wall_clock_speed", "human_help"],
+          cost_included: false,
+          unknown_cost_is_zero: false
+        },
+        minimal_sufficient_subscription: {
+          plan_digest: digestB,
+          label: "Qwen local conçoit · Codex construit · Qwen vérifie",
+          monthly_subscription_eur: 20,
+          total_cost_claimed: false
+        },
+        claims: {
+          single_global_winner_declared: false,
+          scientific_superiority_claimed: false,
+          arrangement_attribution: "user_declared",
+          artifact_authorship_verified: false,
+          valid_for_task_family: "greenfield_browser_game",
+          three_runs_are_arcade_exploration: true,
+          five_runs_enable_monthly_compass_not_universal_truth: true,
+          exact_versions_required: true,
+          raw_metrics_preserved: true
+        },
+        integrity: {
+          algorithm: "SHA-256",
+          digest: "f".repeat(64),
+          kind: "integrity_digest_not_signature",
+          provenance_authenticated: false
+        }
+      };
+      forgeBenchStackError = "";
+      if (els.evidenceLedgerSource) els.evidenceLedgerSource.value = "forgebench_stack_scoreboard_compiled";
+      if (els.forgeBenchStackArenaDetails) els.forgeBenchStackArenaDetails.open = false;
+      renderForgeBenchStackArena();
+      renderEvidenceLedgerPanel();
+      return {
+        plan: state.forgeBenchStackPlan,
+        runs: state.forgeBenchStackRuns,
+        scoreboard: state.forgeBenchStackScoreboard,
+        panel: els.forgeBenchStackArenaDetails?.textContent || "",
+        open: Boolean(els.forgeBenchStackArenaDetails?.open)
+      };
+    },
     applyForgeBenchRuntimeMissingState() {
       this.applyForgeBenchState();
       state.forgeBenchRuntime = {
@@ -24249,6 +25276,52 @@ els.probeForgeBenchRuntimeBtn?.addEventListener("click", probeForgeBenchRuntime)
 els.copyForgeBenchRuntimeCommandBtn?.addEventListener("click", copyForgeBenchRuntimeCommand);
 els.runForgeBenchPilotBtn?.addEventListener("click", runForgeBenchReferencePilot);
 els.runForgeBenchCandidateBtn?.addEventListener("click", runForgeBenchOllamaCandidate);
+els.forgeBenchStackPreset?.addEventListener("change", () => applyForgeBenchStackPreset(els.forgeBenchStackPreset.value));
+for (const input of [
+  els.forgeBenchStackLabel,
+  els.forgeBenchStackTargetRuns,
+  els.forgeBenchStackMonthlyCost,
+  els.forgeBenchStackHardwareCost
+]) {
+  input?.addEventListener("change", () => {
+    invalidateForgeBenchStackPlan();
+    renderForgeBenchStackArena();
+  });
+}
+els.forgeBenchStackStages?.addEventListener("change", (event) => {
+  const row = event.target?.closest?.("[data-stack-stage]");
+  const field = event.target?.getAttribute?.("data-stack-stage-field");
+  const index = Number(row?.getAttribute?.("data-stack-stage"));
+  if (!Number.isInteger(index) || index < 0 || !forgeBenchStackStagesDraft[index] || !["role", "provider", "identity", "version"].includes(field)) return;
+  forgeBenchStackStagesDraft[index][field] = event.target.value;
+  invalidateForgeBenchStackPlan();
+  renderForgeBenchStackArena();
+});
+els.compileForgeBenchStackBtn?.addEventListener("click", compileForgeBenchStackPlan);
+els.exportForgeBenchStackBtn?.addEventListener("click", exportForgeBenchStackStarter);
+els.copyForgeBenchStackBriefBtn?.addEventListener("click", copyForgeBenchStackBrief);
+els.startForgeBenchStackTimerBtn?.addEventListener("click", startForgeBenchStackTimer);
+els.stopForgeBenchStackTimerBtn?.addEventListener("click", stopForgeBenchStackTimer);
+els.resetForgeBenchStackTimerBtn?.addEventListener("click", resetForgeBenchStackTimer);
+for (const input of [
+  els.forgeBenchStackInterventions,
+  els.forgeBenchStackManualEdits,
+  els.forgeBenchStackPermissionClicks,
+  els.forgeBenchStackQuotaUnit,
+  els.forgeBenchStackQuotaBefore,
+  els.forgeBenchStackQuotaAfter,
+  els.forgeBenchStackApiCost,
+  els.forgeBenchStackEnergyWh,
+  els.forgeBenchStackEnergyRate,
+  els.forgeBenchStackArtifactConsent
+]) {
+  input?.addEventListener("input", renderForgeBenchStackTimer);
+  input?.addEventListener("change", renderForgeBenchStackTimer);
+}
+els.evaluateForgeBenchStackBtn?.addEventListener("click", evaluateForgeBenchStackArtifact);
+els.copyForgeBenchStackRunBtn?.addEventListener("click", copyForgeBenchStackRun);
+els.copyForgeBenchStackScoreboardBtn?.addEventListener("click", copyForgeBenchStackScoreboard);
+els.clearForgeBenchStackRunsBtn?.addEventListener("click", clearForgeBenchStackRuns);
 els.runWorkstackArenaBtn?.addEventListener("click", runWorkstackArenaCodexPilot);
 els.copyWorkstackArenaBtn?.addEventListener("click", copyWorkstackArenaReceipt);
 els.clearWorkstackArenaBtn?.addEventListener("click", () => clearWorkstackArena(false));
@@ -24676,6 +25749,8 @@ if (!invoke) {
 
 restoreWorkspaceSectionState();
 restoreWorkspaceTab();
+restoreForgeBenchStackRuns();
+applyForgeBenchStackPreset("kimi-grok-claude-grok", true);
 installPanelStatusObserver();
 loadHistory();
 renderBenchmarkHistory();
@@ -24699,6 +25774,7 @@ renderForgeBenchIsolationPanel();
 renderForgeBenchRuntimePanel();
 renderForgeBenchRunnerPanel();
 renderForgeBenchCandidatePanel();
+renderForgeBenchStackArena();
 renderWorkstackArenaPanel();
 renderEvidenceLedgerPanel();
 renderPreparePanel();
@@ -24714,6 +25790,7 @@ if (invoke) {
   void refreshLocalCapabilityBridgeStatus(true);
   void refreshLocalActionLaneStatus(true);
   void refreshBenchmarkCommonsStatus(true);
+  if (state.forgeBenchStackRuns.length) void compileForgeBenchStackScoreboard();
   window.setInterval(() => {
     if (state.localCapabilityBridge) void refreshLocalCapabilityBridgeStatus(true);
   }, 15_000);
@@ -24721,6 +25798,7 @@ if (invoke) {
     if (state.localActionLane) void refreshLocalActionLaneStatus(true);
   }, 2_000);
   window.addEventListener("beforeunload", () => {
+    stopForgeBenchStackTimerLoop();
     void invoke("stop_local_capability_bridge");
     void invoke("stop_local_action_lane");
   });

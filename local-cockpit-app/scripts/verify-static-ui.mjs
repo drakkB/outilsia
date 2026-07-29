@@ -7,7 +7,7 @@ const html = readFileSync(resolve(root, "src/index.html"), "utf8");
 const js = readFileSync(resolve(root, "src/app.js"), "utf8");
 const agentAdapterPolicyJs = readFileSync(resolve(root, "src/agent-adapter-policy.js"), "utf8");
 const allJs = `${js}\n${agentAdapterPolicyJs}`;
-const rust = ["lib.rs", "local_mcp_http.rs", "local_capability_bridge.rs", "local_action_lane.rs", "benchmark_commons.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "agent_adapter_policy.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runtime.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_hidden.rs", "forgebench_candidate.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
+const rust = ["lib.rs", "local_mcp_http.rs", "local_capability_bridge.rs", "local_action_lane.rs", "benchmark_commons.rs", "board_observer.rs", "workstack_composer.rs", "capability_router.rs", "agent_adapter_policy.rs", "forgebench.rs", "forgebench_vault.rs", "forgebench_sandbox.rs", "forgebench_isolation.rs", "forgebench_runtime.rs", "forgebench_runner.rs", "forgebench_browser.rs", "forgebench_hidden.rs", "forgebench_candidate.rs", "forgebench_stack_arena.rs", "workstack_arena.rs", "workstack_review.rs", "evidence_ledger.rs"]
   .map((name) => readFileSync(resolve(root, "src-tauri/src", name), "utf8"))
   .join("\n");
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");

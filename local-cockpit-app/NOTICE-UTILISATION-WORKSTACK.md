@@ -1,6 +1,6 @@
 # Notice d'utilisation - Workstacks et preuves OutilsIA
 
-Version de la notice : 2026-07-28
+Version de la notice : 2026-07-29
 Périmètre : OutilsIA Local Cockpit, espace **Atelier IA**
 
 ## Navigation du cockpit
@@ -32,6 +32,7 @@ Les actions transversales ouvrent automatiquement l'espace correspondant. Par ex
 | Benchmark Commons v1 | Préparer après une mesure standard un JSON pseudonymisé, le vérifier avant export et permettre son retrait local. Le client candidat peut aussi préparer une soumission authentifiée après synchronisation et consentement réseau séparé. | Le partage réseau est désactivé dans les builds actuels. Même activé, un reçu serveur ne vaut ni preuve terrain, ni validation communautaire, ni classement. La révocation distante précède toujours le retrait local. |
 | Evidence Ledger | Conserver une trace locale chaînée des étapes validées et de leurs empreintes. | Ne stocke ni description brute, prompt, réponse de modèle, credential ou fichier projet. Il ne prouve pas à lui seul la qualité du résultat. |
 | ForgeBench | Préparer un protocole équitable `Signal Maze v1`, publier un contrat de gameplay observable, vérifier une référence clavier/souris/tactile, sceller localement des seeds privés, tester bubblewrap puis Chromium sans réseau, exécuter un pilote technique, puis appeler facultativement un modèle Ollama local sur le seul contrat public. | Le préflight Chromium n'installe rien : il teste une page minimale et propose au besoin une commande Playwright à copier. Après consentement, le code candidat est gelé, contrôlé publiquement puis soumis à un second Chromium holdout sans réseau. Cette preuve locale ne vaut encore ni score scientifique ni vainqueur : familles de checks publiques, vault non chiffré, pairs et énergie restent des blocages. ForgeBench ne lance pas seul un agent CLI. |
+| Ring des arrangements | Sceller une équipe versionnée, exporter le même challenge et ses handoffs, chronométrer le travail effectué dans les outils officiels, puis évaluer hors ligne les trois fichiers finaux choisis par l'utilisateur. Trois reçus ouvrent l'Arcade ; cinq alimentent une boussole mensuelle. | OutilsIA ne pilote aucun abonnement, ne lit aucun compte ou quota et ne juge pas un modèle isolé lorsqu'une équipe a travaillé. La V1 n'enregistre que les artefacts acceptés `51/51` : elle ne compare donc pas encore la fiabilité des échecs ni la finition subjective et ne déclare aucun vainqueur universel. |
 | Workstack Arena | Dans le candidat source, lancer **Codex CLI uniquement sur Signal Maze public** dans un workspace jetable, avec un seul essai borné, puis enregistrer une décision humaine structurée sur le reçu signé. | Aucun projet utilisateur, board, test caché, fusion ou publication. La revue n'inspecte ni capture ni code et n'autorise ni livraison ni gagnant. Claude Code, Hermes, Kimi et l'exécution d'une carte arbitraire restent indisponibles. Le build public actuel ne contient pas encore ce pilote. |
 | MemoryForge / Obsidian | Conserver les décisions, bilans et connaissances durables du projet. | Ne reçoit pas tous les logs, prompts ou sorties brutes du Ledger. |
 | Strategy Arena | Exploiter les capacités IA locales préparées par OutilsIA pour les workflows quant, puis compiler et backtester. | OutilsIA ne génère pas de stratégie financière et ne lance pas de backtest. |
@@ -228,6 +229,76 @@ ForgeBench v0 compile `outilsia.forgebench_experiment.v1`. Chaque stack sélecti
 - une politique future de mesures séparées de résultat, vitesse, efficacité et coût ;
 - un évaluateur indépendant ;
 - une empreinte de protocole identique et exportable.
+
+### Ring des arrangements collaboratifs
+
+Le contrat candidat `outilsia.forgebench_stack_plan.v1` ne représente pas un
+modèle isolé. Il décrit l'arrangement complet qui produit l'artefact : par
+exemple Kimi conçoit, Grok construit, Claude relit, puis Grok répare. Chaque
+relais possède un rôle unique, un fournisseur, une identité et une version
+exacte. Le SHA-256 du plan contrôle sa cohérence locale ; il ne constitue pas
+une signature d'identité ou une preuve de provenance.
+
+Parcours V1 :
+
+1. Dans **Atelier IA > ForgeBench**, déplier **Ring des arrangements**.
+2. Choisir un arrangement de départ ou renseigner les relais dans leur ordre
+   réel. Il doit exister exactement un rôle Construction.
+3. Renseigner l'identité et la version exactes de chaque outil ou modèle. Une
+   étiquette vague comme `Grok` ou `Qwen récent` rend la comparaison caduque.
+4. Choisir trois runs pour l'Arcade ou cinq runs pour la boussole mensuelle.
+   Trois essais restent exploratoires ; cinq essais ne prouvent pas une vérité
+   universelle.
+5. Déclarer séparément l'engagement mensuel des abonnements et, si elle est
+   connue, l'amortissement matériel local par run. Laisser une valeur vide
+   lorsqu'elle est inconnue : OutilsIA ne la remplace jamais par zéro.
+6. Cliquer **Sceller l'arrangement**. Cette action compile le brief et les
+   handoffs ; elle ne démarre aucun outil, modèle, compte ou appel réseau.
+7. Cliquer **Exporter le kit** et choisir son dossier parent. Le kit contient
+   uniquement le starter public, le brief, le plan et une carte bornée par
+   relais.
+8. Démarrer le chrono, puis utiliser chaque IA dans son environnement officiel
+   avec le compte de l'utilisateur. Transmettre le workspace et le handoff
+   prévus. OutilsIA n'automatise pas ce parcours.
+9. Compter les corrections sémantiques demandées et les éditions humaines.
+   Les clics de permission sont consignés mais ne réduisent pas l'indice
+   d'autonomie. Déclarer le quota avant/après seulement si son unité et ses
+   valeurs sont réellement observables.
+10. À la fin, arrêter le chrono, cocher l'autorisation et sélectionner le
+    dossier qui contient exactement `index.html`, `styles.css` et `game.js`.
+    Une confirmation native séparée précède toute copie ou exécution.
+11. OutilsIA copie l'artefact dans un workspace privé jetable, fige son
+    empreinte, applique `7` contrôles statiques, `39` contrôles de gameplay
+    visible puis `5` familles de holdout hors ligne. Le workspace temporaire
+    doit être supprimé avant que le reçu soit accepté.
+12. Répéter avec le même plan. Le tableau affiche médiane, dispersion, aide
+    humaine, coût connu/inconnu et frontière de Pareto. Ajouter ensuite le run
+    et le tableau à **Evidence Ledger** si une trace durable est souhaitée.
+    **Copier le dernier reçu** exporte les métriques du run sans artefact ni
+    chemin ; **Copier le tableau** exporte uniquement les agrégats.
+
+Un reçu réussi atteste seulement que cet artefact a passé les `51` contrôles
+objectifs de `Signal Maze v1` dans ce protocole. La finition visuelle n'est pas
+notée. L'attribution de l'artefact à l'arrangement est une déclaration de
+l'utilisateur : OutilsIA ne conserve pas les échanges, n'atteste pas l'auteur
+et ne transforme pas un SHA-256 en preuve d'origine. Un artefact refusé ne
+produit pas encore de reçu d'échec : comparer le
+taux de réussite de deux arrangements reste donc hors V1. Les dimensions de
+coût sont exclues de Pareto dès qu'un composant marginal manque. L'engagement
+mensuel est affiché à côté du coût observé par run, jamais transformé en coût
+du run.
+
+Les contrats produits sont :
+
+- `outilsia.forgebench_stack_plan.v1` : arrangement, versions, brief, coûts
+  déclarés, règle des runs et liaison au holdout ;
+- `outilsia.forgebench_stack_starter_export_result.v1` : preuve minimale de
+  l'export local, sans chemin personnel ;
+- `outilsia.forgebench_stack_run_result.v1` : artefact accepté, durée,
+  autonomie, coût, `51/51`, attribution utilisateur non attestée, bornes de
+  sécurité et limites ;
+- `outilsia.forgebench_stack_scoreboard.v1` : agrégats exploratoires et
+  frontière de Pareto, sans gagnant global ni prétention scientifique.
 
 ### Visible Gameplay Contract v1
 

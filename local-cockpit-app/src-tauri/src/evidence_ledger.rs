@@ -4,6 +4,7 @@ use crate::forgebench::validate_forgebench_result;
 use crate::forgebench_candidate::validate_forgebench_ollama_candidate_result;
 use crate::forgebench_isolation::validate_forgebench_isolation_result;
 use crate::forgebench_runner::validate_forgebench_reference_pilot_result;
+use crate::forgebench_stack_arena::{validate_stack_run_result, validate_stack_scoreboard};
 use crate::workstack_arena::validate_workstack_arena_result;
 use crate::workstack_composer::{canonical_sha256, validate_workstack_plan};
 use crate::workstack_review::validate_workstack_human_review_result;
@@ -152,6 +153,7 @@ fn verify_entry(
     let is_reference_run = event_type == "forgebench_reference_pilot_verified";
     let is_candidate_run = event_type == "forgebench_ollama_candidate_verified";
     let is_arena_run = event_type == "workstack_arena_codex_pilot_verified";
+    let is_stack_run = event_type == "forgebench_stack_run_verified";
     let is_local_action_execution = event_type == "local_action_execution_recorded";
     let is_local_action_decision = event_type == "local_action_decision_recorded";
     let is_benchmark_commons = matches!(
@@ -162,6 +164,7 @@ fn verify_entry(
     let is_executed_run = is_reference_run
         || is_candidate_run
         || is_arena_run
+        || is_stack_run
         || is_local_action_execution
         || is_benchmark_commons;
     let invalid_execution_contract = if is_reference_run {
@@ -202,6 +205,23 @@ fn verify_entry(
                 .pointer("/human_decision/status")
                 .and_then(Value::as_str)
                 != Some("explicitly_confirmed_codex_cli_pilot")
+    } else if is_stack_run {
+        entry
+            .pointer("/human_decision/status")
+            .and_then(Value::as_str)
+            != Some("explicitly_selected_and_confirmed_in_native_ui")
+            || entry
+                .pointer("/execution/cost_status")
+                .and_then(Value::as_str)
+                != Some("declared_observation_with_unknowns_preserved")
+            || entry
+                .pointer("/evidence/claims/subscription_automation")
+                .and_then(Value::as_bool)
+                != Some(false)
+            || entry
+                .pointer("/evidence/claims/winner_declared")
+                .and_then(Value::as_bool)
+                != Some(false)
     } else if is_local_action_execution {
         entry
             .pointer("/execution/api_cost_eur")
@@ -1123,6 +1143,89 @@ fn source_contract(event_type: &str, source: &Value) -> Result<Value, String> {
                 "human_decision": {"status": "explicitly_confirmed_local_candidate"}
             }))
         }
+        "forgebench_stack_run_verified" => {
+            validate_stack_run_result(source)?;
+            let lane = required_enum_claim(
+                source,
+                "/plan_ref/lane",
+                &["local", "hybrid", "subscription"],
+                "Lane ForgeBench Stack Arena",
+            )?;
+            Ok(json!({
+                "actor": {"kind": "outilsia_component", "id": "forgebench_stack_arena"},
+                "workstack_id": Value::Null,
+                "proof_level": "isolated_imported_artifact_run",
+                "source_integrity_sha256": source.pointer("/integrity/digest").cloned().unwrap_or(Value::Null),
+                "claims": {
+                    "run_id": source.get("run_id").cloned().unwrap_or(Value::Null),
+                    "plan_id": source.pointer("/plan_ref/plan_id").cloned().unwrap_or(Value::Null),
+                    "plan_digest": source.pointer("/plan_ref/plan_digest").cloned().unwrap_or(Value::Null),
+                    "lane": lane,
+                    "benchmark_id": source.pointer("/benchmark/id").cloned().unwrap_or(Value::Null),
+                    "artifact_digest": source.pointer("/artifact/digest").cloned().unwrap_or(Value::Null),
+                    "objective_checks_total": numeric_claim(source, "/quality/objective_checks_total"),
+                    "objective_checks_passed": numeric_claim(source, "/quality/objective_checks_passed"),
+                    "elapsed_ms": numeric_claim(source, "/timing/elapsed_ms"),
+                    "semantic_interventions": numeric_claim(source, "/autonomy/semantic_interventions"),
+                    "manual_edits": numeric_claim(source, "/autonomy/manual_edits"),
+                    "permission_clicks": numeric_claim(source, "/autonomy/permission_clicks"),
+                    "marginal_cost_complete": source.pointer("/cost/marginal_cost_complete").cloned().unwrap_or(json!(false)),
+                    "known_marginal_components_eur": source.pointer("/cost/known_marginal_components_eur").cloned().unwrap_or(Value::Null),
+                    "unknown_components_total": source.pointer("/cost/unknown_components").and_then(Value::as_array).map_or(0, Vec::len),
+                    "arrangement_attribution": "user_declared",
+                    "artifact_authorship_verified": false,
+                    "subscription_automation": false,
+                    "hidden_holdout_used": true,
+                    "raw_artifact_stored": false,
+                    "scientific_eligible": false,
+                    "winner_declared": false
+                },
+                "execution": {
+                    "started": true,
+                    "latency_ms": source.pointer("/timing/evaluation_ms").and_then(Value::as_u64).unwrap_or_default(),
+                    "api_cost_eur": source.pointer("/cost/api_overage_eur").cloned().unwrap_or(Value::Null),
+                    "cost_status": "declared_observation_with_unknowns_preserved"
+                },
+                "validation": {
+                    "source_contract_valid": true,
+                    "independent_run_verification": true
+                },
+                "human_decision": {"status": "explicitly_selected_and_confirmed_in_native_ui"}
+            }))
+        }
+        "forgebench_stack_scoreboard_compiled" => {
+            validate_stack_scoreboard(source)?;
+            Ok(json!({
+                "actor": {"kind": "outilsia_component", "id": "forgebench_stack_arena"},
+                "workstack_id": Value::Null,
+                "proof_level": "exploratory_multi_run_aggregate",
+                "source_integrity_sha256": source.pointer("/integrity/digest").cloned().unwrap_or(Value::Null),
+                "claims": {
+                    "status": source.get("status").cloned().unwrap_or(Value::Null),
+                    "benchmark_id": source.pointer("/benchmark/id").cloned().unwrap_or(Value::Null),
+                    "runs_total": numeric_claim(source, "/runs_total"),
+                    "arrangements_total": source.get("arrangements").and_then(Value::as_array).map_or(0, Vec::len),
+                    "pareto_frontier_total": source.pointer("/pareto/frontier_plan_digests").and_then(Value::as_array).map_or(0, Vec::len),
+                    "cost_included": source.pointer("/pareto/cost_included").cloned().unwrap_or(json!(false)),
+                    "arrangement_attribution": "user_declared",
+                    "artifact_authorship_verified": false,
+                    "raw_metrics_preserved": true,
+                    "scientific_superiority_claimed": false,
+                    "winner_declared": false
+                },
+                "execution": {
+                    "started": false,
+                    "latency_ms": 0,
+                    "api_cost_eur": 0,
+                    "cost_status": "not_incurred"
+                },
+                "validation": {
+                    "source_contract_valid": true,
+                    "independent_run_verification": false
+                },
+                "human_decision": {"status": "not_required_aggregate_only"}
+            }))
+        }
         "local_action_execution_recorded" | "local_action_decision_recorded" => {
             validate_local_action_receipt(source)?;
             let execution_started = source
@@ -1981,6 +2084,83 @@ mod tests {
         assert!(!serialized.contains("index_html"));
         assert!(!serialized.contains("workspace_path"));
         assert!(!serialized.contains("hidden_seeds\":"));
+    }
+
+    #[test]
+    fn appends_a_guided_stack_run_without_artifact_or_subscription_access() {
+        let source = crate::forgebench_stack_arena::tests::signed_result();
+        let (ledger, appended) = append_to_ledger(
+            empty_ledger().expect("empty"),
+            "forgebench_stack_run_verified",
+            &source,
+            4_950,
+        )
+        .expect("guided stack run entry");
+        assert!(appended);
+        verify_ledger(&ledger).expect("verified guided stack ledger");
+        let entry = &ledger["entries"][0];
+        assert_eq!(
+            entry["evidence"]["proof_level"],
+            "isolated_imported_artifact_run"
+        );
+        assert_eq!(entry["execution"]["started"], true);
+        assert_eq!(
+            entry["human_decision"]["status"],
+            "explicitly_selected_and_confirmed_in_native_ui"
+        );
+        assert_eq!(
+            entry["evidence"]["claims"]["subscription_automation"],
+            false
+        );
+        assert_eq!(
+            entry["evidence"]["claims"]["arrangement_attribution"],
+            "user_declared"
+        );
+        assert_eq!(
+            entry["evidence"]["claims"]["artifact_authorship_verified"],
+            false
+        );
+        assert_eq!(entry["evidence"]["claims"]["winner_declared"], false);
+        let serialized = serde_json::to_string(&ledger).expect("ledger JSON");
+        assert!(!serialized.contains("brief_markdown"));
+        assert!(!serialized.contains("source_path"));
+        assert!(!serialized.contains("\"raw_files\""));
+    }
+
+    #[test]
+    fn appends_an_exploratory_stack_scoreboard_without_global_winner() {
+        let source = crate::forgebench_stack_arena::tests::signed_scoreboard();
+        let (ledger, appended) = append_to_ledger(
+            empty_ledger().expect("empty"),
+            "forgebench_stack_scoreboard_compiled",
+            &source,
+            4_975,
+        )
+        .expect("guided stack scoreboard entry");
+        assert!(appended);
+        verify_ledger(&ledger).expect("verified guided stack scoreboard ledger");
+        let entry = &ledger["entries"][0];
+        assert_eq!(
+            entry["evidence"]["proof_level"],
+            "exploratory_multi_run_aggregate"
+        );
+        assert_eq!(entry["execution"]["started"], false);
+        assert_eq!(entry["evidence"]["claims"]["winner_declared"], false);
+        assert_eq!(
+            entry["evidence"]["claims"]["scientific_superiority_claimed"],
+            false
+        );
+        assert_eq!(
+            entry["evidence"]["claims"]["arrangement_attribution"],
+            "user_declared"
+        );
+        assert_eq!(
+            entry["evidence"]["claims"]["artifact_authorship_verified"],
+            false
+        );
+        let serialized = serde_json::to_string(&ledger).expect("ledger JSON");
+        assert!(!serialized.contains("\"arrangement\":"));
+        assert!(!serialized.contains("\"runs\":"));
     }
 
     #[test]

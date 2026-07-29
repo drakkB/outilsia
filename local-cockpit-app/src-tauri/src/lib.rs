@@ -11,6 +11,7 @@ mod forgebench_isolation;
 mod forgebench_runner;
 mod forgebench_runtime;
 mod forgebench_sandbox;
+mod forgebench_stack_arena;
 mod forgebench_vault;
 mod local_action_lane;
 mod local_capability_bridge;
@@ -44,6 +45,10 @@ use forgebench_runtime::probe_forgebench_runtime;
 use forgebench_sandbox::{
     clear_forgebench_worker_sandbox, get_forgebench_worker_sandbox_status,
     prepare_forgebench_worker_sandbox,
+};
+use forgebench_stack_arena::{
+    compile_forgebench_stack_plan, compile_forgebench_stack_scoreboard,
+    evaluate_forgebench_stack_artifact, export_forgebench_stack_starter,
 };
 use forgebench_vault::{
     clear_forgebench_hidden_suite, get_forgebench_hidden_suite_status, seal_forgebench_hidden_suite,
@@ -6028,6 +6033,10 @@ pub fn run() {
             probe_forgebench_runtime,
             run_forgebench_reference_pilot,
             run_forgebench_ollama_candidate,
+            compile_forgebench_stack_plan,
+            export_forgebench_stack_starter,
+            evaluate_forgebench_stack_artifact,
+            compile_forgebench_stack_scoreboard,
             start_local_capability_bridge,
             get_local_capability_bridge_status,
             stop_local_capability_bridge,
