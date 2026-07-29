@@ -48,12 +48,18 @@ jobs:
           node-version: "20"
           cache: npm
           cache-dependency-path: local-cockpit-app/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: local-cockpit-app/src-tauri
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          python -m pip install playwright==1.58.0
+          python -m playwright install chromium
       - name: Build and package private Windows RC
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-windows-release-candidate.ps1 -RcNumber $env:OUTILSIA_RC_NUMBER -BuildId $env:OUTILSIA_BUILD_ID -KitDir "$env:RUNNER_TEMP\OutilsIA-Local-Cockpit-RC-Test" -SkipInstall
       - name: Verify source
@@ -111,12 +117,18 @@ jobs:
           node-version: "20"
           cache: npm
           cache-dependency-path: local-cockpit-app/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: local-cockpit-app/src-tauri
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          python -m pip install playwright==1.58.0
+          python -m playwright install chromium
       - name: Lock clean Linux source provenance
         run: |
           tracked_dirty="$(git -C .. status --porcelain --untracked-files=no)"

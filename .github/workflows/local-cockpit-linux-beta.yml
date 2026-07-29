@@ -64,6 +64,11 @@ jobs:
           cache: "npm"
           cache-dependency-path: local-cockpit-app/package-lock.json
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -73,7 +78,10 @@ jobs:
           workspaces: local-cockpit-app/src-tauri
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: |
+          npm ci
+          python -m pip install playwright==1.58.0
+          python -m playwright install chromium
 
       - name: Test Rust core
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
