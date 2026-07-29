@@ -20,6 +20,14 @@ function Invoke-Checked([string]$FilePath, [string[]]$Arguments) {
   }
 }
 
+function Get-TrackedContentChanges([string]$RepositoryRoot) {
+  $paths = @(& git -C $RepositoryRoot diff --name-only HEAD --)
+  if ($LASTEXITCODE -ne 0) {
+    throw "Unable to compare the tracked source tree with HEAD."
+  }
+  return @($paths | Where-Object { $_ } | Sort-Object -Unique)
+}
+
 $appRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $repoRoot = Resolve-Path (Join-Path $appRoot "..")
 $desktop = [Environment]::GetFolderPath("Desktop")
@@ -40,7 +48,7 @@ if ($RequireSignedArtifacts -and -not $signingThumbprintProvided) {
   throw "Signed artifacts are required, but no certificate thumbprint was provided."
 }
 
-$trackedDirty = (& git -C $repoRoot status --porcelain --untracked-files=no)
+$trackedDirty = Get-TrackedContentChanges $repoRoot
 if ($trackedDirty -and !$AllowDirty) {
   Write-Host "Tracked changes detected before RC build:" -ForegroundColor Red
   $trackedDirty | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
@@ -69,7 +77,7 @@ if ($signingThumbprintProvided) {
 }
 if ($RequireSignedArtifacts) { $buildArgs += "-RequireSignedArtifacts" }
 Invoke-Checked "powershell.exe" $buildArgs
-$postBuildTrackedDirty = (& git -C $repoRoot status --porcelain --untracked-files=no)
+$postBuildTrackedDirty = Get-TrackedContentChanges $repoRoot
 if ($postBuildTrackedDirty) {
   Write-Host "Tracked changes generated during the Windows build:" -ForegroundColor Yellow
   $postBuildTrackedDirty | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
