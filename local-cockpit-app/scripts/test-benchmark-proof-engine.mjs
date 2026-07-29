@@ -172,6 +172,16 @@ equal(proof.schema, "outilsia.proof_card.v1", "Proof card schema");
 equal(proof.badge.verified, false, "Local card is not identity verified");
 equal(proof.links.shared_report, "https://outilsia.fr/r/public_demo", "Exact share URL");
 equal(proof.diagnosis.purchase.key, "no_buy", "No-buy proof propagation");
+equal(
+  proof.measurement.measured_at,
+  new Date(1785200000000).toISOString(),
+  "Measured timestamp propagation"
+);
+equal(
+  proof.generated_at,
+  proof.measurement.measured_at,
+  "Proof generation stays deterministic for the measured benchmark"
+);
 const privacy = engine.proofCardPrivacyAudit(proof, [
   "secret-machine",
   "Chris-PC",

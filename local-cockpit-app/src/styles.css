@@ -251,6 +251,15 @@ textarea {
   z-index: 1;
 }
 
+.mode-essential .topbar {
+  grid-template-columns: 54px minmax(0, 1fr);
+  min-height: 82px;
+}
+
+.mode-essential .topbar .actions {
+  display: none;
+}
+
 .brand-mark {
   align-items: center;
   aspect-ratio: 1;
@@ -828,6 +837,176 @@ summary:focus-visible,
   margin-bottom: 8px;
 }
 
+.legacy-decision-state {
+  display: none !important;
+}
+
+.essential-journey {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent),
+    var(--surface);
+  border: 1px solid rgba(134, 239, 172, 0.26);
+  border-radius: 8px;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.26);
+  display: grid;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 14px;
+}
+
+.mode-advanced .essential-journey {
+  display: none;
+}
+
+.essential-journey-head {
+  align-items: end;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
+}
+
+.essential-journey-head h2,
+.essential-journey-head p {
+  overflow-wrap: anywhere;
+}
+
+.essential-journey-head h2 {
+  font-size: 19px;
+  margin: 3px 0 0;
+}
+
+.essential-journey-head p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 0;
+  text-align: right;
+}
+
+.essential-journey-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.essential-step {
+  background: rgba(5, 12, 16, 0.58);
+  border: 1px solid rgba(139, 163, 174, 0.18);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-rows: auto auto minmax(42px, 1fr) auto;
+  min-width: 0;
+  padding: 12px;
+  position: relative;
+}
+
+.essential-step::before {
+  background: rgba(139, 163, 174, 0.22);
+  content: "";
+  height: 2px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.essential-step.is-current {
+  background:
+    linear-gradient(135deg, rgba(15, 58, 52, 0.66), rgba(5, 12, 16, 0.74));
+  border-color: rgba(134, 239, 172, 0.46);
+}
+
+.essential-step.is-current::before {
+  background: var(--green);
+}
+
+.essential-step.is-complete {
+  border-color: rgba(103, 232, 249, 0.32);
+}
+
+.essential-step.is-complete::before {
+  background: var(--cyan);
+}
+
+.essential-step.is-locked {
+  opacity: 0.68;
+}
+
+.essential-step-head {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.essential-step-index {
+  align-items: center;
+  background: rgba(103, 232, 249, 0.09);
+  border: 1px solid rgba(103, 232, 249, 0.28);
+  border-radius: 50%;
+  color: var(--cyan);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 950;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.essential-step-state {
+  color: var(--muted-2);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.essential-step.is-current .essential-step-state {
+  color: var(--green);
+}
+
+.essential-step.is-complete .essential-step-state {
+  color: var(--cyan);
+}
+
+.essential-step > strong,
+.essential-step > p {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.essential-step > strong {
+  font-size: 15px;
+}
+
+.essential-step > p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.42;
+  margin: 0;
+}
+
+.essential-step > button {
+  min-height: 42px;
+  width: 100%;
+}
+
+.essential-step.is-current > button {
+  background: var(--green);
+  border-color: var(--green);
+  color: #061410;
+}
+
+.essential-step.is-complete > button {
+  background: rgba(103, 232, 249, 0.10);
+  border-color: rgba(103, 232, 249, 0.32);
+  color: var(--cyan);
+}
+
+.advanced-workspace-tab {
+  border-style: dashed;
+}
+
 .machine-summary-strip {
   background:
     radial-gradient(circle at 0% 0%, rgba(120, 220, 232, 0.15), transparent 32%),
@@ -1166,6 +1345,7 @@ summary:focus-visible,
 }
 
 .mode-advanced .quick-decision-strip,
+.mode-advanced .essential-journey,
 .mode-advanced .sticky-action-strip,
 .mode-advanced .hero-insights,
 .mode-advanced:not([data-workspace-tab="account"]) .status-strip,
@@ -2033,6 +2213,15 @@ summary:focus-visible,
 
 .readiness-panel:has(.readiness-prescan-box) .readiness-primary-actions,
 .readiness-panel:has(.readiness-prescan-box) .readiness-export-actions {
+  display: none;
+}
+
+.mode-essential .readiness-prescan [data-run-analysis] {
+  display: none;
+}
+
+.mode-essential .readiness-actions,
+.mode-essential .readiness-technical {
   display: none;
 }
 
@@ -6514,7 +6703,7 @@ dd {
 }
 
 .readiness-score strong {
-  color: var(--accent);
+  color: var(--workspace-accent, var(--cyan));
   font-size: 28px;
   line-height: 1;
 }
@@ -6577,7 +6766,7 @@ dd {
     linear-gradient(120deg, rgba(103, 232, 249, 0.08), transparent 44%),
     rgba(4, 12, 15, 0.76);
   border: 1px solid rgba(103, 232, 249, 0.28);
-  border-left: 4px solid var(--accent);
+  border-left: 4px solid var(--workspace-accent, var(--cyan));
   border-radius: 8px;
   display: grid;
   gap: 12px;
@@ -6602,7 +6791,7 @@ dd {
 }
 
 .proof-card-badge span {
-  color: var(--accent);
+  color: var(--workspace-accent, var(--cyan));
   font-size: 11px;
   font-weight: 950;
   text-transform: uppercase;
@@ -6628,7 +6817,7 @@ dd {
 .proof-card-metrics {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .proof-card-metrics span {
@@ -6649,6 +6838,37 @@ dd {
   border-top: 1px solid rgba(139, 163, 174, 0.14);
   grid-column: 1 / -1;
   padding-top: 8px;
+}
+
+.proof-card-trace {
+  background: rgba(103, 232, 249, 0.045);
+  border: 1px solid rgba(103, 232, 249, 0.14);
+  border-radius: 6px;
+  display: grid;
+  gap: 6px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 8px 9px;
+}
+
+.proof-card-trace span,
+.proof-card-trace strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.proof-card-trace span {
+  color: var(--muted-2);
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.proof-card-trace strong {
+  color: var(--text);
+  font-size: 10px;
+  margin-top: 3px;
+  text-transform: none;
 }
 
 .readiness-actions {
@@ -6705,7 +6925,7 @@ dd {
   background: rgba(103, 232, 249, 0.08);
   border: 1px solid rgba(103, 232, 249, 0.20);
   border-radius: 999px;
-  color: var(--accent);
+  color: var(--workspace-accent, var(--cyan));
   font-size: 9px;
   font-style: normal;
   font-weight: 900;
@@ -6813,6 +7033,12 @@ dd {
 
 .readiness-primary-actions {
   margin-top: 2px;
+}
+
+.readiness-primary-actions > button:first-child {
+  background: var(--workspace-accent, var(--cyan));
+  border-color: var(--workspace-accent, var(--cyan));
+  color: #071114;
 }
 
 .readiness-export-actions .row-actions {
@@ -7033,7 +7259,7 @@ dd {
 }
 
 .chat-preset-box button:not(:disabled):hover {
-  border-color: var(--accent);
+  border-color: var(--workspace-accent, var(--cyan));
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
@@ -7370,6 +7596,27 @@ dd {
   .hero-lead,
   .hero-insights {
     display: none;
+  }
+
+  .essential-journey {
+    padding: 10px;
+  }
+
+  .essential-journey-head,
+  .essential-journey-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .essential-journey-head {
+    gap: 5px;
+  }
+
+  .essential-journey-head p {
+    text-align: left;
+  }
+
+  .essential-step {
+    grid-template-rows: auto auto auto auto;
   }
 
   .actions {
@@ -7838,7 +8085,8 @@ dd {
   }
 
   .proof-card-preview,
-  .proof-card-metrics {
+  .proof-card-metrics,
+  .proof-card-trace {
     grid-template-columns: 1fr;
   }
 

@@ -59,25 +59,18 @@ def assert_button_text_fits(page, label: str):
 
 
 def assert_primary_hover(page, label: str):
-    checked = 0
-    for selector in ["#prepareBtn", "#quickActionBtn"]:
-        button = page.locator(selector)
-        if selector == "#quickActionBtn" and not button.is_visible():
-            continue
-        if not button.is_visible() or button.is_disabled():
-            raise AssertionError(f"{label}: primary action is not available: {selector}")
-        checked += 1
-        button.hover()
-        appearance = button.evaluate(
-            """(node) => ({
-              backgroundImage: getComputedStyle(node).backgroundImage,
-              color: getComputedStyle(node).color
-            })"""
-        )
-        if "linear-gradient" not in appearance["backgroundImage"] or appearance["color"] != "rgb(2, 21, 17)":
-            raise AssertionError(f"{label}: primary hover loses contrast: {selector} {appearance}")
-    if not checked:
-        raise AssertionError(f"{label}: no primary action was available for hover verification")
+    button = page.locator("#essentialAnalyzeBtn")
+    if not button.is_visible() or button.is_disabled():
+        raise AssertionError(f"{label}: essential analysis action is not available")
+    button.hover()
+    appearance = button.evaluate(
+        """(node) => ({
+          backgroundColor: getComputedStyle(node).backgroundColor,
+          color: getComputedStyle(node).color
+        })"""
+    )
+    if appearance["backgroundColor"] != "rgb(134, 239, 172)" or appearance["color"] != "rgb(6, 20, 16)":
+        raise AssertionError(f"{label}: essential primary hover loses contrast: {appearance}")
     page.mouse.move(0, 0)
 
 
@@ -122,8 +115,8 @@ def assert_prescan_readiness(page, label: str):
     if "Ce PC n'a pas encore été analysé" not in text:
         raise AssertionError(f"{label}: prescan decision is unclear: {text[:400]}")
     buttons = page.locator("#readinessBox button:visible")
-    if buttons.count() != 1 or buttons.first.inner_text().strip() != "Analyser ce PC":
-        raise AssertionError(f"{label}: prescan should expose one analysis action")
+    if buttons.count():
+        raise AssertionError(f"{label}: prescan report duplicates the journey action")
     if page.locator("#readinessBox .readiness-action-card").count():
         raise AssertionError(f"{label}: advanced decisions leaked before scan")
     if page.locator(".readiness-primary-actions:visible, .readiness-export-actions:visible").count():
@@ -154,7 +147,7 @@ def assert_scan_failure_recovery(page, label: str):
     page.wait_for_timeout(100)
     panel = page.locator("#readinessBox")
     text = panel.inner_text()
-    if "Le scan n'a pas pu se terminer" not in text or "Relancer l'analyse" not in text:
+    if "Le scan n'a pas pu se terminer" not in text:
         raise AssertionError(f"{label}: scan failure has no clear recovery path: {text[:400]}")
     if any(fragment in text or fragment in proof["error"] for fragment in ("C:\\Users\\demo", "AppData", "/home/demo")):
         raise AssertionError(f"{label}: scan failure exposes a personal path")
@@ -162,9 +155,11 @@ def assert_scan_failure_recovery(page, label: str):
         raise AssertionError(f"{label}: machine summary does not expose the retry state")
     if page.locator("#quickActionText").inner_text().strip() != "Relancer l'analyse":
         raise AssertionError(f"{label}: quick action does not offer a retry")
-    retry = panel.locator("[data-run-analysis]")
+    retry = page.locator("#essentialAnalyzeBtn")
     if not retry.is_visible() or retry.is_disabled() or retry.inner_text().strip() != "Relancer l'analyse":
-        raise AssertionError(f"{label}: scan retry button is not actionable")
+        raise AssertionError(f"{label}: journey retry button is not actionable")
+    if panel.locator("[data-run-analysis]").is_visible():
+        raise AssertionError(f"{label}: report duplicates the journey retry action")
     if page.locator("#readinessState").get_attribute("data-status-tone") != "action":
         raise AssertionError(f"{label}: scan failure state is not visually actionable")
     page.evaluate("() => window.__OUTILSIA_TEST__.clearScanFailureState()")
@@ -185,7 +180,9 @@ def check_viewport(browser, width: int, height: int, label: str):
     page = browser.new_page(viewport={"width": width, "height": height}, device_scale_factor=1)
     page.goto(HTML.as_uri(), wait_until="load")
     assert_visible(page, ".brand-mark", f"{label} brand")
-    assert_visible(page, "#prepareBtn", f"{label} primary analysis")
+    assert_hidden(page, "#prepareBtn", f"{label} legacy header analysis")
+    assert_visible(page, "#essentialJourney", f"{label} essential journey")
+    assert_visible(page, "#essentialAnalyzeBtn", f"{label} primary analysis")
     assert_hidden(page, "#scanBtn", f"{label} legacy scan button")
     assert_visible(page, ".machine-summary-strip", f"{label} machine summary")
     assert_hidden(page, ".quick-decision-strip", f"{label} duplicate prescan decision")

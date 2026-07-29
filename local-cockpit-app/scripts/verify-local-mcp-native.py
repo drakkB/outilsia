@@ -2,9 +2,10 @@
 """Black-box recipe for the native OutilsIA Local MCP bridge.
 
 The script attaches to an already running Tauri WebView2 instance through CDP,
-uses the visible UI to scan the machine, generate the Capability Passport and
-start the bridge, then exercises the MCP endpoint from an independent HTTP
-client. The ephemeral token is never written to the report.
+uses the visible UI to scan the machine and starts the bridge through the
+single guarded action that prepares the snapshot before confirmation. It then
+exercises the MCP endpoint from an independent HTTP client. The ephemeral token
+is never written to the report.
 """
 
 from __future__ import annotations
@@ -165,19 +166,22 @@ def find_outilsia_page(browser: Any) -> Page:
 
 
 def wait_for_scan(page: Page, timeout_ms: int) -> dict[str, str]:
-    page.locator("#prepareBtn").wait_for(state="visible", timeout=timeout_ms)
-    if page.locator("#prepareBtn").is_disabled():
+    button = page.locator("#essentialAnalyzeBtn:visible, #prepareBtn:visible").first
+    button.wait_for(state="visible", timeout=timeout_ms)
+    if button.is_disabled():
         page.wait_for_function(
-            "() => !document.getElementById('prepareBtn').disabled",
+            """() => [...document.querySelectorAll('#essentialAnalyzeBtn, #prepareBtn')]
+              .some((node) => node.offsetParent !== null && !node.disabled)""",
             timeout=timeout_ms,
         )
-    page.locator("#prepareBtn").click()
+    button.click()
     page.wait_for_function(
         """() => {
-          const button = document.getElementById('prepareBtn');
+          const buttons = [...document.querySelectorAll('#essentialAnalyzeBtn, #prepareBtn')];
           const cpu = document.getElementById('topCpuText')?.textContent?.trim();
           const gpu = document.getElementById('topGpuText')?.textContent?.trim();
-          return button && !button.disabled && cpu && cpu !== '--' && gpu && gpu !== '--';
+          return buttons.some((button) => !button.disabled)
+            && cpu && cpu !== '--' && gpu && gpu !== '--';
         }""",
         timeout=timeout_ms,
     )
@@ -201,26 +205,18 @@ def open_workflow_section(page: Page, selector: str) -> None:
 
 
 def start_bridge_from_ui(page: Page, timeout_ms: int) -> dict[str, Any]:
-    open_workflow_section(page, ".capability-passport-panel")
-    passport_button = page.locator("#generateCapabilityPassportBtn")
-    passport_button.wait_for(state="visible")
-    assert not passport_button.is_disabled(), "Capability Passport remains disabled after scan"
-    passport_button.click()
-    page.wait_for_function(
-        "() => document.getElementById('capabilityPassportState')?.textContent?.includes('cohérence vérifiée')",
-        timeout=timeout_ms,
-    )
-
     open_workflow_section(page, ".local-capability-bridge-panel")
     start_button = page.locator("#startLocalCapabilityBridgeBtn")
     start_button.wait_for(state="visible")
-    assert not start_button.is_disabled(), "Local MCP start remains disabled after Passport"
+    assert not start_button.is_disabled(), "Local MCP start remains disabled after scan"
+    assert "Un seul bouton, deux garde-fous" in page.locator("#localCapabilityBridgeBox").inner_text()
     page.once("dialog", lambda dialog: dialog.accept())
     start_button.click()
     page.wait_for_function(
         "() => document.getElementById('localCapabilityBridgeState')?.textContent?.startsWith('active')",
         timeout=timeout_ms,
     )
+    assert "cohérence vérifiée" in page.locator("#capabilityPassportState").inner_text()
 
     copy_button = page.locator("#copyLocalCapabilityBridgeBtn")
     assert not copy_button.is_disabled(), "MCP pairing copy remains disabled"

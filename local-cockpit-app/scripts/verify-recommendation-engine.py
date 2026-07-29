@@ -47,8 +47,9 @@ def main():
         page.locator("#workspaceSectionSelect").select_option(".readiness-panel")
         readiness_before = page.locator("#readinessBox").inner_text()
         open_comparison = page.locator('#readinessBox [data-open-feature="recommendation"]').first
-        assert open_comparison.is_visible(), "The home summary must expose the comparison action"
-        open_comparison.click()
+        assert not open_comparison.is_visible(), "The essential home must keep advanced comparison folded"
+        page.locator("#workspaceTestsBtn").click()
+        page.locator("#workspaceSectionSelect").select_option(".prepare-panel")
         page.wait_for_timeout(200)
         navigation = page.evaluate(
             """() => ({
@@ -78,8 +79,8 @@ def main():
     assert negative["wrongUsage"]["passed_count"] == 6, negative
     assert negative["malformed"]["score"] == 0, negative
     assert "recommendation engine v2 non encore lancé" not in readiness_before.lower(), readiness_before
-    assert "choisir le meilleur modèle" in readiness_before.lower(), readiness_before
-    assert "ouvrir la comparaison" in readiness_before.lower(), readiness_before
+    assert "choisir le meilleur modèle" not in readiness_before.lower(), readiness_before
+    assert "ouvrir la comparaison" not in readiness_before.lower(), readiness_before
     assert navigation == {
         "tab": "tests",
         "section": ".prepare-panel",

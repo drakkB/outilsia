@@ -186,18 +186,21 @@ def open_section(page: Page, workspace: str, selector: str) -> None:
 
 
 def wait_for_scan(page: Page, timeout_ms: int) -> dict[str, str]:
-    page.locator("#prepareBtn").wait_for(state="visible")
+    button = page.locator("#essentialAnalyzeBtn:visible, #prepareBtn:visible").first
+    button.wait_for(state="visible")
     page.wait_for_function(
-        "() => !document.getElementById('prepareBtn').disabled",
+        """() => [...document.querySelectorAll('#essentialAnalyzeBtn, #prepareBtn')]
+          .some((node) => node.offsetParent !== null && !node.disabled)""",
         timeout=timeout_ms,
     )
-    page.locator("#prepareBtn").click()
+    button.click()
     page.wait_for_function(
         """() => {
-          const button = document.getElementById('prepareBtn');
+          const buttons = [...document.querySelectorAll('#essentialAnalyzeBtn, #prepareBtn')];
           const cpu = document.getElementById('topCpuText')?.textContent?.trim();
           const gpu = document.getElementById('topGpuText')?.textContent?.trim();
-          return button && !button.disabled && cpu && cpu !== '--' && gpu && gpu !== '--';
+          return buttons.some((button) => !button.disabled)
+            && cpu && cpu !== '--' && gpu && gpu !== '--';
         }""",
         timeout=timeout_ms,
     )

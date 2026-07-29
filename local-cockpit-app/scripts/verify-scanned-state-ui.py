@@ -77,6 +77,8 @@ def assert_single_header_action(page, label: str):
         raise AssertionError(
             f"{label}: header action command {primary_command!r} != {expected['command']!r}"
         )
+    if primary_button.is_visible():
+        raise AssertionError(f"{label}: legacy header action should be hidden in essential mode")
     hidden = page.evaluate(
         """() => ['#scanBtn', '#checkBtn', '#saveBtn', '#topAccountBtn']
           .filter((selector) => {
@@ -141,27 +143,28 @@ def assert_sticky_action_hidden_in_essential(page, label: str):
         raise AssertionError(f"{label}: sticky action duplicates the primary action in essential mode")
 
 
-def assert_quick_action_button(page, label: str):
-    quick = page.locator("#quickActionText").inner_text(timeout=5000).strip()
-    button_text = page.locator("#quickActionBtn").inner_text(timeout=5000).strip()
-    if quick != button_text:
-        raise AssertionError(f"{label}: quick action button mismatch quick={quick!r} button={button_text!r}")
+def assert_essential_journey(page, label: str):
     state = page.evaluate(
         """() => {
-          const btn = document.querySelector('#quickActionBtn');
+          const journey = window.__OUTILSIA_TEST__.essentialJourneyState();
+          const proof = document.querySelector('#essentialProofBtn');
           return {
-            visible: !!btn && btn.offsetParent !== null && getComputedStyle(btn).display !== 'none',
-            command: btn?.dataset?.primaryCommand || '',
-            disabled: !!btn?.disabled
+            journey,
+            visible: !!document.querySelector('#essentialJourney')?.offsetParent,
+            legacyVisible: !!document.querySelector('.quick-decision-strip')?.offsetParent,
+            proofVisible: !!proof?.offsetParent,
+            proofDisabled: !!proof?.disabled
           };
         }"""
     )
     if not state["visible"]:
-        raise AssertionError(f"{label}: quick action button is not visible in essential mode")
-    if not state["command"] or state["command"] == "analyze":
-        raise AssertionError(f"{label}: quick action button is not wired to the next command {state}")
-    if state["disabled"]:
-        raise AssertionError(f"{label}: quick action button should be enabled while idle {state}")
+        raise AssertionError(f"{label}: essential journey is not visible")
+    if state["legacyVisible"]:
+        raise AssertionError(f"{label}: legacy quick decision strip leaked into essential mode")
+    if not state["proofVisible"] or state["proofDisabled"]:
+        raise AssertionError(f"{label}: measured proof is not actionable {state}")
+    if state["journey"]["activeStep"] != 3 or not state["journey"]["test"]["complete"]:
+        raise AssertionError(f"{label}: journey did not advance to proof {state}")
 
 
 def assert_readiness_visual_state(page, width: int, label: str):
@@ -208,11 +211,11 @@ def check_scanned_view(browser, width: int, height: int, label: str):
     assert_text(page, "#quickActionDetail", "Potentiel matériel", f"{label} quick potential context")
     assert_text(page, "#topOllamaText", "Prêt", f"{label} runtime summary")
     assert_text(page, "#topGpuText", "RTX", f"{label} machine summary gpu")
-    assert_quick_action_button(page, label)
+    assert_essential_journey(page, label)
     assert_sticky_action_hidden_in_essential(page, label)
     assert_text(page, "#readinessBox", "Machine prête pour l'IA locale", f"{label} readiness")
-    assert_text(page, "#readinessBox", "Trois actions utiles", f"{label} readiness actions")
-    assert_text(page, "#readinessBox", "CHOISIR LE MEILLEUR MODÈLE", f"{label} recommendation action")
+    if page.locator("#readinessBox .readiness-actions:visible, #readinessBox .readiness-technical:visible").count():
+        raise AssertionError(f"{label}: advanced readiness actions leaked into essential mode")
     assert_no_text(page, "#readinessBox", "Recommendation Engine v2 non encore lancé", f"{label} readiness jargon")
     assert_text(page, "#arenaBox", "Meilleur compromis", f"{label} arena")
     assert_no_text(page, "#arenaBox", "undefined/100", f"{label} arena score")
@@ -224,7 +227,7 @@ def check_scanned_view(browser, width: int, height: int, label: str):
         raise AssertionError(f"{label}: essential mode shows too many work panels {visible_tools}")
 
     page.locator("#workspaceSectionSelect").select_option(".verdict-panel")
-    assert_text(page, ".quick-decision-strip", "MODÈLE CONSEILLÉ", f"{label} recommended model label")
+    assert_text(page, ".quick-decision-strip", "Modèle conseillé", f"{label} recommended model label")
     assert_text(page, "#quickModelDetail", "benchmarké", f"{label} quick model")
     assert_text(page, "#quickProofText", "qwen3:0.6b", f"{label} quick proof")
     assert_text(page, "#quickUpgradeText", "Aucun achat prioritaire", f"{label} quick upgrade")
@@ -232,24 +235,6 @@ def check_scanned_view(browser, width: int, height: int, label: str):
 
     page.locator("#workspaceSectionSelect").select_option(".readiness-panel")
     assert_readiness_visual_state(page, width, label)
-    page.locator('#readinessBox [data-open-feature="recommendation"]').first.click()
-    page.wait_for_timeout(180)
-    recommendation_navigation = page.evaluate(
-        """() => ({
-          tab: document.querySelector('.app-shell')?.dataset.workspaceTab,
-          section: document.querySelector('#workspaceSectionSelect')?.value,
-          engineVisible: !!document.querySelector('.recommendation-engine-card')?.offsetParent,
-          runVisible: !!document.querySelector('[data-run-recommendation]')?.offsetParent
-        })"""
-    )
-    if recommendation_navigation != {
-        "tab": "tests",
-        "section": ".prepare-panel",
-        "engineVisible": True,
-        "runVisible": True,
-    }:
-        raise AssertionError(f"{label}: recommendation action did not open the exact control {recommendation_navigation}")
-    page.evaluate("() => window.__OUTILSIA_TEST__.setWorkspaceTab('overview')")
 
     memory = result["memory"]
     required_memory = [
@@ -395,13 +380,17 @@ def check_scanned_view(browser, width: int, height: int, label: str):
         raise AssertionError(f"{label}: Accueil section routing leaked another workspace {overview_visibility}")
     quick_summary_visibility = page.evaluate(
         r"""() => ({
-          primaryVisible: !!document.querySelector('.quick-decision-strip > div:first-child')?.offsetParent,
-          secondaryVisible: [...document.querySelectorAll('.quick-decision-strip > div:not(:first-child)')]
-            .filter((cell) => cell.offsetParent !== null).length
+          legacyVisible: !!document.querySelector('.quick-decision-strip')?.offsetParent,
+          journeyVisible: !!document.querySelector('#essentialJourney')?.offsetParent,
+          proofVisible: !!document.querySelector('#essentialProofBtn')?.offsetParent
         })"""
     )
-    if not quick_summary_visibility["primaryVisible"] or quick_summary_visibility["secondaryVisible"] != 0:
-        raise AssertionError(f"{label}: Bilan machine should keep one next action without duplicate proof cards {quick_summary_visibility}")
+    if (
+        quick_summary_visibility["legacyVisible"]
+        or not quick_summary_visibility["journeyVisible"]
+        or not quick_summary_visibility["proofVisible"]
+    ):
+        raise AssertionError(f"{label}: essential journey should replace duplicate decision cards {quick_summary_visibility}")
     quick_action = page.locator("#quickActionText").inner_text(timeout=5000)
     if "Optimiser" in quick_action or "PromptForge" in quick_action:
         raise AssertionError(f"{label}: PromptForge leaked into top action: {quick_action}")
@@ -411,7 +400,7 @@ def check_scanned_view(browser, width: int, height: int, label: str):
         raise AssertionError(f"{label}: report state should target report action, got {report_state['action']}")
     if report_state["reportReady"]:
         raise AssertionError(f"{label}: report state should start without a generated report")
-    page.click("#quickActionBtn")
+    page.evaluate("() => document.querySelector('#quickActionBtn')?.click()")
     page.wait_for_timeout(250)
     report_after_click = page.evaluate(
         """() => {

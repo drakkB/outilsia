@@ -371,7 +371,6 @@ def check(browser, width: int, height: int, label: str):
     prerequisite_routes = [
         ("tests", ".model-autopilot-panel", '.model-autopilot-panel [data-open-feature="benchmark"]', "tests", ".benchmark-panel", "#benchmarkModelInput", "autopilot-to-benchmark"),
         ("tests", ".flight-recorder-panel", '.flight-recorder-panel [data-open-feature="benchmark"]', "tests", ".benchmark-panel", "#benchmarkModelInput", "flight-to-benchmark"),
-        ("workflows", ".local-capability-bridge-panel", '.local-capability-bridge-panel [data-open-feature="passport"]', "workflows", ".capability-passport-panel", "#generateCapabilityPassportBtn", "bridge-to-passport"),
         ("workflows", ".workstack-composer-panel", '.workstack-composer-panel [data-open-feature="board"]', "workflows", ".board-observer-panel", "#boardObserverUrl", "workstack-to-board"),
         ("workflows", ".capability-router-panel", '.capability-router-panel [data-open-feature="workstack"]', "workflows", ".workstack-composer-panel", "#workstackPriority", "router-to-workstack"),
         ("workflows", ".forgebench-panel", '.forgebench-panel [data-open-feature="router"]', "workflows", ".capability-router-panel", "#capabilityRouterObjective", "forgebench-to-router"),
@@ -380,6 +379,14 @@ def check(browser, width: int, height: int, label: str):
     ]
     for route in prerequisite_routes:
         assert_feature_route(page, *route[:-1], f"{label}-{route[-1]}")
+
+    page.locator("#workspaceWorkflowsBtn").click()
+    page.locator("#workspaceSectionSelect").select_option(".local-capability-bridge-panel")
+    bridge_details = page.locator(".local-capability-bridge-panel .local-bridge-advanced")
+    if bridge_details.evaluate("(element) => element.open"):
+        raise AssertionError(f"{label}: MCP technical links should be folded by default")
+    if bridge_details.locator('[data-open-feature="passport"]').count() != 1:
+        raise AssertionError(f"{label}: MCP technical snapshot route is missing")
 
     page.locator("#workspaceTestsBtn").click()
     page.locator("#workspaceSectionSelect").select_option(".flight-recorder-panel")

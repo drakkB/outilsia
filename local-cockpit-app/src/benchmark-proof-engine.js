@@ -443,7 +443,7 @@
     return {
       schema: PROOF_CARD_SCHEMA,
       card_version: "1.0.0",
-      generated_at: input.generated_at || new Date().toISOString(),
+      generated_at: input.generated_at || protocol.captured_at || new Date().toISOString(),
       badge: {
         key: standard ? "standard_measured" : "local_measured",
         label: standard ? "Protocole standard mesuré" : "Mesure locale OutilsIA",
@@ -465,6 +465,7 @@
         ollama_version: cleanText(protocol.binding?.ollama_version, 80)
       },
       measurement: {
+        measured_at: cleanText(protocol.captured_at || input.measured_at, 48),
         tokens_per_second: finiteNumber(benchmark.estimated_tokens_per_second),
         prompt_tokens_per_second: finiteNumber(benchmark.prompt_tokens_per_second),
         elapsed_ms: finiteNumber(benchmark.elapsed_ms),

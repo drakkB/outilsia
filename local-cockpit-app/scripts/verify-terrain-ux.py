@@ -56,33 +56,27 @@ def assert_no_horizontal_overflow(page, label: str):
 
 
 def assert_first_screen_contract(page, label: str, scanned: bool = False):
-    if not visible(page, "#prepareBtn"):
-        raise AssertionError(f"{label}: main analysis button must be visible")
-    expected_action = page.evaluate("() => window.__OUTILSIA_TEST__.primaryActionState()")
-    primary_button = page.locator("#prepareBtn")
-    primary_label = primary_button.locator("span").inner_text(timeout=5000).strip()
-    primary_detail = primary_button.locator("small").inner_text(timeout=5000).strip()
+    if visible(page, "#prepareBtn"):
+        raise AssertionError(f"{label}: legacy header action must stay hidden in essential mode")
+    journey = page.evaluate("() => window.__OUTILSIA_TEST__.essentialJourneyState()")
+    primary_button = page.locator("#essentialAnalyzeBtn" if not scanned else "#essentialTestBtn")
+    primary_label = primary_button.inner_text(timeout=5000).strip()
     primary_command = primary_button.get_attribute("data-primary-command")
-    if primary_label != expected_action["label"]:
+    expected_label = journey["scan"]["label"] if not scanned else journey["test"]["label"]
+    expected_command = journey["scan"]["command"] if not scanned else journey["test"]["command"]
+    if primary_label != expected_label:
         raise AssertionError(
-            f"{label}: primary label {primary_label!r} != {expected_action['label']!r}"
+            f"{label}: journey label {primary_label!r} != {expected_label!r}"
         )
-    if primary_detail != expected_action["detail"]:
+    if primary_command != expected_command:
         raise AssertionError(
-            f"{label}: primary detail {primary_detail!r} != {expected_action['detail']!r}"
-        )
-    if primary_command != expected_action["command"]:
-        raise AssertionError(
-            f"{label}: primary command {primary_command!r} != {expected_action['command']!r}"
+            f"{label}: journey command {primary_command!r} != {expected_command!r}"
         )
 
     if not visible(page, ".machine-summary-strip"):
         raise AssertionError(f"{label}: machine summary must be immediately visible")
-    quick_visible = visible(page, ".quick-decision-strip")
-    if scanned and not quick_visible:
-        raise AssertionError(f"{label}: scanned action strip must remain available")
-    if not scanned and quick_visible:
-        raise AssertionError(f"{label}: duplicate prescan decision must stay hidden")
+    if visible(page, ".quick-decision-strip"):
+        raise AssertionError(f"{label}: legacy decision strip must stay hidden")
 
     machine = text(page, ".machine-summary-strip")
     machine_lower = machine.lower()
@@ -184,8 +178,8 @@ def check(browser, width: int, height: int, label: str):
     screenshot_initial = OUT / f"terrain-ux-{label}-initial.png"
     page.screenshot(path=screenshot_initial, full_page=True)
 
-    page.locator("#prepareBtn").click()
-    page.wait_for_function("() => !document.querySelector('#prepareBtn')?.disabled")
+    page.locator("#essentialAnalyzeBtn").click()
+    page.wait_for_function("() => !document.querySelector('#essentialAnalyzeBtn')?.disabled")
     page.locator("#workspaceOverviewBtn").click()
     page.locator("#workspaceSectionSelect").select_option(".readiness-panel")
     scan_only = text(page, "#readinessBox")

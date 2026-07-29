@@ -13,7 +13,7 @@
         <div class="hero-copy">
           <p class="eyebrow">OutilsIA Local Cockpit</p>
           <h1>Votre PC est-il prêt pour l'IA locale ?</h1>
-          <p class="hero-lead">Scannez la machine, vérifiez Qwen, Llama, Hermes ou Mistral, puis gardez la config dans votre compte OutilsIA.</p>
+          <p class="hero-lead">Scannez la machine, testez un modèle local, puis gardez une preuve datée et traçable.</p>
           <p id="desktopManifestText" class="manifest-line">Application locale - catalogue OutilsIA.</p>
           <div class="signal-row" aria-hidden="true">
             <span></span><span></span><span></span><span></span><span></span>
@@ -46,7 +46,46 @@
         </div>
       </section>
 
-      <section class="quick-decision-strip" aria-label="Résultat d'analyse">
+      <section id="essentialJourney" class="essential-journey" aria-labelledby="essentialJourneyTitle">
+        <div class="essential-journey-head">
+          <div>
+            <span class="label">Parcours essentiel</span>
+            <h2 id="essentialJourneyTitle">Analyser, tester, prouver</h2>
+          </div>
+          <p>Trois gestes. Aucun achat conseillé ni aucune action locale avant une mesure et votre confirmation.</p>
+        </div>
+        <div class="essential-journey-grid">
+          <article id="essentialAnalyzeStep" class="essential-step is-current" data-step-state="current">
+            <div class="essential-step-head">
+              <span class="essential-step-index">1</span>
+              <span id="essentialAnalyzeState" class="essential-step-state">À faire</span>
+            </div>
+            <strong>Analyser ce PC</strong>
+            <p id="essentialAnalyzeDetail">Détecter CPU, RAM, GPU, VRAM, Ollama et modèles installés.</p>
+            <button id="essentialAnalyzeBtn" type="button" data-primary-command="analyze">Analyser ce PC</button>
+          </article>
+          <article id="essentialTestStep" class="essential-step is-locked" data-step-state="locked">
+            <div class="essential-step-head">
+              <span class="essential-step-index">2</span>
+              <span id="essentialTestState" class="essential-step-state">En attente</span>
+            </div>
+            <strong>Tester le modèle conseillé</strong>
+            <p id="essentialTestDetail">OutilsIA choisira le test utile après l'analyse.</p>
+            <button id="essentialTestBtn" type="button" disabled>Analyse requise</button>
+          </article>
+          <article id="essentialProofStep" class="essential-step is-locked" data-step-state="locked">
+            <div class="essential-step-head">
+              <span class="essential-step-index">3</span>
+              <span id="essentialProofState" class="essential-step-state">En attente</span>
+            </div>
+            <strong>Garder la preuve</strong>
+            <p id="essentialProofDetail">La carte contiendra la machine, le runtime, le modèle, la mesure, la date, le SHA et ses limites.</p>
+            <button id="essentialProofBtn" type="button" disabled>Mesure requise</button>
+          </article>
+        </div>
+      </section>
+
+      <section class="quick-decision-strip legacy-decision-state" aria-label="État de décision interne" aria-hidden="true">
         <div>
           <span class="label">Action suivante</span>
           <strong id="quickActionText">Scanner ce PC</strong>
@@ -176,7 +215,7 @@
             <button id="workspaceModelsBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="models" tabindex="-1">Modèles</button>
             <button id="workspaceTestsBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="tests" tabindex="-1">Tests</button>
             <button id="workspaceAssistantBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="assistant" tabindex="-1">Assistant</button>
-            <button id="workspaceWorkflowsBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="workflows" tabindex="-1">Atelier avancé</button>
+            <button id="workspaceWorkflowsBtn" class="advanced-workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="workflows" tabindex="-1" title="Fonctions expertes séparées du parcours essentiel">Mode avancé</button>
             <button id="workspaceAccountBtn" type="button" role="tab" aria-selected="false" aria-controls="workspaceContent" data-workspace-tab-target="account" tabindex="-1">Compte</button>
           </div>
           <div class="workspace-section-nav" aria-label="Naviguer dans les sections de l'espace actif">
@@ -360,7 +399,7 @@
             <span id="localCapabilityBridgeState">désactivée</span>
           </div>
           <div id="localCapabilityBridgeBox" class="local-capability-bridge-box empty">
-            Génère d'abord l'instantané de capacités IA. Tu pourras ensuite connecter Codex, Claude Code ou un autre client MCP pendant 15 minutes, sans lui donner le droit d'agir sur le PC.
+            Après le scan, un clic prépare l'instantané puis demande la permission d'ouvrir le serveur pendant 15 minutes. Aucun droit d'action sur le PC n'est exposé.
           </div>
           <div class="local-bridge-client-controls">
             <label>
@@ -374,13 +413,13 @@
             <button id="copyLocalCapabilityTokenBtn" type="button" disabled>Copier le jeton 15 min</button>
           </div>
           <div class="row-actions">
-            <button class="path-action" type="button" data-open-feature="passport">Préparer l'instantané</button>
-            <button id="startLocalCapabilityBridgeBtn" type="button" disabled>Démarrer MCP 15 min</button>
+            <button id="startLocalCapabilityBridgeBtn" type="button" disabled>Préparer et démarrer 15 min</button>
             <button id="stopLocalCapabilityBridgeBtn" type="button" disabled>Arrêter</button>
           </div>
           <details class="local-bridge-advanced">
             <summary>Connexion avancée</summary>
             <div class="row-actions">
+              <button type="button" data-open-feature="passport">Voir l'instantané</button>
               <button id="copyLocalCapabilityBridgeBtn" type="button" disabled>Copier le JSON complet</button>
               <button id="refreshLocalCapabilityBridgeBtn" type="button" disabled>Vérifier le serveur</button>
             </div>
@@ -1146,18 +1185,19 @@
           </div>
           <div id="readinessBox" class="readiness-box empty" aria-live="polite">Analyse la machine puis lance un benchmark pour obtenir un bilan lisible et des actions concrètes.</div>
           <div class="row-actions readiness-primary-actions">
-            <button id="saveReadinessAccountBtn" type="button" disabled>Sauver compte</button>
-            <button id="shareReadinessBtn" type="button" disabled>Partager</button>
-            <button id="pdfReadinessBtn" type="button" disabled>PDF modèle/upgrade</button>
-            <button id="saveReadinessMemoryBtn" type="button" disabled>MemoryForge</button>
+            <button id="copyProofCardBtn" type="button" disabled hidden>Copier la carte</button>
+            <button id="downloadProofCardBtn" type="button" disabled hidden>Télécharger le JSON + SHA</button>
+            <button id="shareReadinessBtn" type="button" disabled>Partager la preuve</button>
+            <button id="proofConnectMcpBtn" type="button" data-open-feature="bridge" hidden>Connecter une IA</button>
           </div>
           <details class="readiness-export-actions">
-            <summary>Copies et exports techniques</summary>
+            <summary>Compte, PDF, mémoire et exports techniques</summary>
             <div class="row-actions">
+              <button id="saveReadinessAccountBtn" type="button" disabled>Sauver compte</button>
+              <button id="pdfReadinessBtn" type="button" disabled>PDF modèle/upgrade</button>
+              <button id="saveReadinessMemoryBtn" type="button" disabled>MemoryForge</button>
               <button id="copyReadinessSummaryBtn" type="button" disabled>Copier résumé</button>
               <button id="copyReadinessBtn" type="button" disabled>Copier rapport complet</button>
-              <button id="copyProofCardBtn" type="button" disabled>Copier carte de preuve</button>
-              <button id="downloadProofCardBtn" type="button" disabled>Télécharger preuve JSON</button>
               <button id="copyWindowsRecipeBtn" type="button" disabled>Copier recette bêta</button>
               <button id="downloadWindowsRecipeBtn" type="button" disabled>Télécharger recette</button>
             </div>

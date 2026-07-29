@@ -422,6 +422,19 @@ const $ = (id) => document.getElementById(id);
 
 const els = {
   appShell: $("appShell"),
+  essentialJourney: $("essentialJourney"),
+  essentialAnalyzeStep: $("essentialAnalyzeStep"),
+  essentialAnalyzeState: $("essentialAnalyzeState"),
+  essentialAnalyzeDetail: $("essentialAnalyzeDetail"),
+  essentialAnalyzeBtn: $("essentialAnalyzeBtn"),
+  essentialTestStep: $("essentialTestStep"),
+  essentialTestState: $("essentialTestState"),
+  essentialTestDetail: $("essentialTestDetail"),
+  essentialTestBtn: $("essentialTestBtn"),
+  essentialProofStep: $("essentialProofStep"),
+  essentialProofState: $("essentialProofState"),
+  essentialProofDetail: $("essentialProofDetail"),
+  essentialProofBtn: $("essentialProofBtn"),
   quickDecisionStrip: document.querySelector(".quick-decision-strip"),
   quickMomentCell: document.querySelector(".quick-moment-cell"),
   workspaceNav: document.querySelector(".workspace-nav"),
@@ -739,6 +752,7 @@ const els = {
   copyReadinessBtn: $("copyReadinessBtn"),
   copyProofCardBtn: $("copyProofCardBtn"),
   downloadProofCardBtn: $("downloadProofCardBtn"),
+  proofConnectMcpBtn: $("proofConnectMcpBtn"),
   saveReadinessMemoryBtn: $("saveReadinessMemoryBtn"),
   saveReadinessAccountBtn: $("saveReadinessAccountBtn"),
   shareReadinessBtn: $("shareReadinessBtn"),
@@ -1089,7 +1103,8 @@ const workspaceSectionState = {};
 const readinessProof = {
   copied: false,
   savedAccount: false,
-  shared: false
+  shared: false,
+  benchmarkFingerprint: ""
 };
 
 function setStatus(text, kind = "") {
@@ -2848,6 +2863,160 @@ function preferredModelCommand(models = []) {
   } : null;
 }
 
+function benchmarkMachineKey(benchmark = null) {
+  return String(
+    benchmark?.machine_key
+    || benchmark?.machine?.machine_key
+    || ""
+  ).trim();
+}
+
+function benchmarkMatchesCurrentMachine(benchmark = null) {
+  const currentMachineKey = String(state.scan?.machine_key || "").trim();
+  const measuredMachineKey = benchmarkMachineKey(benchmark);
+  return Boolean(
+    currentMachineKey
+    && measuredMachineKey
+    && currentMachineKey === measuredMachineKey
+  );
+}
+
+function proofBenchmarkFingerprint(benchmark = null) {
+  if (!benchmark || !benchmarkMatchesCurrentMachine(benchmark)) return "";
+  return [
+    benchmarkMachineKey(benchmark),
+    normalizeOllamaRef(benchmark.model || ""),
+    String(benchmark.created_at_ms || benchmark.benchmark_protocol_v2?.captured_at || ""),
+    String(benchmark.estimated_tokens_per_second || ""),
+    String(benchmark.elapsed_ms || ""),
+    String(benchmark.benchmark_protocol_v2?.binding?.prompt_sha256 || ""),
+    String(benchmark.benchmark_protocol_v2?.binding?.runtime || benchmark.runtime || ""),
+    String(benchmark.benchmark_protocol_v2?.binding?.ollama_version || "")
+  ].join("|");
+}
+
+function journeyProofBenchmark() {
+  const recommended = recommendedModelState();
+  const candidates = [
+    recommended.ref ? successfulBenchmarkFor(recommended.ref) : null,
+    state.benchmark?.success ? state.benchmark : null,
+    successfulBenchmarkFor("qwen3:0.6b"),
+    ...readBenchmarkHistory().filter((item) => item?.success)
+  ].filter(Boolean);
+  return candidates.find((item) => (
+    benchmarkMatchesCurrentMachine(item)
+    && benchmarkProtocolV2(item)
+    && proofCardDraft(item)
+  )) || null;
+}
+
+function essentialJourneyState(action = primaryActionState()) {
+  const recommended = recommendedModelState();
+  const proofBenchmark = journeyProofBenchmark();
+  const proofCard = proofBenchmark ? proofCardDraft(proofBenchmark) : null;
+  const scanComplete = Boolean(state.scan);
+  const testComplete = Boolean(proofCard);
+  const proofFingerprint = proofBenchmarkFingerprint(proofBenchmark);
+  const proofKept = Boolean(
+    proofCard
+    && proofFingerprint
+    && proofFingerprint === readinessProof.benchmarkFingerprint
+    && (readinessProof.copied || readinessProof.shared)
+  );
+  const activeStep = !scanComplete ? 1 : !testComplete ? 2 : 3;
+  const testModel = recommended.ref || action.model || prepareFlowState().testModel;
+  const measuredModel = proofBenchmark?.model || "";
+  const nextTestModel = recommended.ref || measuredModel;
+  const retestsMeasuredModel = Boolean(
+    measuredModel
+    && nextTestModel
+    && sameOllamaModel(measuredModel, nextTestModel)
+  );
+  return {
+    activeStep,
+    scan: {
+      complete: scanComplete,
+      state: scanComplete ? "Terminé" : state.analysisError ? "À relancer" : "À faire",
+      detail: scanComplete
+        ? `${gpuDisplayLabel(state.scan)} · ${memoryDisplayLabel(state.scan)} · ${ollamaRuntimeLabel(state.scan)}`
+        : state.analysisError || "Détecter CPU, RAM, GPU, VRAM, Ollama et modèles installés.",
+      label: scanComplete ? "Relancer l'analyse" : state.analysisError ? "Relancer l'analyse" : "Analyser ce PC",
+      command: "scan"
+    },
+    test: {
+      complete: testComplete,
+      locked: !scanComplete,
+      state: testComplete ? "Mesuré" : scanComplete ? "Prochaine action" : "En attente",
+      detail: testComplete
+        ? `${measuredModel} · ${proofBenchmark.estimated_tokens_per_second || 0} tok/s · ${proofCard.model.runtime || "runtime local"}`
+        : scanComplete
+          ? `${testModel || "Modèle à déterminer"} · ${action.status}`
+          : "OutilsIA choisira le test utile après l'analyse.",
+      label: testComplete
+        ? retestsMeasuredModel ? "Retester ce modèle" : "Tester le modèle suivant"
+        : scanComplete ? action.label : "Analyse requise",
+      command: testComplete ? "benchmark-recommended" : action.command,
+      model: testComplete ? nextTestModel : (action.model || "")
+    },
+    proof: {
+      complete: proofKept,
+      locked: !testComplete,
+      state: proofKept ? "Conservée" : testComplete ? "Prête" : "En attente",
+      detail: proofCard
+        ? `${proofCard.machine.gpu} · ${proofCard.model.ref} · ${proofCard.measurement.tokens_per_second} tok/s · ${proofCard.model.runtime} · SHA-256 calculé`
+        : "La carte contiendra la machine, le runtime, le modèle, la mesure, la date, le SHA et ses limites.",
+      label: testComplete ? "Voir et partager la preuve" : "Mesure requise",
+      card: proofCard
+    }
+  };
+}
+
+function applyEssentialStepState(element, stateName) {
+  if (!element) return;
+  element.dataset.stepState = stateName;
+  element.classList.toggle("is-current", stateName === "current");
+  element.classList.toggle("is-complete", stateName === "complete");
+  element.classList.toggle("is-locked", stateName === "locked");
+}
+
+function renderEssentialJourney(action = primaryActionState()) {
+  if (!els.essentialJourney) return;
+  const journey = essentialJourneyState(action);
+  if (els.appShell) els.appShell.dataset.essentialStep = String(journey.activeStep);
+
+  applyEssentialStepState(
+    els.essentialAnalyzeStep,
+    journey.scan.complete ? "complete" : "current"
+  );
+  els.essentialAnalyzeState.textContent = journey.scan.state;
+  els.essentialAnalyzeDetail.textContent = journey.scan.detail;
+  els.essentialAnalyzeBtn.textContent = journey.scan.label;
+  els.essentialAnalyzeBtn.dataset.primaryCommand = journey.scan.command;
+  els.essentialAnalyzeBtn.disabled = Boolean(primaryAnalysisBusy);
+
+  applyEssentialStepState(
+    els.essentialTestStep,
+    journey.test.complete ? "complete" : journey.test.locked ? "locked" : "current"
+  );
+  els.essentialTestState.textContent = journey.test.state;
+  els.essentialTestDetail.textContent = journey.test.detail;
+  els.essentialTestBtn.textContent = journey.test.label;
+  els.essentialTestBtn.dataset.primaryCommand = journey.test.command || "";
+  if (journey.test.model) els.essentialTestBtn.dataset.primaryModel = journey.test.model;
+  else delete els.essentialTestBtn.dataset.primaryModel;
+  els.essentialTestBtn.disabled = journey.test.locked || Boolean(primaryAnalysisBusy);
+
+  applyEssentialStepState(
+    els.essentialProofStep,
+    journey.proof.complete ? "complete" : journey.proof.locked ? "locked" : "current"
+  );
+  els.essentialProofState.textContent = journey.proof.state;
+  els.essentialProofDetail.textContent = journey.proof.detail;
+  els.essentialProofBtn.textContent = journey.proof.label;
+  els.essentialProofBtn.disabled = journey.proof.locked;
+  return journey;
+}
+
 function primaryActionState() {
   const flow = prepareFlowState();
   const recommended = recommendedModelState();
@@ -2990,6 +3159,7 @@ function renderPrimaryAction() {
   renderStickyAction(action);
   renderEssentialFocus(action);
   renderQuickDecision(action);
+  renderEssentialJourney(action);
   renderWorkspacePrerequisite();
 }
 
@@ -3043,7 +3213,7 @@ function renderQuickDecision(action = primaryActionState()) {
   const score = normalizeScore(compatibility.score ?? compatibility.compatibility_score ?? null);
   const upgrades = compatibilityUpgradesForCurrentDecision(compatibility);
   const upgrade = upgrades.find((item) => item && typeof item === "object") || null;
-  const benchmark = successfulBenchmarkFor(flow.testModel);
+  const benchmark = journeyProofBenchmark() || successfulBenchmarkFor(flow.testModel);
   const runtime = runtimeReadinessState(flow.testModel);
   const recommended = flow.recommended;
   const recommendedLabel = recommended?.ref
@@ -7175,7 +7345,7 @@ function readinessReport() {
     || compatibility.score?.summary
     || compatibility.score?.label
     || (state.scan ? fallbackVerdict(state.scan) : "");
-  const benchmark = successfulBenchmarkFor(flow.testModel);
+  const benchmark = journeyProofBenchmark() || successfulBenchmarkFor(flow.testModel);
   const benchmarkStatus = benchmark
     ? isOllamaModelInstalled(benchmark.model) ? "current" : "historical_model_absent"
     : "missing";
@@ -8355,11 +8525,18 @@ function syncReadinessControls(scanReady = Boolean(state.scan)) {
   els.copyReadinessSummaryBtn.disabled = !scanReady;
   els.copyReadinessBtn.disabled = !scanReady;
   const proofReady = Boolean(scanReady && proofCardDraft(readinessReport().benchmark));
-  if (els.copyProofCardBtn) els.copyProofCardBtn.disabled = !proofReady;
-  if (els.downloadProofCardBtn) els.downloadProofCardBtn.disabled = !proofReady;
+  if (els.copyProofCardBtn) {
+    els.copyProofCardBtn.disabled = !proofReady;
+    els.copyProofCardBtn.hidden = !proofReady;
+  }
+  if (els.downloadProofCardBtn) {
+    els.downloadProofCardBtn.disabled = !proofReady;
+    els.downloadProofCardBtn.hidden = !proofReady;
+  }
+  if (els.proofConnectMcpBtn) els.proofConnectMcpBtn.hidden = !proofReady;
   els.saveReadinessMemoryBtn.disabled = !scanReady;
   els.saveReadinessAccountBtn.disabled = !scanReady;
-  els.shareReadinessBtn.disabled = !scanReady || !lastSyncedMachineId;
+  els.shareReadinessBtn.disabled = !proofReady || !lastSyncedMachineId;
   if (els.revokeShareReportBtn) {
     els.revokeShareReportBtn.disabled = !lastSyncedMachineId;
   }
@@ -8369,6 +8546,51 @@ function syncReadinessControls(scanReady = Boolean(state.scan)) {
   els.downloadWindowsRecipeBtn.disabled = !scanReady;
   els.topCopyWindowsRecipeBtn.disabled = !scanReady;
   els.topDownloadWindowsRecipeBtn.disabled = !scanReady;
+}
+
+function proofMeasuredAtLabel(card) {
+  const value = card?.measurement?.measured_at || card?.generated_at || "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "date indisponible"
+    : date.toLocaleString("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+}
+
+function proofCardRenderKey(card = null) {
+  if (!card) return "";
+  return [
+    card.schema || "",
+    card.model?.ref || "",
+    card.measurement?.measured_at || "",
+    card.measurement?.tokens_per_second || "",
+    card.producer?.build_id || "",
+    card.links?.shared_report || ""
+  ].join("|");
+}
+
+async function renderProofCardDigest(benchmark, expectedRenderKey = "") {
+  const digestElement = document.querySelector("#proofCardDigestText");
+  if (!digestElement || !benchmark) return;
+  try {
+    const card = await finalizedProofCard(benchmark);
+    const currentElement = document.querySelector("#proofCardDigestText");
+    if (
+      !currentElement
+      || currentElement.dataset.proofKey !== expectedRenderKey
+      || proofCardRenderKey(card) !== expectedRenderKey
+    ) return;
+    const digest = card.integrity.digest;
+    currentElement.textContent = `${digest.slice(0, 16)}…${digest.slice(-8)}`;
+    currentElement.title = digest;
+  } catch (_) {
+    digestElement.textContent = "indisponible";
+  }
 }
 
 function renderReadinessPanel() {
@@ -8402,6 +8624,8 @@ function renderReadinessPanel() {
   const benchmark = report.benchmark;
   const bottleneck = report.bottleneck_explainer;
   const proofCard = report.proof_card;
+  const proofMeasuredAt = proofMeasuredAtLabel(proofCard);
+  const proofRenderKey = proofCardRenderKey(proofCard);
   const heroScope = report.ready
     ? "Bilan mesuré sur ce PC"
     : benchmark
@@ -8551,14 +8775,20 @@ function renderReadinessPanel() {
         </div>
         <div class="proof-card-main">
           <strong>${escapeHtml(proofCard.headline)}</strong>
-          <p>${escapeHtml(proofCard.machine.gpu)} · ${escapeHtml(proofCard.machine.vram_gb ?? "?")} Go VRAM · ${escapeHtml(proofCard.machine.ram_gb ?? "?")} Go RAM</p>
+          <p>${escapeHtml(proofCard.machine.cpu)} · ${escapeHtml(proofCard.machine.gpu)} · ${escapeHtml(proofCard.machine.vram_gb ?? "?")} Go VRAM · ${escapeHtml(proofCard.machine.ram_gb ?? "?")} Go RAM</p>
         </div>
         <div class="proof-card-metrics">
+          <span>Débit <strong>${escapeHtml(proofCard.measurement.tokens_per_second)} tok/s</strong></span>
           <span>Préfill <strong>${escapeHtml(proofCard.measurement.prompt_tokens_per_second || "n/a")} tok/s</strong></span>
           <span>Placement <strong>${escapeHtml(proofCard.measurement.gpu_offload_percent == null ? "inconnu" : `${proofCard.measurement.gpu_offload_percent} % GPU`)}</strong></span>
-          <span>Décision <strong>${escapeHtml(proofCard.diagnosis.purchase.headline)}</strong></span>
+          <span>Mesurée le <strong>${escapeHtml(proofMeasuredAt)}</strong></span>
         </div>
-        <p class="proof-card-note">Mesure locale ponctuelle · checksum de cohérence à l'export · aucune identité matérielle certifiée.</p>
+        <div class="proof-card-trace">
+          <span>Runtime <strong>${escapeHtml(proofCard.model.runtime || "inconnu")} · Ollama ${escapeHtml(proofCard.model.ollama_version || "inconnue")}</strong></span>
+          <span>Build <strong>${escapeHtml(proofCard.producer.build_id || "inconnu")} · ${escapeHtml(proofCard.producer.source_commit ? proofCard.producer.source_commit.slice(0, 12) : "commit absent")}</strong></span>
+          <span>SHA-256 de cohérence <strong id="proofCardDigestText" data-proof-key="${escapeHtml(proofRenderKey)}">calcul en cours…</strong></span>
+        </div>
+        <p class="proof-card-note">${escapeHtml(proofCard.diagnosis.purchase.headline)} · ${escapeHtml(proofCard.limitations[0])} ${escapeHtml(proofCard.limitations[1])}</p>
       </section>
     ` : ""}
     <section class="readiness-actions" aria-label="Prochaines actions utiles">
@@ -8603,8 +8833,10 @@ function renderReadinessPanel() {
       <span>${report.account_ready ? "La machine est synchronisée : partage ou exporte le rapport." : "Sauvegarde le PC dans ton compte pour retrouver ses benchmarks et partager le rapport."}</span>
     </div>
   `;
+  if (proofCard && benchmark) void renderProofCardDigest(benchmark, proofRenderKey);
   queueWindowsRecipeAutosave();
   renderCapabilityPassportPanel();
+  renderEssentialJourney(primaryActionState());
 }
 
 async function copyReadinessSummary() {
@@ -8623,6 +8855,8 @@ async function copyReadinessReport() {
   }
   await navigator.clipboard.writeText(readinessMarkdown());
   readinessProof.copied = true;
+  readinessProof.benchmarkFingerprint = proofBenchmarkFingerprint(journeyProofBenchmark());
+  renderEssentialJourney(primaryActionState());
   setStatus("Rapport machine prête copié", "ok");
 }
 
@@ -8680,7 +8914,12 @@ async function shareReadinessReport() {
     renderReadinessPanel();
     if (!lastSyncedMachineId) return;
   }
-  await createShareReport();
+  const benchmark = journeyProofBenchmark();
+  if (!benchmark) {
+    setStatus("Une mesure locale traçable est requise avant le partage", "warn");
+    return;
+  }
+  await createShareReport(benchmark);
   renderReadinessPanel();
 }
 
@@ -11466,7 +11705,7 @@ function bottleneckForBenchmark(benchmark = state.benchmark) {
 
 function proofCardDraft(benchmark = state.benchmark, bottleneck = null) {
   const protocol = benchmarkProtocolV2(benchmark);
-  if (!benchmark || !protocol) return null;
+  if (!benchmark || !protocol || !benchmarkMatchesCurrentMachine(benchmark)) return null;
   return BENCHMARK_PROOF_ENGINE.buildProofCard({
     protocol,
     benchmark,
@@ -11556,7 +11795,9 @@ function proofCardMarkdown(card) {
     "",
     `- Machine: ${card.machine.cpu} · ${card.machine.gpu} · ${card.machine.ram_gb ?? "?"} Go RAM · ${card.machine.vram_gb ?? "?"} Go VRAM`,
     `- Mesure: ${card.measurement.tokens_per_second} tok/s · préremplissage ${card.measurement.prompt_tokens_per_second || "n/a"} tok/s · ${offload}`,
+    `- Mesurée le: ${card.measurement.measured_at || "date indisponible"}`,
     `- Runtime: ${card.model.runtime} · Ollama ${card.model.ollama_version || "version inconnue"}`,
+    `- Build: ${card.producer.build_id || "inconnu"} · commit ${card.producer.source_commit || "inconnu"}`,
     `- Diagnostic: ${card.diagnosis.label} · confiance ${card.diagnosis.confidence}`,
     `- Décision: ${card.diagnosis.purchase.headline}`,
     `- Protocole: ${card.protocol.schema} · ${card.protocol.prompt_kind}`,
@@ -11564,7 +11805,7 @@ function proofCardMarkdown(card) {
     card.integrity?.digest ? `- SHA-256 de cohérence: ${card.integrity.digest}` : "",
     card.links.shared_report ? `- Rapport: ${card.links.shared_report}` : "",
     "",
-    card.limitations[0],
+    ...card.limitations.map((limitation) => `- Limite: ${limitation}`),
     "",
     "Produit par OutilsIA Local Cockpit · https://outilsia.fr/telecharger-scanner-ia-local"
   ];
@@ -11573,8 +11814,12 @@ function proofCardMarkdown(card) {
 
 async function copyProofCard() {
   try {
-    const card = await finalizedProofCard();
+    const benchmark = journeyProofBenchmark();
+    const card = await finalizedProofCard(benchmark);
     await navigator.clipboard.writeText(proofCardMarkdown(card));
+    readinessProof.copied = true;
+    readinessProof.benchmarkFingerprint = proofBenchmarkFingerprint(benchmark);
+    renderEssentialJourney(primaryActionState());
     setStatus("Carte de preuve mesurée copiée", "ok");
   } catch (error) {
     setStatus(`Carte de preuve indisponible : ${error}`, "warn");
@@ -11583,13 +11828,17 @@ async function copyProofCard() {
 
 async function downloadProofCard() {
   try {
-    const card = await finalizedProofCard();
+    const benchmark = journeyProofBenchmark();
+    const card = await finalizedProofCard(benchmark);
     const model = normalizeOllamaRef(card.model.ref).replace(/[^a-z0-9._-]+/gi, "-") || "modele";
     downloadTextFile(
       `outilsia-proof-card-${model}.json`,
       `${JSON.stringify(card, null, 2)}\n`,
       "application/json;charset=utf-8"
     );
+    readinessProof.copied = true;
+    readinessProof.benchmarkFingerprint = proofBenchmarkFingerprint(benchmark);
+    renderEssentialJourney(primaryActionState());
     setStatus("Carte de preuve JSON téléchargée", "ok");
   } catch (error) {
     setStatus(`Carte de preuve indisponible : ${error}`, "warn");
@@ -12228,7 +12477,7 @@ function renderLocalCapabilityBridgePanel() {
   const runtime = state.localCapabilityBridge;
   const running = localCapabilityBridgeIsRunning(runtime);
   const passportCurrent = capabilityPassportIsCurrent();
-  els.startLocalCapabilityBridgeBtn.disabled = !invoke || !passportCurrent || running;
+  els.startLocalCapabilityBridgeBtn.disabled = !invoke || !state.scan || running;
   els.copyLocalCapabilityClientConfigBtn.disabled = !running || !runtime?.mcp_url;
   els.copyLocalCapabilityTokenBtn.disabled = !running || !runtime?.token;
   els.copyLocalCapabilityBridgeBtn.disabled = !running || !runtime?.token;
@@ -12254,13 +12503,16 @@ function renderLocalCapabilityBridgePanel() {
   if (!state.scan) {
     els.localCapabilityBridgeState.textContent = "scan requis";
     els.localCapabilityBridgeBox.className = "local-capability-bridge-box empty";
-    els.localCapabilityBridgeBox.textContent = "Scanne la machine puis génère son instantané de capacités IA.";
+    els.localCapabilityBridgeBox.textContent = "Scanne la machine. Le bouton préparera ensuite l'instantané avant de demander l'ouverture du serveur.";
     return;
   }
   if (!passportCurrent && !running) {
-    els.localCapabilityBridgeState.textContent = "instantané requis";
+    els.localCapabilityBridgeState.textContent = "prête à préparer";
     els.localCapabilityBridgeBox.className = "local-capability-bridge-box empty";
-    els.localCapabilityBridgeBox.textContent = "Génère un instantané à jour. Aucun serveur MCP local ne démarre automatiquement.";
+    els.localCapabilityBridgeBox.innerHTML = `
+      <strong>Un seul bouton, deux garde-fous.</strong>
+      <span>OutilsIA prépare d'abord un instantané sans prompt ni réponse brute. Une confirmation distincte est ensuite requise avant d'ouvrir le MCP sur 127.0.0.1.</span>
+    `;
     return;
   }
   if (!running) {
@@ -12295,17 +12547,24 @@ function renderLocalCapabilityBridgePanel() {
   `;
 }
 
+async function prepareLocalCapabilityBridgeSnapshot() {
+  if (!state.scan) {
+    setStatus("Scan requis avant connexion d'une IA", "warn");
+    return null;
+  }
+  if (capabilityPassportIsCurrent()) return state.capabilityPassport;
+  return generateCapabilityPassport();
+}
+
 async function startLocalCapabilityBridge() {
   if (!invoke) {
     setStatus("Passerelle disponible uniquement dans l'app native", "warn");
     return null;
   }
-  if (!capabilityPassportIsCurrent()) {
-    setStatus("Génère d'abord un instantané de capacités IA à jour", "warn");
-    return null;
-  }
+  const passport = await prepareLocalCapabilityBridgeSnapshot();
+  if (!passport) return null;
   const confirmed = window.confirm(
-    "Ouvrir pendant 15 minutes le serveur MCP local en lecture seule sur 127.0.0.1 ? Il exposera uniquement l'instantané courant et ne pourra déclencher aucune action."
+    "L'instantané est prêt. Ouvrir pendant 15 minutes le serveur MCP local en lecture seule sur 127.0.0.1 ? Il exposera uniquement cet instantané et ne pourra déclencher aucune action."
   );
   if (!confirmed) return null;
   try {
@@ -20791,12 +21050,12 @@ async function syncDesktop() {
   }
 }
 
-async function createShareReport() {
+async function createShareReport(selectedBenchmark = state.benchmark) {
   if (!lastSyncedMachineId) {
     setStatus("Synchronise le PC avant de creer le rapport", "bad");
     return;
   }
-  const benchmark = state.benchmark;
+  const benchmark = selectedBenchmark;
   const protocol = benchmarkProtocolV2(benchmark);
   if (
     benchmark?.success
@@ -20818,6 +21077,7 @@ async function createShareReport() {
     const url = payload.absolute_url || absolutize(payload.share_url || "/compte");
     lastShareReportUrl = url;
     readinessProof.shared = true;
+    readinessProof.benchmarkFingerprint = proofBenchmarkFingerprint(benchmark);
     els.syncResult.innerHTML = `
       <strong>Rapport partageable pret</strong>
       <span><a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a></span>
@@ -21909,6 +22169,11 @@ function installTestHarness() {
     proofCardDraft,
     finalizedProofCard,
     proofCardMarkdown,
+    benchmarkMatchesCurrentMachine,
+    proofBenchmarkFingerprint,
+    journeyProofBenchmark,
+    essentialJourneyState,
+    renderEssentialJourney,
     arenaObjectiveProfileScore,
     doctorRuntimeEvidence,
     gpuProbeIsUnknown,
@@ -21930,6 +22195,7 @@ function installTestHarness() {
     buildCapabilityPassport,
     verifyCapabilityPassportIntegrity,
     capabilityPassportSummary,
+    prepareLocalCapabilityBridgeSnapshot,
     strategyArenaReadiness,
     modelInstallSizeBudget,
     evaluateInstallSafetyPreflight,
@@ -24020,6 +24286,7 @@ function installTestHarness() {
       readinessProof.copied = false;
       readinessProof.savedAccount = false;
       readinessProof.shared = false;
+      readinessProof.benchmarkFingerprint = "";
       writeRecommendationRun(null);
       writeLastArenaRun(null);
       writeBenchmarkHistory([]);
@@ -24063,6 +24330,7 @@ function installTestHarness() {
       lastShareReportUrl = "https://outilsia.fr/r/demo";
       readinessProof.savedAccount = true;
       readinessProof.shared = true;
+      readinessProof.benchmarkFingerprint = proofBenchmarkFingerprint(qwen);
       renderBenchmark(qwen);
       renderPromptForge(prompt);
       renderLocalChat(state.chatResult);
@@ -25064,6 +25332,9 @@ function demoDesktopUpdates() {
 }
 
 els.prepareBtn.addEventListener("click", handlePrimaryAction);
+els.essentialAnalyzeBtn?.addEventListener("click", handlePrimaryAction);
+els.essentialTestBtn?.addEventListener("click", handlePrimaryAction);
+els.essentialProofBtn?.addEventListener("click", () => revealWorkspaceFeature("readiness"));
 els.stickyActionBtn?.addEventListener("click", handlePrimaryAction);
 els.quickActionBtn?.addEventListener("click", handlePrimaryAction);
 for (const button of els.workspaceTabButtons) {
