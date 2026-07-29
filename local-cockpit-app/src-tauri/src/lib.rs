@@ -81,6 +81,7 @@ use workstack_review::record_workstack_human_review;
 
 const OUTILSIA_ENDPOINT: &str = "https://outilsia.fr";
 const DETECTION_COMMAND_TIMEOUT: Duration = Duration::from_secs(12);
+const STANDARD_BENCHMARK_QUESTION: &str = "Pourquoi la VRAM est importante pour un LLM local ?";
 
 #[derive(Default)]
 struct ActiveInstalls(Mutex<HashMap<String, u32>>);
@@ -882,6 +883,27 @@ async fn create_share_report_with_token(app: AppHandle, machine_id: u64) -> Resu
 }
 
 #[tauri::command]
+async fn revoke_machine_share_with_token(app: AppHandle, machine_id: u64) -> Result<Value, String> {
+    if machine_id == 0 {
+        return Err("Machine synchronisee requise avant revocation.".to_string());
+    }
+    let auth = read_desktop_auth(&app)?
+        .ok_or_else(|| "Token desktop absent. Lance le pairing OutilsIA.".to_string())?;
+    let client = reqwest::Client::new();
+    response_json(
+        client
+            .post(format!(
+                "{OUTILSIA_ENDPOINT}/api/account/machines/{machine_id}/share/revoke"
+            ))
+            .bearer_auth(auth.desktop_token)
+            .send()
+            .await
+            .map_err(|err| format!("Impossible de revoquer le rapport partageable: {err}"))?,
+    )
+    .await
+}
+
+#[tauri::command]
 async fn delete_machine_with_token(app: AppHandle, machine_id: u64) -> Result<Value, String> {
     if machine_id == 0 {
         return Err("Machine synchronisee requise avant suppression.".to_string());
@@ -977,11 +999,81 @@ async fn fetch_desktop_memoryforge_with_token(
     Ok(body)
 }
 
+fn benchmark_proof_has_forbidden_key(value: &Value) -> bool {
+    const FORBIDDEN_KEYS: &[&str] = &[
+        "machine_key",
+        "hostname",
+        "host_name",
+        "account",
+        "email",
+        "token",
+        "authorization",
+        "cookie",
+        "path",
+        "file_path",
+        "ip",
+        "user_agent",
+        "prompt",
+        "output",
+        "output_preview",
+        "output_text",
+    ];
+    match value {
+        Value::Array(items) => items.iter().any(benchmark_proof_has_forbidden_key),
+        Value::Object(object) => object.iter().any(|(key, nested)| {
+            let normalized = key.to_ascii_lowercase();
+            FORBIDDEN_KEYS.contains(&normalized.as_str())
+                || benchmark_proof_has_forbidden_key(nested)
+        }),
+        _ => false,
+    }
+}
+
+fn benchmark_proof_document<'a>(
+    envelope: &'a serde_json::Map<String, Value>,
+    key: &str,
+    schema: &str,
+) -> Result<&'a Value, String> {
+    let value = envelope
+        .get(key)
+        .ok_or_else(|| format!("Preuve benchmark incomplète : {key} absent."))?;
+    if value.get("schema").and_then(Value::as_str) != Some(schema) {
+        return Err(format!("Schéma de preuve benchmark refusé : {key}."));
+    }
+    Ok(value)
+}
+
+fn sanitize_benchmark_proof_envelope(proof: Option<Value>) -> Result<Value, String> {
+    let Some(value) = proof else {
+        return Ok(Value::Null);
+    };
+    let object = value
+        .as_object()
+        .ok_or_else(|| "Enveloppe de preuve benchmark invalide.".to_string())?;
+    if object.get("schema").and_then(Value::as_str) != Some("outilsia.benchmark_proof_envelope.v1")
+    {
+        return Err("Schéma d'enveloppe de preuve benchmark refusé.".to_string());
+    }
+    benchmark_proof_document(object, "protocol", "outilsia.benchmark_protocol.v2")?;
+    benchmark_proof_document(object, "bottleneck", "outilsia.bottleneck_explainer.v1")?;
+    benchmark_proof_document(object, "proof_card", "outilsia.proof_card.v1")?;
+    if benchmark_proof_has_forbidden_key(&value) {
+        return Err("Enveloppe de preuve refusée : donnée privée ou contenu brut.".to_string());
+    }
+    let serialized =
+        serde_json::to_vec(&value).map_err(|err| format!("Preuve benchmark illisible: {err}"))?;
+    if serialized.len() > 48 * 1024 {
+        return Err("Enveloppe de preuve benchmark trop volumineuse.".to_string());
+    }
+    Ok(value)
+}
+
 #[tauri::command]
 async fn sync_benchmark_with_token(
     app: AppHandle,
     scan: MachineScan,
     benchmark: BenchmarkResult,
+    proof: Option<Value>,
 ) -> Result<Value, String> {
     let auth = read_desktop_auth(&app)?
         .ok_or_else(|| "Token desktop absent. Lance le pairing OutilsIA.".to_string())?;
@@ -998,6 +1090,7 @@ async fn sync_benchmark_with_token(
             })?,
     )
     .await?;
+    let proof = sanitize_benchmark_proof_envelope(proof)?;
     let payload = json!({
         "machine_key": scan.machine_key,
         "benchmark": {
@@ -1006,9 +1099,10 @@ async fn sync_benchmark_with_token(
             "prompt_type": "short-local",
             "tokens_per_second": benchmark.estimated_tokens_per_second,
             "context_tokens": benchmark.estimated_tokens,
-            "notes": benchmark.output_preview,
+            "notes": "Mesure locale OutilsIA sans prompt ni sortie brute.",
             "success": benchmark.success,
-            "elapsed_ms": benchmark.elapsed_ms
+            "elapsed_ms": benchmark.elapsed_ms,
+            "proof": proof
         }
     });
     let mut result = response_json(
@@ -1368,10 +1462,14 @@ async fn benchmark_ollama(request: BenchmarkRequest) -> Result<BenchmarkResult, 
 
 fn prepare_benchmark_prompt(request_prompt: Option<String>, objective_arena: bool) -> String {
     let prompt_limit = if objective_arena { 3000 } else { 500 };
-    let user_prompt = request_prompt
-        .unwrap_or_else(|| {
-            "Réponds en français, en une seule phrase courte, sans raisonnement: pourquoi la VRAM est importante pour un LLM local ?".to_string()
-        })
+    let requested = request_prompt.unwrap_or_default();
+    let requested = requested.trim();
+    let requested = if requested.is_empty() {
+        STANDARD_BENCHMARK_QUESTION
+    } else {
+        requested
+    };
+    let user_prompt = requested
         .trim()
         .chars()
         .take(prompt_limit)
@@ -5896,6 +5994,7 @@ pub fn run() {
             revoke_desktop_auth,
             sync_desktop_with_token,
             create_share_report_with_token,
+            revoke_machine_share_with_token,
             delete_machine_with_token,
             fetch_desktop_updates_with_token,
             send_feedback_with_token,
@@ -6457,6 +6556,12 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603|2026-06-15|PCI\\VEN_10DE|
         );
         assert!(prepare_benchmark_prompt(Some(prompt.to_string()), false)
             .ends_with("Réponse finale uniquement, une phrase courte en français."));
+        assert_eq!(
+            prepare_benchmark_prompt(Some(String::new()), false),
+            format!(
+                "{STANDARD_BENCHMARK_QUESTION}\nRéponse finale uniquement, une phrase courte en français."
+            )
+        );
         let payload = ollama_chat_payload("qwen3:0.6b", prompt, false, true, Some(192), None);
         assert_eq!(
             payload
@@ -6634,6 +6739,66 @@ NVIDIA GeForce RTX 4080 SUPER|17179869184|32.0.15.6603|2026-06-15|PCI\\VEN_10DE|
         assert_eq!(value["runtime_gpu_offload_percent"], 75.0);
         assert_eq!(value["runtime_processor"], "cpu/gpu");
         assert_eq!(value["runtime_evidence_source"], "ollama_api_ps");
+    }
+
+    #[test]
+    fn benchmark_proof_sync_accepts_only_versioned_private_envelope() {
+        let proof = json!({
+            "schema": "outilsia.benchmark_proof_envelope.v1",
+            "protocol": {
+                "schema": "outilsia.benchmark_protocol.v2",
+                "binding": {
+                    "model": "qwen3:14b",
+                    "prompt_sha256": "a".repeat(64)
+                }
+            },
+            "bottleneck": {
+                "schema": "outilsia.bottleneck_explainer.v1",
+                "primary": { "key": "no_observed_hardware_bottleneck" }
+            },
+            "proof_card": {
+                "schema": "outilsia.proof_card.v1",
+                "headline": "qwen3:14b · 71.4 tok/s",
+                "privacy": {
+                    "raw_prompt_included": false,
+                    "raw_output_included": false
+                }
+            }
+        });
+        let accepted = sanitize_benchmark_proof_envelope(Some(proof.clone())).unwrap();
+        assert_eq!(accepted, proof);
+
+        let mut leaking = proof;
+        leaking["proof_card"]["output_preview"] = json!("contenu privé");
+        assert!(sanitize_benchmark_proof_envelope(Some(leaking))
+            .unwrap_err()
+            .contains("donnée privée"));
+    }
+
+    #[test]
+    fn benchmark_proof_sync_rejects_unknown_schema_and_large_payload() {
+        let wrong = json!({
+            "schema": "outilsia.benchmark_proof_envelope.v1",
+            "protocol": { "schema": "legacy" },
+            "bottleneck": { "schema": "outilsia.bottleneck_explainer.v1" },
+            "proof_card": { "schema": "outilsia.proof_card.v1" }
+        });
+        assert!(sanitize_benchmark_proof_envelope(Some(wrong))
+            .unwrap_err()
+            .contains("Schéma"));
+
+        let large = json!({
+            "schema": "outilsia.benchmark_proof_envelope.v1",
+            "protocol": { "schema": "outilsia.benchmark_protocol.v2" },
+            "bottleneck": {
+                "schema": "outilsia.bottleneck_explainer.v1",
+                "facts": ["x".repeat(49 * 1024)]
+            },
+            "proof_card": { "schema": "outilsia.proof_card.v1" }
+        });
+        assert!(sanitize_benchmark_proof_envelope(Some(large))
+            .unwrap_err()
+            .contains("volumineuse"));
     }
 
     #[test]

@@ -33,6 +33,20 @@ des preuves invalide le Passport et arrête la connexion.
 | `outilsia_get_capability_passport` | Passport complet et empreinte SHA-256 |
 | `outilsia_get_strategy_arena_handoff` | Handoff borné pour Strategy Arena |
 
+À partir de l'instantané `1.5.0`, les preuves benchmark peuvent inclure trois
+documents versionnés :
+
+- `outilsia.benchmark_protocol.v2` lie modèle, digest du prompt, runtime,
+  version Ollama, mode d'exécution, réglages et métriques exactes ;
+- `outilsia.bottleneck_explainer.v1` sépare faits, hypothèses, inconnus et
+  décision d'achat ;
+- `outilsia.proof_card.v1` fournit la carte compacte destinée au rapport.
+
+Ces documents n'exposent jamais le prompt, la sortie brute, la clé machine,
+le compte, un jeton, une IP ou un chemin personnel. `identity_verified=false`
+et `digest_semantics=coherence_only` sont des bornes de sécurité : le MCP lit
+une mesure locale cohérente, pas une attestation matérielle ou une identité.
+
 Chaque outil porte :
 
 ```json

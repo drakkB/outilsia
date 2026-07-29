@@ -156,6 +156,19 @@
       <p class="fine"><strong>Recette Computer Use · candidat 0.1.2 :</strong> l'état installé vient du scan courant, les mesures plus anciennes sont marquées historiques, une recommandation ouvre le préflight sans lancer le benchmark, le rapport final affiche une confirmation persistante, PromptForge expose une grille heuristique et une réponse locale incomplète est signalée. Ce lot reste candidat tant que la recette noire du nouvel EXE n'est pas repassée.</p>
     </section>
 
+    <section class="wrap panel" id="carte-preuve-benchmark-ollama" style="margin-bottom:18px;border-color:rgba(45,212,191,.38);background:linear-gradient(135deg,rgba(45,212,191,.11),rgba(15,23,42,.92),rgba(103,232,249,.06))">
+      <span class="pill">Protocole + goulot + carte de preuve · candidat source</span>
+      <h2>Un chiffre partageable avec son contexte, pas un badge marketing</h2>
+      <p class="muted">Le candidat source lie chaque mesure exacte au modèle, au digest du prompt, au runtime, à la version Ollama et aux réglages d'exécution. Il explique ensuite le goulot sans confondre fait, hypothèse et inconnue, puis prépare une carte compacte pour le rapport, le PDF, MemoryForge et le MCP local.</p>
+      <div class="proof" style="margin-top:14px">
+        <div><strong>Comparabilité stricte</strong><span>Un modèle, prompt, runtime, Ollama ou réglage différent suspend le verdict de comparaison.</span></div>
+        <div><strong>Achat après mesure</strong><span>Un offload GPU complet peut produire « Aucun achat prioritaire » et retirer les liens matériel contradictoires du rapport partagé.</span></div>
+        <div><strong>Confidentialité</strong><span>Aucun prompt, sortie brute, clé machine, compte, IP, token ou chemin personnel dans la carte.</span></div>
+        <div><strong>Assurance exacte</strong><span>Mesure locale et cohérence du JSON ; aucune identité machine/propriétaire ni provenance matérielle attestée.</span></div>
+      </div>
+      <p class="fine">Fonction candidate non incluse dans le build public actuel. Le lien public est volontaire, authentifié à la création et révocable ; les agrégats communautaires exigent encore les contrôles serveur et un seuil de cohorte.</p>
+    </section>
+
     <section class="wrap panel" id="preflight-installation-modele-ollama" style="scroll-margin-top:84px;margin-bottom:18px;border-color:rgba(248,113,113,.36);background:linear-gradient(135deg,rgba(248,113,113,.10),rgba(15,23,42,.92),rgba(251,191,36,.06))">
       <span class="pill">Install Safety Preflight v1 · candidat</span>
       <h2>Contrôler le vrai volume Ollama avant chaque téléchargement de modèle</h2>
@@ -164,7 +177,7 @@
         <div><strong>Runtime prêt</strong><span>Le préflight refuse de lancer un pull vers un Ollama qui ne répond pas.</span></div>
         <div><strong>Budget prudent</strong><span>Taille haute estimée du modèle plus réserve disque explicite.</span></div>
         <div><strong>WSL séparé</strong><span>Le volume Linux de la distribution n'est pas confondu avec le disque système Windows.</span></div>
-        <div><strong>Aucun chemin exporté</strong><span>Rapport, PDF et Instantané de capacités IA 1.4.0 gardent le verdict et les nombres, jamais le chemin personnel.</span></div>
+        <div><strong>Aucun chemin exporté</strong><span>Rapport, PDF et Instantané de capacités IA 1.5.0 gardent le verdict et les nombres, jamais le chemin personnel.</span></div>
       </div>
       <p class="fine">Fonction candidate, absente du build public actuel. Elle ne garantit ni les performances du modèle ni son offload GPU et ne constitue pas une preuve terrain physique.</p>
     </section>
@@ -177,7 +190,7 @@
         <div><strong>Modèles installés</strong><span>Aucun téléchargement ni installation pendant le run.</span></div>
         <div><strong>Budget fixe</strong><span>Une tâche, 2 à 3 candidats, 60 secondes maximum par modèle.</span></div>
         <div><strong>Score explicable</strong><span>Checks réussis, débit, latence et empreinte SHA-256 de chaque sortie.</span></div>
-        <div><strong>Confidentialité</strong><span>Consignes et réponses brutes exclues du rapport, PDF, MemoryForge et Instantané de capacités IA 1.4.0.</span></div>
+        <div><strong>Confidentialité</strong><span>Consignes et réponses brutes exclues du rapport, PDF, MemoryForge et Instantané de capacités IA 1.5.0.</span></div>
       </div>
       <p class="fine">Fonction présente dans un candidat source postérieur au build public actuel. Le score compare des critères courts et bornés ; il ne mesure pas toute la qualité du modèle et ne compte jamais comme validation physique.</p>
     </section>
@@ -260,7 +273,7 @@
     </section>
 
     <section class="wrap panel" id="hardware-doctor-capability-passport" style="margin-bottom:18px;border-color:rgba(103,232,249,.36);background:linear-gradient(135deg,rgba(103,232,249,.10),rgba(15,23,42,.92),rgba(34,197,94,.07))">
-      <span class="pill">Hardware Doctor 2.0 + Instantané de capacités IA 1.4.0</span>
+      <span class="pill">Hardware Doctor 2.0 + Instantané de capacités IA 1.5.0</span>
       <h2>Mesurer le PC, prouver l'offload Ollama, exporter les capacités</h2>
       <p class="muted">Le build courant distingue la présence d'un pilote de l'utilisation réelle du GPU. Après benchmark, Ollama <code>/api/ps</code> permet de classer l'exécution CPU, hybride ou GPU et d'enregistrer le pourcentage du modèle observé en VRAM. Une sonde GPU muette reste « GPU non déterminé », jamais automatiquement « CPU-only ».</p>
       <div class="proof" style="margin-top:14px">

@@ -6297,6 +6297,85 @@ dd {
   margin-top: 4px;
 }
 
+.proof-card-preview {
+  background:
+    linear-gradient(120deg, rgba(103, 232, 249, 0.08), transparent 44%),
+    rgba(4, 12, 15, 0.76);
+  border: 1px solid rgba(103, 232, 249, 0.28);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(150px, 0.55fr) minmax(220px, 1fr) minmax(280px, 1.3fr);
+  padding: 13px 14px;
+}
+
+.proof-card-badge,
+.proof-card-main,
+.proof-card-metrics {
+  min-width: 0;
+}
+
+.proof-card-badge span,
+.proof-card-badge small,
+.proof-card-main strong,
+.proof-card-main p,
+.proof-card-metrics span,
+.proof-card-metrics strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.proof-card-badge span {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.proof-card-badge small,
+.proof-card-main p,
+.proof-card-note {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.proof-card-main strong {
+  font-size: 16px;
+}
+
+.proof-card-main p,
+.proof-card-note {
+  margin: 4px 0 0;
+}
+
+.proof-card-metrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.proof-card-metrics span {
+  color: var(--muted-2);
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.proof-card-metrics strong {
+  color: var(--text);
+  font-size: 11px;
+  margin-top: 3px;
+  text-transform: none;
+}
+
+.proof-card-note {
+  border-top: 1px solid rgba(139, 163, 174, 0.14);
+  grid-column: 1 / -1;
+  padding-top: 8px;
+}
+
 .readiness-actions {
   display: grid;
   gap: 10px;
@@ -6975,6 +7054,15 @@ dd {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .proof-card-preview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .proof-card-metrics,
+  .proof-card-note {
+    grid-column: 1 / -1;
+  }
+
   .workstack-arena-proof-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -7472,6 +7560,16 @@ dd {
 
   .readiness-proof-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .proof-card-preview,
+  .proof-card-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .proof-card-metrics,
+  .proof-card-note {
+    grid-column: auto;
   }
 
   .readiness-score {

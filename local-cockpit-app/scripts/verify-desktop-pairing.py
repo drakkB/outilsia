@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import copy
 import os
 import sys
 import tempfile
@@ -10,7 +11,7 @@ from fastapi.testclient import TestClient
 
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-SERVER = os.path.join(ROOT, "server-work")
+SERVER = os.environ.get("OUTILSIA_SERVER_DIR", os.path.join(ROOT, "server-work"))
 sys.path.insert(0, SERVER)
 
 from routers.ops_routes import create_ops_router  # noqa: E402
@@ -190,7 +191,167 @@ def main() -> int:
                     "prompt_type": "short-local",
                     "tokens_per_second": 37.5,
                     "context_tokens": 45,
-                    "notes": "verification benchmark desktop",
+                    "notes": "PRIVATE-LEGACY-BENCHMARK-OUTPUT",
+                    "proof": {
+                        "schema": "outilsia.benchmark_proof_envelope.v1",
+                        "protocol": {
+                            "schema": "outilsia.benchmark_protocol.v2",
+                            "protocol_version": "2.0.0",
+                            "binding": {
+                                "model": "qwen3:latest",
+                                "prompt_kind": "outilsia_vram_standard_v1",
+                                "prompt_sha256": "a" * 64,
+                                "runtime": "ollama-native",
+                                "ollama_version": "0.11.3",
+                                "execution_mode": "auto",
+                                "settings": {
+                                    "num_ctx": 2048,
+                                    "num_predict": 96,
+                                    "seed": 42,
+                                    "temperature": 0,
+                                    "stream": False,
+                                    "think": False,
+                                    "keep_alive": "2m",
+                                },
+                            },
+                            "producer": {
+                                "app_version": "0.1.2",
+                                "build_id": "proof-test",
+                                "source_commit": "test",
+                            },
+                            "measurement": {
+                                "exact": True,
+                                "source": "ollama_api",
+                                "success": True,
+                                "tokens_per_second": 37.5,
+                                "prompt_tokens_per_second": 80,
+                                "elapsed_ms": 2400,
+                                "load_duration_ms": 300,
+                                "allocation_measured": True,
+                                "runtime_processor": "gpu",
+                                "gpu_offload_percent": 100,
+                                "runtime_evidence_source": "ollama_api_ps",
+                            },
+                            "eligibility": {
+                                "local_measured_proof": True,
+                                "standard_comparison": True,
+                                "public_aggregate": True,
+                                "blockers": [],
+                            },
+                        },
+                        "bottleneck": {
+                            "schema": "outilsia.bottleneck_explainer.v1",
+                            "primary": {
+                                "key": "no_observed_hardware_bottleneck",
+                                "label": "Aucun goulot matériel prouvé",
+                                "confidence": "high",
+                                "statement": "Le modèle testé est entièrement placé sur le GPU.",
+                            },
+                            "facts": [
+                                "Débit Ollama API mesuré : 37.5 tok/s.",
+                                "Placement Ollama mesuré : gpu · 100 % GPU.",
+                            ],
+                            "hypotheses": [],
+                            "unknowns": [],
+                            "next_tests": ["Comparer un second modèle avec exactement le même protocole."],
+                            "purchase": {
+                                "key": "no_buy",
+                                "headline": "Aucun achat prioritaire",
+                                "summary": "Cette mesure ne montre pas de manque de VRAM.",
+                            },
+                        },
+                        "proof_card": {
+                            "schema": "outilsia.proof_card.v1",
+                            "card_version": "1.0.0",
+                            "badge": {
+                                "key": "standard_measured",
+                                "label": "Protocole standard mesuré",
+                                "verified": False,
+                                "verification_label": "Mesuré localement · identité non attestée",
+                            },
+                            "headline": "qwen3:latest · 37.5 tok/s",
+                            "machine": {
+                                "cpu": "Ryzen",
+                                "ram_gb": 64,
+                                "gpu": "NVIDIA RTX 3090",
+                                "vram_gb": 24,
+                                "unified_memory": False,
+                                "os": "Linux",
+                            },
+                            "model": {
+                                "ref": "qwen3:latest",
+                                "runtime": "ollama-native",
+                                "ollama_version": "0.11.3",
+                            },
+                            "measurement": {
+                                "tokens_per_second": 37.5,
+                                "prompt_tokens_per_second": 80,
+                                "elapsed_ms": 2400,
+                                "load_duration_ms": 300,
+                                "runtime_processor": "gpu",
+                                "gpu_offload_percent": 100,
+                                "source": "ollama_api",
+                                "measured": True,
+                            },
+                            "protocol": {
+                                "schema": "outilsia.benchmark_protocol.v2",
+                                "version": "2.0.0",
+                                "prompt_kind": "outilsia_vram_standard_v1",
+                                "prompt_sha256": "a" * 64,
+                                "settings": {
+                                    "num_ctx": 2048,
+                                    "num_predict": 96,
+                                    "seed": 42,
+                                    "temperature": 0,
+                                    "stream": False,
+                                    "think": False,
+                                    "keep_alive": "2m",
+                                },
+                                "public_aggregate_eligible": True,
+                            },
+                            "diagnosis": {
+                                "primary_key": "no_observed_hardware_bottleneck",
+                                "label": "Aucun goulot matériel prouvé",
+                                "confidence": "high",
+                                "statement": "Le modèle testé est entièrement placé sur le GPU.",
+                                "purchase": {
+                                    "key": "no_buy",
+                                    "headline": "Aucun achat prioritaire",
+                                    "summary": "Cette mesure ne montre pas de manque de VRAM.",
+                                },
+                            },
+                            "producer": {
+                                "name": "OutilsIA Local Cockpit",
+                                "app_version": "0.1.2",
+                                "build_id": "proof-test",
+                                "source_commit": "test",
+                            },
+                            "links": {
+                                "shared_report": "",
+                                "product": "https://outilsia.fr/telecharger-scanner-ia-local",
+                            },
+                            "privacy": {
+                                "raw_prompt_included": False,
+                                "raw_output_included": False,
+                                "machine_identifier_included": False,
+                                "account_identifier_included": False,
+                                "personal_path_included": False,
+                                "ip_address_included": False,
+                            },
+                            "assurance": {
+                                "physical_field_proof": False,
+                                "identity_verified": False,
+                                "local_measurement_exact": True,
+                                "digest_semantics": "coherence_only",
+                                "verification_semantics": "coherence_not_provenance",
+                                "revocable_public_link": False,
+                            },
+                            "limitations": [
+                                "Mesure locale ponctuelle.",
+                                "Identité non attestée.",
+                            ],
+                        },
+                    },
                 },
             },
             headers={"Authorization": f"Bearer {claimed['desktop_token']}"},
@@ -198,10 +359,50 @@ def main() -> int:
         assert benchmark["ok"] is True
         assert benchmark["benchmark"]["model_name"] == "qwen3:latest"
         assert benchmark["benchmark"]["tokens_per_second"] == 37.5
+        assert benchmark["benchmark"]["proof"]["proof_card"]["badge"]["verified"] is False
+        tampered_proof = copy.deepcopy(benchmark["benchmark"]["proof"])
+        tampered_proof["proof_card"]["model"]["ref"] = "fake:72b"
+        tampered = client.post(
+            "/api/desktop/benchmarks",
+            json={
+                "machine_key": scan["machine_key"],
+                "benchmark": {
+                    "model_name": "qwen3:latest",
+                    "tokens_per_second": 37.5,
+                    "context_tokens": 45,
+                    "proof": tampered_proof,
+                },
+            },
+            headers={"Authorization": f"Bearer {claimed['desktop_token']}"},
+        )
+        assert tampered.status_code == 400
+        assert tampered.json()["error"] == "proof_modele_incoherent"
+        tampered_diagnosis = copy.deepcopy(benchmark["benchmark"]["proof"])
+        tampered_diagnosis["proof_card"]["diagnosis"]["purchase"]["key"] = "no_buy"
+        tampered_diagnosis["proof_card"]["diagnosis"]["purchase"]["headline"] = "Achat obligatoire"
+        diagnosis_response = client.post(
+            "/api/desktop/benchmarks",
+            json={
+                "machine_key": scan["machine_key"],
+                "benchmark": {
+                    "model_name": "qwen3:latest",
+                    "tokens_per_second": 37.5,
+                    "context_tokens": 45,
+                    "proof": tampered_diagnosis,
+                },
+            },
+            headers={"Authorization": f"Bearer {claimed['desktop_token']}"},
+        )
+        assert diagnosis_response.status_code == 400
+        assert diagnosis_response.json()["error"] == "proof_achat_incoherent"
 
         machine_json = client.get(f"/api/account/machines/{synced['machine']['id']}").json()
         assert machine_json["ok"] is True
         assert machine_json["machine"]["benchmarks"][0]["model_name"] == "qwen3:latest"
+        assert machine_json["machine"]["benchmarks"][0]["proof"]["protocol"]["schema"] == "outilsia.benchmark_protocol.v2"
+        account_page = client.get("/compte")
+        assert account_page.status_code == 200
+        assert f'data-revoke-machine-share="{synced["machine"]["id"]}"' in account_page.text
 
         updates = client.get(
             "/api/desktop/updates",
@@ -228,6 +429,15 @@ def main() -> int:
         assert "OutilsIA" in shared_report.text
         assert "NVIDIA RTX 3090" in shared_report.text
         assert scan["machine_key"] not in shared_report.text
+        assert "Carte de preuve" in shared_report.text
+        assert "37.5 tok/s" in shared_report.text
+        assert "identité non attestée" in shared_report.text
+        assert 'property="og:title"' in shared_report.text
+        assert 'name="twitter:card"' in shared_report.text
+        assert "Aucun achat prioritaire selon cette mesure" in shared_report.text
+        assert "Achats guidés après diagnostic" not in shared_report.text
+        assert "Comparer GPU/RAM IA locale" not in shared_report.text
+        assert "PRIVATE-LEGACY-BENCHMARK-OUTPUT" not in shared_report.text
 
         token_only_share_client = TestClient(client.app, base_url="https://testserver")
         token_share = token_only_share_client.post(
@@ -236,6 +446,16 @@ def main() -> int:
         ).json()
         assert token_share["ok"] is True
         assert token_share["share_url"].startswith("/r/")
+        revoked_shares = token_only_share_client.post(
+            f"/api/account/machines/{synced['machine']['id']}/share/revoke",
+            headers={"Authorization": f"Bearer {claimed['desktop_token']}"},
+        ).json()
+        assert revoked_shares["ok"] is True
+        assert revoked_shares["revoked_links"] == 2
+        assert token_only_share_client.get(share["share_url"]).status_code == 404
+        assert token_only_share_client.get(token_share["share_url"]).status_code == 404
+        share = client.post(f"/api/account/machines/{synced['machine']['id']}/share").json()
+        assert share["ok"] is True
 
         feedback = client.post(
             "/api/desktop/feedback",
@@ -276,6 +496,10 @@ def main() -> int:
         assert "## Achats guides OutilsIA" in memoryforge.text
         assert "## Shopping list OutilsIA" in memoryforge.text
         assert "qwen3:latest" in memoryforge.text
+        assert "## Carte de preuve locale" in memoryforge.text
+        assert "identite du PC et du proprietaire non attestee" in memoryforge.text
+        assert "PRIVATE-LEGACY-BENCHMARK-OUTPUT" not in memoryforge.text
+        assert "Aucun upgrade prioritaire calcule." in memoryforge.text
 
         desktop_memoryforge = client.get(
             f"/api/desktop/machines/{synced['machine']['id']}/memoryforge.md",

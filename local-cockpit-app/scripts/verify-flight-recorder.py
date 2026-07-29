@@ -31,7 +31,8 @@ def main():
     for token in (
         'const FLIGHT_RECORDER_PROTOCOL = "outilsia.flight_recorder.v1"',
         'physical_field_proof: false',
-        'prompt différent',
+        'BENCHMARK_PROOF_ENGINE.compareBenchmarkProtocols',
+        'benchmark_protocol_v2',
         'réglage Autopilot différent',
         'warn: -10, bad: -20',
         'warn: -12, bad: -25',

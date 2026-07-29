@@ -13,6 +13,7 @@ const rust = ["lib.rs", "local_mcp_http.rs", "local_capability_bridge.rs", "loca
 const runtimeDriverMatrix = readFileSync(resolve(root, "src/runtime-driver-matrix.js"), "utf8");
 const privateWorkloadCatalog = readFileSync(resolve(root, "src/private-workload-packs.js"), "utf8");
 const releaseUpdatePolicy = readFileSync(resolve(root, "src/release-update-policy.js"), "utf8");
+const benchmarkProofEngine = readFileSync(resolve(root, "src/benchmark-proof-engine.js"), "utf8");
 const forgeBenchContract = readFileSync(resolve(root, "forgebench/signal-maze-v1.json"), "utf8");
 const workstackNotice = readFileSync(resolve(root, "NOTICE-UTILISATION-WORKSTACK.md"), "utf8");
 
@@ -54,6 +55,19 @@ const requiredFeatureText = [
   ["css workspace isolation", readFileSync(resolve(root, "src/styles.css"), "utf8"), "data-workspace-tab=\"workflows\""],
   ["html runtime driver matrix", html, "runtime-driver-matrix.js"],
   ["html release update policy", html, "release-update-policy.js"],
+  ["html benchmark proof engine", html, "benchmark-proof-engine.js"],
+  ["benchmark protocol v2", benchmarkProofEngine, "outilsia.benchmark_protocol.v2"],
+  ["bottleneck explainer v1", benchmarkProofEngine, "outilsia.bottleneck_explainer.v1"],
+  ["proof card v1", benchmarkProofEngine, "outilsia.proof_card.v1"],
+  ["proof card privacy audit", benchmarkProofEngine, "proofCardPrivacyAudit"],
+  ["proof card no identity claim", benchmarkProofEngine, "coherence_not_provenance"],
+  ["html proof card copy", html, "copyProofCardBtn"],
+  ["html proof card download", html, "downloadProofCardBtn"],
+  ["html shared proof revocation", html, "revokeShareReportBtn"],
+  ["js benchmark evidence attachment", js, "attachBenchmarkEvidence"],
+  ["js bottleneck readiness", js, "bottleneck_explainer"],
+  ["js shared proof revocation", js, "revoke_machine_share_with_token"],
+  ["rust shared proof revocation", rust, "revoke_machine_share_with_token"],
   ["release platform policy", releaseUpdatePolicy, "artifactForPlatform"],
   ["release update status policy", releaseUpdatePolicy, "updateStatus"],
   ["rust target operating system", rust, "target_os"],

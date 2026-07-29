@@ -40,6 +40,10 @@ const RELEASE_UPDATE_POLICY = globalThis.__OUTILSIA_RELEASE_UPDATE_POLICY__;
 if (!RELEASE_UPDATE_POLICY) {
   throw new Error("Release update policy is unavailable.");
 }
+const BENCHMARK_PROOF_ENGINE = globalThis.__OUTILSIA_BENCHMARK_PROOF_ENGINE__;
+if (!BENCHMARK_PROOF_ENGINE) {
+  throw new Error("Benchmark proof engine is unavailable.");
+}
 
 const state = {
   scan: null,
@@ -428,6 +432,7 @@ const els = {
   claimBtn: $("claimBtn"),
   syncBtn: $("syncBtn"),
   shareReportBtn: $("shareReportBtn"),
+  revokeShareReportBtn: $("revokeShareReportBtn"),
   refreshUpdatesBtn: $("refreshUpdatesBtn"),
   disconnectBtn: $("disconnectBtn"),
   benchmarkBtn: $("benchmarkBtn"),
@@ -685,6 +690,8 @@ const els = {
   readinessBox: $("readinessBox"),
   copyReadinessSummaryBtn: $("copyReadinessSummaryBtn"),
   copyReadinessBtn: $("copyReadinessBtn"),
+  copyProofCardBtn: $("copyProofCardBtn"),
+  downloadProofCardBtn: $("downloadProofCardBtn"),
   saveReadinessMemoryBtn: $("saveReadinessMemoryBtn"),
   saveReadinessAccountBtn: $("saveReadinessAccountBtn"),
   shareReadinessBtn: $("shareReadinessBtn"),
@@ -3004,7 +3011,7 @@ function renderQuickDecision(action = primaryActionState()) {
     : benchmark?.success
       ? `${benchmark.estimated_tokens_per_second || 0} tok/s · ${benchmark.elapsed_ms || 0} ms · ${String(benchmark.execution_mode || "auto") === "cpu" ? "CPU seul" : "mode automatique"}`
       : flow.modelReady ? "Lance un benchmark court visible dans l'app." : "Installe le modèle test puis mesure.";
-  const upgradeLabel = upgrade?.label || upgrade?.name || (state.scan ? "Aucun achat urgent" : "Pas encore");
+  const upgradeLabel = upgrade?.label || upgrade?.name || (state.scan ? "Aucun achat prioritaire" : "Pas encore");
   const upgradeDetail = upgrade?.reason || upgrade?.price_range_eur || (state.scan ? "Teste d'abord, achète seulement si un blocage est prouvé." : "Aucun achat avant diagnostic.");
   els.quickActionText.textContent = state.scan || state.analysisError ? action.label : "Analyser ce PC";
   els.quickActionDetail.textContent = state.scan
@@ -7127,6 +7134,8 @@ function readinessReport() {
   const arena = arenaRun ? arenaWinners(arenaRun.results || []) : null;
   const recommendationEngine = recommendationReportSnapshot();
   const hardwareDoctor = hardwareDoctorSnapshot(scan);
+  const bottleneck = bottleneckForBenchmark(benchmark);
+  const proofCard = proofCardDraft(benchmark, bottleneck);
   const runtimeDriver = hardwareDoctor?.runtime?.driver_intelligence || null;
   const flightRecorder = flightRecorderSummary();
   const upgradeDigitalTwin = digitalTwinSummary();
@@ -7208,6 +7217,8 @@ function readinessReport() {
       ollama: runtimeOllama(scan)
     },
     hardware_doctor: hardwareDoctor,
+    bottleneck_explainer: bottleneck,
+    proof_card: proofCard,
     flight_recorder: flightRecorder,
     upgrade_digital_twin: upgradeDigitalTwin,
     purchases_suppressed_by_digital_twin: digitalTwinSuppressesPurchases(),
@@ -7347,6 +7358,15 @@ function readinessMarkdown(report = readinessReport()) {
       ? `- Benchmark${report.benchmark_status === "historical_model_absent" ? " historique, modèle absent du scan actuel" : ""}: ${report.benchmark.model} - ${report.benchmark.estimated_tokens_per_second} tok/s - ${report.benchmark.elapsed_ms} ms - ${benchmarkMeasurementLabel(report.benchmark)} - ${benchmarkExecutionLabel(report.benchmark)} - succès ${report.benchmark.success ? "oui" : "non"}`
       : "- Aucun benchmark lancé.",
     report.benchmark && benchmarkPlacementVerdict(report.benchmark) ? `- ${benchmarkPlacementVerdict(report.benchmark)}` : "",
+    `- Goulot principal: ${report.bottleneck_explainer?.primary?.label || "non mesuré"} · confiance ${report.bottleneck_explainer?.primary?.confidence || "aucune"}.`,
+    `- Décision achat: ${report.bottleneck_explainer?.purchase?.headline || "Mesurer avant achat"} · ${report.bottleneck_explainer?.purchase?.summary || "Aucun achat déduit sans preuve."}`,
+    ...(report.bottleneck_explainer?.facts || []).map((item) => `- Fait mesuré: ${item}`),
+    ...(report.bottleneck_explainer?.hypotheses || []).map((item) => `- Hypothèse: ${item}`),
+    ...(report.bottleneck_explainer?.unknowns || []).map((item) => `- Inconnu: ${item}`),
+    ...(report.bottleneck_explainer?.next_tests || []).map((item) => `- Test suivant: ${item}`),
+    report.proof_card
+      ? `- Carte de preuve: ${report.proof_card.badge.label} · protocole ${report.proof_card.protocol.version} · identité non attestée · ${report.proof_card.protocol.public_aggregate_eligible ? "éligible au contrôle serveur standard" : "hors comparaison publique standard"}.`
+      : "- Carte de preuve: lancer une nouvelle mesure Ollama API avec le protocole v2.",
     report.model_autopilot?.active
       ? `- Model Autopilot: profil ${report.model_autopilot.active.label} actif - ${modelAutopilotTuningLabel(report.model_autopilot.active.tuning)}`
       : report.model_autopilot?.recommended
@@ -7445,6 +7465,9 @@ function readinessSummaryText(report = readinessReport()) {
     `Hardware Doctor: ${report.hardware_doctor ? `${report.hardware_doctor.score}/100 - ${report.hardware_doctor.headline}` : "non calculé"}`,
     `Build: ${report.release.build_id || report.release.app_version || "non chargé"}`,
     `Preuve locale: ${benchmark}`,
+    `Goulot expliqué: ${report.bottleneck_explainer?.primary?.label || "non mesuré"} (confiance ${report.bottleneck_explainer?.primary?.confidence || "aucune"})`,
+    `Décision achat: ${report.bottleneck_explainer?.purchase?.headline || "mesurer avant achat"}`,
+    `Carte de preuve: ${report.proof_card ? `${report.proof_card.badge.label} · identité non attestée` : "non disponible"}`,
     `Deuxième modèle: ${recommended}`,
     `Prompt: ${prompt}`,
     `Arena: ${readinessArenaLabel(report)}`,
@@ -7548,11 +7571,15 @@ function premiumReportHtml(report = readinessReport()) {
   const fieldSummary = state.scan ? fieldTestProfile() : null;
   const hardwareDoctor = report.hardware_doctor || hardwareDoctorSnapshot();
   const flightRecorder = report.flight_recorder || null;
+  const bottleneck = report.bottleneck_explainer || null;
+  const proofCard = report.proof_card || null;
   const proofLabel = benchmark
     ? `${benchmark.model} · ${benchmark.estimated_tokens_per_second ?? "--"} tok/s${report.benchmark_status === "historical_model_absent" ? " · historique" : ""}`
     : "Benchmark à lancer";
   const proofItems = [
     benchmark ? `Benchmark ${report.benchmark_status === "historical_model_absent" ? "historique, modèle absent" : "réel"} : ${benchmark.model} à ${benchmark.estimated_tokens_per_second ?? "--"} tok/s` : "Benchmark court à lancer",
+    bottleneck ? `Goulot : ${bottleneck.primary.label} · confiance ${bottleneck.primary.confidence} · ${bottleneck.purchase.headline}` : "Goulot non mesuré",
+    proofCard ? `Carte de preuve : ${proofCard.badge.label} · protocole v2 · identité non attestée` : "Carte de preuve v2 à produire",
     report.promptForge ? `PromptForge, grille heuristique : ${report.promptForge.before_score}/100 -> ${report.promptForge.after_score}/100` : "PromptForge non utilisé",
     report.arena?.compromise ? `Arena : ${readinessArenaLabel(report)}` : "Arena locale à comparer",
     recommendation?.winner ? `Recommendation Engine : ${recommendation.verdict} (${recommendation.winner.score}/100)` : "Recommendation Engine v2 à lancer",
@@ -7565,11 +7592,13 @@ function premiumReportHtml(report = readinessReport()) {
   ];
   const installNow = model.ref || report.test_model || "qwen3:0.6b";
   const installNowReason = model.fit || model.strength || "Valider la machine avec un modèle local actionnable avant de monter en gamme.";
-  const buyOnlyIf = digitalTwinRun
-    ? `${upgradeTitle}. ${upgradeReason}`
-    : upgrade.title
-      ? `${upgrade.title} seulement si le modèle visé reste bloqué ou trop lent après benchmark.`
-      : "Aucun achat prioritaire tant qu'un benchmark local n'a pas montré un vrai blocage.";
+  const buyOnlyIf = bottleneck?.purchase
+    ? `${bottleneck.purchase.headline}. ${bottleneck.purchase.summary}`
+    : digitalTwinRun
+      ? `${upgradeTitle}. ${upgradeReason}`
+      : upgrade.title
+        ? `${upgrade.title} seulement si le modèle visé reste bloqué ou trop lent après benchmark.`
+        : "Aucun achat prioritaire tant qu'un benchmark local n'a pas montré un vrai blocage.";
   const shareProof = report.share_url
     ? `Rapport partageable : ${report.share_url}`
     : "Rapport local prêt à exporter, sauvegarder ou partager depuis le compte OutilsIA.";
@@ -7631,8 +7660,8 @@ function premiumReportHtml(report = readinessReport()) {
           <strong>${escapeHtml(proofLabel)}</strong>
         </div>
         <div>
-          <span>Upgrade utile</span>
-          <strong>${escapeHtml(upgradeTitle)}</strong>
+          <span>Goulot principal</span>
+          <strong>${escapeHtml(bottleneck?.primary?.label || "Non mesuré")}</strong>
         </div>
       </section>
 
@@ -7765,7 +7794,13 @@ function premiumReportHtml(report = readinessReport()) {
           <span>Preuve locale</span>
           <strong>${escapeHtml(benchmark?.model || "À benchmarker")}</strong>
           <p>${escapeHtml(speedText)}</p>
-          <p>${escapeHtml(pdfExcerpt(benchmark?.output_preview || "Lance un test court pour obtenir une preuve locale lisible.", 260))}</p>
+          <p>${escapeHtml(proofCard ? `${proofCard.badge.label} · ${proofCard.badge.verification_label} · protocole ${proofCard.protocol.version}` : "Lance une nouvelle mesure avec Benchmark Protocol v2 pour créer la carte de preuve.")}</p>
+        </div>
+        <div class="pdf-card">
+          <span>Goulot expliqué</span>
+          <strong>${escapeHtml(bottleneck?.primary?.label || "Non mesuré")}</strong>
+          <p>${escapeHtml(bottleneck?.primary?.statement || "Aucun composant ne peut encore être condamné.")}</p>
+          <p>${escapeHtml(bottleneck?.purchase ? `${bottleneck.purchase.headline} · ${bottleneck.purchase.summary}` : "Mesurer avant achat.")}</p>
         </div>
         <div class="pdf-card">
           <span>PromptForge</span>
@@ -8268,9 +8303,15 @@ function cockpitMemoryMarkdown() {
 function syncReadinessControls(scanReady = Boolean(state.scan)) {
   els.copyReadinessSummaryBtn.disabled = !scanReady;
   els.copyReadinessBtn.disabled = !scanReady;
+  const proofReady = Boolean(scanReady && proofCardDraft(readinessReport().benchmark));
+  if (els.copyProofCardBtn) els.copyProofCardBtn.disabled = !proofReady;
+  if (els.downloadProofCardBtn) els.downloadProofCardBtn.disabled = !proofReady;
   els.saveReadinessMemoryBtn.disabled = !scanReady;
   els.saveReadinessAccountBtn.disabled = !scanReady;
   els.shareReadinessBtn.disabled = !scanReady || !lastSyncedMachineId;
+  if (els.revokeShareReportBtn) {
+    els.revokeShareReportBtn.disabled = !lastSyncedMachineId;
+  }
   if (els.pdfReportBtn) els.pdfReportBtn.disabled = !scanReady;
   if (els.pdfReadinessBtn) els.pdfReadinessBtn.disabled = !scanReady;
   els.copyWindowsRecipeBtn.disabled = !scanReady;
@@ -8308,6 +8349,8 @@ function renderReadinessPanel() {
   const recommendation = report.recommendation_engine;
   const recommendationWinner = recommendation?.winner;
   const benchmark = report.benchmark;
+  const bottleneck = report.bottleneck_explainer;
+  const proofCard = report.proof_card;
   const heroScope = report.ready
     ? "Bilan mesuré sur ce PC"
     : benchmark
@@ -8444,11 +8487,29 @@ function renderReadinessPanel() {
         <small>${escapeHtml(arenaDetail)}</small>
       </div>
       <div>
-        <span>Upgrade utile</span>
-        <strong>${escapeHtml(report.upgrades[0]?.title || "Aucun achat urgent")}</strong>
-        <small>${escapeHtml(report.upgrades[0]?.reason || "Mesure avant décision d'achat")}</small>
+        <span>Goulot principal</span>
+        <strong>${escapeHtml(bottleneck?.primary?.label || "Non mesuré")}</strong>
+        <small>${escapeHtml(`${bottleneck?.primary?.confidence === "none" ? "confiance absente" : `confiance ${bottleneck?.primary?.confidence || "faible"}`} · ${bottleneck?.purchase?.headline || "mesurer avant achat"}`)}</small>
       </div>
     </div>
+    ${proofCard ? `
+      <section class="proof-card-preview" aria-label="Carte de preuve OutilsIA">
+        <div class="proof-card-badge">
+          <span>${escapeHtml(proofCard.badge.label)}</span>
+          <small>Identité non attestée</small>
+        </div>
+        <div class="proof-card-main">
+          <strong>${escapeHtml(proofCard.headline)}</strong>
+          <p>${escapeHtml(proofCard.machine.gpu)} · ${escapeHtml(proofCard.machine.vram_gb ?? "?")} Go VRAM · ${escapeHtml(proofCard.machine.ram_gb ?? "?")} Go RAM</p>
+        </div>
+        <div class="proof-card-metrics">
+          <span>Préfill <strong>${escapeHtml(proofCard.measurement.prompt_tokens_per_second || "n/a")} tok/s</strong></span>
+          <span>Placement <strong>${escapeHtml(proofCard.measurement.gpu_offload_percent == null ? "inconnu" : `${proofCard.measurement.gpu_offload_percent} % GPU`)}</strong></span>
+          <span>Décision <strong>${escapeHtml(proofCard.diagnosis.purchase.headline)}</strong></span>
+        </div>
+        <p class="proof-card-note">Mesure locale ponctuelle · checksum de cohérence à l'export · aucune identité matérielle certifiée.</p>
+      </section>
+    ` : ""}
     <section class="readiness-actions" aria-label="Prochaines actions utiles">
       <div class="readiness-section-head">
         <div>
@@ -8543,6 +8604,16 @@ async function saveReadinessToAccount() {
     return;
   }
   await syncDesktop();
+  const benchmark = state.benchmark;
+  const protocol = benchmarkProtocolV2(benchmark);
+  if (
+    lastSyncedMachineId
+    && benchmark?.success
+    && protocol?.eligibility?.local_measured_proof
+    && lastSyncedBenchmarkFingerprint !== benchmarkCommonsBenchmarkFingerprint(benchmark)
+  ) {
+    await syncBenchmarkValue(benchmark, els.saveReadinessAccountBtn);
+  }
   readinessProof.savedAccount = Boolean(lastSyncedMachineId);
   renderReadinessPanel();
 }
@@ -11304,6 +11375,205 @@ async function sha256Hex(value) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function benchmarkPreparedPrompt(value = "") {
+  const raw = String(value || "").trim().slice(0, 500);
+  if (!raw) return BENCHMARK_PROOF_ENGINE.STANDARD_PROMPT;
+  if (raw === BENCHMARK_PROOF_ENGINE.STANDARD_PROMPT) return raw;
+  return `${raw}\nRéponse finale uniquement, une phrase courte en français.`;
+}
+
+function benchmarkOllamaVersion(scan = state.scan || {}, runtime = "native") {
+  if (runtime === "wsl" || runtime === "ollama-wsl") {
+    return scan.runtimes?.ollama_wsl?.version
+      || scan.runtimes?.wsl?.ollama_version
+      || "";
+  }
+  return scan.runtimes?.ollama?.version || "";
+}
+
+function benchmarkProtocolV2(benchmark = state.benchmark) {
+  return benchmark?.benchmark_protocol_v2?.schema === BENCHMARK_PROOF_ENGINE.BENCHMARK_PROTOCOL_SCHEMA
+    ? benchmark.benchmark_protocol_v2
+    : null;
+}
+
+function bottleneckForBenchmark(benchmark = state.benchmark) {
+  if (benchmark?.bottleneck_explainer?.schema === BENCHMARK_PROOF_ENGINE.BOTTLENECK_SCHEMA) {
+    return benchmark.bottleneck_explainer;
+  }
+  const preflight = state.installSafetyPreflight?.model
+    && sameOllamaModel(state.installSafetyPreflight.model, benchmark?.model || "")
+    ? installSafetyPreflightSummary()
+    : null;
+  return BENCHMARK_PROOF_ENGINE.explainBottleneck({
+    benchmark,
+    scan: state.scan || {},
+    doctor: hardwareDoctorSnapshot(state.scan || {}),
+    preflight
+  });
+}
+
+function proofCardDraft(benchmark = state.benchmark, bottleneck = null) {
+  const protocol = benchmarkProtocolV2(benchmark);
+  if (!benchmark || !protocol) return null;
+  return BENCHMARK_PROOF_ENGINE.buildProofCard({
+    protocol,
+    benchmark,
+    scan: state.scan || {},
+    bottleneck: bottleneck || bottleneckForBenchmark(benchmark),
+    share_url: lastShareReportUrl
+  });
+}
+
+async function attachBenchmarkEvidence(result, options = {}) {
+  const runtime = options.runtime || result.runtime || defaultOllamaRuntime(result.model || "");
+  const prompt = result.prompt
+    ? String(result.prompt)
+    : benchmarkPreparedPrompt(options.prompt || "");
+  const promptSha256 = await sha256Hex(prompt);
+  const normalized = {
+    ...result,
+    prompt,
+    prompt_sha256: promptSha256,
+    runtime,
+    benchmark_protocol: BENCHMARK_PROOF_ENGINE.BENCHMARK_PROTOCOL_SCHEMA
+  };
+  const protocol = BENCHMARK_PROOF_ENGINE.buildBenchmarkProtocol({
+    benchmark: normalized,
+    prompt_sha256: promptSha256,
+    runtime,
+    ollama_version: benchmarkOllamaVersion(state.scan || {}, runtime),
+    release: releaseProof(),
+    force_cpu: options.force_cpu,
+    tuning: normalized.tuning
+  });
+  normalized.benchmark_protocol_v2 = protocol;
+  normalized.bottleneck_explainer = BENCHMARK_PROOF_ENGINE.explainBottleneck({
+    benchmark: normalized,
+    scan: state.scan || {},
+    doctor: hardwareDoctorSnapshot(state.scan || {}),
+    preflight: state.installSafetyPreflight?.model
+      && sameOllamaModel(state.installSafetyPreflight.model, normalized.model)
+      ? installSafetyPreflightSummary()
+      : null
+  });
+  normalized.proof_card_v1 = BENCHMARK_PROOF_ENGINE.buildProofCard({
+    protocol,
+    benchmark: normalized,
+    scan: state.scan || {},
+    bottleneck: normalized.bottleneck_explainer,
+    share_url: lastShareReportUrl
+  });
+  return normalized;
+}
+
+async function finalizedProofCard(benchmark = readinessReport().benchmark) {
+  const card = proofCardDraft(benchmark);
+  if (!card) throw new Error("Une mesure Ollama API avec protocole v2 est requise");
+  const privacy = BENCHMARK_PROOF_ENGINE.proofCardPrivacyAudit(card, [
+    state.scan?.machine_key || "",
+    state.scan?.name || "",
+    benchmark?.prompt || "",
+    benchmark?.output_preview || "",
+    benchmark?.output_text || ""
+  ]);
+  if (!privacy.ok) {
+    throw new Error(`Carte refusée par le contrôle de confidentialité : ${privacy.violations.join(", ")}`);
+  }
+  return {
+    ...card,
+    integrity: {
+      algorithm: "SHA-256",
+      canonicalization: "recursive-key-sort-json-v1",
+      scope: "canonical_document_without_integrity",
+      digest: await sha256Hex(card),
+      identity_signature: false,
+      verification_semantics: "coherence_not_provenance"
+    }
+  };
+}
+
+function proofCardMarkdown(card) {
+  if (!card) return "";
+  const offload = card.measurement.gpu_offload_percent == null
+    ? "allocation CPU/GPU non prouvée"
+    : `${card.measurement.gpu_offload_percent} % sur GPU`;
+  const lines = [
+    `# ${card.badge.label}`,
+    "",
+    `**${card.headline}**`,
+    "",
+    `- Machine: ${card.machine.cpu} · ${card.machine.gpu} · ${card.machine.ram_gb ?? "?"} Go RAM · ${card.machine.vram_gb ?? "?"} Go VRAM`,
+    `- Mesure: ${card.measurement.tokens_per_second} tok/s · préremplissage ${card.measurement.prompt_tokens_per_second || "n/a"} tok/s · ${offload}`,
+    `- Runtime: ${card.model.runtime} · Ollama ${card.model.ollama_version || "version inconnue"}`,
+    `- Diagnostic: ${card.diagnosis.label} · confiance ${card.diagnosis.confidence}`,
+    `- Décision: ${card.diagnosis.purchase.headline}`,
+    `- Protocole: ${card.protocol.schema} · ${card.protocol.prompt_kind}`,
+    `- Assurance: ${card.badge.verification_label}`,
+    card.integrity?.digest ? `- SHA-256 de cohérence: ${card.integrity.digest}` : "",
+    card.links.shared_report ? `- Rapport: ${card.links.shared_report}` : "",
+    "",
+    card.limitations[0],
+    "",
+    "Produit par OutilsIA Local Cockpit · https://outilsia.fr/telecharger-scanner-ia-local"
+  ];
+  return lines.filter(Boolean).join("\n");
+}
+
+async function copyProofCard() {
+  try {
+    const card = await finalizedProofCard();
+    await navigator.clipboard.writeText(proofCardMarkdown(card));
+    setStatus("Carte de preuve mesurée copiée", "ok");
+  } catch (error) {
+    setStatus(`Carte de preuve indisponible : ${error}`, "warn");
+  }
+}
+
+async function downloadProofCard() {
+  try {
+    const card = await finalizedProofCard();
+    const model = normalizeOllamaRef(card.model.ref).replace(/[^a-z0-9._-]+/gi, "-") || "modele";
+    downloadTextFile(
+      `outilsia-proof-card-${model}.json`,
+      `${JSON.stringify(card, null, 2)}\n`,
+      "application/json;charset=utf-8"
+    );
+    setStatus("Carte de preuve JSON téléchargée", "ok");
+  } catch (error) {
+    setStatus(`Carte de preuve indisponible : ${error}`, "warn");
+  }
+}
+
+function benchmarkProofSyncEnvelope(benchmark) {
+  const protocol = benchmarkProtocolV2(benchmark);
+  const bottleneck = bottleneckForBenchmark(benchmark);
+  const proofCard = protocol
+    ? BENCHMARK_PROOF_ENGINE.buildProofCard({
+        protocol,
+        benchmark,
+        scan: state.scan || {},
+        bottleneck,
+        share_url: ""
+      })
+    : null;
+  if (!protocol || !proofCard) return null;
+  const envelope = {
+    schema: "outilsia.benchmark_proof_envelope.v1",
+    protocol,
+    bottleneck,
+    proof_card: proofCard
+  };
+  const privacy = BENCHMARK_PROOF_ENGINE.proofCardPrivacyAudit(envelope, [
+    state.scan?.machine_key || "",
+    state.scan?.name || "",
+    benchmark?.prompt || "",
+    benchmark?.output_preview || "",
+    benchmark?.output_text || ""
+  ]);
+  return privacy.ok ? envelope : null;
+}
+
 function capabilityPassportSourceRevision() {
   const proof = releaseProof();
   const benchmark = readBenchmarkHistory()[0] || state.benchmark || {};
@@ -11315,6 +11585,8 @@ function capabilityPassportSourceRevision() {
     proof.build_id || "",
     benchmark.created_at_ms || 0,
     benchmark.model || "",
+    canonicalJson(benchmark.benchmark_protocol_v2 || {}),
+    canonicalJson(benchmark.bottleneck_explainer || {}),
     canonicalJson(modelAutopilotSnapshot() || {}),
     canonicalJson(flightRecorderSummary() || {}),
     canonicalJson(digitalTwinSummary() || {}),
@@ -11380,7 +11652,7 @@ function capabilityPassportDocument() {
   return {
     schema: "outilsia.ai_capability_passport.v1",
     document_kind: "capability_snapshot",
-    passport_version: "1.4.0",
+    passport_version: "1.5.0",
     generated_at: new Date().toISOString(),
     source_revision: capabilityPassportSourceRevision(),
     issuer: {
@@ -11434,6 +11706,9 @@ function capabilityPassportDocument() {
       local_capability_bridge_v1: true,
       local_mcp_read_only_v0_1: true,
       install_safety_preflight_v1: true,
+      benchmark_protocol_v2: Boolean(report.benchmark?.benchmark_protocol_v2),
+      bottleneck_explainer_v1: report.bottleneck_explainer?.schema === BENCHMARK_PROOF_ENGINE.BOTTLENECK_SCHEMA,
+      proof_card_v1: Boolean(report.proof_card),
       local_arena: Boolean(report.arena),
       strategy_arena_profile_export: true
     },
@@ -11453,7 +11728,10 @@ function capabilityPassportDocument() {
       gpu_offload_percent: Number(item.runtime_gpu_offload_percent || 0),
       runtime_evidence_source: item.runtime_evidence_source || "",
       autopilot_profile: item.autopilot_active_profile || item.autopilot_profile || "",
-      tuning: item.tuning || null
+      tuning: item.tuning || null,
+      protocol: item.benchmark_protocol_v2 || null,
+      bottleneck: item.bottleneck_explainer || null,
+      proof_card: item.proof_card_v1 || null
     })),
     recommendation: {
       usage_profile: report.usage_profile,
@@ -11462,6 +11740,8 @@ function capabilityPassportDocument() {
       upgrade: report.upgrades?.[0] || null
     },
     model_autopilot: report.model_autopilot,
+    bottleneck_explainer: report.bottleneck_explainer,
+    proof_card: report.proof_card,
     flight_recorder: report.flight_recorder,
     upgrade_digital_twin: report.upgrade_digital_twin,
     private_workload_pack: report.private_workload_pack,
@@ -11489,6 +11769,8 @@ function capabilityPassportDocument() {
       excludes_private_workload_outputs: true,
       excludes_personal_files: true,
       excludes_ollama_storage_path: true,
+      proof_card_excludes_machine_key: true,
+      proof_card_excludes_raw_prompt_and_output: true,
       machine_key_is_local_pseudonymous_identifier: true
     },
     assurance: {
@@ -11511,6 +11793,9 @@ function capabilityPassportDocument() {
       "Upgrade Digital Twin simule des scénarios ; alimentation, connecteurs, dimensions, slots et QVL doivent être vérifiés physiquement avant achat.",
       "Tests privés compare des sorties avec des critères déterministes bornés ; les prompts et réponses bruts ne sont pas inclus dans l'instantané.",
       "Install Safety Preflight estime le budget du modèle et mesure l'espace du volume Ollama sans exporter son chemin ; il ne prédit pas la vitesse ni l'offload GPU.",
+      "Benchmark Protocol v2 lie modèle, empreinte du prompt, runtime, version Ollama, réglages et métriques ; son checksum prouve la cohérence, jamais l'identité.",
+      "Bottleneck Explainer sépare faits, hypothèses et inconnues ; sa recommandation d'achat reste conditionnelle au scénario mesuré.",
+      "La carte de preuve locale n'est ni une attestation matérielle ni une identité vérifiée ; l'éligibilité publique exige encore les contrôles serveur.",
       "Le serveur MCP local est désactivé par défaut, lié à 127.0.0.1, borné dans le temps et strictement en lecture seule ; son jeton éphémère n'est pas inclus dans cet instantané.",
       "Le checksum SHA-256 est produit dans la WebView puis relu par Rust à l'ouverture du MCP ; il prouve seulement la cohérence du JSON reçu, jamais sa provenance.",
       "Cet instantané n'est ni signé par une clé Rust/OS, ni une attestation matérielle, ni une preuve d'identité du PC ou de son propriétaire.",
@@ -11796,6 +12081,8 @@ function localCapabilityBridgePayload() {
     passport,
     installed_models: passport.installed_models || [],
     benchmark_proofs: passport.benchmark_proofs || [],
+    bottleneck_explainer: report.bottleneck_explainer || null,
+    proof_card: report.proof_card || null,
     recommendation: {
       usage_profile: report.usage_profile?.key || "",
       recommended_model: winner?.model || report.recommended_model?.ref || strategy.recommended_model || "",
@@ -15760,6 +16047,17 @@ function fieldTestMachineEntry() {
     benchmark_load_duration_ms: Number(benchmark?.load_duration_ms || 0),
     benchmark_prompt_tokens_per_second: Number(benchmark?.prompt_tokens_per_second || 0),
     benchmark_eval_duration_ms: Number(benchmark?.eval_duration_ms || 0),
+    benchmark_protocol_schema: benchmark?.benchmark_protocol_v2?.schema || "",
+    benchmark_protocol_version: benchmark?.benchmark_protocol_v2?.protocol_version || "",
+    benchmark_prompt_sha256: benchmark?.benchmark_protocol_v2?.binding?.prompt_sha256 || "",
+    benchmark_standard_comparison_eligible: Boolean(benchmark?.benchmark_protocol_v2?.eligibility?.standard_comparison),
+    bottleneck_key: report.bottleneck_explainer?.primary?.key || "unknown",
+    bottleneck_label: report.bottleneck_explainer?.primary?.label || "Non mesuré",
+    bottleneck_confidence: report.bottleneck_explainer?.primary?.confidence || "none",
+    bottleneck_purchase_decision: report.bottleneck_explainer?.purchase?.key || "measure_first",
+    proof_card_schema: report.proof_card?.schema || "",
+    proof_card_badge: report.proof_card?.badge?.key || "",
+    proof_card_identity_verified: false,
     promptforge_ok: Boolean(promptForge?.optimized),
     dialogue_ok: Boolean(state.chatResult?.success && localChatOutput(state.chatResult)),
     arena_ok: Boolean(successfulArena),
@@ -17080,12 +17378,7 @@ function flightRecorderBenchmarkFor(model) {
 }
 
 function flightRecorderOllamaVersion(scan, runtime) {
-  if (runtime === "wsl") {
-    return scan?.runtimes?.ollama_wsl?.version
-      || scan?.runtimes?.wsl?.ollama_version
-      || "";
-  }
-  return scan?.runtimes?.ollama?.version || "";
+  return benchmarkOllamaVersion(scan, runtime);
 }
 
 function flightRecorderCapture(model = els.benchmarkModelInput?.value || state.benchmark?.model || "") {
@@ -17119,6 +17412,7 @@ function flightRecorderCapture(model = els.benchmarkModelInput?.value || state.b
       runtime,
       execution_mode: benchmark.execution_mode || "auto",
       benchmark_protocol: benchmark.benchmark_protocol || benchmark.protocol || "standard",
+      benchmark_protocol_v2: benchmarkProtocolV2(benchmark),
       prompt: benchmark.prompt || "",
       autopilot_profile: autopilotKey,
       tuning
@@ -17235,14 +17529,15 @@ function flightRecorderMetricDelta(spec, referenceValue, currentValue, comparabl
 function compareFlightRecorderCaptures(referenceCapture, currentCapture) {
   if (!referenceCapture || !currentCapture) return null;
   const sameTuning = canonicalJson(referenceCapture.binding?.tuning || {}) === canonicalJson(currentCapture.binding?.tuning || {});
+  const protocolComparison = BENCHMARK_PROOF_ENGINE.compareBenchmarkProtocols(
+    referenceCapture.binding?.benchmark_protocol_v2,
+    currentCapture.binding?.benchmark_protocol_v2
+  );
   const comparableChecks = [
     [referenceCapture.binding?.machine_key === currentCapture.binding?.machine_key, "machine différente"],
     [sameOllamaModel(referenceCapture.binding?.model, currentCapture.binding?.model), "modèle différent"],
-    [referenceCapture.binding?.runtime === currentCapture.binding?.runtime, "runtime différent"],
-    [referenceCapture.binding?.execution_mode === currentCapture.binding?.execution_mode, "mode CPU/GPU différent"],
-    [referenceCapture.binding?.benchmark_protocol === currentCapture.binding?.benchmark_protocol, "protocole différent"],
-    [referenceCapture.binding?.prompt === currentCapture.binding?.prompt, "prompt différent"],
-    [sameTuning, "réglage Autopilot différent"]
+    [sameTuning, "réglage Autopilot différent"],
+    [protocolComparison.comparable, protocolComparison.blockers.join(", ") || "protocole v2 différent"]
   ];
   const blockers = comparableChecks.filter(([ok]) => !ok).map(([, label]) => label);
   const comparable = blockers.length === 0;
@@ -17660,6 +17955,7 @@ async function runBenchmark(options = {}) {
   els.benchmarkBtn.disabled = true;
   const activeTuning = forceCpu ? null : activeModelAutopilotProfile(model);
   const timeoutSeconds = benchmarkTimeoutSeconds(model);
+  const requestedPrompt = els.benchmarkPromptInput.value.trim();
   resetOperationConsole(`${forceCpu ? "Retest CPU" : "Benchmark Ollama"} lancé : ${model}`);
   setOperationFocus(`${forceCpu ? "Retest CPU sans GPU" : "Benchmark en cours"} : ${model}`, [
     forceCpu ? "Ollama force num_gpu=0 pour isoler le pilote GPU." : "Ollama reçoit un prompt court.",
@@ -17671,7 +17967,7 @@ async function runBenchmark(options = {}) {
   if (timeoutSeconds > 45) {
     appendOperationLine(`Modèle lourd : OutilsIA autorise ${timeoutSeconds} secondes pour le chargement et l'offload RAM.`, "alerte");
   }
-  appendOperationLine(`Prompt : ${els.benchmarkPromptInput.value.trim() || "prompt court par défaut"}`, "info");
+  appendOperationLine(`Prompt : ${requestedPrompt || "prompt court par défaut"}`, "info");
   els.benchmarkResult.textContent = forceCpu ? "Retest CPU Ollama en cours..." : "Benchmark Ollama en cours...";
   setStatus(`${forceCpu ? "Retest CPU" : "Benchmark"} ${model} en cours...`);
   const benchmarkStartedAt = Date.now();
@@ -17680,22 +17976,28 @@ async function runBenchmark(options = {}) {
       ? await invoke("benchmark_ollama", {
           request: {
             model,
-            prompt: els.benchmarkPromptInput.value.trim(),
+            prompt: requestedPrompt,
             timeout_seconds: timeoutSeconds,
             force_cpu: forceCpu,
+            protocol: BENCHMARK_PROOF_ENGINE.BENCHMARK_PROTOCOL_SCHEMA,
             ...(forceCpu ? {} : modelAutopilotTuningPayload(model)),
             ...ollamaRuntimePayload(model)
           }
         })
       : { ...demoBenchmark(model), execution_mode: forceCpu ? "cpu" : "auto" };
-    const normalizedResult = {
+    const normalizedResult = await attachBenchmarkEvidence({
       ...result,
       machine_key: state.scan?.machine_key || "",
       runtime: defaultOllamaRuntime(model),
       execution_mode: result.execution_mode || (forceCpu ? "cpu" : "auto"),
       autopilot_active_profile: activeTuning?.key || "",
       tuning: activeTuning?.tuning || null
-    };
+    }, {
+      prompt: requestedPrompt,
+      runtime: defaultOllamaRuntime(model),
+      force_cpu: forceCpu
+    });
+    invalidateCapabilityPassport();
     state.benchmark = normalizedResult;
     if (normalizedResult.success) recordActivationMilestone("first_benchmark_success");
     renderBenchmark(normalizedResult);
@@ -17718,9 +18020,9 @@ async function runBenchmark(options = {}) {
     setStatus(outcome, normalizedResult.success ? "ok" : benchmarkTimedOut(normalizedResult) ? "warn" : "bad");
   } catch (error) {
     const rawError = String(error || "Benchmark Ollama interrompu.");
-    const failedResult = {
+    const failedResult = await attachBenchmarkEvidence({
       model,
-      prompt: els.benchmarkPromptInput.value.trim(),
+      prompt: benchmarkPreparedPrompt(requestedPrompt),
       elapsed_ms: Math.max(0, Date.now() - benchmarkStartedAt),
       estimated_tokens: 0,
       estimated_tokens_per_second: 0,
@@ -17731,8 +18033,15 @@ async function runBenchmark(options = {}) {
       runtime: defaultOllamaRuntime(model),
       execution_mode: forceCpu ? "cpu" : "auto",
       machine_key: state.scan?.machine_key || "",
-      measurement_source: "unavailable"
-    };
+      measurement_source: "unavailable",
+      autopilot_active_profile: activeTuning?.key || "",
+      tuning: activeTuning?.tuning || null
+    }, {
+      prompt: requestedPrompt,
+      runtime: defaultOllamaRuntime(model),
+      force_cpu: forceCpu
+    });
+    invalidateCapabilityPassport();
     state.benchmark = failedResult;
     const message = friendlyBenchmarkError(failedResult);
     renderBenchmark(failedResult);
@@ -18848,7 +19157,8 @@ async function syncBenchmarkValue(benchmark, button = els.syncBenchmarkBtn) {
     const payload = invoke
       ? await invoke("sync_benchmark_with_token", {
           scan: state.scan,
-          benchmark
+          benchmark,
+          proof: benchmarkProofSyncEnvelope(benchmark)
         })
       : { ok: true, benchmark: { id: 1 }, machine: { id: lastSyncedMachineId || 1 } };
     lastSyncedMachineId = Number(payload.machine?.id || lastSyncedMachineId || 0) || null;
@@ -18856,8 +19166,10 @@ async function syncBenchmarkValue(benchmark, button = els.syncBenchmarkBtn) {
     readinessProof.savedAccount = Boolean(lastSyncedMachineId);
     setStatus(`Benchmark synchronisé #${payload.benchmark?.id || ""}`, "ok");
     await refreshBenchmarkCommonsStatus(true);
+    return true;
   } catch (error) {
     setStatus(String(error), "bad");
+    return false;
   } finally {
     await refreshAuthState();
   }
@@ -19046,6 +19358,10 @@ function benchmarkHistoryEntry(result) {
     autopilot_active_profile: result.autopilot_active_profile || "",
     tuning: result.tuning || null,
     benchmark_protocol: result.benchmark_protocol || "",
+    prompt_sha256: result.prompt_sha256 || "",
+    benchmark_protocol_v2: result.benchmark_protocol_v2 || null,
+    bottleneck_explainer: result.bottleneck_explainer || null,
+    proof_card_v1: result.proof_card_v1 || null,
     arena_objective: result.arena_objective || null,
     arena_preflight_schema: result.arena_preflight_schema || "",
     arena_runtime: result.arena_runtime || "",
@@ -19143,6 +19459,8 @@ function benchmarkCommonsEligibleBenchmark() {
     && item.timed_out !== true
     && String(item.measurement_source || "") === "ollama_api"
     && String(item.prompt || "") === BENCHMARK_COMMONS_STANDARD_PROMPT
+    && item.benchmark_protocol_v2?.schema === BENCHMARK_PROOF_ENGINE.BENCHMARK_PROTOCOL_SCHEMA
+    && item.benchmark_protocol_v2?.eligibility?.standard_comparison === true
     && Number(item.eval_count || 0) > 0
     && Number(item.eval_duration_ms || 0) >= 200
     && Number(item.estimated_tokens_per_second || 0) > 0
@@ -19158,7 +19476,9 @@ function benchmarkCommonsBenchmarkFingerprint(benchmark) {
     String(benchmark.created_at_ms || ""),
     String(benchmark.estimated_tokens_per_second || ""),
     String(benchmark.eval_count || ""),
-    String(benchmark.eval_duration_ms || "")
+    String(benchmark.eval_duration_ms || ""),
+    String(benchmark.benchmark_protocol_v2?.binding?.prompt_sha256 || ""),
+    String(benchmark.benchmark_protocol_v2?.binding?.ollama_version || "")
   ].join("|");
 }
 
@@ -19726,6 +20046,7 @@ async function syncDesktop() {
     els.syncState.textContent = "synchronisé";
     els.syncResult.innerHTML = renderSyncResult(payload);
     els.shareReportBtn.disabled = !lastSyncedMachineId;
+    syncReadinessControls();
     setStatus("Machine synchronisee avec le compte", "ok");
   } catch (error) {
     els.syncState.textContent = "echec";
@@ -19740,6 +20061,19 @@ async function createShareReport() {
   if (!lastSyncedMachineId) {
     setStatus("Synchronise le PC avant de creer le rapport", "bad");
     return;
+  }
+  const benchmark = state.benchmark;
+  const protocol = benchmarkProtocolV2(benchmark);
+  if (
+    benchmark?.success
+    && protocol?.eligibility?.local_measured_proof
+    && lastSyncedBenchmarkFingerprint !== benchmarkCommonsBenchmarkFingerprint(benchmark)
+  ) {
+    const synced = await syncBenchmarkValue(benchmark, els.shareReportBtn);
+    if (!synced) {
+      setStatus("Partage suspendu : la mesure locale n'a pas pu être synchronisée", "bad");
+      return;
+    }
   }
   els.shareReportBtn.disabled = true;
   setStatus("Creation du rapport partageable...");
@@ -19758,11 +20092,43 @@ async function createShareReport() {
       await invoke("open_external_url", { url }).catch(() => {});
     }
     await navigator.clipboard?.writeText(url).catch(() => {});
+    syncReadinessControls();
     setStatus("Rapport partageable créé et URL copiée", "ok");
   } catch (error) {
     setStatus(String(error), "bad");
   } finally {
     els.shareReportBtn.disabled = !lastSyncedMachineId;
+  }
+}
+
+async function revokeShareReport() {
+  if (!lastSyncedMachineId) {
+    setStatus("Synchronise le PC avant de révoquer ses liens", "bad");
+    return;
+  }
+  const ok = window.confirm(
+    "Révoquer tous les liens publics actifs de cette machine ? Le benchmark et la machine seront conservés."
+  );
+  if (!ok) return;
+  els.revokeShareReportBtn.disabled = true;
+  setStatus("Révocation du rapport partageable...");
+  try {
+    const payload = invoke
+      ? await invoke("revoke_machine_share_with_token", { machineId: lastSyncedMachineId })
+      : { ok: true, revoked_links: 1 };
+    if (!payload?.ok) throw new Error(payload?.error || "revocation_impossible");
+    lastShareReportUrl = "";
+    readinessProof.shared = false;
+    els.syncResult.innerHTML = `
+      <strong>Lien public révoqué</strong>
+      <span>${escapeHtml(`${Number(payload.revoked_links || 0)} lien(s) désactivé(s). La machine et ses mesures sont conservées.`)}</span>
+    `;
+    renderReadinessPanel();
+    setStatus("Lien public révoqué", "ok");
+  } catch (error) {
+    setStatus(String(error), "bad");
+  } finally {
+    syncReadinessControls();
   }
 }
 
@@ -20678,11 +21044,12 @@ function demoMarkdown() {
 }
 
 function demoBenchmark(model) {
-  return {
+  const result = {
     model,
     machine_key: state.scan?.machine_key || "demo-local",
     runtime: "native",
-    prompt: els.benchmarkPromptInput.value,
+    prompt: BENCHMARK_PROOF_ENGINE.STANDARD_PROMPT,
+    prompt_sha256: "785069663c8549aa54592ee3ecf3d11abac6a37b82080658d3ef6a5528f973ef",
     elapsed_ms: 1200,
     output_chars: 180,
     estimated_tokens: 45,
@@ -20707,6 +21074,41 @@ function demoBenchmark(model) {
     runtime_evidence_source: "ollama_api_ps",
     created_at_ms: Date.now()
   };
+  result.benchmark_protocol = BENCHMARK_PROOF_ENGINE.BENCHMARK_PROTOCOL_SCHEMA;
+  result.benchmark_protocol_v2 = BENCHMARK_PROOF_ENGINE.buildBenchmarkProtocol({
+    benchmark: result,
+    prompt_sha256: result.prompt_sha256,
+    runtime: "native",
+    ollama_version: "0.31.1-demo",
+    release: {
+      app_version: "0.1.2",
+      build_id: "browser-demo",
+      source_commit: "demo"
+    }
+  });
+  result.bottleneck_explainer = BENCHMARK_PROOF_ENGINE.explainBottleneck({
+    benchmark: result,
+    scan: state.scan || {
+      cpu_name: "Ryzen 9",
+      gpu_name: "NVIDIA GeForce RTX 3090",
+      ram_gb: 64,
+      vram_gb: 24,
+      raw_scan: {}
+    }
+  });
+  result.proof_card_v1 = BENCHMARK_PROOF_ENGINE.buildProofCard({
+    protocol: result.benchmark_protocol_v2,
+    benchmark: result,
+    scan: state.scan || {
+      cpu_name: "Ryzen 9",
+      gpu_name: "NVIDIA GeForce RTX 3090",
+      ram_gb: 64,
+      vram_gb: 24,
+      os_name: "Demo"
+    },
+    bottleneck: result.bottleneck_explainer
+  });
+  return result;
 }
 
 function demoChat(model, prompt) {
@@ -20768,6 +21170,11 @@ function installTestHarness() {
     recommendationDecision,
     recommendationEngineCandidates,
     demoRecommendationOutput,
+    benchmarkProtocolV2,
+    bottleneckForBenchmark,
+    proofCardDraft,
+    finalizedProofCard,
+    proofCardMarkdown,
     arenaObjectiveProfileScore,
     doctorRuntimeEvidence,
     gpuProbeIsUnknown,
@@ -20842,6 +21249,59 @@ function installTestHarness() {
       setAnalysisError("");
       setWorkspaceTab("overview", { focusContent: false });
       setWorkspaceSection("overview", ".readiness-panel", { focusContent: false });
+    },
+    async applyBenchmarkProofState() {
+      this.applyDemoState();
+      const report = readinessReport();
+      const card = await finalizedProofCard(report.benchmark);
+      const privacy = BENCHMARK_PROOF_ENGINE.proofCardPrivacyAudit(card, [
+        state.scan?.machine_key || "",
+        state.scan?.name || "",
+        report.benchmark?.prompt || "",
+        report.benchmark?.output_preview || ""
+      ]);
+      const passport = capabilityPassportDocument();
+      renderReadinessPanel();
+      return {
+        protocol: report.benchmark.benchmark_protocol_v2,
+        bottleneck: report.bottleneck_explainer,
+        proofCard: card,
+        privacy,
+        passport,
+        bridgePayload: {
+          benchmark_proofs: passport.benchmark_proofs,
+          bottleneck_explainer: report.bottleneck_explainer,
+          proof_card: report.proof_card
+        },
+        markdown: readinessMarkdown(report),
+        memory: cockpitMemoryMarkdown(),
+        panel: els.readinessBox?.textContent || ""
+      };
+    },
+    async applyProofShareFlow() {
+      this.applyDemoState();
+      lastSyncedMachineId = 1;
+      lastSyncedBenchmarkFingerprint = "";
+      lastShareReportUrl = "";
+      readinessProof.savedAccount = true;
+      readinessProof.shared = false;
+      await createShareReport();
+      return {
+        machine_id: lastSyncedMachineId,
+        benchmark_synced: Boolean(lastSyncedBenchmarkFingerprint),
+        share_url: lastShareReportUrl,
+        shared: readinessProof.shared,
+        revoke_enabled: !Boolean(els.revokeShareReportBtn?.disabled)
+      };
+    },
+    async revokeProofShareFlow() {
+      await revokeShareReport();
+      return {
+        share_url: lastShareReportUrl,
+        shared: readinessProof.shared,
+        revoke_enabled: !Boolean(els.revokeShareReportBtn?.disabled),
+        status: els.statusText?.textContent || ""
+      };
     },
     async applyInstallSafetyPreflightState() {
       this.applyDemoState();
@@ -23615,6 +24075,7 @@ els.openPairBtn.addEventListener("click", openPairingPage);
 els.claimBtn.addEventListener("click", claimPairing);
 els.syncBtn.addEventListener("click", syncDesktop);
 els.shareReportBtn.addEventListener("click", createShareReport);
+els.revokeShareReportBtn?.addEventListener("click", revokeShareReport);
 els.refreshUpdatesBtn.addEventListener("click", refreshDesktopUpdates);
 els.disconnectBtn.addEventListener("click", disconnectDesktop);
 els.benchmarkBtn.addEventListener("click", runBenchmark);
@@ -23657,6 +24118,8 @@ els.downloadDigitalTwinMarkdownBtn?.addEventListener("click", downloadUpgradeDig
 els.pdfDigitalTwinBtn?.addEventListener("click", printPremiumReport);
 els.copyReadinessSummaryBtn.addEventListener("click", copyReadinessSummary);
 els.copyReadinessBtn.addEventListener("click", copyReadinessReport);
+els.copyProofCardBtn?.addEventListener("click", copyProofCard);
+els.downloadProofCardBtn?.addEventListener("click", downloadProofCard);
 els.saveReadinessMemoryBtn.addEventListener("click", saveReadinessToMemory);
 els.saveReadinessAccountBtn.addEventListener("click", saveReadinessToAccount);
 els.shareReadinessBtn.addEventListener("click", shareReadinessReport);

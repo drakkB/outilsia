@@ -14,7 +14,7 @@ const contracts = {
     "Install Safety Preflight v1 · candidat",
     "avant le premier octet",
     "Windows, WSL ou Linux",
-    "Instantané de capacités IA 1.4.0",
+    "Instantané de capacités IA 1.5.0",
     "ne compte pas comme preuve terrain physique"
   ],
   download: [

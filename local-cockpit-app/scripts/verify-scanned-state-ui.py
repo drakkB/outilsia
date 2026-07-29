@@ -227,7 +227,7 @@ def check_scanned_view(browser, width: int, height: int, label: str):
     assert_text(page, ".quick-decision-strip", "MODÈLE CONSEILLÉ", f"{label} recommended model label")
     assert_text(page, "#quickModelDetail", "benchmarké", f"{label} quick model")
     assert_text(page, "#quickProofText", "qwen3:0.6b", f"{label} quick proof")
-    assert_text(page, "#quickUpgradeText", "Aucun achat urgent", f"{label} quick upgrade")
+    assert_text(page, "#quickUpgradeText", "Aucun achat prioritaire", f"{label} quick upgrade")
     assert_no_text(page, "#readinessBox", "Gros LLM 24 Go", f"{label} stale upgrade")
 
     page.locator("#workspaceSectionSelect").select_option(".readiness-panel")

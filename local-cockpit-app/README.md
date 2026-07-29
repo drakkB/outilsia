@@ -110,7 +110,7 @@ npm run verify:private-workload-packs
 npm run verify:private-workload-seo
 ```
 
-La source canonique est `server-work/static/data/private-workload-packs.json`. Le fichier `src/private-workload-packs.js` est généré par `npm run sync:private-workload-packs`. Une campagne compare une seule tâche sur deux ou trois modèles Ollama déjà installés, avec 60 secondes maximum par modèle et zéro téléchargement. Seuls scores, checks, métriques et SHA-256 sont persistés ; les consignes personnalisées et réponses brutes sont exclues du stockage, du rapport, du PDF, de MemoryForge et de l'instantané de capacités IA 1.4.0. Son SHA-256 prouve uniquement la cohérence du JSON : aucune signature Rust/OS, attestation matérielle, provenance ou identité n'est revendiquée.
+La source canonique est `server-work/static/data/private-workload-packs.json`. Le fichier `src/private-workload-packs.js` est généré par `npm run sync:private-workload-packs`. Une campagne compare une seule tâche sur deux ou trois modèles Ollama déjà installés, avec 60 secondes maximum par modèle et zéro téléchargement. Seuls scores, checks, métriques et SHA-256 sont persistés ; les consignes personnalisées et réponses brutes sont exclues du stockage, du rapport, du PDF, de MemoryForge et de l'instantané de capacités IA 1.5.0. Son SHA-256 prouve uniquement la cohérence du JSON : aucune signature Rust/OS, attestation matérielle, provenance ou identité n'est revendiquée.
 
 ## Local MCP v0.1 et Capability Bridge
 

@@ -32,7 +32,7 @@ def main():
 
     assert passport["schema"] == "outilsia.ai_capability_passport.v1", passport["schema"]
     assert passport["document_kind"] == "capability_snapshot", passport["document_kind"]
-    assert passport["passport_version"] == "1.4.0", passport["passport_version"]
+    assert passport["passport_version"] == "1.5.0", passport["passport_version"]
     assert result["verified"] is True, result
     assert result["tamperedVerified"] is False, result
     assert result["staleSummary"] is None, result["staleSummary"]
@@ -63,6 +63,9 @@ def main():
     assert passport["capabilities"]["local_capability_bridge_v1"] is True
     assert passport["capabilities"]["local_mcp_read_only_v0_1"] is True
     assert passport["capabilities"]["install_safety_preflight_v1"] is True
+    assert passport["capabilities"]["benchmark_protocol_v2"] is True
+    assert passport["capabilities"]["bottleneck_explainer_v1"] is True
+    assert passport["capabilities"]["proof_card_v1"] is True
     assert passport["interoperability"]["local_capability_bridge"]["enabled_by_default"] is False
     assert passport["interoperability"]["local_capability_bridge"]["bind"] == "127.0.0.1"
     assert passport["interoperability"]["local_capability_bridge"]["read_only"] is True
@@ -89,6 +92,8 @@ def main():
     assert passport["privacy"]["excludes_private_workload_prompts"] is True
     assert passport["privacy"]["excludes_private_workload_outputs"] is True
     assert passport["privacy"]["excludes_ollama_storage_path"] is True
+    assert passport["privacy"]["proof_card_excludes_machine_key"] is True
+    assert passport["privacy"]["proof_card_excludes_raw_prompt_and_output"] is True
     assert "Pourquoi la VRAM" not in serialized
     assert "La VRAM stocke les poids" not in serialized
     assert "desktop_token" not in serialized

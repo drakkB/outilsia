@@ -140,7 +140,7 @@ def main():
     assert token_copy_enabled is True
 
     assert passport["document_kind"] == "capability_snapshot"
-    assert passport["passport_version"] == "1.4.0"
+    assert passport["passport_version"] == "1.5.0"
     assert passport["assurance"]["level"] == "self_consistency_only"
     assert passport["assurance"]["rust_rederived"] is False
     assert passport["assurance"]["os_key_attested"] is False

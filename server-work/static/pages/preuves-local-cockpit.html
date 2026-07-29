@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Preuves OutilsIA Local Cockpit : benchmarks IA locale datés</title>
-  <meta name="description" content="Consultez les preuves datées d'OutilsIA Local Cockpit : machine, modèle, runtime, tokens/s, latence, capture brute, SHA-256 et limites de chaque benchmark IA locale.">
+  <title>Preuves OutilsIA Local Cockpit : benchmarks IA locale datés et protocolés</title>
+  <meta name="description" content="Consultez les preuves datées d'OutilsIA Local Cockpit : machine, modèle, runtime, tokens/s, protocole, placement CPU/GPU, goulot expliqué, SHA-256 et limites.">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="https://outilsia.fr/preuves-local-cockpit">
   <meta property="og:type" content="website">
@@ -364,6 +364,33 @@
             <p>Un benchmark réellement exécuté avec une référence de modèle et un runtime identifiés.</p>
           </article>
         </div>
+      </div>
+    </section>
+
+    <section class="band band--alt">
+      <div class="wrap">
+        <p class="eyebrow">Prochaine couche de preuve · candidat source</p>
+        <h2>Protocole lié, goulot expliqué, carte partageable</h2>
+        <p class="section-intro">Le candidat source postérieur au build public actuel transforme une mesure brute en objet portable sans augmenter artificiellement son niveau d'assurance.</p>
+        <div class="levels">
+          <article class="level">
+            <h3>Benchmark Protocol v2</h3>
+            <p>Lie modèle, SHA-256 du prompt, runtime, version Ollama, mode CPU/GPU et réglages. Toute différence suspend la comparaison.</p>
+          </article>
+          <article class="level">
+            <h3>Bottleneck Explainer v1</h3>
+            <p>Sépare les faits mesurés, les hypothèses et les inconnus avant de recommander VRAM, stockage, pilote ou refroidissement.</p>
+          </article>
+          <article class="level">
+            <h3>Proof Card v1</h3>
+            <p>Expose modèle, tokens/s, placement et décision d'achat, mais jamais prompt, sortie brute, clé machine, compte, IP ou chemin personnel.</p>
+          </article>
+          <article class="level">
+            <h3>Assurance honnête</h3>
+            <p>La carte dit « mesuré localement, identité non attestée ». Son empreinte prouve la cohérence du JSON, pas la provenance matérielle.</p>
+          </article>
+        </div>
+        <p class="caption">Ce palier reste candidat tant qu'un nouveau binaire Windows/Linux n'est pas construit et recetté. Un lien public sera volontaire et révocable ; les statistiques communautaires resteront soumises aux contrôles serveur et à un seuil de cohorte.</p>
       </div>
     </section>
 
